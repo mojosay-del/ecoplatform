@@ -61,6 +61,7 @@ source: —
 - [price-indices/README.md](./05-content/price-indices/README.md) — индексы цен
 - [knowledge-base/README.md](./05-content/knowledge-base/README.md) — база знаний
 - [education/README.md](./05-content/education/README.md) — обучающий раздел
+- [references/README.md](./05-content/references/README.md) — справочники
 
 ### 06-tools/ — прикладные инструменты
 - [ratings-reviews.md](./06-tools/ratings-reviews.md) — рейтинги и отзывы
@@ -79,6 +80,12 @@ source: —
 - [maps-provider.md](./08-architecture/maps-provider.md) — картографический провайдер
 - [geo-logic.md](./08-architecture/geo-logic.md) — геологика
 - [data-model.md](./08-architecture/data-model.md) — модель данных
+
+### 09-forum/ — форум
+- [README.md](./09-forum/README.md) — общая спецификация
+
+### 10-solutions-shop/ — магазин готовых решений
+- [README.md](./10-solutions-shop/README.md) — общая спецификация
 
 ### Корневые документы
 - [GLOSSARY.md](./GLOSSARY.md) — глоссарий терминов
