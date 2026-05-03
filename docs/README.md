@@ -60,7 +60,7 @@ source: —
 - [news/README.md](./05-content/news/README.md) — новости
 - [price-indices/README.md](./05-content/price-indices/README.md) — индексы цен
 - [knowledge-base/README.md](./05-content/knowledge-base/README.md) — база знаний
-- [education/README.md](./05-content/education/README.md) — обучающий раздел
+- [education/](./05-content/education/) — обучающий раздел: [overview.md](./05-content/education/overview.md), [lessons.md](./05-content/education/lessons.md), [progress.md](./05-content/education/progress.md), [cabinet-content-manager.md](./05-content/education/cabinet-content-manager.md), [public-ui.md](./05-content/education/public-ui.md), [limits.md](./05-content/education/limits.md), [other-integrations.md](./05-content/education/other-integrations.md)
 - [references/README.md](./05-content/references/README.md) — справочники
 
 ### 06-tools/ — прикладные инструменты
