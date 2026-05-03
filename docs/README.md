@@ -58,7 +58,7 @@ source: —
 
 ### 05-content/ — контентные модули
 - [news/](./05-content/news/) — новости: [overview.md](./05-content/news/overview.md), [posts.md](./05-content/news/posts.md), [comments.md](./05-content/news/comments.md), [cabinet-content-manager.md](./05-content/news/cabinet-content-manager.md), [public-ui.md](./05-content/news/public-ui.md), [limits.md](./05-content/news/limits.md), [other-integrations.md](./05-content/news/other-integrations.md)
-- [price-indices/README.md](./05-content/price-indices/README.md) — индексы цен
+- [price-indices/](./05-content/price-indices/) — индексы цен: [overview.md](./05-content/price-indices/overview.md), [indices.md](./05-content/price-indices/indices.md), [cabinet-content-manager.md](./05-content/price-indices/cabinet-content-manager.md), [public-ui.md](./05-content/price-indices/public-ui.md), [limits.md](./05-content/price-indices/limits.md), [other-integrations.md](./05-content/price-indices/other-integrations.md)
 - [knowledge-base/README.md](./05-content/knowledge-base/README.md) — база знаний
 - [education/](./05-content/education/) — обучающий раздел: [overview.md](./05-content/education/overview.md), [lessons.md](./05-content/education/lessons.md), [progress.md](./05-content/education/progress.md), [cabinet-content-manager.md](./05-content/education/cabinet-content-manager.md), [public-ui.md](./05-content/education/public-ui.md), [limits.md](./05-content/education/limits.md), [other-integrations.md](./05-content/education/other-integrations.md)
 - [references/README.md](./05-content/references/README.md) — справочники
