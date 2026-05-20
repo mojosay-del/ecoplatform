@@ -587,6 +587,137 @@ describe("Moderation", () => {
   });
 });
 
+describe("Admin users panel", () => {
+  it("выдаёт список пользователей с фильтром по статусу, пагинацией и поиском (только admin)", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+    const userA = await registerCompany("0100001");
+    const userB = await registerCompany("0100002");
+
+    const forbidden = await ctx.http.get("/api/admin/users").set("Authorization", `Bearer ${moderatorToken}`);
+    expect(forbidden.status).toBe(403);
+
+    const all = await ctx.http.get("/api/admin/users?take=50").set("Authorization", `Bearer ${adminToken}`);
+    expect(all.status).toBe(200);
+    expect(all.body.total).toBeGreaterThanOrEqual(4);
+    expect(all.body.items.map((item: { id: string }) => item.id)).toEqual(
+      expect.arrayContaining([userA.userId, userB.userId]),
+    );
+
+    const search = await ctx.http
+      .get(`/api/admin/users?search=user0100002`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(search.status).toBe(200);
+    expect(search.body.items.map((item: { id: string }) => item.id)).toEqual([userB.userId]);
+
+    const byCompany = await ctx.http
+      .get(`/api/admin/users?companyId=${userA.companyId}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(byCompany.body.items.map((item: { id: string }) => item.id)).toEqual([userA.userId]);
+  });
+
+  it("карточка пользователя возвращает связанные сущности (компания, ограничения, сессии)", async () => {
+    const adminToken = await loginAdmin();
+    const target = await registerCompany("0100003");
+
+    const card = await ctx.http
+      .get(`/api/admin/users/${target.userId}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(card.status).toBe(200);
+    expect(card.body.company.id).toBe(target.companyId);
+    expect(card.body.activeRestrictions).toEqual([]);
+    expect(card.body.recentSessions.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("block/unblock переводит User.status и отзывает активные сессии", async () => {
+    const adminToken = await loginAdmin();
+    const target = await registerCompany("0100004");
+
+    const block = await ctx.http
+      .post(`/api/admin/users/${target.userId}/block`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reasonCode: "policy_violation", comment: "Нарушение правил." });
+    expect(block.status).toBe(201);
+    expect(block.body.status).toBe(UserStatus.blocked);
+
+    const activeSessions = await ctx.prisma.session.count({
+      where: { userId: target.userId, revokedAt: null },
+    });
+    expect(activeSessions).toBe(0);
+
+    const relogin = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0100004@test.local", password: "User12345" });
+    expect(relogin.status).toBe(401);
+
+    const unblock = await ctx.http
+      .post(`/api/admin/users/${target.userId}/unblock`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ comment: "Пересмотр." });
+    expect(unblock.status).toBe(201);
+    expect(unblock.body.status).toBe(UserStatus.active);
+
+    const reloginOk = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0100004@test.local", password: "User12345" });
+    expect(reloginOk.status).toBe(201);
+  });
+
+  it("admin не может заблокировать собственную учётную запись", async () => {
+    const adminToken = await loginAdmin();
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+    const res = await ctx.http
+      .post(`/api/admin/users/${me.body.id}/block`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reasonCode: "policy_violation" });
+    expect(res.status).toBe(400);
+  });
+
+  it("PATCH platform-roles добавляет роль и пишет AdminActionLog", async () => {
+    const adminToken = await loginAdmin();
+    const target = await registerCompany("0100005");
+
+    const res = await ctx.http
+      .patch(`/api/admin/users/${target.userId}/platform-roles`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ roles: ["moderator"], isActive: true });
+    expect(res.status).toBe(200);
+    expect(res.body.platformStaff.roles).toEqual(["moderator"]);
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: target.userId, action: "admin.user.platform_roles" },
+    });
+    expect(log).toBeTruthy();
+  });
+
+  it("нельзя снять роль admin у последнего администратора", async () => {
+    const adminToken = await loginAdmin();
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+
+    const res = await ctx.http
+      .patch(`/api/admin/users/${me.body.id}/platform-roles`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ roles: ["moderator"] });
+    expect(res.status).toBe(400);
+  });
+
+  it("admin не может снять роль admin сам с себя при наличии других админов", async () => {
+    const adminToken = await loginAdmin();
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+    const second = await registerCompany("0100006");
+    await ctx.http
+      .patch(`/api/admin/users/${second.userId}/platform-roles`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ roles: ["admin"], isActive: true });
+
+    const res = await ctx.http
+      .patch(`/api/admin/users/${me.body.id}/platform-roles`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ roles: ["moderator"] });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("Admin sanctions", () => {
   async function escalatedCaseAgainstAuthor(
     adminToken: string,
