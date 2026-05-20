@@ -1,38 +1,69 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
-import { apiFetch } from "../lib/api";
+import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { demoIndices, demoKnowledge, demoModules, demoNews } from "../lib/demo-data";
 
-function useApiData<T>(path: string, fallback: T) {
+type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
+const emptyTickets: any[] = [];
+
+function useApiData<T>(path: string, initial: T) {
   const { token } = useAuth();
-  const [data, setData] = useState<T>(fallback);
-  const [isFallback, setIsFallback] = useState(true);
+  const [data, setData] = useState<T>(initial);
+  const [state, setState] = useState<ApiState>("unauthenticated");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
+      setData(initial);
+      setState("unauthenticated");
+      setErrorMessage(null);
       return;
     }
+
+    setState("loading");
+    setErrorMessage(null);
     apiFetch<T>(path, { token })
       .then((result) => {
         setData(result);
-        setIsFallback(false);
+        setState("ready");
       })
-      .catch(() => setIsFallback(true));
-  }, [path, token]);
+      .catch((error) => {
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+          setState("forbidden");
+          return;
+        }
 
-  return { data, isFallback };
+        setData(initial);
+        setState("error");
+        setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить данные");
+      });
+  }, [initial, path, token]);
+
+  return { data, state, errorMessage };
 }
 
 export function NewsView() {
-  const { data, isFallback } = useApiData("/news", demoNews);
+  const { data, state, errorMessage } = useApiData<any[]>("/news", []);
+
+  if (state === "unauthenticated") {
+    return <AuthRequired title="Новости" />;
+  }
+
+  if (state === "forbidden") {
+    return <AccessClosed title="Новости" />;
+  }
+
+  if (state === "error") {
+    return <ErrorState title="Новости" message={errorMessage} />;
+  }
 
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="Последние обновления" subtitle="Новости рынка вторсырья и изменения в работе участников." fallback={isFallback} />
+        <PageHeader title="Последние обновления" subtitle="Новости рынка вторсырья и изменения в работе участников." />
         <div className="card-grid">
           {data.map((post: any) => (
             <article className="card" key={post.id}>
@@ -49,7 +80,7 @@ export function NewsView() {
 }
 
 export function IndicesView() {
-  const { data, isFallback } = useApiData("/indices", demoIndices);
+  const { data, state, errorMessage } = useApiData<any[]>("/indices", []);
   const [activeSlug, setActiveSlug] = useState(data[0]?.slug);
   const active = data.find((category: any) => category.slug === activeSlug) ?? data[0];
 
@@ -57,10 +88,22 @@ export function IndicesView() {
     setActiveSlug(data[0]?.slug);
   }, [data]);
 
+  if (state === "unauthenticated") {
+    return <AuthRequired title="Индексы цен" />;
+  }
+
+  if (state === "forbidden") {
+    return <AccessClosed title="Индексы цен" />;
+  }
+
+  if (state === "error") {
+    return <ErrorState title="Индексы цен" message={errorMessage} />;
+  }
+
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="Индексы цен на вторсырьё" subtitle="Актуальные ценовые индексы по основным категориям сырья." fallback={isFallback} />
+        <PageHeader title="Индексы цен на вторсырьё" subtitle="Актуальные ценовые индексы по основным категориям сырья." />
         <div className="tabs">
           {data.map((category: any) => (
             <button className={`tab ${category.slug === active?.slug ? "active" : ""}`} onClick={() => setActiveSlug(category.slug)} key={category.id}>
@@ -91,12 +134,24 @@ export function IndicesView() {
 }
 
 export function EducationView() {
-  const { data, isFallback } = useApiData("/education/modules", demoModules);
+  const { data, state, errorMessage } = useApiData<any[]>("/education/modules", []);
+
+  if (state === "unauthenticated") {
+    return <AuthRequired title="Обучение" />;
+  }
+
+  if (state === "forbidden") {
+    return <AccessClosed title="Обучение" />;
+  }
+
+  if (state === "error") {
+    return <ErrorState title="Обучение" message={errorMessage} />;
+  }
 
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="Обучение" subtitle="MVP-модули: закупка сырья и склад." fallback={isFallback} />
+        <PageHeader title="Обучение" subtitle="MVP-модули: закупка сырья и склад." />
         <div className="card-grid">
           {data.map((module: any) => (
             <article className="card" key={module.id}>
@@ -113,7 +168,7 @@ export function EducationView() {
 }
 
 export function KnowledgeBaseView() {
-  const { data, isFallback } = useApiData("/knowledge-base", demoKnowledge);
+  const { data, state, errorMessage } = useApiData<any[]>("/knowledge-base", []);
   const [selectedId, setSelectedId] = useState(data[0]?.id);
   const selected = useMemo(() => data.find((article: any) => article.id === selectedId) ?? data[0], [data, selectedId]);
 
@@ -121,10 +176,22 @@ export function KnowledgeBaseView() {
     setSelectedId(data[0]?.id);
   }, [data]);
 
+  if (state === "unauthenticated") {
+    return <AuthRequired title="База знаний" />;
+  }
+
+  if (state === "forbidden") {
+    return <AccessClosed title="База знаний" />;
+  }
+
+  if (state === "error") {
+    return <ErrorState title="База знаний" message={errorMessage} />;
+  }
+
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="База знаний" subtitle="Навигация по сырью и карточки номенклатуры." fallback={isFallback} />
+        <PageHeader title="База знаний" subtitle="Навигация по сырью и карточки номенклатуры." />
         <div className="knowledge-layout">
           <aside className="card">
             <h3>Навигация по сырью</h3>
@@ -146,7 +213,37 @@ export function KnowledgeBaseView() {
 }
 
 export function AccountView() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const { data: billing } = useApiData<any | null>("/billing/status", null);
+  const { data: tickets } = useApiData<any[]>("/support/tickets", emptyTickets);
+  const [supportResult, setSupportResult] = useState("");
+
+  async function onSupportSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!token) {
+      setSupportResult("Сначала войдите в аккаунт.");
+      return;
+    }
+
+    const form = new FormData(event.currentTarget);
+
+    try {
+      await apiFetch("/support/tickets", {
+        method: "POST",
+        token,
+        body: {
+          category: String(form.get("category")),
+          subject: String(form.get("subject")),
+          text: String(form.get("text")),
+        },
+      });
+      event.currentTarget.reset();
+      setSupportResult("Обращение создано. Оно появится в списке после обновления данных.");
+    } catch (error) {
+      setSupportResult(error instanceof Error ? error.message : "Не удалось создать обращение.");
+    }
+  }
 
   return (
     <AppShell>
@@ -161,12 +258,43 @@ export function AccountView() {
           </article>
           <article className="card">
             <h2>Компания</h2>
-            <p>{user?.company?.organizationName ?? "Демо-данные появятся после входа"}</p>
-            <p className="status-pill">{user?.company?.status ?? "guest"}</p>
+            <p>{billing?.organizationName ?? user?.company?.organizationName ?? "Данные появятся после входа"}</p>
+            <p className="status-pill">{billing?.status ?? user?.company?.status ?? "guest"}</p>
           </article>
           <article className="card">
             <h2>Подписка</h2>
-            <p>Первый dev-этап использует ручную активацию через админ-панель.</p>
+            <p>Тариф: {billing?.subscriptionPlan ?? "не активирован"}</p>
+            <p>Demo до: {billing?.demoEndsAt ? new Date(billing.demoEndsAt).toLocaleString("ru-RU") : "нет активного demo"}</p>
+            <p>Подписка до: {billing?.subscriptionEndsAt ? new Date(billing.subscriptionEndsAt).toLocaleString("ru-RU") : "не задана"}</p>
+          </article>
+        </div>
+        <div className="account-layout">
+          <form className="card form" onSubmit={onSupportSubmit}>
+            <h2>Новое обращение</h2>
+            <select className="select" name="category" defaultValue="technical">
+              <option value="billing">Биллинг</option>
+              <option value="moderation_review">Модерация</option>
+              <option value="company_management">Компания</option>
+              <option value="technical">Технический вопрос</option>
+              <option value="data_deletion">Удаление данных</option>
+              <option value="other">Другое</option>
+            </select>
+            <input className="input" name="subject" placeholder="Тема" />
+            <textarea className="textarea" name="text" placeholder="Опишите вопрос" />
+            <button className="button" type="submit">Отправить</button>
+            {supportResult ? <p>{supportResult}</p> : null}
+          </form>
+          <article className="card">
+            <h2>Мои обращения</h2>
+            <div className="stack-list">
+              {tickets.length === 0 ? <p className="page-subtitle">Пока нет обращений.</p> : null}
+              {tickets.map((ticket: any) => (
+                <div className="list-row" key={ticket.id}>
+                  <strong>{ticket.subject}</strong>
+                  <span className="status-pill">{ticket.status}</span>
+                </div>
+              ))}
+            </div>
           </article>
         </div>
       </section>
@@ -174,13 +302,59 @@ export function AccountView() {
   );
 }
 
-function PageHeader({ title, subtitle, fallback }: { title: string; subtitle: string; fallback?: boolean }) {
+function AuthRequired({ title }: { title: string }) {
+  return (
+    <AppShell>
+      <section className="page">
+        <header className="page-header">
+          <h1 className="page-title">{title}</h1>
+          <p className="page-subtitle">Раздел доступен после входа и активного demo или подписки.</p>
+        </header>
+        <div className="auth-actions">
+          <Link className="button" href="/login">Войти</Link>
+          <Link className="button secondary" href="/register">Создать demo</Link>
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+function AccessClosed({ title }: { title: string }) {
+  return (
+    <AppShell>
+      <section className="page">
+        <header className="page-header">
+          <h1 className="page-title">{title}</h1>
+          <p className="page-subtitle">Demo истёк или подписка не активна. Личный кабинет, биллинг и поддержка остаются доступны.</p>
+        </header>
+        <div className="auth-actions">
+          <Link className="button" href="/account">Открыть кабинет</Link>
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <header className="page-header">
       <h1 className="page-title">{title}</h1>
       <p className="page-subtitle">{subtitle}</p>
-      {fallback ? <p className="status-pill">Показаны demo-данные, API пока недоступен или вход не выполнен</p> : null}
     </header>
+  );
+}
+
+function ErrorState({ title, message }: { title: string; message: string | null }) {
+  return (
+    <AppShell>
+      <section className="page">
+        <header className="page-header">
+          <h1 className="page-title">{title}</h1>
+          <p className="page-subtitle">Не удалось загрузить данные. Попробуйте обновить страницу позже.</p>
+        </header>
+        {message ? <p className="status-pill">{message}</p> : null}
+      </section>
+    </AppShell>
   );
 }
 
@@ -192,7 +366,7 @@ function ContentBlocks({ blocks }: { blocks: any[] }) {
         if (block.type === "paragraph") return <p key={index}>{block.payload.markdown}</p>;
         if (block.type === "checklist") {
           return (
-            <div className="card" key={index} style={{ boxShadow: "none", borderColor: block.payload.style === "warning" ? "var(--yellow)" : "var(--green)" }}>
+            <div className="checklist-block" key={index} style={{ borderColor: block.payload.style === "warning" ? "var(--yellow)" : "var(--green)" }}>
               <h3>{block.payload.title}</h3>
               <ul>{block.payload.items.map((item: string) => <li key={item}>{item}</li>)}</ul>
             </div>
@@ -206,6 +380,11 @@ function ContentBlocks({ blocks }: { blocks: any[] }) {
 
 function MiniChart({ points }: { points: Array<{ price: number }> }) {
   const values = points.map((point) => point.price);
+
+  if (values.length === 0) {
+    return <div className="empty-chart">Нет данных для графика</div>;
+  }
+
   const min = Math.min(...values);
   const max = Math.max(...values);
   const path = values
