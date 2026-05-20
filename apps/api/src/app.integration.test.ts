@@ -718,6 +718,80 @@ describe("Admin users panel", () => {
   });
 });
 
+describe("Admin companies panel", () => {
+  it("выдаёт список компаний с фильтрами и поиском (только admin)", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+    const a = await registerCompany("0200001");
+    const b = await registerCompany("0200002");
+
+    const forbidden = await ctx.http.get("/api/admin/companies").set("Authorization", `Bearer ${moderatorToken}`);
+    expect(forbidden.status).toBe(403);
+
+    const list = await ctx.http.get("/api/admin/companies?take=50").set("Authorization", `Bearer ${adminToken}`);
+    expect(list.status).toBe(200);
+    expect(list.body.items.map((item: { id: string }) => item.id)).toEqual(
+      expect.arrayContaining([a.companyId, b.companyId]),
+    );
+
+    const search = await ctx.http
+      .get("/api/admin/companies?search=ООО%20Тест%200200002")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(search.body.items.map((item: { id: string }) => item.id)).toEqual([b.companyId]);
+
+    const demoOnly = await ctx.http
+      .get("/api/admin/companies?status=demo")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(demoOnly.body.items.every((item: { status: string }) => item.status === "demo")).toBe(true);
+  });
+
+  it("карточка компании отдаёт пользователей, подписки и тикеты", async () => {
+    const adminToken = await loginAdmin();
+    const target = await registerCompany("0200003");
+
+    const card = await ctx.http
+      .get(`/api/admin/companies/${target.companyId}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(card.status).toBe(200);
+    expect(card.body.users.map((u: { id: string }) => u.id)).toEqual([target.userId]);
+    expect(card.body.subscriptions).toEqual([]);
+    expect(card.body.supportTickets).toEqual([]);
+  });
+
+  it("смена статуса компании на blocked отзывает сессии пользователей", async () => {
+    const adminToken = await loginAdmin();
+    const target = await registerCompany("0200004");
+
+    const res = await ctx.http
+      .post(`/api/admin/companies/${target.companyId}/status`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ status: "blocked", reasonCode: "policy_violation", comment: "Заблокировано админом." });
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe(CompanyStatus.blocked);
+
+    const active = await ctx.prisma.session.count({
+      where: { user: { companyId: target.companyId }, revokedAt: null },
+    });
+    expect(active).toBe(0);
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: target.companyId, action: "admin.company.status" },
+    });
+    expect(log).toBeTruthy();
+  });
+
+  it("отказывает в смене статуса на тот же самый", async () => {
+    const adminToken = await loginAdmin();
+    const target = await registerCompany("0200005");
+
+    const res = await ctx.http
+      .post(`/api/admin/companies/${target.companyId}/status`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ status: "demo", reasonCode: "manual_activation" });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("Admin sanctions", () => {
   async function escalatedCaseAgainstAuthor(
     adminToken: string,

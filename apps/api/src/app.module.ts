@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AdminCompaniesModule } from "./admin/companies/admin-companies.module";
 import { AdminUsersModule } from "./admin/users/admin-users.module";
 import { AuthModule } from "./auth/auth.module";
 import { BillingModule } from "./billing/billing.module";
@@ -13,6 +14,7 @@ import { SupportModule } from "./support/support.module";
   imports: [
     PrismaModule,
     AuthModule,
+    AdminCompaniesModule,
     AdminUsersModule,
     BillingModule,
     ContentModule,
