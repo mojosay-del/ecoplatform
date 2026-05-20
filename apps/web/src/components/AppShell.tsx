@@ -74,6 +74,8 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
       { href: "/admin/users", label: "Пользователи", icon: Users, roles: ["admin"] },
       { href: "/admin/companies", label: "Компании", icon: Boxes, roles: ["admin"] },
       { href: "/admin/staff", label: "Сотрудники", icon: Shield, roles: ["admin"] },
+      { href: "/admin/journals", label: "Журнал действий", icon: FileText, roles: ["admin"] },
+      { href: "/admin/settings", label: "Настройки", icon: Settings, roles: ["admin"] },
       { href: "/admin/support", label: "Поддержка", icon: HelpCircle, roles: ["admin"] },
     ],
   },
