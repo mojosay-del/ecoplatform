@@ -15,12 +15,27 @@ export const categoryInputSchema = z.object({
   position: z.number().int().nonnegative(),
 });
 
+export const categoryUpdateInputSchema = z.object({
+  name: z.string().min(1).optional(),
+  position: z.number().int().nonnegative().optional(),
+  isActive: z.boolean().optional(),
+});
+
 export const nomenclatureInputSchema = z.object({
   categoryId: z.string().min(1),
   code: z.string().min(1),
   name: z.string().min(1),
   unit: z.string().min(1).default("₽/т"),
   description: z.string().optional(),
+});
+
+export const nomenclatureUpdateInputSchema = z.object({
+  categoryId: z.string().min(1).optional(),
+  code: z.string().min(1).optional(),
+  name: z.string().min(1).optional(),
+  unit: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export const priceIndexInputSchema = z.object({

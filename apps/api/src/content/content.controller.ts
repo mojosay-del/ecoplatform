@@ -7,12 +7,14 @@ import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
 import {
   categoryInputSchema,
+  categoryUpdateInputSchema,
   commentInputSchema,
   knowledgeArticleInputSchema,
   knowledgeMoveInputSchema,
   learningModuleInputSchema,
   newsInputSchema,
   nomenclatureInputSchema,
+  nomenclatureUpdateInputSchema,
   priceIndexInputSchema,
   priceIndexValueInputSchema,
 } from "./content.schemas";
@@ -141,15 +143,51 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/indices/categories")
-  async createCategory(@Body() body: unknown) {
-    return this.content.createCategory(parseBody(categoryInputSchema, body));
+  async createCategory(@Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.content.createCategory(parseBody(categoryInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Patch("admin/content/indices/categories/:id")
+  async updateCategory(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.content.updateCategory(id, parseBody(categoryUpdateInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Delete("admin/content/indices/categories/:id")
+  async deleteCategory(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.deleteCategory(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/indices/nomenclature")
-  async createNomenclature(@Body() body: unknown) {
-    return this.content.createNomenclature(parseBody(nomenclatureInputSchema, body));
+  async createNomenclature(@Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.content.createNomenclature(parseBody(nomenclatureInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Patch("admin/content/indices/nomenclature/:id")
+  async updateNomenclature(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.content.updateNomenclature(id, parseBody(nomenclatureUpdateInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Delete("admin/content/indices/nomenclature/:id")
+  async deleteNomenclature(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.deleteNomenclature(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
@@ -168,9 +206,42 @@ export class ContentController {
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
+  @Delete("admin/content/indices/:id/values/:valueId")
+  async deletePriceValue(
+    @Param("id") id: string,
+    @Param("valueId") valueId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.deletePriceValue(id, valueId, user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
   @Post("admin/content/indices/:id/publish")
-  async publishPriceIndex(@Param("id") id: string) {
-    return this.content.publishPriceIndex(id);
+  async publishPriceIndex(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.content.publishPriceIndex(id, user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Post("admin/content/indices/:id/unpublish")
+  async unpublishPriceIndex(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.unpublishPriceIndex(id, user, body?.reason);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Delete("admin/content/indices/:id")
+  async deletePriceIndex(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.deletePriceIndex(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
