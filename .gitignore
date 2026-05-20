@@ -1,1 +1,10 @@
+node_modules
+.turbo
+.next
+dist
+coverage
+.env
+.env.local
 .DS_Store
+apps/api/generated
+apps/api/prisma/migrations

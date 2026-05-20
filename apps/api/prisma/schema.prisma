@@ -1,0 +1,468 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompanyStatus {
+  demo
+  active
+  past_due
+  suspended
+  blocked
+  archived
+}
+
+enum SubscriptionPlan {
+  basic
+  extended
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  suspended
+  cancelled
+  expired
+}
+
+enum PlatformRole {
+  admin
+  moderator
+  content_manager
+}
+
+enum ContentStatus {
+  draft
+  published
+}
+
+enum LearningAccessLevel {
+  basic
+  extended
+  one_time
+}
+
+enum SupportTicketStatus {
+  new
+  in_progress
+  awaiting_user
+  resolved
+  closed
+}
+
+enum SupportTicketCategory {
+  billing
+  moderation_review
+  company_management
+  technical
+  data_deletion
+  other
+}
+
+enum CommentStatus {
+  published
+  hidden_by_moderator
+  removed_by_admin
+  removed_with_news
+}
+
+enum FileAccessLevel {
+  public
+  authenticated
+  platform_private
+  conversation_private
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  phone          String          @unique
+  firstName      String
+  lastName       String
+  passwordHash   String
+  companyId      String?
+  company        Company?        @relation(fields: [companyId], references: [id])
+  platformStaff  PlatformStaff?
+  sessions       Session[]
+  newsLikes      NewsLike[]
+  comments       Comment[]
+  commentLikes   CommentLike[]
+  lessonProgress LessonProgress[]
+  supportTickets SupportTicket[] @relation("SupportTicketAuthor")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Company {
+  id                   String          @id @default(cuid())
+  organizationName     String
+  status               CompanyStatus   @default(demo)
+  demoEndsAt           DateTime?
+  subscriptionPlan     SubscriptionPlan?
+  subscriptionEndsAt   DateTime?
+  billingInn           String?
+  billingKpp           String?
+  legalAddress         String?
+  bankName             String?
+  bankBik              String?
+  bankAccount          String?
+  correspondentAccount String?
+  users                User[]
+  subscriptions        Subscription[]
+  supportTickets       SupportTicket[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  companyId String
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan      SubscriptionPlan
+  status    SubscriptionStatus @default(active)
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String
+  userAgent        String?
+  ipAddress        String?
+  rememberMe       Boolean   @default(false)
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model PlatformStaff {
+  id        String         @id @default(cuid())
+  userId    String         @unique
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roles     PlatformRole[]
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model AdminActionLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  action     String
+  entityType String
+  entityId   String
+  comment    String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+}
+
+model FileAsset {
+  id            String          @id @default(cuid())
+  originalName  String
+  mimeType      String
+  sizeBytes     Int
+  storageKey    String
+  accessLevel   FileAccessLevel @default(authenticated)
+  uploadedById  String?
+  createdAt     DateTime        @default(now())
+}
+
+model NewsPost {
+  id               String             @id @default(cuid())
+  title            String
+  lead             String
+  coverImageId     String?
+  slug             String             @unique
+  status           ContentStatus      @default(draft)
+  firstPublishedAt DateTime?
+  createdById      String
+  blocks           NewsContentBlock[]
+  tags             NewsPostTag[]
+  likes            NewsLike[]
+  comments         Comment[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+model NewsContentBlock {
+  id         String   @id @default(cuid())
+  newsPostId String
+  newsPost   NewsPost @relation(fields: [newsPostId], references: [id], onDelete: Cascade)
+  position   Int
+  type       String
+  payload    Json
+
+  @@unique([newsPostId, position])
+}
+
+model NewsTag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  slug      String        @unique
+  posts     NewsPostTag[]
+  createdAt DateTime      @default(now())
+}
+
+model NewsPostTag {
+  newsPostId String
+  newsTagId  String
+  newsPost   NewsPost @relation(fields: [newsPostId], references: [id], onDelete: Cascade)
+  newsTag    NewsTag  @relation(fields: [newsTagId], references: [id], onDelete: Cascade)
+  addedAt    DateTime @default(now())
+
+  @@id([newsPostId, newsTagId])
+}
+
+model NewsLike {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  newsPostId String
+  newsPost   NewsPost @relation(fields: [newsPostId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, newsPostId])
+}
+
+model Comment {
+  id              String              @id @default(cuid())
+  newsPostId      String
+  newsPost        NewsPost            @relation(fields: [newsPostId], references: [id], onDelete: Cascade)
+  parentCommentId String?
+  parentComment   Comment?            @relation("CommentThread", fields: [parentCommentId], references: [id])
+  replies         Comment[]           @relation("CommentThread")
+  userId          String
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text            String
+  status          CommentStatus       @default(published)
+  attachments     CommentAttachment[]
+  likes           CommentLike[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+model CommentAttachment {
+  id        String  @id @default(cuid())
+  commentId String
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  fileId    String
+  position  Int
+
+  @@unique([commentId, position])
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, commentId])
+}
+
+model NomenclatureCategory {
+  id             String         @id @default(cuid())
+  name           String         @unique
+  slug           String         @unique
+  position       Int            @unique
+  isActive       Boolean        @default(true)
+  nomenclatures  Nomenclature[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Nomenclature {
+  id          String               @id @default(cuid())
+  code        String               @unique
+  name        String
+  unit        String               @default("₽/т")
+  description String?
+  categoryId  String
+  category    NomenclatureCategory @relation(fields: [categoryId], references: [id])
+  isActive    Boolean              @default(true)
+  priceIndex  PriceIndex?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+}
+
+model PriceIndex {
+  id               String            @id @default(cuid())
+  nomenclatureId   String            @unique
+  nomenclature     Nomenclature      @relation(fields: [nomenclatureId], references: [id], onDelete: Cascade)
+  description      String?
+  status           ContentStatus     @default(draft)
+  firstPublishedAt DateTime?
+  createdById      String
+  values           PriceIndexValue[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model PriceIndexValue {
+  id           String     @id @default(cuid())
+  priceIndexId String
+  priceIndex   PriceIndex @relation(fields: [priceIndexId], references: [id], onDelete: Cascade)
+  date         DateTime
+  price        Decimal    @db.Decimal(12, 2)
+  createdById  String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([priceIndexId, date])
+}
+
+model LearningModule {
+  id               String                @id @default(cuid())
+  title            String
+  summary          String
+  description      String
+  coverImageId     String?
+  accessLevel      LearningAccessLevel   @default(basic)
+  oneTimePrice     Int?
+  status           ContentStatus         @default(draft)
+  firstPublishedAt DateTime?
+  createdById      String
+  preview          LearningModulePreview?
+  chapters         Chapter[]
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+}
+
+model LearningModulePreview {
+  id                     String         @id @default(cuid())
+  moduleId               String         @unique
+  module                 LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  promotionalDescription String
+  whatYouWillLearn       String[]
+  updatedAt              DateTime       @updatedAt
+}
+
+model Chapter {
+  id        String         @id @default(cuid())
+  moduleId  String
+  module    LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title     String
+  position  Int
+  lessons   Lesson[]
+
+  @@unique([moduleId, position])
+}
+
+model Lesson {
+  id               String               @id @default(cuid())
+  chapterId        String
+  chapter          Chapter              @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  title            String
+  position         Int
+  status           ContentStatus        @default(draft)
+  firstPublishedAt DateTime?
+  blocks           LessonContentBlock[]
+  attachments      LessonAttachment[]
+  progress         LessonProgress[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@unique([chapterId, position])
+}
+
+model LessonContentBlock {
+  id       String @id @default(cuid())
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  position Int
+  type     String
+  payload  Json
+
+  @@unique([lessonId, position])
+}
+
+model LessonAttachment {
+  id          String @id @default(cuid())
+  lessonId    String
+  lesson      Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  fileId      String
+  displayName String
+  position    Int
+
+  @@unique([lessonId, position])
+}
+
+model LessonProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+
+  @@unique([userId, lessonId])
+}
+
+model KnowledgeBaseArticle {
+  id               String                 @id @default(cuid())
+  parentId         String?
+  parent           KnowledgeBaseArticle?  @relation("KnowledgeBaseTree", fields: [parentId], references: [id])
+  children         KnowledgeBaseArticle[] @relation("KnowledgeBaseTree")
+  title            String
+  subtitle         String?
+  coverImageId     String?
+  slug             String                 @unique
+  position         Int
+  iconType         String?
+  status           ContentStatus          @default(draft)
+  firstPublishedAt DateTime?
+  createdById      String
+  blocks           KnowledgeBaseBlock[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([parentId, position])
+}
+
+model KnowledgeBaseBlock {
+  id        String               @id @default(cuid())
+  articleId String
+  article   KnowledgeBaseArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  position  Int
+  type      String
+  payload   Json
+
+  @@unique([articleId, position])
+}
+
+model SupportTicket {
+  id             String                @id @default(cuid())
+  authorId       String
+  author         User                  @relation("SupportTicketAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category       SupportTicketCategory
+  subject        String
+  status         SupportTicketStatus   @default(new)
+  messages       SupportTicketMessage[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+}
+
+model SupportTicketMessage {
+  id          String        @id @default(cuid())
+  ticketId    String
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId    String
+  authorRole  String
+  text        String
+  isInternal  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+}
