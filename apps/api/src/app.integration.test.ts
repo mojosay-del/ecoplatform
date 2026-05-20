@@ -792,6 +792,66 @@ describe("Admin companies panel", () => {
   });
 });
 
+describe("Admin journals", () => {
+  it("выдаёт журнал действий админу с фильтрами и пагинацией", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+
+    // Породим пару действий разного типа
+    const company = await registerCompany("0400001");
+    await ctx.http
+      .post(`/api/admin/users/${company.userId}/block`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reasonCode: "policy_violation", comment: "Тест блока." });
+    await ctx.http
+      .patch("/api/admin/settings/moderation.max_locks_per_moderator")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ value: 5 });
+
+    const forbidden = await ctx.http.get("/api/admin/journals").set("Authorization", `Bearer ${moderatorToken}`);
+    expect(forbidden.status).toBe(403);
+
+    const all = await ctx.http
+      .get("/api/admin/journals?take=100")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(all.status).toBe(200);
+    expect(all.body.total).toBeGreaterThanOrEqual(2);
+
+    const byAction = await ctx.http
+      .get("/api/admin/journals?action=admin.user.block")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(byAction.body.items.every((item: { action: string }) => item.action === "admin.user.block")).toBe(true);
+
+    const byEntity = await ctx.http
+      .get("/api/admin/journals?entityType=PlatformSetting")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(byEntity.body.items.every((item: { entityType: string }) => item.entityType === "PlatformSetting")).toBe(true);
+
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+    const byActor = await ctx.http
+      .get(`/api/admin/journals?actorId=${me.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(byActor.body.items.every((item: { actorId: string }) => item.actorId === me.body.id)).toBe(true);
+    expect(byActor.body.items[0].actor.email).toBe("admin@test.local");
+  });
+
+  it("фильтр по диапазону дат отсекает старые записи", async () => {
+    const adminToken = await loginAdmin();
+
+    await ctx.http
+      .patch("/api/admin/settings/moderation.lock_duration_minutes")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ value: 20 });
+
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const res = await ctx.http
+      .get(`/api/admin/journals?from=${future}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(res.body.total).toBe(0);
+    expect(res.body.items).toEqual([]);
+  });
+});
+
 describe("Platform settings", () => {
   it("выдаёт список настроек со стандартными значениями только админу", async () => {
     const adminToken = await loginAdmin();
