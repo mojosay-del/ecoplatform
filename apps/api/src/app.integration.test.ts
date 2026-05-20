@@ -792,6 +792,68 @@ describe("Admin companies panel", () => {
   });
 });
 
+describe("Platform settings", () => {
+  it("выдаёт список настроек со стандартными значениями только админу", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+
+    const forbidden = await ctx.http.get("/api/admin/settings").set("Authorization", `Bearer ${moderatorToken}`);
+    expect(forbidden.status).toBe(403);
+
+    const res = await ctx.http.get("/api/admin/settings").set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    const keys = res.body.map((item: { key: string }) => item.key);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        "moderation.lock_duration_minutes",
+        "moderation.max_locks_per_moderator",
+        "demo.duration_hours",
+        "indices.stagnation_threshold_percent",
+      ]),
+    );
+    const lockDuration = res.body.find((item: { key: string }) => item.key === "moderation.lock_duration_minutes");
+    expect(lockDuration.value).toBe(15);
+    expect(lockDuration.defaultValue).toBe(15);
+  });
+
+  it("PATCH меняет значение настройки и пишет audit log", async () => {
+    const adminToken = await loginAdmin();
+
+    const res = await ctx.http
+      .patch("/api/admin/settings/moderation.lock_duration_minutes")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ value: 30 });
+    expect(res.status).toBe(200);
+
+    const list = await ctx.http.get("/api/admin/settings").set("Authorization", `Bearer ${adminToken}`);
+    const lockDuration = list.body.find((item: { key: string }) => item.key === "moderation.lock_duration_minutes");
+    expect(lockDuration.value).toBe(30);
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: "moderation.lock_duration_minutes", action: "admin.setting.update" },
+    });
+    expect(log).toBeTruthy();
+  });
+
+  it("отказывает в значении вне диапазона", async () => {
+    const adminToken = await loginAdmin();
+    const res = await ctx.http
+      .patch("/api/admin/settings/moderation.max_locks_per_moderator")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ value: 999 });
+    expect(res.status).toBe(400);
+  });
+
+  it("отказывает в неизвестном ключе настройки", async () => {
+    const adminToken = await loginAdmin();
+    const res = await ctx.http
+      .patch("/api/admin/settings/unknown.key")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ value: 1 });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("Admin staff panel", () => {
   it("выдаёт список сотрудников только admin'у", async () => {
     const adminToken = await loginAdmin();

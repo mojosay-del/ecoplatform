@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AdminCompaniesModule } from "./admin/companies/admin-companies.module";
+import { PlatformSettingsModule } from "./admin/settings/platform-settings.module";
 import { AdminStaffModule } from "./admin/staff/admin-staff.module";
 import { AdminUsersModule } from "./admin/users/admin-users.module";
 import { AuthModule } from "./auth/auth.module";
@@ -14,6 +15,7 @@ import { SupportModule } from "./support/support.module";
 @Module({
   imports: [
     PrismaModule,
+    PlatformSettingsModule,
     AuthModule,
     AdminCompaniesModule,
     AdminStaffModule,
