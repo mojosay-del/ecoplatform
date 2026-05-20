@@ -1,12 +1,14 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import {
   CommentStatus,
+  CompanyStatus,
   ComplaintStatus,
   ContentStatus,
   ModerationCaseStatus,
   ModerationDecisionType,
   NotificationCategory,
   SanctionType,
+  UserStatus,
   type Prisma,
 } from "@prisma/client";
 import { canOpenFunctionalSections } from "@ecoplatform/shared";
@@ -14,7 +16,13 @@ import { AdminActionLogService } from "../common/admin-action-log.service";
 import type { RequestUser } from "../common/request-user";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
-import type { complaintInputSchema, moderationDecisionInputSchema, ModeratedEntityType } from "./moderation.schemas";
+import type {
+  adminSanctionInputSchema,
+  complaintInputSchema,
+  moderationDecisionInputSchema,
+  ModeratedEntityType,
+  sanctionLiftInputSchema,
+} from "./moderation.schemas";
 import { moderatedEntityTypes } from "./moderation.schemas";
 import type { z } from "zod";
 
@@ -54,6 +62,8 @@ const moderationCaseInclude = {
 
 type ComplaintInput = z.infer<typeof complaintInputSchema>;
 type ModerationDecisionInput = z.infer<typeof moderationDecisionInputSchema>;
+type AdminSanctionInput = z.infer<typeof adminSanctionInputSchema>;
+type SanctionLiftInput = z.infer<typeof sanctionLiftInputSchema>;
 type ModerationCaseWithRelations = Prisma.ModerationCaseGetPayload<{ include: typeof moderationCaseInclude }>;
 
 type UserSummary = {
@@ -330,6 +340,295 @@ export class ModerationService {
     await this.notifyDecision(result.updatedCase, result.decision).catch(() => undefined);
 
     return (await this.enrichCases([result.updatedCase]))[0];
+  }
+
+  async applyAdminSanction(id: string, input: AdminSanctionInput, user: RequestUser) {
+    if (!this.isAdmin(user)) {
+      throw new ForbiddenException("Применить эту санкцию может только администратор.");
+    }
+
+    const found = await this.prisma.moderationCase.findUnique({
+      where: { id },
+      include: moderationCaseInclude,
+    });
+    if (!found) {
+      throw new NotFoundException("Кейс модерации не найден.");
+    }
+    if (found.status !== ModerationCaseStatus.escalated) {
+      throw new BadRequestException("Админ-санкция применяется только по эскалированному кейсу.");
+    }
+
+    if (input.type === "module_restriction" || input.type === "user_block") {
+      if (!found.entityAuthorId) {
+        throw new BadRequestException("У сущности нет автора-пользователя для применения санкции.");
+      }
+    }
+    if (input.type === "company_block" && !found.entityCompanyId) {
+      throw new BadRequestException("У сущности нет компании для блокировки.");
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const sanctionType =
+        input.type === "user_block"
+          ? SanctionType.user_block
+          : input.type === "company_block"
+            ? SanctionType.company_block
+            : SanctionType.module_restriction;
+
+      const { targetType, targetId } = this.resolveSanctionTarget(input.type, found);
+
+      const baseParameters: Prisma.InputJsonValue = {
+        reasonCode: input.reasonCode,
+        ...(input.comment ? { comment: input.comment } : {}),
+      };
+
+      if (input.type === "user_block") {
+        await tx.user.update({ where: { id: targetId }, data: { status: UserStatus.blocked } });
+        await tx.session.updateMany({
+          where: { userId: targetId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      } else if (input.type === "company_block") {
+        await tx.company.update({ where: { id: targetId }, data: { status: CompanyStatus.blocked } });
+        await tx.session.updateMany({
+          where: { user: { companyId: targetId }, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+
+      const sanction = await tx.sanction.create({
+        data: {
+          caseId: found.id,
+          type: sanctionType,
+          targetType,
+          targetId,
+          appliedById: user.id,
+          parameters:
+            input.type === "module_restriction"
+              ? {
+                  ...baseParameters,
+                  moduleCode: input.moduleCode!,
+                  durationDays: input.durationDays!,
+                }
+              : baseParameters,
+        },
+      });
+
+      if (input.type === "module_restriction") {
+        const expiresAt = new Date(Date.now() + input.durationDays! * 24 * 60 * 60 * 1000);
+        await tx.userModuleRestriction.create({
+          data: {
+            userId: found.entityAuthorId!,
+            companyId: found.entityCompanyId,
+            moduleCode: input.moduleCode!,
+            sanctionId: sanction.id,
+            reasonCode: input.reasonCode,
+            comment: input.comment,
+            appliedById: user.id,
+            expiresAt,
+          },
+        });
+      }
+
+      const updatedCase = await tx.moderationCase.update({
+        where: { id: found.id },
+        data: { status: ModerationCaseStatus.closed_by_admin, closedAt: new Date(), lockedById: null, lockedUntil: null },
+        include: moderationCaseInclude,
+      });
+
+      return { sanction, updatedCase };
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: `moderation.admin_sanction.${input.type}`,
+      entityType: "ModerationCase",
+      entityId: found.id,
+      comment: input.comment,
+      payload: {
+        sanctionId: result.sanction.id,
+        reasonCode: input.reasonCode,
+        ...(input.type === "module_restriction"
+          ? { moduleCode: input.moduleCode, durationDays: input.durationDays }
+          : {}),
+      },
+    });
+
+    await this.notifyAdminSanction(found, result.sanction, input).catch(() => undefined);
+
+    return (await this.enrichCases([result.updatedCase]))[0];
+  }
+
+  async liftSanction(id: string, input: SanctionLiftInput, user: RequestUser) {
+    if (!this.isAdmin(user)) {
+      throw new ForbiddenException("Снять санкцию может только администратор.");
+    }
+
+    const sanction = await this.prisma.sanction.findUnique({ where: { id } });
+    if (!sanction) {
+      throw new NotFoundException("Санкция не найдена.");
+    }
+    if (sanction.liftedAt) {
+      throw new BadRequestException("Санкция уже снята.");
+    }
+    if (sanction.type === SanctionType.warning || sanction.type === SanctionType.content_removal) {
+      throw new BadRequestException("Эта санкция не снимается через данный эндпойнт.");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.sanction.update({
+        where: { id },
+        data: { liftedAt: new Date(), liftedById: user.id },
+      });
+
+      if (sanction.type === SanctionType.user_block) {
+        await tx.user.update({ where: { id: sanction.targetId }, data: { status: UserStatus.active } });
+      } else if (sanction.type === SanctionType.company_block) {
+        await tx.company.update({ where: { id: sanction.targetId }, data: { status: CompanyStatus.active } });
+      } else if (sanction.type === SanctionType.module_restriction) {
+        await tx.userModuleRestriction.updateMany({
+          where: { sanctionId: id, liftedAt: null },
+          data: { liftedAt: new Date(), liftedById: user.id },
+        });
+      }
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: `moderation.sanction.lift.${sanction.type}`,
+      entityType: "Sanction",
+      entityId: id,
+      comment: input.comment,
+      payload: { reasonCode: input.reasonCode },
+    });
+
+    await this.notifySanctionLift(sanction).catch(() => undefined);
+
+    return this.prisma.sanction.findUniqueOrThrow({ where: { id } });
+  }
+
+  private resolveSanctionTarget(
+    type: AdminSanctionInput["type"],
+    found: ModerationCaseWithRelations,
+  ): { targetType: string; targetId: string } {
+    if (type === "company_block") {
+      return { targetType: "company", targetId: found.entityCompanyId! };
+    }
+    return { targetType: "user", targetId: found.entityAuthorId! };
+  }
+
+  private async notifyAdminSanction(
+    found: ModerationCaseWithRelations,
+    sanction: { id: string },
+    input: AdminSanctionInput,
+  ) {
+    const recipients =
+      input.type === "company_block"
+        ? await this.prisma.user.findMany({
+            where: { companyId: found.entityCompanyId ?? undefined },
+            select: { id: true },
+          })
+        : found.entityAuthorId
+          ? [{ id: found.entityAuthorId }]
+          : [];
+
+    if (recipients.length === 0) return;
+
+    const category =
+      input.type === "module_restriction" ? NotificationCategory.moderation : NotificationCategory.security;
+
+    const titles = this.adminSanctionCopy(input);
+
+    await Promise.all(
+      recipients.map((recipient) =>
+        this.notifications.createInApp({
+          userId: recipient.id,
+          eventType: titles.eventType,
+          sourceId: `${sanction.id}:${recipient.id}`,
+          category,
+          title: titles.title,
+          body: titles.body,
+          link: "/notifications",
+          payload: { caseId: found.id, sanctionId: sanction.id, reasonCode: input.reasonCode },
+        }),
+      ),
+    );
+  }
+
+  private async notifySanctionLift(sanction: { id: string; type: SanctionType; targetType: string; targetId: string }) {
+    const recipients =
+      sanction.type === SanctionType.company_block
+        ? await this.prisma.user.findMany({
+            where: { companyId: sanction.targetId },
+            select: { id: true },
+          })
+        : [{ id: sanction.targetId }];
+
+    if (recipients.length === 0) return;
+
+    const category =
+      sanction.type === SanctionType.module_restriction ? NotificationCategory.moderation : NotificationCategory.security;
+
+    const titles = this.sanctionLiftCopy(sanction.type);
+
+    await Promise.all(
+      recipients.map((recipient) =>
+        this.notifications.createInApp({
+          userId: recipient.id,
+          eventType: titles.eventType,
+          sourceId: `${sanction.id}:lift:${recipient.id}`,
+          category,
+          title: titles.title,
+          body: titles.body,
+          link: "/notifications",
+          payload: { sanctionId: sanction.id },
+        }),
+      ),
+    );
+  }
+
+  private adminSanctionCopy(input: AdminSanctionInput) {
+    if (input.type === "user_block") {
+      return {
+        eventType: "moderation.user.blocked",
+        title: "Учётная запись заблокирована",
+        body: "Ваша учётная запись заблокирована администратором платформы.",
+      };
+    }
+    if (input.type === "company_block") {
+      return {
+        eventType: "moderation.company.blocked",
+        title: "Компания заблокирована",
+        body: "Компания заблокирована администратором платформы.",
+      };
+    }
+    return {
+      eventType: "moderation.module_restriction.applied",
+      title: "Ограничение доступа к модулю",
+      body: `Доступ к модулю «${input.moduleCode}» ограничен на ${input.durationDays} дн.`,
+    };
+  }
+
+  private sanctionLiftCopy(type: SanctionType) {
+    if (type === SanctionType.user_block) {
+      return {
+        eventType: "moderation.user.unblocked",
+        title: "Учётная запись разблокирована",
+        body: "Доступ к учётной записи восстановлен.",
+      };
+    }
+    if (type === SanctionType.company_block) {
+      return {
+        eventType: "moderation.company.unblocked",
+        title: "Компания разблокирована",
+        body: "Доступ компании восстановлен.",
+      };
+    }
+    return {
+      eventType: "moderation.module_restriction.lifted",
+      title: "Ограничение доступа к модулю снято",
+      body: "Доступ к модулю восстановлен досрочно.",
+    };
   }
 
   private assertFunctionalAccess(user: RequestUser) {

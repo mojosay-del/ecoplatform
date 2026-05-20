@@ -13,6 +13,7 @@ import {
 } from "@ecoplatform/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { AdminActionLogService } from "../common/admin-action-log.service";
+import { ModuleAccessService } from "../common/module-access.service";
 import type { RequestUser } from "../common/request-user";
 import type {
   categoryInputSchema,
@@ -52,6 +53,7 @@ export class ContentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AdminActionLogService,
+    private readonly moduleAccess: ModuleAccessService,
   ) {}
 
   private assertFunctionalAccess(user: RequestUser) {
@@ -368,6 +370,7 @@ export class ContentService {
 
   async addNewsComment(newsPostId: string, user: RequestUser, input: { text: string; parentCommentId?: string }) {
     this.assertFunctionalAccess(user);
+    await this.moduleAccess.assertModuleAccess(user.id, "comments");
 
     let parentCommentId = input.parentCommentId;
 

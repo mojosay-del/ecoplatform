@@ -53,3 +53,47 @@ export const moderationDecisionInputSchema = z
       });
     }
   });
+
+export const adminSanctionTypes = ["user_block", "company_block", "module_restriction"] as const;
+export type AdminSanctionType = (typeof adminSanctionTypes)[number];
+
+export const restrictableModuleCodes = ["comments", "marketplace", "reviews"] as const;
+
+export const adminSanctionInputSchema = z
+  .object({
+    type: z.enum(adminSanctionTypes),
+    reasonCode: z.enum(decisionReasonCodes),
+    comment: z.string().trim().max(1000).optional(),
+    moduleCode: z.enum(restrictableModuleCodes).optional(),
+    durationDays: z.number().int().min(1).max(365).optional(),
+  })
+  .superRefine((input, context) => {
+    if (input.reasonCode === "other" && !input.comment) {
+      context.addIssue({
+        code: "custom",
+        path: ["comment"],
+        message: "Для причины other нужно указать комментарий.",
+      });
+    }
+    if (input.type === "module_restriction") {
+      if (!input.moduleCode) {
+        context.addIssue({
+          code: "custom",
+          path: ["moduleCode"],
+          message: "Для module_restriction нужно указать moduleCode.",
+        });
+      }
+      if (!input.durationDays) {
+        context.addIssue({
+          code: "custom",
+          path: ["durationDays"],
+          message: "Для module_restriction нужно указать durationDays.",
+        });
+      }
+    }
+  });
+
+export const sanctionLiftInputSchema = z.object({
+  reasonCode: z.enum(decisionReasonCodes),
+  comment: z.string().trim().max(1000).optional(),
+});

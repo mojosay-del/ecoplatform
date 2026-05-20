@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { CompanyStatus } from "@prisma/client";
+import { CompanyStatus, UserStatus } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 import type { LoginDto, RegisterDto } from "@ecoplatform/shared";
@@ -61,6 +61,10 @@ export class AuthService {
 
     if (!user || !(await compare(input.password, user.passwordHash))) {
       throw new UnauthorizedException("Неверный email или пароль.");
+    }
+
+    if (user.status === UserStatus.blocked) {
+      throw new UnauthorizedException("Учётная запись заблокирована.");
     }
 
     if (user.company?.status === "blocked" || user.company?.status === "archived") {

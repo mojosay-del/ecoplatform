@@ -5,7 +5,12 @@ import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
 import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
-import { complaintInputSchema, moderationDecisionInputSchema } from "./moderation.schemas";
+import {
+  adminSanctionInputSchema,
+  complaintInputSchema,
+  moderationDecisionInputSchema,
+  sanctionLiftInputSchema,
+} from "./moderation.schemas";
 import { ModerationService } from "./moderation.service";
 
 @UseGuards(JwtAuthGuard)
@@ -51,5 +56,19 @@ export class ModerationController {
   @Post("admin/moderation/cases/:id/decisions")
   async createDecision(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     return this.moderation.createDecision(id, parseBody(moderationDecisionInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Post("admin/moderation/cases/:id/admin-sanctions")
+  async applyAdminSanction(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.moderation.applyAdminSanction(id, parseBody(adminSanctionInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Post("admin/moderation/sanctions/:id/lift")
+  async liftSanction(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.moderation.liftSanction(id, parseBody(sanctionLiftInputSchema, body), user);
   }
 }
