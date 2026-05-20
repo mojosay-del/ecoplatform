@@ -131,6 +131,14 @@ enum ModerationDecisionType {
 enum SanctionType {
   warning
   content_removal
+  module_restriction
+  user_block
+  company_block
+}
+
+enum UserStatus {
+  active
+  blocked
 }
 
 model User {
@@ -140,6 +148,7 @@ model User {
   firstName               String
   lastName                String
   passwordHash            String
+  status                  UserStatus                   @default(active)
   companyId               String?
   company                 Company?                     @relation(fields: [companyId], references: [id])
   platformStaff           PlatformStaff?
@@ -152,8 +161,11 @@ model User {
   notifications           InAppNotification[]
   notificationDeliveries  NotificationDelivery[]       @relation("NotificationRecipient")
   notificationPreferences UserNotificationPreferences?
+  moduleRestrictions      UserModuleRestriction[]
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt
+
+  @@index([status])
 }
 
 model Company {
@@ -618,22 +630,43 @@ model ModerationDecision {
 }
 
 model Sanction {
-  id          String              @id @default(cuid())
-  caseId      String
-  case        ModerationCase      @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  decisionId  String?
-  decision    ModerationDecision? @relation(fields: [decisionId], references: [id], onDelete: SetNull)
-  type        SanctionType
-  targetType  String
-  targetId    String
-  parameters  Json?
-  appliedById String
-  appliedAt   DateTime            @default(now())
-  liftedAt    DateTime?
-  liftedById  String?
+  id                 String                  @id @default(cuid())
+  caseId             String
+  case               ModerationCase          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  decisionId         String?
+  decision           ModerationDecision?     @relation(fields: [decisionId], references: [id], onDelete: SetNull)
+  type               SanctionType
+  targetType         String
+  targetId           String
+  parameters         Json?
+  appliedById        String
+  appliedAt          DateTime                @default(now())
+  liftedAt           DateTime?
+  liftedById         String?
+  moduleRestrictions UserModuleRestriction[]
 
   @@index([targetType, targetId, appliedAt])
   @@index([caseId, type])
+}
+
+model UserModuleRestriction {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId   String?
+  moduleCode  String
+  sanctionId  String?
+  sanction    Sanction? @relation(fields: [sanctionId], references: [id], onDelete: SetNull)
+  reasonCode  String
+  comment     String?
+  appliedById String
+  appliedAt   DateTime  @default(now())
+  expiresAt   DateTime
+  liftedAt    DateTime?
+  liftedById  String?
+
+  @@index([userId, moduleCode, liftedAt, expiresAt])
+  @@index([companyId, moduleCode])
 }
 
 model SupportTicket {
