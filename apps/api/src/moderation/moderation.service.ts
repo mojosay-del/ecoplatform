@@ -12,6 +12,7 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { canOpenFunctionalSections } from "@ecoplatform/shared";
+import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { AdminActionLogService } from "../common/admin-action-log.service";
 import type { RequestUser } from "../common/request-user";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -26,8 +27,6 @@ import type {
 import { moderatedEntityTypes } from "./moderation.schemas";
 import type { z } from "zod";
 
-const LOCK_DURATION_MS = 15 * 60 * 1000;
-const MAX_MODERATOR_LOCKS = 3;
 const ACTIVE_CASE_STATUSES = [ModerationCaseStatus.open, ModerationCaseStatus.in_review, ModerationCaseStatus.escalated];
 
 function isModeratedEntityType(value: string): value is ModeratedEntityType {
@@ -80,6 +79,7 @@ export class ModerationService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AdminActionLogService,
     private readonly notifications: NotificationsService,
+    private readonly settings: PlatformSettingsService,
   ) {}
 
   async createComplaint(input: ComplaintInput, user: RequestUser) {
@@ -175,6 +175,9 @@ export class ModerationService {
       throw new ConflictException("Кейс уже находится в работе у другого сотрудника.");
     }
 
+    const maxLocks = await this.settings.getValue("moderation.max_locks_per_moderator");
+    const lockDurationMs = (await this.settings.getValue("moderation.lock_duration_minutes")) * 60 * 1000;
+
     if (!this.isAdmin(user)) {
       const activeLocks = await this.prisma.moderationCase.count({
         where: {
@@ -185,8 +188,8 @@ export class ModerationService {
         },
       });
 
-      if (activeLocks >= MAX_MODERATOR_LOCKS) {
-        throw new ConflictException("Модератор может держать в работе не более трёх кейсов.");
+      if (activeLocks >= maxLocks) {
+        throw new ConflictException(`Модератор может держать в работе не более ${maxLocks} кейсов.`);
       }
     }
 
@@ -195,7 +198,7 @@ export class ModerationService {
       data: {
         status: found.status === ModerationCaseStatus.open ? ModerationCaseStatus.in_review : found.status,
         lockedById: user.id,
-        lockedUntil: new Date(now.getTime() + LOCK_DURATION_MS),
+        lockedUntil: new Date(now.getTime() + lockDurationMs),
       },
       include: moderationCaseInclude,
     });

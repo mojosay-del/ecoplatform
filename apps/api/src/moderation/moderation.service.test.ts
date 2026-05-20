@@ -21,6 +21,13 @@ function serviceWithPrisma(prisma: Record<string, unknown>) {
     prisma as any,
     { record: vi.fn().mockResolvedValue({}) } as any,
     { createInApp: vi.fn().mockResolvedValue({}) } as any,
+    {
+      getValue: vi.fn(async (key: string) => {
+        if (key === "moderation.lock_duration_minutes") return 15;
+        if (key === "moderation.max_locks_per_moderator") return 3;
+        return 0;
+      }),
+    } as any,
   );
 }
 

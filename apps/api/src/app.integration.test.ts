@@ -852,6 +852,38 @@ describe("Platform settings", () => {
       .send({ value: 1 });
     expect(res.status).toBe(400);
   });
+
+  it("изменение настройки модерации применяется к новым lock'ам", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+    const author = await registerCompany("0300001");
+    const reporter = await registerCompany("0300002");
+    const { comment } = await createPublishedNewsWithComment(adminToken, author.token);
+
+    await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "spam" });
+
+    await ctx.http
+      .patch("/api/admin/settings/moderation.lock_duration_minutes")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ value: 45 });
+
+    const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
+    const caseId = list.body[0].id as string;
+
+    const lockedAt = Date.now();
+    const lock = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/lock`)
+      .set("Authorization", `Bearer ${moderatorToken}`);
+    expect(lock.status).toBe(201);
+
+    const lockedUntil = new Date(lock.body.lockedUntil).getTime();
+    const ttlMinutes = (lockedUntil - lockedAt) / 60000;
+    expect(ttlMinutes).toBeGreaterThan(40);
+    expect(ttlMinutes).toBeLessThan(50);
+  });
 });
 
 describe("Admin staff panel", () => {
