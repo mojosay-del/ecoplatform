@@ -9,6 +9,7 @@ import {
   categoryInputSchema,
   commentInputSchema,
   knowledgeArticleInputSchema,
+  knowledgeMoveInputSchema,
   learningModuleInputSchema,
   newsInputSchema,
   nomenclatureInputSchema,
@@ -210,7 +211,40 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/knowledge-base/:id/publish")
-  async publishKnowledgeArticle(@Param("id") id: string) {
-    return this.content.publishKnowledgeArticle(id);
+  async publishKnowledgeArticle(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.content.publishKnowledgeArticle(id, user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Post("admin/content/knowledge-base/:id/unpublish")
+  async unpublishKnowledgeArticle(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.unpublishKnowledgeArticle(id, user, body?.reason);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
+  @Patch("admin/content/knowledge-base/:id/move")
+  async moveKnowledgeArticle(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.moveKnowledgeArticle(id, parseBody(knowledgeMoveInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Delete("admin/content/knowledge-base/:id")
+  async deleteKnowledgeArticle(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.deleteKnowledgeArticle(id, user, body?.reason);
   }
 }

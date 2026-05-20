@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { baseContentBlockSchema } from "@ecoplatform/shared";
+import { baseContentBlockSchema, lessonBlockSchema, newsBlockSchema } from "@ecoplatform/shared";
 
 export const newsInputSchema = z.object({
   title: z.string().min(1),
   lead: z.string().min(1),
   coverImageId: z.string().optional(),
   slug: z.string().optional(),
-  blocks: z.array(baseContentBlockSchema).default([]),
+  blocks: z.array(newsBlockSchema).default([]),
   tags: z.array(z.string().min(1)).default([]),
 });
 
@@ -50,7 +50,7 @@ export const learningModuleInputSchema = z.object({
       lessons: z.array(
         z.object({
           title: z.string().min(1),
-          blocks: z.array(baseContentBlockSchema).default([]),
+          blocks: z.array(lessonBlockSchema).default([]),
           attachments: z
             .array(
               z.object({
@@ -79,4 +79,9 @@ export const knowledgeArticleInputSchema = z.object({
 export const commentInputSchema = z.object({
   text: z.string().min(1),
   parentCommentId: z.string().optional(),
+});
+
+export const knowledgeMoveInputSchema = z.object({
+  parentId: z.string().nullable(),
+  position: z.number().int().nonnegative(),
 });

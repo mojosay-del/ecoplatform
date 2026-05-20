@@ -641,9 +641,11 @@ export class ContentService {
       throw new ForbiddenException(check.message);
     }
 
+    await this.assertKnowledgeDepth(input.parentId ?? null);
+
     const slug = input.slug ?? (await this.uniqueSlug(input.title, async (candidate) => Boolean(await this.prisma.knowledgeBaseArticle.findUnique({ where: { slug: candidate } }))));
 
-    return this.prisma.knowledgeBaseArticle.create({
+    const article = await this.prisma.knowledgeBaseArticle.create({
       data: {
         parentId: input.parentId ?? null,
         title: input.title,
@@ -662,12 +664,185 @@ export class ContentService {
         },
       },
     });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "knowledge.create",
+      entityType: "KnowledgeBaseArticle",
+      entityId: article.id,
+    });
+
+    return article;
   }
 
-  async publishKnowledgeArticle(id: string) {
-    return this.prisma.knowledgeBaseArticle.update({
+  async publishKnowledgeArticle(id: string, user: RequestUser) {
+    const existing = await this.prisma.knowledgeBaseArticle.findUnique({
       where: { id },
-      data: { status: ContentStatus.published, firstPublishedAt: new Date() },
+      include: { _count: { select: { blocks: true } } },
     });
+    if (!existing) {
+      throw new NotFoundException("Статья не найдена.");
+    }
+    if (existing._count.blocks === 0) {
+      throw new ForbiddenException("Нельзя опубликовать статью без блоков.");
+    }
+
+    const article = await this.prisma.knowledgeBaseArticle.update({
+      where: { id },
+      data: {
+        status: ContentStatus.published,
+        firstPublishedAt: existing.firstPublishedAt ?? new Date(),
+      },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "knowledge.publish",
+      entityType: "KnowledgeBaseArticle",
+      entityId: id,
+    });
+
+    return article;
+  }
+
+  async unpublishKnowledgeArticle(id: string, user: RequestUser, reason?: string) {
+    const existing = await this.prisma.knowledgeBaseArticle.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Статья не найдена.");
+    }
+
+    const article = await this.prisma.knowledgeBaseArticle.update({
+      where: { id },
+      data: { status: ContentStatus.draft },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "knowledge.unpublish",
+      entityType: "KnowledgeBaseArticle",
+      entityId: id,
+      comment: reason,
+    });
+
+    return article;
+  }
+
+  async moveKnowledgeArticle(
+    id: string,
+    input: { parentId: string | null; position: number },
+    user: RequestUser,
+  ) {
+    const existing = await this.prisma.knowledgeBaseArticle.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Статья не найдена.");
+    }
+
+    if (input.parentId === id) {
+      throw new ForbiddenException("Статья не может быть собственным родителем.");
+    }
+
+    await this.assertKnowledgeDepth(input.parentId, id);
+
+    const article = await this.prisma.knowledgeBaseArticle.update({
+      where: { id },
+      data: { parentId: input.parentId, position: input.position },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "knowledge.move",
+      entityType: "KnowledgeBaseArticle",
+      entityId: id,
+      payload: {
+        from: { parentId: existing.parentId, position: existing.position },
+        to: { parentId: input.parentId, position: input.position },
+      },
+    });
+
+    return article;
+  }
+
+  async deleteKnowledgeArticle(id: string, user: RequestUser, reason?: string) {
+    const existing = await this.prisma.knowledgeBaseArticle.findUnique({
+      where: { id },
+      include: { _count: { select: { children: true } } },
+    });
+    if (!existing) {
+      throw new NotFoundException("Статья не найдена.");
+    }
+    if (existing._count.children > 0) {
+      throw new ForbiddenException("Нельзя удалить статью с дочерними узлами. Сначала переместите или удалите их.");
+    }
+
+    await this.prisma.knowledgeBaseArticle.delete({ where: { id } });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "knowledge.delete",
+      entityType: "KnowledgeBaseArticle",
+      entityId: id,
+      comment: reason,
+      payload: { title: existing.title, slug: existing.slug, parentId: existing.parentId },
+    });
+
+    return { ok: true };
+  }
+
+  private async assertKnowledgeDepth(parentId: string | null, movingId?: string) {
+    if (!parentId) {
+      return;
+    }
+
+    const depth = await this.knowledgeDepth(parentId);
+    // Допустимы уровни 0, 1, 2 (категория → вид → подвид). Новый ребёнок добавит уровень depth+1.
+    if (depth + 1 > 2) {
+      throw new ForbiddenException("Дерево базы знаний ограничено тремя уровнями.");
+    }
+
+    if (movingId) {
+      const subtreeDepth = await this.subtreeDepth(movingId);
+      if (depth + 1 + subtreeDepth > 2) {
+        throw new ForbiddenException("Перемещение нарушит ограничение в три уровня.");
+      }
+    }
+  }
+
+  private async knowledgeDepth(nodeId: string): Promise<number> {
+    let current: string | null = nodeId;
+    let depth = 0;
+    const visited = new Set<string>();
+
+    while (current) {
+      if (visited.has(current)) {
+        throw new ForbiddenException("Циклическая структура в дереве базы знаний.");
+      }
+      visited.add(current);
+      const node: { parentId: string | null } | null = await this.prisma.knowledgeBaseArticle.findUnique({
+        where: { id: current },
+        select: { parentId: true },
+      });
+      if (!node) {
+        break;
+      }
+      if (node.parentId === null) {
+        return depth;
+      }
+      depth += 1;
+      current = node.parentId;
+    }
+
+    return depth;
+  }
+
+  private async subtreeDepth(nodeId: string): Promise<number> {
+    const children = await this.prisma.knowledgeBaseArticle.findMany({
+      where: { parentId: nodeId },
+      select: { id: true },
+    });
+    if (children.length === 0) {
+      return 0;
+    }
+    const depths = await Promise.all(children.map((child) => this.subtreeDepth(child.id)));
+    return 1 + Math.max(...depths);
   }
 }
