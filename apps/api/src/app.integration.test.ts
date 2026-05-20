@@ -792,6 +792,134 @@ describe("Admin companies panel", () => {
   });
 });
 
+describe("Admin staff panel", () => {
+  it("выдаёт список сотрудников только admin'у", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+
+    const forbidden = await ctx.http.get("/api/admin/staff").set("Authorization", `Bearer ${moderatorToken}`);
+    expect(forbidden.status).toBe(403);
+
+    const list = await ctx.http.get("/api/admin/staff").set("Authorization", `Bearer ${adminToken}`);
+    expect(list.status).toBe(200);
+    expect(list.body.length).toBeGreaterThanOrEqual(2);
+    expect(list.body.map((item: { user: { email: string } }) => item.user.email)).toEqual(
+      expect.arrayContaining(["admin@test.local", "moderator@test.local"]),
+    );
+  });
+
+  it("создаёт модератора, который может залогиниться выданным паролем", async () => {
+    const adminToken = await loginAdmin();
+
+    const res = await ctx.http
+      .post("/api/admin/staff")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        email: "moder.new@test.local",
+        phone: "+79991234567",
+        firstName: "Новый",
+        lastName: "Модератор",
+        password: "Moder12345!",
+        roles: ["moderator"],
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.platformStaff.roles).toEqual(["moderator"]);
+
+    const login = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "moder.new@test.local", password: "Moder12345!" });
+    expect(login.status).toBe(201);
+  });
+
+  it("отбивает создание с занятым email/phone", async () => {
+    const adminToken = await loginAdmin();
+
+    const res = await ctx.http
+      .post("/api/admin/staff")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        email: "admin@test.local",
+        phone: "+79991234999",
+        firstName: "А",
+        lastName: "Б",
+        password: "Password1!",
+        roles: ["moderator"],
+      });
+    expect(res.status).toBe(409);
+  });
+
+  it("PATCH сотрудника меняет роли и пишет лог", async () => {
+    const adminToken = await loginAdmin();
+    const created = await ctx.http
+      .post("/api/admin/staff")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        email: "promo.staff@test.local",
+        phone: "+79991234500",
+        firstName: "К",
+        lastName: "М",
+        password: "Password1!",
+        roles: ["content_manager"],
+      });
+    expect(created.status).toBe(201);
+
+    const update = await ctx.http
+      .patch(`/api/admin/staff/${created.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ roles: ["content_manager", "moderator"] });
+    expect(update.status).toBe(200);
+    expect(update.body.roles).toEqual(["content_manager", "moderator"]);
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: created.body.id, action: "admin.staff.update" },
+    });
+    expect(log).toBeTruthy();
+  });
+
+  it("деактивация сотрудника отзывает его сессии", async () => {
+    const adminToken = await loginAdmin();
+    const created = await ctx.http
+      .post("/api/admin/staff")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        email: "deact.staff@test.local",
+        phone: "+79991234501",
+        firstName: "К",
+        lastName: "М",
+        password: "Password1!",
+        roles: ["moderator"],
+      });
+    expect(created.status).toBe(201);
+
+    const login = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "deact.staff@test.local", password: "Password1!" });
+    expect(login.status).toBe(201);
+
+    const update = await ctx.http
+      .patch(`/api/admin/staff/${created.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ isActive: false });
+    expect(update.status).toBe(200);
+
+    const activeSessions = await ctx.prisma.session.count({
+      where: { userId: created.body.id, revokedAt: null },
+    });
+    expect(activeSessions).toBe(0);
+  });
+
+  it("нельзя снять admin у последнего администратора через staff PATCH", async () => {
+    const adminToken = await loginAdmin();
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+
+    const res = await ctx.http
+      .patch(`/api/admin/staff/${me.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ roles: ["moderator"] });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("Admin sanctions", () => {
   async function escalatedCaseAgainstAuthor(
     adminToken: string,
