@@ -71,6 +71,7 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
       { href: "/notifications", label: "Уведомления", icon: Bell },
       { href: "/admin/content/news", label: "Админ / CMS", icon: Shield, roles: ["admin", "content_manager"] },
       { href: "/admin/moderation", label: "Модерация", icon: Shield, roles: ["admin", "moderator"] },
+      { href: "/admin/users", label: "Пользователи", icon: Users, roles: ["admin"] },
       { href: "/admin/support", label: "Поддержка", icon: HelpCircle, roles: ["admin"] },
     ],
   },
