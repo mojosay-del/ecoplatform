@@ -71,9 +71,199 @@ export function NewsView() {
               <h2>{post.title}</h2>
               <p>{post.lead}</p>
               <p style={{ color: "var(--muted)" }}>👍 {post._count?.likes ?? 0} · 💬 {post._count?.comments ?? 0}</p>
+              <Link className="button secondary" href={`/news/${post.slug}`}>
+                Открыть
+              </Link>
             </article>
           ))}
         </div>
+      </section>
+    </AppShell>
+  );
+}
+
+const complaintReasons = [
+  ["contact_data", "Контактные данные"],
+  ["false_information", "Недостоверная информация"],
+  ["offensive_content", "Оскорбления"],
+  ["spam", "Спам"],
+  ["illegal_content", "Нарушает закон"],
+  ["other", "Иное"],
+] as const;
+
+export function NewsPostView({ slug }: { slug: string }) {
+  const { token } = useAuth();
+  const [post, setPost] = useState<any | null>(null);
+  const [state, setState] = useState<ApiState>("unauthenticated");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState("offensive_content");
+  const [reportComment, setReportComment] = useState("");
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
+
+  async function load() {
+    if (!token) {
+      setState("unauthenticated");
+      setPost(null);
+      return;
+    }
+
+    setState("loading");
+    setErrorMessage(null);
+    try {
+      const data = await apiFetch<any>(`/news/${slug}`, { token });
+      setPost(data);
+      setState("ready");
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        setState("forbidden");
+        return;
+      }
+      setState("error");
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить новость");
+    }
+  }
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, token]);
+
+  async function submitComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !post || !commentText.trim()) return;
+
+    await apiFetch(`/news/${post.id}/comments`, {
+      method: "POST",
+      token,
+      body: { text: commentText.trim() },
+    });
+    setCommentText("");
+    setResultMessage("Комментарий опубликован.");
+    await load();
+  }
+
+  async function submitComplaint(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !reportingCommentId) return;
+
+    await apiFetch("/moderation/complaints", {
+      method: "POST",
+      token,
+      body: {
+        entityType: "news_comment",
+        entityId: reportingCommentId,
+        reasonCode: reportReason,
+        comment: reportComment.trim() || undefined,
+      },
+    });
+    setReportingCommentId(null);
+    setReportReason("offensive_content");
+    setReportComment("");
+    setResultMessage("Жалоба отправлена модератору.");
+  }
+
+  if (state === "unauthenticated") {
+    return <AuthRequired title="Новости" />;
+  }
+
+  if (state === "forbidden") {
+    return <AccessClosed title="Новости" />;
+  }
+
+  if (state === "error") {
+    return <ErrorState title="Новости" message={errorMessage} />;
+  }
+
+  return (
+    <AppShell>
+      <section className="page">
+        <Link className="button secondary" href="/news">
+          Назад
+        </Link>
+        {state === "loading" || !post ? (
+          <p className="page-subtitle">Загрузка…</p>
+        ) : (
+          <>
+            <header className="page-header">
+              <h1 className="page-title">{post.title}</h1>
+              <p className="page-subtitle">{post.lead}</p>
+            </header>
+            <article className="content-article">
+              {post.blocks?.map((block: any) => (
+                <div key={block.id}>
+                  {block.type === "heading" ? <h2>{block.payload.text}</h2> : null}
+                  {block.type === "paragraph" ? <p>{block.payload.markdown}</p> : null}
+                  {block.type === "quote" ? <blockquote>{block.payload.text}</blockquote> : null}
+                </div>
+              ))}
+            </article>
+            <section className="comments-section">
+              <h2>Комментарии</h2>
+              {resultMessage ? <p className="status-pill">{resultMessage}</p> : null}
+              <form className="reply-form" onSubmit={submitComment}>
+                <textarea
+                  className="textarea small"
+                  onChange={(event) => setCommentText(event.target.value)}
+                  placeholder="Написать комментарий"
+                  value={commentText}
+                />
+                <button className="button" type="submit">
+                  Отправить
+                </button>
+              </form>
+              <div className="comment-list">
+                {post.comments?.map((comment: any) => (
+                  <article className="comment-item" key={comment.id}>
+                    <div className="comment-head">
+                      <strong>
+                        {comment.user.firstName} {comment.user.lastName}
+                      </strong>
+                      <button className="button secondary" onClick={() => setReportingCommentId(comment.id)}>
+                        Пожаловаться
+                      </button>
+                    </div>
+                    <p>{comment.text}</p>
+                    {reportingCommentId === comment.id ? (
+                      <form className="form report-form" onSubmit={submitComplaint}>
+                        <select className="select" onChange={(event) => setReportReason(event.target.value)} value={reportReason}>
+                          {complaintReasons.map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                        <textarea
+                          className="textarea small"
+                          onChange={(event) => setReportComment(event.target.value)}
+                          placeholder="Комментарий к жалобе"
+                          value={reportComment}
+                        />
+                        <div className="auth-actions">
+                          <button className="button" type="submit">
+                            Отправить жалобу
+                          </button>
+                          <button className="button secondary" onClick={() => setReportingCommentId(null)} type="button">
+                            Отмена
+                          </button>
+                        </div>
+                      </form>
+                    ) : null}
+                    {comment.replies?.map((reply: any) => (
+                      <article className="comment-item reply" key={reply.id}>
+                        <strong>
+                          {reply.user.firstName} {reply.user.lastName}
+                        </strong>
+                        <p>{reply.text}</p>
+                      </article>
+                    ))}
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
       </section>
     </AppShell>
   );

@@ -85,7 +85,10 @@ export class ContentService {
     return this.prisma.newsPost.findMany({
       where: { status: ContentStatus.published },
       orderBy: { firstPublishedAt: "desc" },
-      include: { tags: { include: { newsTag: true } }, _count: { select: { likes: true, comments: true } } },
+      include: {
+        tags: { include: { newsTag: true } },
+        _count: { select: { likes: true, comments: { where: { status: CommentStatus.published } } } },
+      },
     });
   }
 
@@ -98,15 +101,19 @@ export class ContentService {
         blocks: { orderBy: { position: "asc" } },
         tags: { include: { newsTag: true } },
         comments: {
-          where: { parentCommentId: null },
+          where: { parentCommentId: null, status: CommentStatus.published },
           orderBy: { createdAt: "desc" },
           include: {
-            user: true,
-            replies: { orderBy: { createdAt: "asc" }, include: { user: true, _count: { select: { likes: true } } } },
+            user: { select: { id: true, firstName: true, lastName: true } },
+            replies: {
+              where: { status: CommentStatus.published },
+              orderBy: { createdAt: "asc" },
+              include: { user: { select: { id: true, firstName: true, lastName: true } }, _count: { select: { likes: true } } },
+            },
             _count: { select: { likes: true } },
           },
         },
-        _count: { select: { likes: true, comments: true } },
+        _count: { select: { likes: true, comments: { where: { status: CommentStatus.published } } } },
       },
     });
 

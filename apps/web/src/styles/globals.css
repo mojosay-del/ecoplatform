@@ -355,12 +355,113 @@ select {
   gap: 10px;
 }
 
+.content-article {
+  max-width: 860px;
+  display: grid;
+  gap: 12px;
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.content-article blockquote {
+  margin: 0;
+  border-left: 4px solid var(--blue);
+  padding: 10px 16px;
+  color: var(--muted);
+  background: var(--panel-soft);
+}
+
+.comments-section {
+  max-width: 900px;
+  margin-top: 32px;
+  display: grid;
+  gap: 18px;
+}
+
+.comment-list {
+  display: grid;
+  gap: 12px;
+}
+
+.comment-item {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.comment-item.reply {
+  margin-left: 24px;
+  padding-left: 14px;
+  border-left: 2px solid var(--line);
+}
+
+.comment-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-form {
+  max-width: 560px;
+  padding: 14px;
+  background: var(--panel-soft);
+  border-radius: 8px;
+}
+
+.moderation-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.moderation-case-row {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.moderation-case-row.active,
+.moderation-case-row:hover {
+  border-color: var(--blue);
+}
+
+.moderation-case-row span:last-of-type {
+  color: var(--muted);
+}
+
+.moderation-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.moderated-content {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 18px;
+}
+
+.moderation-decision-form {
+  max-width: 680px;
+}
+
 @media (max-width: 960px) {
   .app-shell,
   .knowledge-layout,
   .cms-layout,
   .account-layout,
   .indices-admin-layout,
+  .moderation-layout,
   .reply-form {
     grid-template-columns: 1fr;
   }

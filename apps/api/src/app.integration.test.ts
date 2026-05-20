@@ -4,7 +4,7 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hash } from "bcryptjs";
-import { CompanyStatus, ContentStatus, PlatformRole } from "@prisma/client";
+import { CommentStatus, CompanyStatus, ContentStatus, PlatformRole, SanctionType } from "@prisma/client";
 import { createTestApp, resetDb, TestApp } from "./test/test-app";
 
 let ctx: TestApp;
@@ -55,6 +55,51 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
   const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
   expect(me.status).toBe(200);
   return { token, companyId: me.body.company.id, userId: me.body.id };
+}
+
+async function loginModerator(): Promise<string> {
+  await ctx.prisma.user.create({
+    data: {
+      email: "moderator@test.local",
+      firstName: "Модератор",
+      lastName: "Тестов",
+      phone: "+70000000002",
+      passwordHash: await hash("Moderator12345", 4),
+      platformStaff: { create: { roles: [PlatformRole.moderator], isActive: true } },
+    },
+  });
+
+  const res = await ctx.http
+    .post("/api/auth/login")
+    .send({ email: "moderator@test.local", password: "Moderator12345" });
+  expect(res.status).toBe(201);
+  return res.body.accessToken as string;
+}
+
+async function createPublishedNewsWithComment(adminToken: string, authorToken: string) {
+  const draft = await ctx.http
+    .post("/api/admin/content/news")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({
+      title: "Новость для модерации",
+      lead: "Лид новости",
+      blocks: [{ type: "paragraph", payload: { markdown: "Тело новости." } }],
+      tags: ["moderation"],
+    });
+  expect(draft.status).toBe(201);
+
+  const publish = await ctx.http
+    .post(`/api/admin/content/news/${draft.body.id}/publish`)
+    .set("Authorization", `Bearer ${adminToken}`);
+  expect(publish.status).toBe(201);
+
+  const comment = await ctx.http
+    .post(`/api/news/${draft.body.id}/comments`)
+    .set("Authorization", `Bearer ${authorToken}`)
+    .send({ text: "Комментарий для проверки модерации" });
+  expect(comment.status).toBe(201);
+
+  return { news: publish.body, comment: comment.body };
 }
 
 describe("Auth", () => {

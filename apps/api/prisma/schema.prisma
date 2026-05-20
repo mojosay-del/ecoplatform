@@ -102,6 +102,37 @@ enum NotificationDeliveryStatus {
   no_recipients
 }
 
+enum ModerationCaseType {
+  complaint
+  suspicious_activity
+}
+
+enum ModerationCaseStatus {
+  open
+  in_review
+  resolved
+  escalated
+  closed_by_admin
+}
+
+enum ComplaintStatus {
+  pending
+  resolved
+  auto_closed
+}
+
+enum ModerationDecisionType {
+  leave_as_is
+  remove_content
+  warn_company
+  escalate_to_admin
+}
+
+enum SanctionType {
+  warning
+  content_removal
+}
+
 model User {
   id                      String                       @id @default(cuid())
   email                   String                       @unique
@@ -530,6 +561,79 @@ model NotificationDelivery {
   @@unique([domainEventId, recipientUserId, channel])
   @@index([recipientUserId, createdAt])
   @@index([status, createdAt])
+}
+
+model ModerationCase {
+  id              String               @id @default(cuid())
+  type            ModerationCaseType   @default(complaint)
+  entityType      String
+  entityId        String
+  entityAuthorId  String?
+  entityCompanyId String?
+  status          ModerationCaseStatus @default(open)
+  lockedById      String?
+  lockedUntil     DateTime?
+  complaints      Complaint[]
+  decisions       ModerationDecision[]
+  sanctions       Sanction[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  closedAt        DateTime?
+
+  @@index([status, createdAt])
+  @@index([entityType, entityId, status])
+  @@index([lockedById, lockedUntil])
+}
+
+model Complaint {
+  id              String          @id @default(cuid())
+  caseId          String
+  case            ModerationCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  entityType      String
+  entityId        String
+  authorId        String
+  authorCompanyId String?
+  reasonCode      String
+  comment         String?
+  status          ComplaintStatus @default(pending)
+  createdAt       DateTime        @default(now())
+
+  @@unique([entityType, entityId, authorId, reasonCode])
+  @@index([caseId, status])
+}
+
+model ModerationDecision {
+  id         String                 @id @default(cuid())
+  caseId     String
+  case       ModerationCase         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorId    String
+  actorRole  String
+  type       ModerationDecisionType
+  reasonCode String
+  comment    String?
+  sanctions  Sanction[]
+  createdAt  DateTime               @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+model Sanction {
+  id          String              @id @default(cuid())
+  caseId      String
+  case        ModerationCase      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  decisionId  String?
+  decision    ModerationDecision? @relation(fields: [decisionId], references: [id], onDelete: SetNull)
+  type        SanctionType
+  targetType  String
+  targetId    String
+  parameters  Json?
+  appliedById String
+  appliedAt   DateTime            @default(now())
+  liftedAt    DateTime?
+  liftedById  String?
+
+  @@index([targetType, targetId, appliedAt])
+  @@index([caseId, type])
 }
 
 model SupportTicket {
