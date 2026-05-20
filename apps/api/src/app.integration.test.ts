@@ -853,6 +853,21 @@ describe("Platform settings", () => {
     expect(res.status).toBe(400);
   });
 
+  it("изменение настройки demo.duration_hours применяется к новой регистрации", async () => {
+    const adminToken = await loginAdmin();
+
+    await ctx.http
+      .patch("/api/admin/settings/demo.duration_hours")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ value: 72 });
+
+    const registered = await registerCompany("0300010");
+    const company = await ctx.prisma.company.findUnique({ where: { id: registered.companyId } });
+    const ttlHours = (company!.demoEndsAt!.getTime() - Date.now()) / (60 * 60 * 1000);
+    expect(ttlHours).toBeGreaterThan(70);
+    expect(ttlHours).toBeLessThan(73);
+  });
+
   it("изменение настройки модерации применяется к новым lock'ам", async () => {
     const adminToken = await loginAdmin();
     const moderatorToken = await loginModerator();

@@ -4,7 +4,7 @@ import { CompanyStatus, UserStatus } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 import type { LoginDto, RegisterDto } from "@ecoplatform/shared";
-import { demoEndsAt } from "@ecoplatform/shared";
+import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 type SessionTokens = {
@@ -17,6 +17,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly settings: PlatformSettingsService,
   ) {}
 
   async register(input: RegisterDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {
@@ -31,11 +32,12 @@ export class AuthService {
     }
 
     const passwordHash = await hash(input.password, 12);
+    const demoHours = await this.settings.getValue("demo.duration_hours");
     const company = await this.prisma.company.create({
       data: {
         organizationName: input.organizationName,
         status: CompanyStatus.demo,
-        demoEndsAt: demoEndsAt(),
+        demoEndsAt: new Date(Date.now() + demoHours * 60 * 60 * 1000),
       },
     });
 

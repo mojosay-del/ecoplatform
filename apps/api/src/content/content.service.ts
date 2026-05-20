@@ -12,6 +12,7 @@ import {
   validateContentBlocks,
 } from "@ecoplatform/shared";
 import { PrismaService } from "../prisma/prisma.service";
+import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { AdminActionLogService } from "../common/admin-action-log.service";
 import { ModuleAccessService } from "../common/module-access.service";
 import type { RequestUser } from "../common/request-user";
@@ -54,6 +55,7 @@ export class ContentService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AdminActionLogService,
     private readonly moduleAccess: ModuleAccessService,
+    private readonly settings: PlatformSettingsService,
   ) {}
 
   private assertFunctionalAccess(user: RequestUser) {
@@ -392,6 +394,8 @@ export class ContentService {
   async listIndices(user: RequestUser) {
     this.assertFunctionalAccess(user);
 
+    const stagnationThreshold = await this.settings.getValue("indices.stagnation_threshold_percent");
+
     const categories = await this.prisma.nomenclatureCategory.findMany({
       where: { isActive: true },
       orderBy: { position: "asc" },
@@ -409,7 +413,7 @@ export class ContentService {
       nomenclatures: category.nomenclatures
         .map((item) => {
           const values = item.priceIndex?.values.map((value) => ({ date: value.date, price: Number(value.price) })) ?? [];
-          const summary = summarizePriceIndex(values);
+          const summary = summarizePriceIndex(values, new Date(), stagnationThreshold);
           return summary
             ? {
                 ...item,
