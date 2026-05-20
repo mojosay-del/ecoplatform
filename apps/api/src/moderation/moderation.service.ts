@@ -14,13 +14,37 @@ import { AdminActionLogService } from "../common/admin-action-log.service";
 import type { RequestUser } from "../common/request-user";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
-import type { complaintInputSchema, moderationDecisionInputSchema } from "./moderation.schemas";
+import type { complaintInputSchema, moderationDecisionInputSchema, ModeratedEntityType } from "./moderation.schemas";
+import { moderatedEntityTypes } from "./moderation.schemas";
 import type { z } from "zod";
 
 const LOCK_DURATION_MS = 15 * 60 * 1000;
 const MAX_MODERATOR_LOCKS = 3;
-const MODERATED_ENTITY_TYPE = "news_comment";
 const ACTIVE_CASE_STATUSES = [ModerationCaseStatus.open, ModerationCaseStatus.in_review, ModerationCaseStatus.escalated];
+
+function isModeratedEntityType(value: string): value is ModeratedEntityType {
+  return (moderatedEntityTypes as readonly string[]).includes(value);
+}
+
+type EntityResolution = {
+  type: ModeratedEntityType;
+  authorUserId: string | null;
+  authorCompanyId: string | null;
+};
+
+type ResolvedEntitySummary =
+  | {
+      type: "news_comment";
+      id: string;
+      text: string;
+      status: CommentStatus;
+      createdAt: Date;
+      newsPost: { id: string; title: string; slug: string };
+    }
+  | { type: "news_post"; id: string; title: string; slug: string; status: ContentStatus }
+  | { type: "knowledge_article"; id: string; title: string; slug: string; status: ContentStatus };
+
+type DecisionLink = { title: string; link: string };
 
 const moderationCaseInclude = {
   complaints: { orderBy: { createdAt: "asc" } },
@@ -66,7 +90,7 @@ export class ModerationService {
       return { complaint: existing, duplicate: true };
     }
 
-    const entity = await this.getPublishedNewsComment(input.entityId);
+    const entity = await this.loadPublishedEntity(input.entityType, input.entityId);
 
     const complaint = await this.prisma.$transaction(async (tx) => {
       const activeCase =
@@ -83,8 +107,8 @@ export class ModerationService {
             type: "complaint",
             entityType: input.entityType,
             entityId: input.entityId,
-            entityAuthorId: entity.userId,
-            entityCompanyId: entity.user.companyId,
+            entityAuthorId: entity.authorUserId,
+            entityCompanyId: entity.authorCompanyId,
           },
         }));
 
@@ -314,31 +338,83 @@ export class ModerationService {
     }
   }
 
-  private async getPublishedNewsComment(commentId: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id: commentId },
-      include: {
-        newsPost: { select: { id: true, title: true, slug: true, status: true } },
-        user: { select: { id: true, companyId: true } },
-      },
-    });
-
-    if (!comment || comment.status !== CommentStatus.published || comment.newsPost.status !== ContentStatus.published) {
-      throw new NotFoundException("Комментарий не найден или недоступен для жалобы.");
+  private async loadPublishedEntity(entityType: ModeratedEntityType, entityId: string): Promise<EntityResolution> {
+    if (entityType === "news_comment") {
+      const comment = await this.prisma.comment.findUnique({
+        where: { id: entityId },
+        include: {
+          newsPost: { select: { status: true } },
+          user: { select: { id: true, companyId: true } },
+        },
+      });
+      if (
+        !comment ||
+        comment.status !== CommentStatus.published ||
+        comment.newsPost.status !== ContentStatus.published
+      ) {
+        throw new NotFoundException("Комментарий не найден или недоступен для жалобы.");
+      }
+      return { type: "news_comment", authorUserId: comment.userId, authorCompanyId: comment.user.companyId };
     }
 
-    return comment;
+    if (entityType === "news_post") {
+      const post = await this.prisma.newsPost.findUnique({
+        where: { id: entityId },
+        select: { id: true, status: true, createdById: true },
+      });
+      if (!post || post.status !== ContentStatus.published) {
+        throw new NotFoundException("Новость не найдена или недоступна для жалобы.");
+      }
+      return { type: "news_post", authorUserId: post.createdById, authorCompanyId: null };
+    }
+
+    const article = await this.prisma.knowledgeBaseArticle.findUnique({
+      where: { id: entityId },
+      select: { id: true, status: true, createdById: true },
+    });
+    if (!article || article.status !== ContentStatus.published) {
+      throw new NotFoundException("Статья базы знаний не найдена или недоступна для жалобы.");
+    }
+    return { type: "knowledge_article", authorUserId: article.createdById, authorCompanyId: null };
   }
 
   private async removeModeratedEntity(tx: Prisma.TransactionClient, found: ModerationCaseWithRelations) {
-    if (found.entityType !== MODERATED_ENTITY_TYPE) {
-      throw new BadRequestException("В MVP поддерживаются только комментарии к новостям.");
+    if (found.entityType === "news_comment") {
+      await tx.comment.update({
+        where: { id: found.entityId },
+        data: { status: CommentStatus.hidden_by_moderator },
+      });
+      return;
     }
 
-    await tx.comment.update({
-      where: { id: found.entityId },
-      data: { status: CommentStatus.hidden_by_moderator },
-    });
+    if (found.entityType === "news_post") {
+      const post = await tx.newsPost.findUnique({ where: { id: found.entityId }, select: { status: true } });
+      if (!post) {
+        throw new BadRequestException("Новость уже удалена.");
+      }
+      await tx.newsPost.update({
+        where: { id: found.entityId },
+        data: { status: ContentStatus.draft },
+      });
+      return;
+    }
+
+    if (found.entityType === "knowledge_article") {
+      const article = await tx.knowledgeBaseArticle.findUnique({
+        where: { id: found.entityId },
+        select: { status: true },
+      });
+      if (!article) {
+        throw new BadRequestException("Статья базы знаний уже удалена.");
+      }
+      await tx.knowledgeBaseArticle.update({
+        where: { id: found.entityId },
+        data: { status: ContentStatus.draft },
+      });
+      return;
+    }
+
+    throw new BadRequestException("Тип сущности не поддерживается модерацией.");
   }
 
   private async notifyDecision(
@@ -348,7 +424,10 @@ export class ModerationService {
     if (decision.type === ModerationDecisionType.escalate_to_admin) return;
 
     const entity = await this.getModerationEntity(found);
+    const fallbackLink = this.fallbackLinkForEntityType(found.entityType);
     const complaintAuthors = [...new Set(found.complaints.map((complaint) => complaint.authorId))];
+
+    const subject = this.subjectForEntity(found.entityType, entity?.title);
 
     await Promise.all(
       complaintAuthors.map((userId) =>
@@ -358,8 +437,8 @@ export class ModerationService {
           sourceId: `${decision.id}:${userId}`,
           category: NotificationCategory.moderation,
           title: "Жалоба рассмотрена",
-          body: `Жалоба по комментарию к новости «${entity?.newsPost.title ?? "Новость"}» рассмотрена.`,
-          link: entity?.newsPost.slug ? `/news/${entity.newsPost.slug}` : "/news",
+          body: `${subject.complaintBody} рассмотрена.`,
+          link: entity?.link ?? fallbackLink,
           payload: { caseId: found.id, decisionId: decision.id, reasonCode: decision.reasonCode },
         }),
       ),
@@ -371,9 +450,9 @@ export class ModerationService {
         eventType: "moderation.content.removed",
         sourceId: decision.id,
         category: NotificationCategory.moderation,
-        title: "Комментарий снят модератором",
-        body: `Ваш комментарий к новости «${entity?.newsPost.title ?? "Новость"}» скрыт по итогам модерации.`,
-        link: entity?.newsPost.slug ? `/news/${entity.newsPost.slug}` : "/news",
+        title: subject.removalTitle,
+        body: subject.removalBody,
+        link: entity?.link ?? fallbackLink,
         payload: { caseId: found.id, decisionId: decision.id },
       });
     }
@@ -385,24 +464,69 @@ export class ModerationService {
         sourceId: decision.id,
         category: NotificationCategory.moderation,
         title: "Предупреждение от модератора",
-        body: `По комментарию к новости «${entity?.newsPost.title ?? "Новость"}» вынесено предупреждение компании.`,
+        body: `${subject.warningBody} вынесено предупреждение компании.`,
         link: "/notifications",
         payload: { caseId: found.id, decisionId: decision.id },
       });
     }
   }
 
+  private subjectForEntity(entityType: string, title: string | undefined) {
+    const safeTitle = title ?? "—";
+    if (entityType === "news_comment") {
+      return {
+        complaintBody: `Жалоба по комментарию к новости «${safeTitle}»`,
+        removalTitle: "Комментарий снят модератором",
+        removalBody: `Ваш комментарий к новости «${safeTitle}» скрыт по итогам модерации.`,
+        warningBody: `По комментарию к новости «${safeTitle}»`,
+      };
+    }
+    if (entityType === "news_post") {
+      return {
+        complaintBody: `Жалоба по новости «${safeTitle}»`,
+        removalTitle: "Новость снята модератором",
+        removalBody: `Новость «${safeTitle}» снята с публикации по итогам модерации.`,
+        warningBody: `По новости «${safeTitle}»`,
+      };
+    }
+    return {
+      complaintBody: `Жалоба по статье «${safeTitle}»`,
+      removalTitle: "Статья базы знаний снята модератором",
+      removalBody: `Статья «${safeTitle}» снята с публикации по итогам модерации.`,
+      warningBody: `По статье «${safeTitle}»`,
+    };
+  }
+
+  private fallbackLinkForEntityType(entityType: string): string {
+    if (entityType === "knowledge_article") return "/knowledge-base";
+    return "/news";
+  }
+
   private async enrichCases(cases: ModerationCaseWithRelations[]) {
     if (cases.length === 0) return [];
 
-    const entityIds = cases.filter((item) => item.entityType === MODERATED_ENTITY_TYPE).map((item) => item.entityId);
-    const comments = await this.prisma.comment.findMany({
-      where: { id: { in: entityIds } },
-      include: {
-        newsPost: { select: { id: true, title: true, slug: true } },
-      },
-    });
+    const commentIds = cases.filter((item) => item.entityType === "news_comment").map((item) => item.entityId);
+    const newsPostIds = cases.filter((item) => item.entityType === "news_post").map((item) => item.entityId);
+    const articleIds = cases.filter((item) => item.entityType === "knowledge_article").map((item) => item.entityId);
+
+    const [comments, newsPosts, articles] = await Promise.all([
+      this.prisma.comment.findMany({
+        where: { id: { in: commentIds } },
+        include: { newsPost: { select: { id: true, title: true, slug: true } } },
+      }),
+      this.prisma.newsPost.findMany({
+        where: { id: { in: newsPostIds } },
+        select: { id: true, title: true, slug: true, status: true },
+      }),
+      this.prisma.knowledgeBaseArticle.findMany({
+        where: { id: { in: articleIds } },
+        select: { id: true, title: true, slug: true, status: true },
+      }),
+    ]);
+
     const commentMap = new Map(comments.map((comment) => [comment.id, comment]));
+    const newsPostMap = new Map(newsPosts.map((item) => [item.id, item]));
+    const articleMap = new Map(articles.map((item) => [item.id, item]));
 
     const userIds = [
       ...cases.flatMap((item) => [
@@ -425,22 +549,14 @@ export class ModerationService {
     const userMap = new Map<string, UserSummary>(users.map((item) => [item.id, item]));
 
     return cases.map((item) => {
-      const entity = commentMap.get(item.entityId);
+      const entity = this.buildEntitySummary(item, commentMap, newsPostMap, articleMap);
       return {
         ...item,
         lockedBy: item.lockedById ? userMap.get(item.lockedById) ?? null : null,
         entity:
-          item.entityType === MODERATED_ENTITY_TYPE && entity
-            ? {
-                type: MODERATED_ENTITY_TYPE,
-                id: entity.id,
-                text: entity.text,
-                status: entity.status,
-                createdAt: entity.createdAt,
-                newsPost: entity.newsPost,
-                author: item.entityAuthorId ? userMap.get(item.entityAuthorId) ?? null : null,
-              }
-            : null,
+          entity && entity.type === "news_comment"
+            ? { ...entity, author: item.entityAuthorId ? userMap.get(item.entityAuthorId) ?? null : null }
+            : entity,
         complaints: item.complaints.map((complaint) => ({
           ...complaint,
           author: userMap.get(complaint.authorId) ?? null,
@@ -453,12 +569,67 @@ export class ModerationService {
     });
   }
 
-  private async getModerationEntity(found: ModerationCaseWithRelations) {
-    if (found.entityType !== MODERATED_ENTITY_TYPE) return null;
-    return this.prisma.comment.findUnique({
+  private buildEntitySummary(
+    item: ModerationCaseWithRelations,
+    commentMap: Map<string, { id: string; text: string; status: CommentStatus; createdAt: Date; newsPost: { id: string; title: string; slug: string } }>,
+    newsPostMap: Map<string, { id: string; title: string; slug: string; status: ContentStatus }>,
+    articleMap: Map<string, { id: string; title: string; slug: string; status: ContentStatus }>,
+  ): ResolvedEntitySummary | null {
+    if (item.entityType === "news_comment") {
+      const found = commentMap.get(item.entityId);
+      if (!found) return null;
+      return {
+        type: "news_comment",
+        id: found.id,
+        text: found.text,
+        status: found.status,
+        createdAt: found.createdAt,
+        newsPost: found.newsPost,
+      };
+    }
+    if (item.entityType === "news_post") {
+      const found = newsPostMap.get(item.entityId);
+      if (!found) return null;
+      return { type: "news_post", id: found.id, title: found.title, slug: found.slug, status: found.status };
+    }
+    if (item.entityType === "knowledge_article") {
+      const found = articleMap.get(item.entityId);
+      if (!found) return null;
+      return {
+        type: "knowledge_article",
+        id: found.id,
+        title: found.title,
+        slug: found.slug,
+        status: found.status,
+      };
+    }
+    return null;
+  }
+
+  private async getModerationEntity(found: ModerationCaseWithRelations): Promise<DecisionLink | null> {
+    if (!isModeratedEntityType(found.entityType)) return null;
+    if (found.entityType === "news_comment") {
+      const comment = await this.prisma.comment.findUnique({
+        where: { id: found.entityId },
+        include: { newsPost: { select: { id: true, title: true, slug: true } } },
+      });
+      if (!comment) return null;
+      return { title: comment.newsPost.title, link: `/news/${comment.newsPost.slug}` };
+    }
+    if (found.entityType === "news_post") {
+      const post = await this.prisma.newsPost.findUnique({
+        where: { id: found.entityId },
+        select: { title: true, slug: true },
+      });
+      if (!post) return null;
+      return { title: post.title, link: `/news/${post.slug}` };
+    }
+    const article = await this.prisma.knowledgeBaseArticle.findUnique({
       where: { id: found.entityId },
-      include: { newsPost: { select: { id: true, title: true, slug: true } } },
+      select: { title: true, slug: true },
     });
+    if (!article) return null;
+    return { title: article.title, link: `/knowledge-base/${article.slug}` };
   }
 
   private isAdmin(user: RequestUser) {

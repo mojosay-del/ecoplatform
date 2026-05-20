@@ -102,6 +102,45 @@ async function createPublishedNewsWithComment(adminToken: string, authorToken: s
   return { news: publish.body, comment: comment.body };
 }
 
+async function createPublishedNews(adminToken: string, suffix: string) {
+  const draft = await ctx.http
+    .post("/api/admin/content/news")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({
+      title: `Новость для модерации ${suffix}`,
+      lead: "Лид новости",
+      blocks: [{ type: "paragraph", payload: { markdown: "Тело новости." } }],
+      tags: [`moderation-${suffix}`],
+    });
+  expect(draft.status).toBe(201);
+
+  const publish = await ctx.http
+    .post(`/api/admin/content/news/${draft.body.id}/publish`)
+    .set("Authorization", `Bearer ${adminToken}`);
+  expect(publish.status).toBe(201);
+
+  return publish.body as { id: string; slug: string; title: string };
+}
+
+async function createPublishedKnowledgeArticle(adminToken: string, suffix: string) {
+  const draft = await ctx.http
+    .post("/api/admin/content/knowledge-base")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({
+      title: `Статья ${suffix}`,
+      position: 0,
+      blocks: [{ type: "paragraph", payload: { markdown: "Тело статьи." } }],
+    });
+  expect(draft.status).toBe(201);
+
+  const publish = await ctx.http
+    .post(`/api/admin/content/knowledge-base/${draft.body.id}/publish`)
+    .set("Authorization", `Bearer ${adminToken}`);
+  expect(publish.status).toBe(201);
+
+  return publish.body as { id: string; slug: string; title: string };
+}
+
 describe("Auth", () => {
   it("регистрация создаёт компанию в demo-статусе и возвращает access-токен", async () => {
     const { token, companyId } = await registerCompany("0000001");
@@ -438,5 +477,112 @@ describe("Moderation", () => {
       .set("Authorization", `Bearer ${reporter.token}`)
       .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "other" });
     expect(res.status).toBe(400);
+  });
+
+  it("remove_content по жалобе на news_post переводит новость в draft и убирает её из публичной выдачи", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+    const reporter = await registerCompany("0000053");
+    const news = await createPublishedNews(adminToken, "post-removal");
+
+    const complaint = await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_post", entityId: news.id, reasonCode: "false_information" });
+    expect(complaint.status).toBe(201);
+
+    const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].entity).toMatchObject({ type: "news_post", title: news.title, slug: news.slug });
+    const caseId = list.body[0].id as string;
+
+    await ctx.http.post(`/api/admin/moderation/cases/${caseId}/lock`).set("Authorization", `Bearer ${moderatorToken}`);
+    const decision = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/decisions`)
+      .set("Authorization", `Bearer ${moderatorToken}`)
+      .send({ type: "remove_content", reasonCode: "valid_complaint", comment: "Недостоверная информация в новости." });
+    expect(decision.status).toBe(201);
+    expect(decision.body.status).toBe("resolved");
+
+    const updatedNews = await ctx.prisma.newsPost.findUnique({ where: { id: news.id } });
+    expect(updatedNews?.status).toBe(ContentStatus.draft);
+    expect(await ctx.prisma.sanction.count({ where: { caseId, type: SanctionType.content_removal } })).toBe(1);
+
+    const publicNewsFeed = await ctx.http.get("/api/news").set("Authorization", `Bearer ${reporter.token}`);
+    expect(publicNewsFeed.status).toBe(200);
+    expect(publicNewsFeed.body.some((item: { id: string }) => item.id === news.id)).toBe(false);
+
+    const reporterUser = await ctx.prisma.user.findUnique({ where: { email: "user0000053@test.local" } });
+    const complaintNotice = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId: reporterUser!.id, eventType: "moderation.complaint.resolved" },
+    });
+    expect(complaintNotice).toBeTruthy();
+    expect(complaintNotice?.link).toBe(`/news/${news.slug}`);
+  });
+
+  it("remove_content по жалобе на knowledge_article переводит статью в draft", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+    const reporter = await registerCompany("0000054");
+    const article = await createPublishedKnowledgeArticle(adminToken, "kb-removal");
+
+    const complaint = await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "knowledge_article", entityId: article.id, reasonCode: "false_information" });
+    expect(complaint.status).toBe(201);
+
+    const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].entity).toMatchObject({ type: "knowledge_article", title: article.title, slug: article.slug });
+    const caseId = list.body[0].id as string;
+
+    await ctx.http.post(`/api/admin/moderation/cases/${caseId}/lock`).set("Authorization", `Bearer ${moderatorToken}`);
+    const decision = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/decisions`)
+      .set("Authorization", `Bearer ${moderatorToken}`)
+      .send({ type: "remove_content", reasonCode: "valid_complaint" });
+    expect(decision.status).toBe(201);
+    expect(decision.body.status).toBe("resolved");
+
+    const updatedArticle = await ctx.prisma.knowledgeBaseArticle.findUnique({ where: { id: article.id } });
+    expect(updatedArticle?.status).toBe(ContentStatus.draft);
+    expect(await ctx.prisma.sanction.count({ where: { caseId, type: SanctionType.content_removal } })).toBe(1);
+  });
+
+  it("отказывает в жалобе на неопубликованную новость", async () => {
+    const adminToken = await loginAdmin();
+    const reporter = await registerCompany("0000055");
+    const news = await createPublishedNews(adminToken, "draft-rejection");
+
+    const unpublish = await ctx.http
+      .post(`/api/admin/content/news/${news.id}/unpublish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(unpublish.status).toBe(201);
+
+    const res = await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_post", entityId: news.id, reasonCode: "false_information" });
+    expect(res.status).toBe(404);
+  });
+
+  it("warn_company по жалобе на news_post отбивается отсутствием компании автора", async () => {
+    const adminToken = await loginAdmin();
+    const reporter = await registerCompany("0000056");
+    const news = await createPublishedNews(adminToken, "warn-rejection");
+
+    await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_post", entityId: news.id, reasonCode: "spam" });
+
+    const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${adminToken}`);
+    const caseId = list.body[0].id as string;
+    const decision = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/decisions`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ type: "warn_company", reasonCode: "valid_complaint" });
+    expect(decision.status).toBe(400);
   });
 });

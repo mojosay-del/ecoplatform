@@ -84,6 +84,8 @@ describe("ModerationService", () => {
         update,
       },
       comment: { findMany: vi.fn().mockResolvedValue([]) },
+      newsPost: { findMany: vi.fn().mockResolvedValue([]) },
+      knowledgeBaseArticle: { findMany: vi.fn().mockResolvedValue([]) },
       user: { findMany: vi.fn().mockResolvedValue([]) },
     });
 

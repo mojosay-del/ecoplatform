@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const moderatedEntityTypes = ["news_comment", "news_post", "knowledge_article"] as const;
+export type ModeratedEntityType = (typeof moderatedEntityTypes)[number];
+
 export const complaintReasonCodes = [
   "contact_data",
   "false_information",
@@ -20,7 +23,7 @@ export const decisionReasonCodes = [
 
 export const complaintInputSchema = z
   .object({
-    entityType: z.literal("news_comment"),
+    entityType: z.enum(moderatedEntityTypes),
     entityId: z.string().min(1),
     reasonCode: z.enum(complaintReasonCodes),
     comment: z.string().trim().max(500).optional(),
