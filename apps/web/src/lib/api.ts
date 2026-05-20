@@ -6,6 +6,16 @@ export type ApiOptions = {
   body?: unknown;
 };
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     method: options.method ?? "GET",
@@ -19,7 +29,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || "API request failed");
+    throw new ApiError(message || "API request failed", response.status);
   }
 
   return response.json() as Promise<T>;

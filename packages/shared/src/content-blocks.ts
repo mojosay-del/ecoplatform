@@ -111,13 +111,22 @@ export const knowledgeBaseSectionTitles = [
 
 export type KnowledgeBaseSectionTitle = (typeof knowledgeBaseSectionTitles)[number];
 
-export function validateContentBlocks(blocks: BaseContentBlock[]): { ok: true } | { ok: false; message: string } {
+type BlockParseResult =
+  | { success: true }
+  | { success: false; error: { issues: Array<{ message: string }> } };
+
+type BlockSchema = { safeParse: (value: unknown) => BlockParseResult };
+
+export function validateContentBlocks(
+  blocks: BaseContentBlock[],
+  schema: BlockSchema = baseContentBlockSchema,
+): { ok: true } | { ok: false; message: string } {
   if (blocks.length === 0) {
     return { ok: false, message: "Нужен хотя бы один блок контента." };
   }
 
   for (const block of blocks) {
-    const parsed = baseContentBlockSchema.safeParse(block);
+    const parsed = schema.safeParse(block);
 
     if (!parsed.success) {
       return { ok: false, message: parsed.error.issues[0]?.message ?? "Блок контента заполнен неверно." };
@@ -125,4 +134,12 @@ export function validateContentBlocks(blocks: BaseContentBlock[]): { ok: true } 
   }
 
   return { ok: true };
+}
+
+export function validateNewsBlocks(blocks: BaseContentBlock[]): { ok: true } | { ok: false; message: string } {
+  return validateContentBlocks(blocks, newsBlockSchema);
+}
+
+export function validateLessonBlocks(blocks: BaseContentBlock[]): { ok: true } | { ok: false; message: string } {
+  return validateContentBlocks(blocks, lessonBlockSchema);
 }

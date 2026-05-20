@@ -205,6 +205,10 @@ select {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+.textarea.small {
+  min-height: 130px;
+}
+
 .form {
   display: grid;
   gap: 14px;
@@ -285,10 +289,79 @@ select {
   gap: 24px;
 }
 
+.account-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.indices-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stack-list {
+  display: grid;
+  gap: 12px;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checklist-block {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--panel-soft);
+}
+
+.empty-chart {
+  display: grid;
+  place-items: center;
+  min-height: 150px;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+
+.support-ticket {
+  display: grid;
+  gap: 16px;
+}
+
+.message-list {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.reply-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
 @media (max-width: 960px) {
   .app-shell,
   .knowledge-layout,
-  .cms-layout {
+  .cms-layout,
+  .account-layout,
+  .indices-admin-layout,
+  .reply-form {
     grid-template-columns: 1fr;
   }
 
@@ -299,4 +372,101 @@ select {
   .card-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.notification-bell {
+  position: relative;
+}
+
+.notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.notifications-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.notification-list {
+  display: grid;
+  gap: 12px;
+}
+
+.notification-card {
+  background: var(--card, #fff);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 16px 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.notification-card.unread {
+  border-left: 4px solid #4d73d8;
+  background: rgba(77, 115, 216, 0.04);
+}
+
+.notification-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.notification-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.notification-preferences {
+  margin-top: 28px;
+}
+
+.notification-preferences h2 {
+  margin: 0 0 14px;
+  font-size: 22px;
+}
+
+.preference-list {
+  display: grid;
+  gap: 8px;
+  max-width: 560px;
+}
+
+.preference-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 46px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.preference-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--blue);
+}
+
+.preference-row.locked {
+  color: var(--muted);
 }

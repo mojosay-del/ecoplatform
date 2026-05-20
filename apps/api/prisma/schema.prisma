@@ -77,30 +77,58 @@ enum FileAccessLevel {
   conversation_private
 }
 
+enum NotificationCategory {
+  security
+  billing
+  marketplace
+  moderation
+  support
+  system
+}
+
+enum NotificationChannel {
+  in_app
+  email
+  sms
+}
+
+enum NotificationDeliveryStatus {
+  queued
+  in_progress
+  delivered
+  failed
+  retry_scheduled
+  dead_lettered
+  no_recipients
+}
+
 model User {
-  id             String          @id @default(cuid())
-  email          String          @unique
-  phone          String          @unique
-  firstName      String
-  lastName       String
-  passwordHash   String
-  companyId      String?
-  company        Company?        @relation(fields: [companyId], references: [id])
-  platformStaff  PlatformStaff?
-  sessions       Session[]
-  newsLikes      NewsLike[]
-  comments       Comment[]
-  commentLikes   CommentLike[]
-  lessonProgress LessonProgress[]
-  supportTickets SupportTicket[] @relation("SupportTicketAuthor")
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id                      String                       @id @default(cuid())
+  email                   String                       @unique
+  phone                   String                       @unique
+  firstName               String
+  lastName                String
+  passwordHash            String
+  companyId               String?
+  company                 Company?                     @relation(fields: [companyId], references: [id])
+  platformStaff           PlatformStaff?
+  sessions                Session[]
+  newsLikes               NewsLike[]
+  comments                Comment[]
+  commentLikes            CommentLike[]
+  lessonProgress          LessonProgress[]
+  supportTickets          SupportTicket[]              @relation("SupportTicketAuthor")
+  notifications           InAppNotification[]
+  notificationDeliveries  NotificationDelivery[]       @relation("NotificationRecipient")
+  notificationPreferences UserNotificationPreferences?
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
 }
 
 model Company {
-  id                   String          @id @default(cuid())
+  id                   String            @id @default(cuid())
   organizationName     String
-  status               CompanyStatus   @default(demo)
+  status               CompanyStatus     @default(demo)
   demoEndsAt           DateTime?
   subscriptionPlan     SubscriptionPlan?
   subscriptionEndsAt   DateTime?
@@ -114,8 +142,8 @@ model Company {
   users                User[]
   subscriptions        Subscription[]
   supportTickets       SupportTicket[]
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 }
 
 model Subscription {
@@ -167,14 +195,14 @@ model AdminActionLog {
 }
 
 model FileAsset {
-  id            String          @id @default(cuid())
-  originalName  String
-  mimeType      String
-  sizeBytes     Int
-  storageKey    String
-  accessLevel   FileAccessLevel @default(authenticated)
-  uploadedById  String?
-  createdAt     DateTime        @default(now())
+  id           String          @id @default(cuid())
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String
+  accessLevel  FileAccessLevel @default(authenticated)
+  uploadedById String?
+  createdAt    DateTime        @default(now())
 }
 
 model NewsPost {
@@ -275,14 +303,14 @@ model CommentLike {
 }
 
 model NomenclatureCategory {
-  id             String         @id @default(cuid())
-  name           String         @unique
-  slug           String         @unique
-  position       Int            @unique
-  isActive       Boolean        @default(true)
-  nomenclatures  Nomenclature[]
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id            String         @id @default(cuid())
+  name          String         @unique
+  slug          String         @unique
+  position      Int            @unique
+  isActive      Boolean        @default(true)
+  nomenclatures Nomenclature[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Nomenclature {
@@ -326,20 +354,20 @@ model PriceIndexValue {
 }
 
 model LearningModule {
-  id               String                @id @default(cuid())
+  id               String                 @id @default(cuid())
   title            String
   summary          String
   description      String
   coverImageId     String?
-  accessLevel      LearningAccessLevel   @default(basic)
+  accessLevel      LearningAccessLevel    @default(basic)
   oneTimePrice     Int?
-  status           ContentStatus         @default(draft)
+  status           ContentStatus          @default(draft)
   firstPublishedAt DateTime?
   createdById      String
   preview          LearningModulePreview?
   chapters         Chapter[]
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 }
 
 model LearningModulePreview {
@@ -448,27 +476,83 @@ model KnowledgeBaseBlock {
   @@unique([articleId, position])
 }
 
+model InAppNotification {
+  id            String                @id @default(cuid())
+  userId        String
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryId    String?               @unique
+  delivery      NotificationDelivery? @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  domainEventId String
+  eventType     String
+  sourceId      String?
+  category      NotificationCategory
+  title         String
+  body          String
+  link          String?
+  payload       Json?
+  readAt        DateTime?
+  archivedAt    DateTime?
+  createdAt     DateTime              @default(now())
+
+  @@unique([domainEventId, userId])
+  @@index([userId, archivedAt, readAt])
+  @@index([userId, createdAt])
+}
+
+model UserNotificationPreferences {
+  id                   String                 @id @default(cuid())
+  userId               String                 @unique
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inAppMutedCategories NotificationCategory[] @default([])
+  emailMutedCategories NotificationCategory[] @default([])
+  updatedAt            DateTime               @updatedAt
+}
+
+model NotificationDelivery {
+  id                String                     @id @default(cuid())
+  domainEventId     String
+  eventType         String
+  recipientUserId   String
+  recipient         User                       @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  channel           NotificationChannel
+  address           String?
+  status            NotificationDeliveryStatus @default(queued)
+  attempt           Int                        @default(0)
+  providerMessageId String?
+  providerErrorCode String?
+  providerErrorText String?
+  queuedAt          DateTime                   @default(now())
+  finishedAt        DateTime?
+  inAppNotification InAppNotification?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@unique([domainEventId, recipientUserId, channel])
+  @@index([recipientUserId, createdAt])
+  @@index([status, createdAt])
+}
+
 model SupportTicket {
-  id             String                @id @default(cuid())
-  authorId       String
-  author         User                  @relation("SupportTicketAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  companyId      String
-  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  category       SupportTicketCategory
-  subject        String
-  status         SupportTicketStatus   @default(new)
-  messages       SupportTicketMessage[]
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  id        String                 @id @default(cuid())
+  authorId  String
+  author    User                   @relation("SupportTicketAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category  SupportTicketCategory
+  subject   String
+  status    SupportTicketStatus    @default(new)
+  messages  SupportTicketMessage[]
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
 }
 
 model SupportTicketMessage {
-  id          String        @id @default(cuid())
-  ticketId    String
-  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  authorId    String
-  authorRole  String
-  text        String
-  isInternal  Boolean       @default(false)
-  createdAt   DateTime      @default(now())
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  authorRole String
+  text       String
+  isInternal Boolean       @default(false)
+  createdAt  DateTime      @default(now())
 }

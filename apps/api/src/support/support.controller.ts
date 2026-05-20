@@ -30,7 +30,7 @@ export class SupportController {
   @Post("support/tickets/:id/replies")
   async ownReply(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(replySchema, body);
-    return this.support.reply(id, user.id, "company_user", input.text);
+    return this.support.replyAsCompanyUser(id, user.id, user.companyId!, input.text);
   }
 
   @UseGuards(RolesGuard)
@@ -45,6 +45,6 @@ export class SupportController {
   @Post("admin/support/tickets/:id/replies")
   async adminReply(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(replySchema, body);
-    return this.support.reply(id, user.id, "admin", input.text);
+    return this.support.replyAsAdmin(id, user.id, input.text);
   }
 }

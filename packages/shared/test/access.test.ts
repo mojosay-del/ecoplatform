@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { canAccessLearningLevel, canOpenFunctionalSections, demoEndsAt, summarizePriceIndex, slugify } from "../src";
+import {
+  canAccessLearningLevel,
+  canOpenFunctionalSections,
+  demoEndsAt,
+  summarizePriceIndex,
+  slugify,
+  validateLessonBlocks,
+  validateNewsBlocks,
+} from "../src";
 
 describe("MVP access rules", () => {
   it("treats active demo as basic access", () => {
@@ -14,6 +22,18 @@ describe("MVP access rules", () => {
     expect(canOpenFunctionalSections(company, now)).toBe(true);
     expect(canAccessLearningLevel(company, "basic", false, now)).toBe(true);
     expect(canAccessLearningLevel(company, "extended", false, now)).toBe(false);
+  });
+
+  it("closes functional sections after demo expires", () => {
+    const now = new Date("2026-05-20T10:00:00.000Z");
+    const company = {
+      status: "demo" as const,
+      demoEndsAt: new Date("2026-05-20T09:59:59.000Z"),
+      subscriptionPlan: null,
+      subscriptionEndsAt: null,
+    };
+
+    expect(canOpenFunctionalSections(company, now)).toBe(false);
   });
 });
 
@@ -35,5 +55,29 @@ describe("price index helpers", () => {
 describe("slug helper", () => {
   it("transliterates Russian headings", () => {
     expect(slugify("Гофрокартон и бумага")).toBe("gofrokarton-i-bumaga");
+  });
+});
+
+describe("content block validation", () => {
+  it("rejects file blocks in news", () => {
+    const result = validateNewsBlocks([
+      {
+        type: "file",
+        payload: { fileId: "file-1", displayName: "ГОСТ.pdf" },
+      },
+    ]);
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects audio blocks in lessons", () => {
+    const result = validateLessonBlocks([
+      {
+        type: "audio",
+        payload: { fileId: "audio-1" },
+      },
+    ]);
+
+    expect(result.ok).toBe(false);
   });
 });

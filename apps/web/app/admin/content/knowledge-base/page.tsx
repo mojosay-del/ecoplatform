@@ -15,5 +15,13 @@ const sample = {
 };
 
 export default function AdminKnowledgePage() {
-  return <AdminJsonEditor title="CMS / База знаний" endpoint="/admin/content/knowledge-base" sample={sample} />;
+  return (
+    <AdminJsonEditor
+      title="CMS / База знаний"
+      endpoint="/admin/content/knowledge-base"
+      listEndpoint="/admin/content/knowledge-base"
+      publishEndpointTemplate="/admin/content/knowledge-base/:id/publish"
+      sample={sample}
+    />
+  );
 }

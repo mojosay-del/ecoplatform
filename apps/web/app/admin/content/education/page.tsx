@@ -29,5 +29,13 @@ const sample = {
 };
 
 export default function AdminEducationPage() {
-  return <AdminJsonEditor title="CMS / Обучение" endpoint="/admin/content/education/modules" sample={sample} />;
+  return (
+    <AdminJsonEditor
+      title="CMS / Обучение"
+      endpoint="/admin/content/education/modules"
+      listEndpoint="/admin/content/education"
+      publishEndpointTemplate="/admin/content/education/modules/:id/publish"
+      sample={sample}
+    />
+  );
 }

@@ -5,8 +5,8 @@
     "rootDir": "src",
     "declaration": true,
     "declarationMap": true,
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "noEmit": false
   },
   "include": ["src/**/*.ts"],

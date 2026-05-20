@@ -15,5 +15,13 @@ const sample = {
 };
 
 export default function AdminNewsPage() {
-  return <AdminJsonEditor title="CMS / Новости" endpoint="/admin/content/news" sample={sample} />;
+  return (
+    <AdminJsonEditor
+      title="CMS / Новости"
+      endpoint="/admin/content/news"
+      listEndpoint="/admin/content/news"
+      publishEndpointTemplate="/admin/content/news/:id/publish"
+      sample={sample}
+    />
+  );
 }

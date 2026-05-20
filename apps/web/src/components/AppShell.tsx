@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   BookOpen,
@@ -20,8 +21,17 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
+import { NotificationBell } from "./NotificationBell";
 
-const nav = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  disabled?: boolean;
+  roles?: string[];
+};
+
+const nav: Array<{ title: string; items: NavItem[] }> = [
   {
     title: "Главная",
     items: [
@@ -58,8 +68,9 @@ const nav = [
     title: "Служебное",
     items: [
       { href: "/account", label: "Личный кабинет", icon: Settings },
-      { href: "/admin/content/news", label: "Админ / CMS", icon: Shield },
-      { href: "/admin/support", label: "Поддержка", icon: HelpCircle },
+      { href: "/notifications", label: "Уведомления", icon: Bell },
+      { href: "/admin/content/news", label: "Админ / CMS", icon: Shield, roles: ["admin", "content_manager"] },
+      { href: "/admin/support", label: "Поддержка", icon: HelpCircle, roles: ["admin"] },
     ],
   },
 ];
@@ -78,7 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {nav.map((section) => (
           <nav className="nav-section" key={section.title}>
             <p className="nav-title">{section.title}</p>
-            {section.items.map((item) => {
+            {section.items.filter((item) => !item.roles || item.roles.some((role) => user?.platformRoles.includes(role))).map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return item.disabled ? (
@@ -99,9 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="main">
         <header className="topbar">
           <div className="topbar-search" />
-          <button className="icon-button" title="Уведомления">
-            <Bell size={25} />
-          </button>
+          <NotificationBell />
           <button className="icon-button" title="Настройки">
             <Settings size={25} />
           </button>

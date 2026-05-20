@@ -1,3 +1,9 @@
+import { config as loadEnv } from "dotenv";
+import { resolve } from "path";
+
+// Сид может запускаться отдельно от приложения, поэтому загружаем .env здесь же.
+loadEnv({ path: resolve(__dirname, "../../../.env") });
+
 import { PrismaClient, CompanyStatus, ContentStatus, LearningAccessLevel, PlatformRole, SubscriptionPlan } from "@prisma/client";
 import { hash } from "bcryptjs";
 import { demoEndsAt, slugify } from "@ecoplatform/shared";
@@ -134,95 +140,102 @@ async function main() {
     create: { newsPostId: news.id, newsTagId: tag.id },
   });
 
-  const module = await prisma.learningModule.create({
-    data: {
-      title: "Закупка сырья",
-      summary: "Базовые правила закупки вторсырья без типичных ошибок новичков.",
-      description: "Практический модуль для сотрудников, которые принимают и оценивают сырьё.",
-      accessLevel: LearningAccessLevel.basic,
-      status: ContentStatus.published,
-      firstPublishedAt: new Date(),
-      createdById: admin.id,
-      preview: {
-        create: {
-          promotionalDescription: "В модуле собраны практические правила закупки сырья.",
-          whatYouWillLearn: ["Оценивать качество партии", "Понимать риски влажности и засора"],
+  const existingPurchaseModule = await prisma.learningModule.findFirst({ where: { title: "Закупка сырья" } });
+  const module =
+    existingPurchaseModule ??
+    (await prisma.learningModule.create({
+      data: {
+        title: "Закупка сырья",
+        summary: "Базовые правила закупки вторсырья без типичных ошибок новичков.",
+        description: "Практический модуль для сотрудников, которые принимают и оценивают сырьё.",
+        accessLevel: LearningAccessLevel.basic,
+        status: ContentStatus.published,
+        firstPublishedAt: new Date(),
+        createdById: admin.id,
+        preview: {
+          create: {
+            promotionalDescription: "В модуле собраны практические правила закупки сырья.",
+            whatYouWillLearn: ["Оценивать качество партии", "Понимать риски влажности и засора"],
+          },
+        },
+        chapters: {
+          create: [
+            {
+              title: "Основы приёмки",
+              position: 0,
+              lessons: {
+                create: [
+                  {
+                    title: "Что проверить до покупки",
+                    position: 0,
+                    status: ContentStatus.published,
+                    firstPublishedAt: new Date(),
+                    blocks: {
+                      create: [
+                        {
+                          position: 0,
+                          type: "paragraph",
+                          payload: { markdown: "Проверьте вид сырья, влажность, засор, форму поставки и документы." },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          ],
         },
       },
-      chapters: {
-        create: [
-          {
-            title: "Основы приёмки",
-            position: 0,
-            lessons: {
-              create: [
-                {
-                  title: "Что проверить до покупки",
-                  position: 0,
-                  status: ContentStatus.published,
-                  firstPublishedAt: new Date(),
-                  blocks: {
-                    create: [
-                      {
-                        position: 0,
-                        type: "paragraph",
-                        payload: { markdown: "Проверьте вид сырья, влажность, засор, форму поставки и документы." },
-                      },
-                    ],
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-  });
+    }));
 
-  await prisma.learningModule.create({
-    data: {
-      title: "Склад",
-      summary: "Как организовать склад, сортировку и хранение сырья.",
-      description: "Модуль про складские процессы, тюки, россыпь и подготовку к отгрузке.",
-      accessLevel: LearningAccessLevel.basic,
-      status: ContentStatus.published,
-      firstPublishedAt: new Date(),
-      createdById: admin.id,
-      preview: {
-        create: {
-          promotionalDescription: "Складской модуль помогает снизить потери на приёмке и хранении.",
-          whatYouWillLearn: ["Разделять потоки сырья", "Готовить партии к продаже"],
+  const existingWarehouseModule = await prisma.learningModule.findFirst({ where: { title: "Склад" } });
+
+  if (!existingWarehouseModule) {
+    await prisma.learningModule.create({
+      data: {
+        title: "Склад",
+        summary: "Как организовать склад, сортировку и хранение сырья.",
+        description: "Модуль про складские процессы, тюки, россыпь и подготовку к отгрузке.",
+        accessLevel: LearningAccessLevel.basic,
+        status: ContentStatus.published,
+        firstPublishedAt: new Date(),
+        createdById: admin.id,
+        preview: {
+          create: {
+            promotionalDescription: "Складской модуль помогает снизить потери на приёмке и хранении.",
+            whatYouWillLearn: ["Разделять потоки сырья", "Готовить партии к продаже"],
+          },
+        },
+        chapters: {
+          create: [
+            {
+              title: "Организация склада",
+              position: 0,
+              lessons: {
+                create: [
+                  {
+                    title: "Зоны хранения",
+                    position: 0,
+                    status: ContentStatus.published,
+                    firstPublishedAt: new Date(),
+                    blocks: {
+                      create: [
+                        {
+                          position: 0,
+                          type: "paragraph",
+                          payload: { markdown: "Отделяйте мокрое сырьё от сухого, а спорные партии маркируйте отдельно." },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          ],
         },
       },
-      chapters: {
-        create: [
-          {
-            title: "Организация склада",
-            position: 0,
-            lessons: {
-              create: [
-                {
-                  title: "Зоны хранения",
-                  position: 0,
-                  status: ContentStatus.published,
-                  firstPublishedAt: new Date(),
-                  blocks: {
-                    create: [
-                      {
-                        position: 0,
-                        type: "paragraph",
-                        payload: { markdown: "Отделяйте мокрое сырьё от сухого, а спорные партии маркируйте отдельно." },
-                      },
-                    ],
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-  });
+    });
+  }
 
   await prisma.knowledgeBaseArticle.upsert({
     where: { slug: "gofrokarton" },

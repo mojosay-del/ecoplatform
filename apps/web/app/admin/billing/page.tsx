@@ -8,5 +8,13 @@ const sample = {
 };
 
 export default function AdminBillingPage() {
-  return <AdminJsonEditor title="Админ / Ручная подписка" endpoint="/admin/billing/manual-subscriptions" sample={sample} />;
+  return (
+    <AdminJsonEditor
+      title="Админ / Ручная подписка"
+      endpoint="/admin/billing/manual-subscriptions"
+      listEndpoint="/admin/billing/companies"
+      listTitleKey="organizationName"
+      sample={sample}
+    />
+  );
 }

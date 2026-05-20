@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ecoplatform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ecoplatform
+      POSTGRES_PASSWORD: ecoplatform
+      POSTGRES_DB: ecoplatform
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecoplatform -d ecoplatform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
