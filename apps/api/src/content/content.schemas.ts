@@ -100,3 +100,56 @@ export const knowledgeMoveInputSchema = z.object({
   parentId: z.string().nullable(),
   position: z.number().int().nonnegative(),
 });
+
+export const learningModuleUpdateInputSchema = z.object({
+  title: z.string().min(1).optional(),
+  summary: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  coverImageId: z.string().nullable().optional(),
+  accessLevel: z.enum(["basic", "extended", "one_time"]).optional(),
+  oneTimePrice: z.number().int().positive().nullable().optional(),
+  preview: z
+    .object({
+      promotionalDescription: z.string().min(1),
+      whatYouWillLearn: z.array(z.string()).default([]),
+    })
+    .optional(),
+});
+
+export const chapterInputSchema = z.object({
+  title: z.string().min(1),
+  position: z.number().int().nonnegative(),
+});
+
+export const chapterUpdateInputSchema = z.object({
+  title: z.string().min(1).optional(),
+  position: z.number().int().nonnegative().optional(),
+});
+
+export const lessonInputSchema = z.object({
+  title: z.string().min(1),
+  position: z.number().int().nonnegative(),
+  blocks: z.array(lessonBlockSchema).default([]),
+  attachments: z
+    .array(
+      z.object({
+        fileId: z.string().min(1),
+        displayName: z.string().min(1),
+      }),
+    )
+    .default([]),
+});
+
+export const lessonUpdateInputSchema = z.object({
+  title: z.string().min(1).optional(),
+  position: z.number().int().nonnegative().optional(),
+  blocks: z.array(lessonBlockSchema).optional(),
+  attachments: z
+    .array(
+      z.object({
+        fileId: z.string().min(1),
+        displayName: z.string().min(1),
+      }),
+    )
+    .optional(),
+});

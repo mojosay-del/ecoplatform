@@ -8,10 +8,15 @@ import { parseBody } from "../common/zod";
 import {
   categoryInputSchema,
   categoryUpdateInputSchema,
+  chapterInputSchema,
+  chapterUpdateInputSchema,
   commentInputSchema,
   knowledgeArticleInputSchema,
   knowledgeMoveInputSchema,
   learningModuleInputSchema,
+  learningModuleUpdateInputSchema,
+  lessonInputSchema,
+  lessonUpdateInputSchema,
   newsInputSchema,
   nomenclatureInputSchema,
   nomenclatureUpdateInputSchema,
@@ -260,9 +265,107 @@ export class ContentController {
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
+  @Patch("admin/content/education/modules/:id")
+  async updateLearningModule(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.content.updateLearningModule(id, parseBody(learningModuleUpdateInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
   @Post("admin/content/education/modules/:id/publish")
-  async publishLearningModule(@Param("id") id: string) {
-    return this.content.publishLearningModule(id);
+  async publishLearningModule(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.content.publishLearningModule(id, user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Post("admin/content/education/modules/:id/unpublish")
+  async unpublishLearningModule(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.unpublishLearningModule(id, user, body?.reason);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Delete("admin/content/education/modules/:id")
+  async deleteLearningModule(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.deleteLearningModule(id, user, body?.reason);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
+  @Post("admin/content/education/modules/:moduleId/chapters")
+  async createChapter(
+    @Param("moduleId") moduleId: string,
+    @Body() body: unknown,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.createChapter(moduleId, parseBody(chapterInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
+  @Patch("admin/content/education/chapters/:id")
+  async updateChapter(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.content.updateChapter(id, parseBody(chapterUpdateInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
+  @Delete("admin/content/education/chapters/:id")
+  async deleteChapter(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.deleteChapter(id, user, body?.reason);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
+  @Post("admin/content/education/chapters/:chapterId/lessons")
+  async createLesson(
+    @Param("chapterId") chapterId: string,
+    @Body() body: unknown,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.createLesson(chapterId, parseBody(lessonInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
+  @Patch("admin/content/education/lessons/:id")
+  async updateLesson(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.content.updateLesson(id, parseBody(lessonUpdateInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
+  @Delete("admin/content/education/lessons/:id")
+  async deleteLesson(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.deleteLesson(id, user, body?.reason);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Post("admin/content/education/lessons/:id/unpublish")
+  async unpublishLesson(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.unpublishLesson(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)

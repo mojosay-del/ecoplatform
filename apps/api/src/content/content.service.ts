@@ -17,8 +17,13 @@ import type { RequestUser } from "../common/request-user";
 import type {
   categoryInputSchema,
   categoryUpdateInputSchema,
+  chapterInputSchema,
+  chapterUpdateInputSchema,
   knowledgeArticleInputSchema,
   learningModuleInputSchema,
+  learningModuleUpdateInputSchema,
+  lessonInputSchema,
+  lessonUpdateInputSchema,
   newsInputSchema,
   nomenclatureInputSchema,
   nomenclatureUpdateInputSchema,
@@ -35,6 +40,11 @@ type NomenclatureUpdateInput = z.infer<typeof nomenclatureUpdateInputSchema>;
 type PriceIndexInput = z.infer<typeof priceIndexInputSchema>;
 type PriceIndexValueInput = z.infer<typeof priceIndexValueInputSchema>;
 type LearningModuleInput = z.infer<typeof learningModuleInputSchema>;
+type LearningModuleUpdateInput = z.infer<typeof learningModuleUpdateInputSchema>;
+type ChapterInput = z.infer<typeof chapterInputSchema>;
+type ChapterUpdateInput = z.infer<typeof chapterUpdateInputSchema>;
+type LessonInput = z.infer<typeof lessonInputSchema>;
+type LessonUpdateInput = z.infer<typeof lessonUpdateInputSchema>;
 type KnowledgeArticleInput = z.infer<typeof knowledgeArticleInputSchema>;
 
 @Injectable()
@@ -724,7 +734,7 @@ export class ContentService {
       }
     }
 
-    return this.prisma.learningModule.create({
+    const module = await this.prisma.learningModule.create({
       data: {
         title: input.title,
         summary: input.summary,
@@ -743,10 +753,12 @@ export class ContentService {
           create: input.chapters.map((chapter, chapterIndex) => ({
             title: chapter.title,
             position: chapterIndex,
+            createdById: user.id,
             lessons: {
               create: chapter.lessons.map((lesson, lessonIndex) => ({
                 title: lesson.title,
                 position: lessonIndex,
+                createdById: user.id,
                 blocks: {
                   create: lesson.blocks.map((block, blockIndex) => ({
                     position: blockIndex,
@@ -767,19 +779,53 @@ export class ContentService {
         },
       },
     });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.module.create",
+      entityType: "LearningModule",
+      entityId: module.id,
+    });
+
+    return module;
   }
 
-  async publishLearningModule(id: string) {
-    const now = new Date();
+  async publishLearningModule(id: string, user: RequestUser) {
+    const existing = await this.prisma.learningModule.findUnique({
+      where: { id },
+      include: { chapters: { include: { lessons: { include: { _count: { select: { blocks: true } } } } } } },
+    });
+    if (!existing) {
+      throw new NotFoundException("Модуль не найден.");
+    }
+    if (existing.chapters.length === 0) {
+      throw new ForbiddenException("Нельзя опубликовать модуль без глав.");
+    }
+    for (const chapter of existing.chapters) {
+      if (chapter.lessons.length === 0) {
+        throw new ForbiddenException(`В главе «${chapter.title}» нет уроков.`);
+      }
+      for (const lesson of chapter.lessons) {
+        if (lesson._count.blocks === 0) {
+          throw new ForbiddenException(`Урок «${lesson.title}» не содержит блоков.`);
+        }
+      }
+    }
 
-    return this.prisma.$transaction(async (tx) => {
+    const now = new Date();
+    const result = await this.prisma.$transaction(async (tx) => {
       const module = await tx.learningModule.update({
         where: { id },
-        data: { status: ContentStatus.published, firstPublishedAt: now },
+        data: {
+          status: ContentStatus.published,
+          firstPublishedAt: existing.firstPublishedAt ?? now,
+        },
         include: { chapters: { include: { lessons: true } } },
       });
 
-      const lessonIds = module.chapters.flatMap((chapter) => chapter.lessons.map((lesson) => lesson.id));
+      const lessonIds = module.chapters.flatMap((chapter) =>
+        chapter.lessons.filter((lesson) => lesson.status === ContentStatus.draft).map((lesson) => lesson.id),
+      );
 
       if (lessonIds.length > 0) {
         await tx.lesson.updateMany({
@@ -790,6 +836,317 @@ export class ContentService {
 
       return module;
     });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.module.publish",
+      entityType: "LearningModule",
+      entityId: id,
+    });
+
+    return result;
+  }
+
+  async unpublishLearningModule(id: string, user: RequestUser, reason?: string) {
+    const existing = await this.prisma.learningModule.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Модуль не найден.");
+    }
+
+    const module = await this.prisma.learningModule.update({
+      where: { id },
+      data: { status: ContentStatus.draft },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.module.unpublish",
+      entityType: "LearningModule",
+      entityId: id,
+      comment: reason,
+    });
+
+    return module;
+  }
+
+  async updateLearningModule(id: string, input: LearningModuleUpdateInput, user: RequestUser) {
+    const existing = await this.prisma.learningModule.findUnique({
+      where: { id },
+      include: { preview: true },
+    });
+    if (!existing) {
+      throw new NotFoundException("Модуль не найден.");
+    }
+
+    const data: Prisma.LearningModuleUpdateInput = {};
+    if (input.title !== undefined) data.title = input.title;
+    if (input.summary !== undefined) data.summary = input.summary;
+    if (input.description !== undefined) data.description = input.description;
+    if (input.coverImageId !== undefined) data.coverImageId = input.coverImageId;
+    if (input.accessLevel !== undefined) data.accessLevel = input.accessLevel;
+    if (input.oneTimePrice !== undefined) data.oneTimePrice = input.oneTimePrice;
+
+    if (input.preview) {
+      data.preview = {
+        upsert: {
+          create: {
+            promotionalDescription: input.preview.promotionalDescription,
+            whatYouWillLearn: input.preview.whatYouWillLearn,
+          },
+          update: {
+            promotionalDescription: input.preview.promotionalDescription,
+            whatYouWillLearn: input.preview.whatYouWillLearn,
+          },
+        },
+      };
+    }
+
+    const module = await this.prisma.learningModule.update({
+      where: { id },
+      data,
+      include: { preview: true },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.module.update",
+      entityType: "LearningModule",
+      entityId: id,
+      payload: input,
+    });
+
+    return module;
+  }
+
+  async deleteLearningModule(id: string, user: RequestUser, reason?: string) {
+    const existing = await this.prisma.learningModule.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Модуль не найден.");
+    }
+
+    await this.prisma.learningModule.delete({ where: { id } });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.module.delete",
+      entityType: "LearningModule",
+      entityId: id,
+      comment: reason,
+      payload: { title: existing.title },
+    });
+
+    return { ok: true };
+  }
+
+  async createChapter(moduleId: string, input: ChapterInput, user: RequestUser) {
+    const module = await this.prisma.learningModule.findUnique({ where: { id: moduleId } });
+    if (!module) {
+      throw new NotFoundException("Модуль не найден.");
+    }
+
+    const chapter = await this.prisma.chapter.create({
+      data: {
+        moduleId,
+        title: input.title,
+        position: input.position,
+        createdById: user.id,
+      },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.chapter.create",
+      entityType: "Chapter",
+      entityId: chapter.id,
+      payload: { moduleId },
+    });
+
+    return chapter;
+  }
+
+  async updateChapter(id: string, input: ChapterUpdateInput, user: RequestUser) {
+    const existing = await this.prisma.chapter.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Глава не найдена.");
+    }
+
+    const chapter = await this.prisma.chapter.update({ where: { id }, data: input });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.chapter.update",
+      entityType: "Chapter",
+      entityId: id,
+      payload: input,
+    });
+
+    return chapter;
+  }
+
+  async deleteChapter(id: string, user: RequestUser, reason?: string) {
+    const existing = await this.prisma.chapter.findUnique({
+      where: { id },
+      include: { _count: { select: { lessons: true } } },
+    });
+    if (!existing) {
+      throw new NotFoundException("Глава не найдена.");
+    }
+    if (existing._count.lessons > 0) {
+      throw new ForbiddenException("Нельзя удалить главу с уроками.");
+    }
+
+    await this.prisma.chapter.delete({ where: { id } });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.chapter.delete",
+      entityType: "Chapter",
+      entityId: id,
+      comment: reason,
+      payload: { title: existing.title, moduleId: existing.moduleId },
+    });
+
+    return { ok: true };
+  }
+
+  async createLesson(chapterId: string, input: LessonInput, user: RequestUser) {
+    const chapter = await this.prisma.chapter.findUnique({ where: { id: chapterId } });
+    if (!chapter) {
+      throw new NotFoundException("Глава не найдена.");
+    }
+
+    const check = validateContentBlocks(input.blocks, lessonBlockSchema);
+    if (!check.ok) {
+      throw new ForbiddenException(check.message);
+    }
+
+    const lesson = await this.prisma.lesson.create({
+      data: {
+        chapterId,
+        title: input.title,
+        position: input.position,
+        createdById: user.id,
+        blocks: {
+          create: input.blocks.map((block, position) => ({
+            position,
+            type: block.type,
+            payload: this.payload(block),
+          })),
+        },
+        attachments: {
+          create: input.attachments.map((attachment, position) => ({
+            fileId: attachment.fileId,
+            displayName: attachment.displayName,
+            position,
+          })),
+        },
+      },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.lesson.create",
+      entityType: "Lesson",
+      entityId: lesson.id,
+      payload: { chapterId },
+    });
+
+    return lesson;
+  }
+
+  async updateLesson(id: string, input: LessonUpdateInput, user: RequestUser) {
+    const existing = await this.prisma.lesson.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Урок не найден.");
+    }
+
+    if (input.blocks) {
+      const check = validateContentBlocks(input.blocks, lessonBlockSchema);
+      if (!check.ok) {
+        throw new ForbiddenException(check.message);
+      }
+    }
+
+    const lesson = await this.prisma.$transaction(async (tx) => {
+      const data: Prisma.LessonUpdateInput = {};
+      if (input.title !== undefined) data.title = input.title;
+      if (input.position !== undefined) data.position = input.position;
+
+      if (input.blocks) {
+        await tx.lessonContentBlock.deleteMany({ where: { lessonId: id } });
+        data.blocks = {
+          create: input.blocks.map((block, position) => ({
+            position,
+            type: block.type,
+            payload: this.payload(block),
+          })),
+        };
+      }
+
+      if (input.attachments) {
+        await tx.lessonAttachment.deleteMany({ where: { lessonId: id } });
+        data.attachments = {
+          create: input.attachments.map((attachment, position) => ({
+            fileId: attachment.fileId,
+            displayName: attachment.displayName,
+            position,
+          })),
+        };
+      }
+
+      return tx.lesson.update({ where: { id }, data });
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.lesson.update",
+      entityType: "Lesson",
+      entityId: id,
+    });
+
+    return lesson;
+  }
+
+  async deleteLesson(id: string, user: RequestUser, reason?: string) {
+    const existing = await this.prisma.lesson.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Урок не найден.");
+    }
+
+    await this.prisma.lesson.delete({ where: { id } });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.lesson.delete",
+      entityType: "Lesson",
+      entityId: id,
+      comment: reason,
+      payload: { title: existing.title, chapterId: existing.chapterId },
+    });
+
+    return { ok: true };
+  }
+
+  async unpublishLesson(id: string, user: RequestUser, reason?: string) {
+    const existing = await this.prisma.lesson.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Урок не найден.");
+    }
+
+    const lesson = await this.prisma.lesson.update({
+      where: { id },
+      data: { status: ContentStatus.draft },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.lesson.unpublish",
+      entityType: "Lesson",
+      entityId: id,
+      comment: reason,
+    });
+
+    return lesson;
   }
 
   async completeLesson(lessonId: string, user: RequestUser) {
