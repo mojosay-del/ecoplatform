@@ -13,7 +13,7 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ["src/**/*.integration.test.ts"],
+    include: ["src/*.integration.test.ts", "src/**/*.integration.test.ts"],
     globalSetup: ["src/test/integration-global-setup.ts"],
     setupFiles: ["src/test/integration-setup.ts"],
     // Integration-тесты используют одну реальную БД, поэтому отключаем параллелизм.

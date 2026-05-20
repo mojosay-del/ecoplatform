@@ -276,3 +276,167 @@ describe("Support ownership", () => {
     expect(adminReply.body.messages.some((m: { authorRole: string; text: string }) => m.authorRole === "admin" && m.text === "Ответ админа")).toBe(true);
   });
 });
+
+describe("Moderation", () => {
+  it("создаёт жалобу на опубликованный комментарий, дедуплицирует повтор и агрегирует второго пользователя", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0000040");
+    const reporterA = await registerCompany("0000041");
+    const reporterB = await registerCompany("0000042");
+    const { comment } = await createPublishedNewsWithComment(adminToken, author.token);
+
+    const first = await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporterA.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "spam" });
+    expect(first.status).toBe(201);
+    expect(first.body.duplicate).toBe(false);
+
+    const duplicate = await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporterA.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "spam" });
+    expect(duplicate.status).toBe(201);
+    expect(duplicate.body.duplicate).toBe(true);
+
+    const second = await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporterB.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "false_information" });
+    expect(second.status).toBe(201);
+    expect(second.body.duplicate).toBe(false);
+
+    expect(await ctx.prisma.moderationCase.count({ where: { entityType: "news_comment", entityId: comment.id } })).toBe(1);
+    expect(await ctx.prisma.complaint.count({ where: { entityType: "news_comment", entityId: comment.id } })).toBe(2);
+  });
+
+  it("не пускает обычного пользователя в очередь и позволяет модератору взять и освободить lock", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+    const author = await registerCompany("0000043");
+    const reporter = await registerCompany("0000044");
+    const { comment } = await createPublishedNewsWithComment(adminToken, author.token);
+
+    await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "offensive_content" });
+
+    const forbidden = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${reporter.token}`);
+    expect(forbidden.status).toBe(403);
+
+    const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
+    expect(list.status).toBe(200);
+    expect(list.body).toHaveLength(1);
+    const caseId = list.body[0].id as string;
+
+    const lock = await ctx.http.post(`/api/admin/moderation/cases/${caseId}/lock`).set("Authorization", `Bearer ${moderatorToken}`);
+    expect(lock.status).toBe(201);
+    expect(lock.body.status).toBe("in_review");
+    expect(lock.body.lockedBy.email).toBe("moderator@test.local");
+
+    const release = await ctx.http.post(`/api/admin/moderation/cases/${caseId}/release`).set("Authorization", `Bearer ${moderatorToken}`);
+    expect(release.status).toBe(201);
+    expect(release.body.status).toBe("open");
+    expect(release.body.lockedById).toBeNull();
+  });
+
+  it("remove_content скрывает комментарий из публичной новости и создаёт sanction", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+    const author = await registerCompany("0000045");
+    const reporter = await registerCompany("0000046");
+    const { news, comment } = await createPublishedNewsWithComment(adminToken, author.token);
+
+    await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "illegal_content" });
+
+    const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
+    const caseId = list.body[0].id as string;
+    await ctx.http.post(`/api/admin/moderation/cases/${caseId}/lock`).set("Authorization", `Bearer ${moderatorToken}`);
+
+    const decision = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/decisions`)
+      .set("Authorization", `Bearer ${moderatorToken}`)
+      .send({ type: "remove_content", reasonCode: "valid_complaint", comment: "Нарушение правил." });
+    expect(decision.status).toBe(201);
+    expect(decision.body.status).toBe("resolved");
+
+    const updatedComment = await ctx.prisma.comment.findUnique({ where: { id: comment.id } });
+    expect(updatedComment?.status).toBe(CommentStatus.hidden_by_moderator);
+    expect(await ctx.prisma.sanction.count({ where: { caseId, type: SanctionType.content_removal } })).toBe(1);
+
+    const publicNews = await ctx.http.get(`/api/news/${news.slug}`).set("Authorization", `Bearer ${reporter.token}`);
+    expect(publicNews.status).toBe(200);
+    expect(publicNews.body.comments.some((item: { id: string }) => item.id === comment.id)).toBe(false);
+  });
+
+  it("leave_as_is закрывает кейс без изменения комментария", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0000047");
+    const reporter = await registerCompany("0000048");
+    const { comment } = await createPublishedNewsWithComment(adminToken, author.token);
+
+    await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "false_information" });
+
+    const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${adminToken}`);
+    const caseId = list.body[0].id as string;
+    const decision = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/decisions`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ type: "leave_as_is", reasonCode: "unfounded_complaint" });
+    expect(decision.status).toBe(201);
+    expect(decision.body.status).toBe("resolved");
+
+    const updatedComment = await ctx.prisma.comment.findUnique({ where: { id: comment.id } });
+    expect(updatedComment?.status).toBe(CommentStatus.published);
+    expect(await ctx.prisma.complaint.count({ where: { caseId, status: "resolved" } })).toBe(1);
+  });
+
+  it("warn_company создаёт warning sanction и уведомляет автора комментария", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0000049");
+    const reporter = await registerCompany("0000050");
+    const { comment } = await createPublishedNewsWithComment(adminToken, author.token);
+
+    await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "contact_data" });
+
+    const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${adminToken}`);
+    const caseId = list.body[0].id as string;
+    const decision = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/decisions`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ type: "warn_company", reasonCode: "valid_complaint", comment: "Контактные данные в комментарии." });
+    expect(decision.status).toBe(201);
+
+    const sanction = await ctx.prisma.sanction.findFirst({ where: { caseId, type: SanctionType.warning } });
+    expect(sanction?.targetType).toBe("company");
+    expect(sanction?.targetId).toBe(author.companyId);
+
+    const warning = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId: author.userId, eventType: "moderation.warning.issued" },
+    });
+    expect(warning).toBeTruthy();
+  });
+
+  it("отклоняет other без комментария", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0000051");
+    const reporter = await registerCompany("0000052");
+    const { comment } = await createPublishedNewsWithComment(adminToken, author.token);
+
+    const res = await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "other" });
+    expect(res.status).toBe(400);
+  });
+});

@@ -414,6 +414,11 @@ select {
   display: grid;
   grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
   gap: 24px;
+  align-items: start;
+}
+
+.moderation-layout > .stack-list {
+  align-content: start;
 }
 
 .moderation-case-row {
@@ -428,13 +433,20 @@ select {
   cursor: pointer;
 }
 
-.moderation-case-row.active,
-.moderation-case-row:hover {
-  border-color: var(--blue);
+.moderation-case-row .status-pill {
+  justify-self: start;
 }
 
 .moderation-case-row span:last-of-type {
   color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moderation-case-row.active,
+.moderation-case-row:hover {
+  border-color: var(--blue);
 }
 
 .moderation-detail {
