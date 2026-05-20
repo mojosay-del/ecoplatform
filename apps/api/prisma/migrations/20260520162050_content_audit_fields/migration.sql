@@ -1,0 +1,11 @@
+-- AlterTable
+ALTER TABLE "Chapter" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "createdById" TEXT,
+ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+-- AlterTable
+ALTER TABLE "Lesson" ADD COLUMN     "createdById" TEXT;
+
+-- AlterTable
+ALTER TABLE "NewsTag" ADD COLUMN     "createdById" TEXT,
+ADD COLUMN     "usageCount" INTEGER NOT NULL DEFAULT 0;

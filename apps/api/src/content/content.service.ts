@@ -1,15 +1,18 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { ContentStatus, Prisma } from "@prisma/client";
+import { CommentStatus, ContentStatus, Prisma } from "@prisma/client";
 import {
   BaseContentBlock,
   canAccessLearningLevel,
   canOpenFunctionalSections,
   filterPriceIndexPoints,
+  lessonBlockSchema,
+  newsBlockSchema,
   slugify,
   summarizePriceIndex,
   validateContentBlocks,
 } from "@ecoplatform/shared";
 import { PrismaService } from "../prisma/prisma.service";
+import { AdminActionLogService } from "../common/admin-action-log.service";
 import type { RequestUser } from "../common/request-user";
 import type {
   categoryInputSchema,
@@ -32,7 +35,10 @@ type KnowledgeArticleInput = z.infer<typeof knowledgeArticleInputSchema>;
 
 @Injectable()
 export class ContentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AdminActionLogService,
+  ) {}
 
   private assertFunctionalAccess(user: RequestUser) {
     // Эта проверка центральная для MVP: после истечения demo пользователь может
@@ -98,7 +104,7 @@ export class ContentService {
   }
 
   async createNews(input: NewsInput, user: RequestUser) {
-    const check = validateContentBlocks(input.blocks);
+    const check = validateContentBlocks(input.blocks, newsBlockSchema);
 
     if (!check.ok) {
       throw new ForbiddenException(check.message);
@@ -123,16 +129,33 @@ export class ContentService {
       },
     });
 
-    await this.replaceNewsTags(post.id, input.tags);
+    await this.replaceNewsTags(post.id, input.tags, user.id);
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "news.create",
+      entityType: "NewsPost",
+      entityId: post.id,
+    });
+
     return this.adminGetNews(post.id);
   }
 
-  async updateNews(id: string, input: NewsInput) {
-    const check = validateContentBlocks(input.blocks);
+  async updateNews(id: string, input: NewsInput, user: RequestUser) {
+    const check = validateContentBlocks(input.blocks, newsBlockSchema);
 
     if (!check.ok) {
       throw new ForbiddenException(check.message);
     }
+
+    const before = await this.prisma.newsPost.findUnique({
+      where: { id },
+      include: { tags: true },
+    });
+    if (!before) {
+      throw new NotFoundException("Новость не найдена.");
+    }
+    const previousTagIds = before.tags.map((tag) => tag.newsTagId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.newsContentBlock.deleteMany({ where: { newsPostId: id } });
@@ -154,18 +177,102 @@ export class ContentService {
       await tx.newsPostTag.deleteMany({ where: { newsPostId: id } });
     });
 
-    await this.replaceNewsTags(id, input.tags);
+    await this.replaceNewsTags(id, input.tags, user.id);
+    await this.refreshTagUsage(previousTagIds);
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "news.update",
+      entityType: "NewsPost",
+      entityId: id,
+    });
+
     return this.adminGetNews(id);
   }
 
-  async publishNews(id: string) {
-    return this.prisma.newsPost.update({
+  async publishNews(id: string, user: RequestUser) {
+    const existing = await this.prisma.newsPost.findUnique({
+      where: { id },
+      include: { _count: { select: { blocks: true } } },
+    });
+    if (!existing) {
+      throw new NotFoundException("Новость не найдена.");
+    }
+    if (existing._count.blocks === 0) {
+      throw new ForbiddenException("Нельзя опубликовать новость без блоков.");
+    }
+
+    const updated = await this.prisma.newsPost.update({
       where: { id },
       data: {
         status: ContentStatus.published,
-        firstPublishedAt: new Date(),
+        firstPublishedAt: existing.firstPublishedAt ?? new Date(),
       },
     });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "news.publish",
+      entityType: "NewsPost",
+      entityId: id,
+    });
+
+    return updated;
+  }
+
+  async unpublishNews(id: string, user: RequestUser, reason?: string) {
+    const existing = await this.prisma.newsPost.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Новость не найдена.");
+    }
+
+    const updated = await this.prisma.newsPost.update({
+      where: { id },
+      data: { status: ContentStatus.draft },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "news.unpublish",
+      entityType: "NewsPost",
+      entityId: id,
+      comment: reason,
+    });
+
+    return updated;
+  }
+
+  async deleteNews(id: string, user: RequestUser, reason?: string) {
+    const existing = await this.prisma.newsPost.findUnique({
+      where: { id },
+      include: { tags: true },
+    });
+    if (!existing) {
+      throw new NotFoundException("Новость не найдена.");
+    }
+
+    const affectedTagIds = existing.tags.map((tag) => tag.newsTagId);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.comment.updateMany({
+        where: { newsPostId: id, status: CommentStatus.published },
+        data: { status: CommentStatus.removed_with_news },
+      });
+      await tx.newsPost.delete({ where: { id } });
+    });
+
+    await this.refreshTagUsage(affectedTagIds);
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "news.delete",
+      entityType: "NewsPost",
+      entityId: id,
+      comment: reason,
+      payload: { title: existing.title, slug: existing.slug },
+    });
+
+    return { ok: true };
   }
 
   async adminListNews() {
@@ -182,18 +289,47 @@ export class ContentService {
     });
   }
 
-  private async replaceNewsTags(newsPostId: string, tagNames: string[]) {
+  private async replaceNewsTags(newsPostId: string, tagNames: string[], actorId: string) {
+    const affectedTagIds: string[] = [];
+
     for (const name of tagNames) {
       const tag = await this.prisma.newsTag.upsert({
         where: { name },
         update: {},
-        create: { name, slug: slugify(name) },
+        create: { name, slug: slugify(name), createdById: actorId },
       });
 
       await this.prisma.newsPostTag.create({
         data: { newsPostId, newsTagId: tag.id },
       });
+
+      affectedTagIds.push(tag.id);
     }
+
+    await this.refreshTagUsage(affectedTagIds);
+  }
+
+  private async refreshTagUsage(tagIds: string[]) {
+    const unique = Array.from(new Set(tagIds));
+    if (unique.length === 0) {
+      return;
+    }
+
+    const counts = await this.prisma.newsPostTag.groupBy({
+      by: ["newsTagId"],
+      where: { newsTagId: { in: unique } },
+      _count: { newsTagId: true },
+    });
+    const countMap = new Map(counts.map((row) => [row.newsTagId, row._count.newsTagId]));
+
+    await Promise.all(
+      unique.map((tagId) =>
+        this.prisma.newsTag.update({
+          where: { id: tagId },
+          data: { usageCount: countMap.get(tagId) ?? 0 },
+        }),
+      ),
+    );
   }
 
   async toggleNewsLike(id: string, user: RequestUser) {
@@ -309,7 +445,14 @@ export class ContentService {
     const modules = await this.prisma.learningModule.findMany({
       where: { status: ContentStatus.published },
       orderBy: { createdAt: "desc" },
-      include: { chapters: { include: { lessons: true } } },
+      include: {
+        chapters: {
+          include: {
+            lessons: { where: { status: ContentStatus.published }, orderBy: { position: "asc" } },
+          },
+          orderBy: { position: "asc" },
+        },
+      },
     });
 
     return modules.map((module) => ({
@@ -328,6 +471,7 @@ export class ContentService {
           orderBy: { position: "asc" },
           include: {
             lessons: {
+              where: { status: ContentStatus.published },
               orderBy: { position: "asc" },
               include: {
                 blocks: { orderBy: { position: "asc" } },
@@ -355,6 +499,16 @@ export class ContentService {
   }
 
   async createLearningModule(input: LearningModuleInput, user: RequestUser) {
+    for (const chapter of input.chapters) {
+      for (const lesson of chapter.lessons) {
+        const check = validateContentBlocks(lesson.blocks, lessonBlockSchema);
+
+        if (!check.ok) {
+          throw new ForbiddenException(check.message);
+        }
+      }
+    }
+
     return this.prisma.learningModule.create({
       data: {
         title: input.title,
@@ -401,9 +555,25 @@ export class ContentService {
   }
 
   async publishLearningModule(id: string) {
-    return this.prisma.learningModule.update({
-      where: { id },
-      data: { status: ContentStatus.published, firstPublishedAt: new Date() },
+    const now = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      const module = await tx.learningModule.update({
+        where: { id },
+        data: { status: ContentStatus.published, firstPublishedAt: now },
+        include: { chapters: { include: { lessons: true } } },
+      });
+
+      const lessonIds = module.chapters.flatMap((chapter) => chapter.lessons.map((lesson) => lesson.id));
+
+      if (lessonIds.length > 0) {
+        await tx.lesson.updateMany({
+          where: { id: { in: lessonIds } },
+          data: { status: ContentStatus.published, firstPublishedAt: now },
+        });
+      }
+
+      return module;
     });
   }
 

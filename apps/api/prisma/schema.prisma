@@ -206,11 +206,13 @@ model NewsContentBlock {
 }
 
 model NewsTag {
-  id        String        @id @default(cuid())
-  name      String        @unique
-  slug      String        @unique
-  posts     NewsPostTag[]
-  createdAt DateTime      @default(now())
+  id          String        @id @default(cuid())
+  name        String        @unique
+  slug        String        @unique
+  createdById String?
+  usageCount  Int           @default(0)
+  posts       NewsPostTag[]
+  createdAt   DateTime      @default(now())
 }
 
 model NewsPostTag {
@@ -350,12 +352,15 @@ model LearningModulePreview {
 }
 
 model Chapter {
-  id        String         @id @default(cuid())
-  moduleId  String
-  module    LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  title     String
-  position  Int
-  lessons   Lesson[]
+  id          String         @id @default(cuid())
+  moduleId    String
+  module      LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title       String
+  position    Int
+  createdById String?
+  lessons     Lesson[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now()) @updatedAt
 
   @@unique([moduleId, position])
 }
@@ -368,6 +373,7 @@ model Lesson {
   position         Int
   status           ContentStatus        @default(draft)
   firstPublishedAt DateTime?
+  createdById      String?
   blocks           LessonContentBlock[]
   attachments      LessonAttachment[]
   progress         LessonProgress[]

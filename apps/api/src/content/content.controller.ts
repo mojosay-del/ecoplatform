@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
@@ -96,16 +96,38 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Patch("admin/content/news/:id")
-  async updateNews(@Param("id") id: string, @Body() body: unknown) {
+  async updateNews(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(newsInputSchema, body);
-    return this.content.updateNews(id, input);
+    return this.content.updateNews(id, input, user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/news/:id/publish")
-  async publishNews(@Param("id") id: string) {
-    return this.content.publishNews(id);
+  async publishNews(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.content.publishNews(id, user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Post("admin/content/news/:id/unpublish")
+  async unpublishNews(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.unpublishNews(id, user, body?.reason);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Delete("admin/content/news/:id")
+  async deleteNews(
+    @Param("id") id: string,
+    @Body() body: { reason?: string } | undefined,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.deleteNews(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
