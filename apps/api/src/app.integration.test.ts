@@ -1555,3 +1555,261 @@ describe("Admin sanctions", () => {
     expect(restored.status).toBe(201);
   });
 });
+
+describe("Content lifecycle: news", () => {
+  it("delete новости убирает её из публичной ленты", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800001");
+    const news = await createPublishedNews(adminToken, "delete-news");
+
+    const before = await ctx.http.get("/api/news").set("Authorization", `Bearer ${reader.token}`);
+    expect(before.body.find((item: { id: string }) => item.id === news.id)).toBeTruthy();
+
+    const del = await ctx.http
+      .delete(`/api/admin/content/news/${news.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "тест удаления" });
+    expect(del.status).toBe(200);
+
+    const after = await ctx.http.get("/api/news").set("Authorization", `Bearer ${reader.token}`);
+    expect(after.body.find((item: { id: string }) => item.id === news.id)).toBeUndefined();
+
+    const direct = await ctx.http.get(`/api/news/${news.slug}`).set("Authorization", `Bearer ${reader.token}`);
+    expect(direct.status).toBe(404);
+  });
+});
+
+describe("Content lifecycle: knowledge base", () => {
+  it("publish → виден публично, unpublish → исчезает, delete → 404 на slug", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800002");
+    const article = await createPublishedKnowledgeArticle(adminToken, "lifecycle");
+
+    const tree = await ctx.http.get("/api/knowledge-base").set("Authorization", `Bearer ${reader.token}`);
+    expect(tree.body.find((item: { id: string }) => item.id === article.id)).toBeTruthy();
+
+    const unpublish = await ctx.http
+      .post(`/api/admin/content/knowledge-base/${article.id}/unpublish`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "тест" });
+    expect(unpublish.status).toBe(201);
+
+    const afterUnpublish = await ctx.http.get("/api/knowledge-base").set("Authorization", `Bearer ${reader.token}`);
+    expect(afterUnpublish.body.find((item: { id: string }) => item.id === article.id)).toBeUndefined();
+
+    const del = await ctx.http
+      .delete(`/api/admin/content/knowledge-base/${article.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "тест" });
+    expect(del.status).toBe(200);
+
+    const slugLookup = await ctx.http
+      .get(`/api/knowledge-base/${article.slug}`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(slugLookup.status).toBe(404);
+  });
+
+  it("PATCH статьи заменяет блоки и пишет в audit log", async () => {
+    const adminToken = await loginAdmin();
+    const draft = await ctx.http
+      .post("/api/admin/content/knowledge-base")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Статья для PATCH",
+        position: 0,
+        blocks: [{ type: "paragraph", payload: { markdown: "Старый текст." } }],
+      });
+    expect(draft.status).toBe(201);
+
+    const patched = await ctx.http
+      .patch(`/api/admin/content/knowledge-base/${draft.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Статья после PATCH",
+        position: 0,
+        blocks: [
+          { type: "heading", payload: { text: "Новый заголовок" } },
+          { type: "paragraph", payload: { markdown: "Новый текст." } },
+        ],
+      });
+    expect(patched.status).toBe(200);
+    expect(patched.body.title).toBe("Статья после PATCH");
+    expect(patched.body.blocks).toHaveLength(2);
+    expect(patched.body.blocks[0].type).toBe("heading");
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: draft.body.id, action: "knowledge.update" },
+    });
+    expect(log).toBeTruthy();
+  });
+});
+
+describe("Content lifecycle: learning modules", () => {
+  async function createLearningModuleWithLesson(adminToken: string, suffix: string) {
+    const moduleRes = await ctx.http
+      .post("/api/admin/content/education/modules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: `Модуль ${suffix}`,
+        summary: "Краткое",
+        description: "Полное описание",
+        accessLevel: "basic",
+        preview: { promotionalDescription: "Превью", whatYouWillLearn: [] },
+        chapters: [],
+      });
+    expect(moduleRes.status).toBe(201);
+
+    const chapterRes = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleRes.body.id}/chapters`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ title: "Глава 1", position: 0 });
+    expect(chapterRes.status).toBe(201);
+
+    const lessonRes = await ctx.http
+      .post(`/api/admin/content/education/chapters/${chapterRes.body.id}/lessons`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Урок 1",
+        position: 0,
+        blocks: [{ type: "paragraph", payload: { markdown: "Тело урока." } }],
+        attachments: [],
+      });
+    expect(lessonRes.status).toBe(201);
+
+    return { moduleId: moduleRes.body.id as string };
+  }
+
+  it("publish модуля делает его видимым в публичной выдаче, unpublish — скрывает, delete — удаляет", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800010");
+    const { moduleId } = await createLearningModuleWithLesson(adminToken, "lifecycle");
+
+    const beforePublish = await ctx.http
+      .get("/api/education/modules")
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(beforePublish.body.find((item: { id: string }) => item.id === moduleId)).toBeUndefined();
+
+    const publish = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleId}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publish.status).toBe(201);
+
+    const afterPublish = await ctx.http
+      .get("/api/education/modules")
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(afterPublish.body.find((item: { id: string }) => item.id === moduleId)).toBeTruthy();
+
+    const unpublish = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleId}/unpublish`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "тест" });
+    expect(unpublish.status).toBe(201);
+
+    const afterUnpublish = await ctx.http
+      .get("/api/education/modules")
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(afterUnpublish.body.find((item: { id: string }) => item.id === moduleId)).toBeUndefined();
+
+    const del = await ctx.http
+      .delete(`/api/admin/content/education/modules/${moduleId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "тест" });
+    expect(del.status).toBe(200);
+
+    const found = await ctx.prisma.learningModule.findUnique({ where: { id: moduleId } });
+    expect(found).toBeNull();
+  });
+
+  it("publish модуля без уроков отбивается 403", async () => {
+    const adminToken = await loginAdmin();
+
+    const moduleRes = await ctx.http
+      .post("/api/admin/content/education/modules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Пустой модуль",
+        summary: "Краткое",
+        description: "Полное",
+        accessLevel: "basic",
+        preview: { promotionalDescription: "Превью", whatYouWillLearn: [] },
+        chapters: [],
+      });
+    expect(moduleRes.status).toBe(201);
+
+    const publish = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleRes.body.id}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publish.status).toBe(403);
+  });
+});
+
+describe("Content lifecycle: price indices", () => {
+  async function createPriceIndexWithValue(adminToken: string, suffix: string) {
+    const category = await ctx.http
+      .post("/api/admin/content/indices/categories")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: `Категория ${suffix}`, position: 0 });
+    expect(category.status).toBe(201);
+
+    const nomenclature = await ctx.http
+      .post("/api/admin/content/indices/nomenclature")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        categoryId: category.body.id,
+        code: `CODE-${suffix}`,
+        name: `Номенклатура ${suffix}`,
+      });
+    expect(nomenclature.status).toBe(201);
+
+    const indexRes = await ctx.http
+      .post("/api/admin/content/indices")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ nomenclatureId: nomenclature.body.id });
+    expect(indexRes.status).toBe(201);
+
+    const valueRes = await ctx.http
+      .post(`/api/admin/content/indices/${indexRes.body.id}/values`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ date: "2026-05-19T00:00:00.000Z", price: 12000 });
+    expect(valueRes.status).toBe(201);
+
+    return { indexId: indexRes.body.id as string, nomenclatureId: nomenclature.body.id as string };
+  }
+
+  it("publish индекса делает его видимым в /indices, unpublish скрывает, delete удаляет", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800020");
+    const { indexId, nomenclatureId } = await createPriceIndexWithValue(adminToken, "lifecycle");
+
+    const beforePublish = await ctx.http.get("/api/indices").set("Authorization", `Bearer ${reader.token}`);
+    const findIndex = (body: Array<{ nomenclatures: Array<{ id: string }> }>) =>
+      body.some((cat) => cat.nomenclatures.some((nom) => nom.id === nomenclatureId));
+    expect(findIndex(beforePublish.body)).toBe(false);
+
+    const publish = await ctx.http
+      .post(`/api/admin/content/indices/${indexId}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publish.status).toBe(201);
+
+    const afterPublish = await ctx.http.get("/api/indices").set("Authorization", `Bearer ${reader.token}`);
+    expect(findIndex(afterPublish.body)).toBe(true);
+
+    const unpublish = await ctx.http
+      .post(`/api/admin/content/indices/${indexId}/unpublish`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "тест" });
+    expect(unpublish.status).toBe(201);
+
+    const afterUnpublish = await ctx.http.get("/api/indices").set("Authorization", `Bearer ${reader.token}`);
+    expect(findIndex(afterUnpublish.body)).toBe(false);
+
+    const del = await ctx.http
+      .delete(`/api/admin/content/indices/${indexId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "тест" });
+    expect(del.status).toBe(200);
+
+    const found = await ctx.prisma.priceIndex.findUnique({ where: { id: indexId } });
+    expect(found).toBeNull();
+  });
+});
