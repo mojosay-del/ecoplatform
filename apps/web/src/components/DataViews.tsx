@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createPortal } from "react-dom";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { ApiError, apiFetch, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -88,6 +91,21 @@ function useCoverAssets(items: Array<{ coverImageId?: string | null }>) {
 export function NewsView() {
   const { data, state, errorMessage } = useApiData<any[]>("/news", []);
   const covers = useCoverAssets(data);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const openedSlug = searchParams.get("post");
+
+  // Модалка открывается через query ?post=slug — это даёт shareable URL,
+  // back/forward в браузере и закрытие по Esc через router.replace('/news').
+  function openPost(slug: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("post", slug);
+    router.push(`/news?${params.toString()}`, { scroll: false });
+  }
+
+  function closePost() {
+    router.push("/news", { scroll: false });
+  }
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Новости" />;
@@ -118,10 +136,11 @@ export function NewsView() {
               const cover = post.coverImageId ? covers.get(post.coverImageId) : null;
               const hasCover = Boolean(cover?.publicUrl);
               return (
-                <Link
+                <button
                   className={`news-tile ${hasCover ? "news-tile-with-cover" : "news-tile-text"}`}
-                  href={`/news/${post.slug}`}
+                  onClick={() => openPost(post.slug)}
                   key={post.id}
+                  type="button"
                 >
                   {hasCover ? (
                     <div className="news-tile-cover">
@@ -145,13 +164,285 @@ export function NewsView() {
                       ) : null}
                     </div>
                   </div>
-                </Link>
+                </button>
               );
             })}
           </div>
         )}
       </section>
+      {openedSlug ? <NewsModal slug={openedSlug} onClose={closePost} /> : null}
     </AppShell>
+  );
+}
+
+function NewsModal({ slug, onClose }: { slug: string; onClose: () => void }) {
+  const { token } = useAuth();
+  const [post, setPost] = useState<any | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error" | "forbidden">("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState("offensive_content");
+  const [reportComment, setReportComment] = useState("");
+
+  async function load() {
+    if (!token) {
+      setState("forbidden");
+      return;
+    }
+    setState("loading");
+    setErrorMessage(null);
+    try {
+      const data = await apiFetch<any>(`/news/${slug}`, { token });
+      setPost(data);
+      setState("ready");
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        setState("forbidden");
+        return;
+      }
+      setState("error");
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить новость");
+    }
+  }
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, token]);
+
+  // Закрытие по Esc, блокируем прокрутку фона пока модалка открыта.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose]);
+
+  async function submitComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !post || !commentText.trim()) return;
+    await apiFetch(`/news/${post.id}/comments`, {
+      method: "POST",
+      token,
+      body: { text: commentText.trim() },
+    });
+    setCommentText("");
+    setResultMessage("Комментарий опубликован.");
+    await load();
+  }
+
+  async function submitComplaint(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !reportingCommentId) return;
+    await apiFetch("/moderation/complaints", {
+      method: "POST",
+      token,
+      body: {
+        entityType: "news_comment",
+        entityId: reportingCommentId,
+        reasonCode: reportReason,
+        comment: reportComment.trim() || undefined,
+      },
+    });
+    setReportingCommentId(null);
+    setReportReason("offensive_content");
+    setReportComment("");
+    setResultMessage("Жалоба отправлена модератору.");
+  }
+
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className="news-modal-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="news-modal">
+        <button className="news-modal-close" onClick={onClose} type="button" aria-label="Закрыть">
+          <X size={20} />
+        </button>
+        {state === "loading" ? (
+          <div className="news-modal-loading">Загрузка…</div>
+        ) : state === "error" ? (
+          <div className="news-modal-loading">{errorMessage ?? "Ошибка."}</div>
+        ) : state === "forbidden" || !post ? (
+          <div className="news-modal-loading">Доступ ограничен.</div>
+        ) : (
+          <NewsArticleContent
+            post={post}
+            commentText={commentText}
+            onCommentTextChange={setCommentText}
+            onSubmitComment={submitComment}
+            resultMessage={resultMessage}
+            reportingCommentId={reportingCommentId}
+            setReportingCommentId={setReportingCommentId}
+            reportReason={reportReason}
+            setReportReason={setReportReason}
+            reportComment={reportComment}
+            setReportComment={setReportComment}
+            onSubmitComplaint={submitComplaint}
+          />
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+type NewsArticleProps = {
+  post: any;
+  commentText: string;
+  onCommentTextChange: (value: string) => void;
+  onSubmitComment: (event: FormEvent<HTMLFormElement>) => void;
+  resultMessage: string | null;
+  reportingCommentId: string | null;
+  setReportingCommentId: (id: string | null) => void;
+  reportReason: string;
+  setReportReason: (value: string) => void;
+  reportComment: string;
+  setReportComment: (value: string) => void;
+  onSubmitComplaint: (event: FormEvent<HTMLFormElement>) => void;
+};
+
+function NewsArticleContent({
+  post,
+  commentText,
+  onCommentTextChange,
+  onSubmitComment,
+  resultMessage,
+  reportingCommentId,
+  setReportingCommentId,
+  reportReason,
+  setReportReason,
+  reportComment,
+  setReportComment,
+  onSubmitComplaint,
+}: NewsArticleProps) {
+  const { token } = useAuth();
+  const [cover, setCover] = useState<FileAsset | null>(null);
+  useEffect(() => {
+    if (!token || !post?.coverImageId) {
+      setCover(null);
+      return;
+    }
+    apiFetch<FileAsset[]>(`/files?ids=${encodeURIComponent(post.coverImageId)}`, { token })
+      .then((result) => setCover(result[0] ?? null))
+      .catch(() => setCover(null));
+  }, [post?.coverImageId, token]);
+
+  return (
+    <div className="news-article">
+      {cover?.publicUrl ? (
+        <div className="news-article-cover">
+          <img alt={cover.originalName ?? post.title} src={cover.publicUrl} />
+        </div>
+      ) : null}
+      <div className="news-article-body">
+        <span className="news-tile-category">Новости</span>
+        <h1 className="news-article-title">{post.title}</h1>
+        <p className="news-article-lead">{post.lead}</p>
+        <div className="content-blocks">
+          <ContentBlocks blocks={post.blocks ?? []} />
+        </div>
+        <div className="news-article-meta">
+          {post.firstPublishedAt ? (
+            <span>{new Date(post.firstPublishedAt).toLocaleString("ru-RU")}</span>
+          ) : null}
+          <span>👍 {post._count?.likes ?? 0}</span>
+          <span>💬 {post._count?.comments ?? 0}</span>
+        </div>
+
+        <section className="comments-section">
+          <h2>Комментарии</h2>
+          {resultMessage ? <p className="status-pill">{resultMessage}</p> : null}
+          <form className="reply-form" onSubmit={onSubmitComment}>
+            <textarea
+              className="textarea small"
+              onChange={(event) => onCommentTextChange(event.target.value)}
+              placeholder="Написать комментарий"
+              value={commentText}
+            />
+            <button className="button" type="submit">
+              Отправить
+            </button>
+          </form>
+          <div className="comment-list">
+            {post.comments?.map((comment: any) => (
+              <article className="comment-item" key={comment.id}>
+                <div className="comment-head">
+                  <strong>
+                    {comment.user.firstName} {comment.user.lastName}
+                  </strong>
+                  <button
+                    className="button secondary"
+                    onClick={() => setReportingCommentId(comment.id)}
+                    type="button"
+                  >
+                    Пожаловаться
+                  </button>
+                </div>
+                <p>{comment.text}</p>
+                {reportingCommentId === comment.id ? (
+                  <form className="form report-form" onSubmit={onSubmitComplaint}>
+                    <select
+                      className="select"
+                      onChange={(event) => setReportReason(event.target.value)}
+                      value={reportReason}
+                    >
+                      {complaintReasons.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <textarea
+                      className="textarea small"
+                      onChange={(event) => setReportComment(event.target.value)}
+                      placeholder="Комментарий к жалобе"
+                      value={reportComment}
+                    />
+                    <div className="auth-actions">
+                      <button className="button" type="submit">
+                        Отправить жалобу
+                      </button>
+                      <button
+                        className="button secondary"
+                        onClick={() => setReportingCommentId(null)}
+                        type="button"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+                {comment.replies?.map((reply: any) => (
+                  <article className="comment-item reply" key={reply.id}>
+                    <strong>
+                      {reply.user.firstName} {reply.user.lastName}
+                    </strong>
+                    <p>{reply.text}</p>
+                  </article>
+                ))}
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }
 

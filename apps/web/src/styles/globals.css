@@ -379,6 +379,141 @@ select {
   margin-left: auto;
 }
 
+/* Кликабельная плитка — это <button> без браузерного скина, чтобы вся
+   карточка реагировала на клик и при этом не ломала layout. */
+.news-tile {
+  text-align: left;
+  font: inherit;
+  padding: 0;
+}
+
+/* Модалка просмотра новости поверх размытого фона.
+   Без классической полупрозрачной маски — backdrop-filter blur, как в
+   дизайнерских макетах. */
+.news-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: grid;
+  place-items: start center;
+  padding: 40px 20px;
+  overflow-y: auto;
+  animation: news-modal-fade-in 160ms ease-out;
+}
+
+@keyframes news-modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.news-modal {
+  position: relative;
+  width: min(880px, 100%);
+  background: var(--panel);
+  border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+  animation: news-modal-rise 180ms ease-out;
+}
+
+@keyframes news-modal-rise {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.news-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.95);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--text);
+  z-index: 2;
+  backdrop-filter: blur(4px);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.news-modal-close:hover {
+  background: var(--panel);
+  border-color: var(--line-strong);
+}
+
+.news-modal-loading {
+  padding: 80px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.news-article-cover {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--panel-soft);
+  overflow: hidden;
+}
+
+.news-article-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.news-article-body {
+  padding: 28px 36px 36px;
+  display: grid;
+  gap: 14px;
+}
+
+.news-article-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.news-article-lead {
+  margin: 0;
+  font-size: 17px;
+  color: #4b5363;
+  line-height: 1.55;
+}
+
+.news-article-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .news-modal-backdrop {
+    padding: 0;
+  }
+  .news-modal {
+    width: 100%;
+    border-radius: 0;
+    min-height: 100vh;
+  }
+  .news-article-body {
+    padding: 24px 20px 32px;
+  }
+}
+
 .button {
   display: inline-flex;
   align-items: center;
