@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
@@ -103,7 +104,23 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, token, ready } = useAuth();
+
+  // Любой защищённый раздел оборачивается в AppShell. Если AuthProvider уже
+  // проверил localStorage и токена нет — отправляем на /login. До ready
+  // ничего не делаем, чтобы не сорвать сессию у залогиненного пользователя
+  // в момент гидратации страницы.
+  useEffect(() => {
+    if (ready && !token) {
+      router.replace("/login");
+    }
+  }, [ready, token, router]);
+
+  if (!ready || !token) {
+    return null;
+  }
+
   const visibleNav = nav.map((section) => ({
     ...section,
     items: filterVisibleItems(section.items, user?.platformRoles ?? []),
