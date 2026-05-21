@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { Block, BlocksEditor, NEWS_BLOCK_KINDS } from "./BlocksEditor";
+import { FileUploadField } from "./FileUploadField";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -267,14 +268,13 @@ export function AdminNewsView() {
                 />
               </label>
 
-              <label className="form-field">
-                <span>fileId обложки (необязательно)</span>
-                <input
-                  className="input"
-                  value={draft.coverImageId}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, coverImageId: event.target.value }))}
-                />
-              </label>
+              <FileUploadField
+                accept="image/*"
+                buttonLabel="Загрузить обложку"
+                label="Обложка (необязательно)"
+                value={draft.coverImageId}
+                onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+              />
 
               <div className="form-field">
                 <span>Теги</span>
@@ -299,13 +299,21 @@ export function AdminNewsView() {
                 </div>
                 <input
                   className="input"
-                  placeholder="Введите тег и нажмите Enter"
+                  placeholder="Введите тег и нажмите Enter или пробел"
                   value={tagDraft}
                   onChange={(event) => setTagDraft(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter") {
+                    // Пробел и Enter превращают введённое в чип. Запятая на всякий
+                    // случай — частый паттерн в подобных полях.
+                    if (event.key === "Enter" || event.key === " " || event.key === ",") {
                       event.preventDefault();
                       addTag(tagDraft);
+                      return;
+                    }
+                    // Backspace на пустом инпуте — удаление последнего чипа.
+                    if (event.key === "Backspace" && tagDraft.length === 0 && draft.tags.length > 0) {
+                      event.preventDefault();
+                      removeTag(draft.tags[draft.tags.length - 1]!);
                     }
                   }}
                 />

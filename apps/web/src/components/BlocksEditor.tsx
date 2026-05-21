@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { FileUploadField } from "./FileUploadField";
 
 // Универсальный композитор контентных блоков.
 // Поддерживает все 10 типов, описанных в shared/content-blocks.
@@ -206,11 +207,12 @@ function BlockBody({ block, onUpdate }: { block: Block; onUpdate: (patch: Record
     case "image":
       return (
         <div className="form" style={{ gap: 6 }}>
-          <input
-            className="input"
-            placeholder="fileId (ID файла в системе)"
+          <FileUploadField
+            accept="image/*"
+            buttonLabel="Загрузить картинку"
+            label="ID изображения"
             value={(block.payload.fileId as string) ?? ""}
-            onChange={(event) => onUpdate({ fileId: event.target.value })}
+            onChange={(fileId, asset) => onUpdate({ fileId, altText: (block.payload.altText as string) || asset?.originalName || "" })}
           />
           <input
             className="input"
@@ -253,11 +255,12 @@ function BlockBody({ block, onUpdate }: { block: Block; onUpdate: (patch: Record
     case "audio":
       return (
         <div className="form" style={{ gap: 6 }}>
-          <input
-            className="input"
-            placeholder="fileId аудиофайла"
+          <FileUploadField
+            accept="audio/*"
+            buttonLabel="Загрузить аудио"
+            label="ID аудиофайла"
             value={(block.payload.fileId as string) ?? ""}
-            onChange={(event) => onUpdate({ fileId: event.target.value })}
+            onChange={(fileId, asset) => onUpdate({ fileId, episodeTitle: (block.payload.episodeTitle as string) || asset?.originalName || "" })}
           />
           <input
             className="input"
@@ -276,11 +279,11 @@ function BlockBody({ block, onUpdate }: { block: Block; onUpdate: (patch: Record
     case "file":
       return (
         <div className="form" style={{ gap: 6 }}>
-          <input
-            className="input"
-            placeholder="fileId"
+          <FileUploadField
+            buttonLabel="Загрузить файл"
+            label="ID файла"
             value={(block.payload.fileId as string) ?? ""}
-            onChange={(event) => onUpdate({ fileId: event.target.value })}
+            onChange={(fileId, asset) => onUpdate({ fileId, displayName: (block.payload.displayName as string) || asset?.originalName || "" })}
           />
           <input
             className="input"
@@ -341,14 +344,15 @@ function GalleryEditor({
           <div className="list-row">
             <strong>Картинка {index + 1}</strong>
             <button className="button secondary" type="button" onClick={() => remove(index)} disabled={images.length === 1}>
-              Удалить
+              ✕ Убрать картинку
             </button>
           </div>
-          <input
-            className="input"
-            placeholder="fileId"
+          <FileUploadField
+            accept="image/*"
+            buttonLabel="Загрузить картинку"
+            label="ID изображения"
             value={(image.fileId as string) ?? ""}
-            onChange={(event) => updateAt(index, { fileId: event.target.value })}
+            onChange={(fileId, asset) => updateAt(index, { fileId, altText: (image.altText as string) || asset?.originalName || "" })}
           />
           <input
             className="input"
@@ -423,7 +427,7 @@ function ChecklistEditor({
               onClick={() => remove(index)}
               disabled={items.length === 1}
             >
-              Удалить
+              ✕ Пункт
             </button>
           </div>
         ))}
@@ -479,11 +483,12 @@ function ImageChecklistEditor({
         ))}
       </select>
       <p className="page-subtitle">Картинка чек-листа</p>
-      <input
-        className="input"
-        placeholder="fileId картинки"
+      <FileUploadField
+        accept="image/*"
+        buttonLabel="Загрузить картинку"
+        label="ID картинки"
         value={(image.fileId as string) ?? ""}
-        onChange={(event) => onChange({ image: { ...image, fileId: event.target.value } })}
+        onChange={(fileId, asset) => onChange({ image: { ...image, fileId, altText: (image.altText as string) || asset?.originalName || "" } })}
       />
       <input
         className="input"
@@ -514,7 +519,7 @@ function ImageChecklistEditor({
               onClick={() => removeItem(index)}
               disabled={items.length === 1}
             >
-              Удалить
+              ✕ Пункт
             </button>
           </div>
         ))}

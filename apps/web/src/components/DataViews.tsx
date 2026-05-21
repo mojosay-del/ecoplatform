@@ -9,7 +9,7 @@ import { useAuth } from "../lib/auth";
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 const emptyTickets: any[] = [];
 
-function useApiData<T>(path: string, initial: T) {
+function useApiData<T>(path: string | null, initial: T) {
   const { token } = useAuth();
   const initialRef = useRef(initial);
   const [data, setData] = useState<T>(initial);
@@ -22,6 +22,15 @@ function useApiData<T>(path: string, initial: T) {
     if (!token) {
       setData(initialRef.current);
       setState("unauthenticated");
+      setErrorMessage(null);
+      return;
+    }
+
+    // path=null означает «не дёргать API» (например, для платформенного
+    // сотрудника, у которого нет компании, — billing/status вернёт 500).
+    if (!path) {
+      setData(initialRef.current);
+      setState("ready");
       setErrorMessage(null);
       return;
     }
@@ -54,8 +63,31 @@ function useApiData<T>(path: string, initial: T) {
   return { data, state, errorMessage };
 }
 
+function useCoverAssets(items: Array<{ coverImageId?: string | null }>) {
+  const { token } = useAuth();
+  const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
+  const ids = useMemo(
+    () => Array.from(new Set(items.map((item) => item.coverImageId).filter((id): id is string => Boolean(id)))).sort(),
+    [items],
+  );
+  const idsKey = ids.join(",");
+
+  useEffect(() => {
+    if (!token || ids.length === 0) {
+      setAssets(new Map());
+      return;
+    }
+    apiFetch<FileAsset[]>(`/files?ids=${encodeURIComponent(idsKey)}`, { token })
+      .then((result) => setAssets(new Map(result.map((asset) => [asset.id, asset]))))
+      .catch(() => setAssets(new Map()));
+  }, [idsKey, token, ids.length]);
+
+  return assets;
+}
+
 export function NewsView() {
   const { data, state, errorMessage } = useApiData<any[]>("/news", []);
+  const covers = useCoverAssets(data);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Новости" />;
@@ -74,17 +106,25 @@ export function NewsView() {
       <section className="page">
         <PageHeader title="Последние обновления" subtitle="Новости рынка вторсырья и изменения в работе участников." />
         <div className="card-grid">
-          {data.map((post: any) => (
-            <article className="card" key={post.id}>
-              <p className="status-pill">Новости</p>
-              <h2>{post.title}</h2>
-              <p>{post.lead}</p>
-              <p style={{ color: "var(--muted)" }}>👍 {post._count?.likes ?? 0} · 💬 {post._count?.comments ?? 0}</p>
-              <Link className="button secondary" href={`/news/${post.slug}`}>
-                Открыть
-              </Link>
-            </article>
-          ))}
+          {data.map((post: any) => {
+            const cover = post.coverImageId ? covers.get(post.coverImageId) : null;
+            return (
+              <article className="card news-card" key={post.id}>
+                {cover?.publicUrl ? (
+                  <div className="news-card-cover">
+                    <img alt={cover.originalName ?? post.title} src={cover.publicUrl} />
+                  </div>
+                ) : null}
+                <p className="status-pill">Новости</p>
+                <h2>{post.title}</h2>
+                <p>{post.lead}</p>
+                <p style={{ color: "var(--muted)" }}>👍 {post._count?.likes ?? 0} · 💬 {post._count?.comments ?? 0}</p>
+                <Link className="button secondary" href={`/news/${post.slug}`}>
+                  Открыть
+                </Link>
+              </article>
+            );
+          })}
         </div>
       </section>
     </AppShell>
@@ -188,8 +228,8 @@ export function NewsPostView({ slug }: { slug: string }) {
   return (
     <AppShell>
       <section className="page">
-        <Link className="button secondary" href="/news">
-          Назад
+        <Link className="button secondary page-back" href="/news">
+          ← Назад к новостям
         </Link>
         {state === "loading" || !post ? (
           <p className="page-subtitle">Загрузка…</p>
@@ -707,10 +747,55 @@ export function KnowledgeArticleView({ slug }: { slug: string }) {
   );
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Администратор",
+  moderator: "Модератор",
+  content_manager: "Контент-менеджер",
+};
+
+const COMPANY_STATUS_LABELS: Record<string, string> = {
+  demo: "Демо",
+  active: "Активна",
+  past_due: "Подписка просрочена",
+  suspended: "Приостановлена",
+  blocked: "Заблокирована",
+  archived: "В архиве",
+};
+
+function describeSubscription(billing: { status?: string; subscriptionPlan?: string | null; demoEndsAt?: string | null; subscriptionEndsAt?: string | null } | null) {
+  if (!billing) {
+    return { tariff: "не активирован", note: "Подписка не активна" };
+  }
+  if (billing.status === "demo") {
+    const endsAt = billing.demoEndsAt ? new Date(billing.demoEndsAt) : null;
+    const expired = endsAt ? endsAt.getTime() <= Date.now() : false;
+    return {
+      tariff: "Демо-доступ",
+      note: endsAt
+        ? expired
+          ? `Демо истёк ${endsAt.toLocaleString("ru-RU")}. Активируйте подписку.`
+          : `Демо до ${endsAt.toLocaleString("ru-RU")}`
+        : "Демо без срока",
+    };
+  }
+  if (billing.status === "active" && billing.subscriptionPlan) {
+    const endsAt = billing.subscriptionEndsAt ? new Date(billing.subscriptionEndsAt) : null;
+    return {
+      tariff: billing.subscriptionPlan === "basic" ? "Базовая подписка" : "Расширенная подписка",
+      note: endsAt ? `Действует до ${endsAt.toLocaleString("ru-RU")}` : "Подписка активна",
+    };
+  }
+  if (billing.status === "past_due") return { tariff: "Подписка просрочена", note: "Свяжитесь с поддержкой для продления." };
+  if (billing.status === "suspended") return { tariff: "Приостановлена", note: "Доступ к разделам временно закрыт." };
+  if (billing.status === "blocked") return { tariff: "Заблокирована", note: "Компания заблокирована." };
+  return { tariff: "не активирован", note: "Подписка не активна" };
+}
+
 export function AccountView() {
   const { user, token, logout } = useAuth();
-  const { data: billing } = useApiData<any | null>("/billing/status", null);
-  const { data: tickets } = useApiData<any[]>("/support/tickets", emptyTickets);
+  const isPlatformStaff = (user?.platformRoles?.length ?? 0) > 0;
+  const { data: billing } = useApiData<any | null>(isPlatformStaff ? null : "/billing/status", null);
+  const { data: tickets } = useApiData<any[]>(isPlatformStaff ? null : "/support/tickets", emptyTickets);
   const [supportResult, setSupportResult] = useState("");
 
   async function onSupportSubmit(event: FormEvent<HTMLFormElement>) {
@@ -740,6 +825,9 @@ export function AccountView() {
     }
   }
 
+  const subscription = describeSubscription(billing);
+  const companyStatusLabel = billing?.status ? COMPANY_STATUS_LABELS[billing.status] ?? billing.status : null;
+
   return (
     <AppShell>
       <section className="page">
@@ -751,47 +839,62 @@ export function AccountView() {
             <p>{user?.email}</p>
             <button className="button secondary" onClick={logout}>Выйти</button>
           </article>
-          <article className="card">
-            <h2>Компания</h2>
-            <p>{billing?.organizationName ?? user?.company?.organizationName ?? "Данные появятся после входа"}</p>
-            <p className="status-pill">{billing?.status ?? user?.company?.status ?? "guest"}</p>
-          </article>
-          <article className="card">
-            <h2>Подписка</h2>
-            <p>Тариф: {billing?.subscriptionPlan ?? "не активирован"}</p>
-            <p>Demo до: {billing?.demoEndsAt ? new Date(billing.demoEndsAt).toLocaleString("ru-RU") : "нет активного demo"}</p>
-            <p>Подписка до: {billing?.subscriptionEndsAt ? new Date(billing.subscriptionEndsAt).toLocaleString("ru-RU") : "не задана"}</p>
-          </article>
+          {isPlatformStaff ? (
+            <article className="card">
+              <h2>Сотрудник платформы</h2>
+              <p>Этот аккаунт не привязан к компании.</p>
+              <div className="auth-actions" style={{ marginTop: 8 }}>
+                {user?.platformRoles?.map((role) => (
+                  <span className="status-pill" key={role}>{ROLE_LABELS[role] ?? role}</span>
+                ))}
+              </div>
+            </article>
+          ) : (
+            <>
+              <article className="card">
+                <h2>Компания</h2>
+                <p>{billing?.organizationName ?? user?.company?.organizationName ?? "Данные появятся после входа"}</p>
+                {companyStatusLabel ? <p className="status-pill">{companyStatusLabel}</p> : null}
+              </article>
+              <article className="card">
+                <h2>Подписка</h2>
+                <p>Тариф: {subscription.tariff}</p>
+                <p className="page-subtitle">{subscription.note}</p>
+              </article>
+            </>
+          )}
         </div>
-        <div className="account-layout">
-          <form className="card form" onSubmit={onSupportSubmit}>
-            <h2>Новое обращение</h2>
-            <select className="select" name="category" defaultValue="technical">
-              <option value="billing">Биллинг</option>
-              <option value="moderation_review">Модерация</option>
-              <option value="company_management">Компания</option>
-              <option value="technical">Технический вопрос</option>
-              <option value="data_deletion">Удаление данных</option>
-              <option value="other">Другое</option>
-            </select>
-            <input className="input" name="subject" placeholder="Тема" />
-            <textarea className="textarea" name="text" placeholder="Опишите вопрос" />
-            <button className="button" type="submit">Отправить</button>
-            {supportResult ? <p>{supportResult}</p> : null}
-          </form>
-          <article className="card">
-            <h2>Мои обращения</h2>
-            <div className="stack-list">
-              {tickets.length === 0 ? <p className="page-subtitle">Пока нет обращений.</p> : null}
-              {tickets.map((ticket: any) => (
-                <div className="list-row" key={ticket.id}>
-                  <strong>{ticket.subject}</strong>
-                  <span className="status-pill">{ticket.status}</span>
-                </div>
-              ))}
-            </div>
-          </article>
-        </div>
+        {isPlatformStaff ? null : (
+          <div className="account-layout">
+            <form className="card form" onSubmit={onSupportSubmit}>
+              <h2>Новое обращение</h2>
+              <select className="select" name="category" defaultValue="technical">
+                <option value="billing">Биллинг</option>
+                <option value="moderation_review">Модерация</option>
+                <option value="company_management">Компания</option>
+                <option value="technical">Технический вопрос</option>
+                <option value="data_deletion">Удаление данных</option>
+                <option value="other">Другое</option>
+              </select>
+              <input className="input" name="subject" placeholder="Тема" />
+              <textarea className="textarea" name="text" placeholder="Опишите вопрос" />
+              <button className="button" type="submit">Отправить</button>
+              {supportResult ? <p>{supportResult}</p> : null}
+            </form>
+            <article className="card">
+              <h2>Мои обращения</h2>
+              <div className="stack-list">
+                {tickets.length === 0 ? <p className="page-subtitle">Пока нет обращений.</p> : null}
+                {tickets.map((ticket: any) => (
+                  <div className="list-row" key={ticket.id}>
+                    <strong>{ticket.subject}</strong>
+                    <span className="status-pill">{ticket.status}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+        )}
       </section>
     </AppShell>
   );
