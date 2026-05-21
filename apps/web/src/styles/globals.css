@@ -358,6 +358,22 @@ select {
   background: var(--panel-soft);
 }
 
+.checklist-positive {
+  border-color: var(--green);
+}
+
+.checklist-negative {
+  border-color: var(--red);
+}
+
+.checklist-warning {
+  border-color: var(--yellow);
+}
+
+.checklist-info {
+  border-color: var(--blue);
+}
+
 .empty-chart {
   display: grid;
   place-items: center;

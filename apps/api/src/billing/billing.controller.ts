@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Post, UseGuards } from "@nestjs/common";
 import { manualSubscriptionDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
@@ -15,7 +15,12 @@ export class BillingController {
 
   @Get("billing/status")
   async ownStatus(@CurrentUser() user: RequestUser) {
-    return this.billing.getOwnStatus(user.companyId!);
+    // У платформенного стаффа companyId=null. Раньше тут был non-null assertion
+    // и запрос падал 500-кой; теперь возвращаем 403 с понятным сообщением.
+    if (!user.companyId) {
+      throw new ForbiddenException("Биллинг доступен только пользователям компаний.");
+    }
+    return this.billing.getOwnStatus(user.companyId);
   }
 
   @UseGuards(RolesGuard)

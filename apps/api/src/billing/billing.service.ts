@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { CompanyStatus, SubscriptionStatus } from "@prisma/client";
+import { CompanyStatus, NotificationCategory, SubscriptionStatus } from "@prisma/client";
 import type { ManualSubscriptionDto } from "@ecoplatform/shared";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class BillingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async getOwnStatus(companyId: string) {
     const company = await this.prisma.company.findUnique({
@@ -34,7 +38,7 @@ export class BillingService {
       throw new NotFoundException("Компания не найдена.");
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const subscription = await tx.subscription.create({
         data: {
           companyId: input.companyId,
@@ -68,5 +72,31 @@ export class BillingService {
 
       return { company: updatedCompany, subscription };
     });
+
+    // Уведомляем всех пользователей компании — симметрично уведомлениям о
+    // скором/состоявшемся истечении подписки, чтобы биллинг-канал был полным.
+    const users = await this.prisma.user.findMany({
+      where: { companyId: input.companyId },
+      select: { id: true },
+    });
+    const endsAtIso = new Date(input.endsAt).toISOString();
+    await Promise.all(
+      users.map((user) =>
+        this.notifications
+          .createInApp({
+            userId: user.id,
+            eventType: "billing.subscription.activated",
+            sourceId: result.subscription.id,
+            category: NotificationCategory.billing,
+            title: "Подписка активирована",
+            body: `Активирован тариф ${input.plan} до ${new Date(input.endsAt).toLocaleString("ru-RU")}.`,
+            link: "/account",
+            payload: { plan: input.plan, endsAt: endsAtIso },
+          })
+          .catch(() => undefined),
+      ),
+    );
+
+    return result;
   }
 }

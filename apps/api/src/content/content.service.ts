@@ -290,13 +290,12 @@ export class ContentService {
 
     const affectedTagIds = existing.tags.map((tag) => tag.newsTagId);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.comment.updateMany({
-        where: { newsPostId: id, status: CommentStatus.published },
-        data: { status: CommentStatus.removed_with_news },
-      });
-      await tx.newsPost.delete({ where: { id } });
-    });
+    // Комментарии физически удаляются каскадом Comment.newsPost (onDelete: Cascade
+    // в schema.prisma). Раньше мы пытались помечать им CommentStatus.removed_with_news
+    // перед delete — но статус никогда не сохранялся, потому что строки сносились
+    // микросекундой позже. Аудит-лог делает запись со slug и title удалённой
+    // новости, этого достаточно для истории.
+    await this.prisma.newsPost.delete({ where: { id } });
 
     await this.refreshTagUsage(affectedTagIds);
 
