@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./AppShell";
-import { ApiError, apiFetch } from "../lib/api";
+import { ApiError, apiFetch, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
@@ -11,13 +11,16 @@ const emptyTickets: any[] = [];
 
 function useApiData<T>(path: string, initial: T) {
   const { token } = useAuth();
+  const initialRef = useRef(initial);
   const [data, setData] = useState<T>(initial);
   const [state, setState] = useState<ApiState>("unauthenticated");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let isActive = true;
+
     if (!token) {
-      setData(initial);
+      setData(initialRef.current);
       setState("unauthenticated");
       setErrorMessage(null);
       return;
@@ -27,20 +30,26 @@ function useApiData<T>(path: string, initial: T) {
     setErrorMessage(null);
     apiFetch<T>(path, { token })
       .then((result) => {
+        if (!isActive) return;
         setData(result);
         setState("ready");
       })
       .catch((error) => {
+        if (!isActive) return;
         if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
           setState("forbidden");
           return;
         }
 
-        setData(initial);
+        setData(initialRef.current);
         setState("error");
         setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить данные");
       });
-  }, [initial, path, token]);
+
+    return () => {
+      isActive = false;
+    };
+  }, [path, token]);
 
   return { data, state, errorMessage };
 }
@@ -191,13 +200,7 @@ export function NewsPostView({ slug }: { slug: string }) {
               <p className="page-subtitle">{post.lead}</p>
             </header>
             <article className="content-article">
-              {post.blocks?.map((block: any) => (
-                <div key={block.id}>
-                  {block.type === "heading" ? <h2>{block.payload.text}</h2> : null}
-                  {block.type === "paragraph" ? <p>{block.payload.markdown}</p> : null}
-                  {block.type === "quote" ? <blockquote>{block.payload.text}</blockquote> : null}
-                </div>
-              ))}
+              <ContentBlocks blocks={post.blocks ?? []} />
             </article>
             <section className="comments-section">
               <h2>Комментарии</h2>
@@ -553,12 +556,28 @@ function ErrorState({ title, message }: { title: string; message: string | null 
 type RenderableBlock =
   | { type: "heading" | "subheading"; payload: { text: string } }
   | { type: "paragraph"; payload: { markdown: string } }
+  | { type: "image"; payload: { fileId: string; caption?: string; altText?: string } }
+  | { type: "gallery"; payload: { images: Array<{ fileId: string; caption?: string; altText?: string }> } }
+  | { type: "video"; payload: { rutubeUrl: string; caption?: string } }
+  | { type: "audio"; payload: { fileId: string; episodeTitle?: string; caption?: string; durationSeconds?: number } }
+  | { type: "file"; payload: { fileId: string; displayName: string; description?: string } }
   | { type: "checklist"; payload: { title: string; style: string; items: string[] } }
+  | {
+      type: "image_checklist";
+      payload: {
+        title: string;
+        style: string;
+        image: { fileId: string; caption?: string; altText?: string };
+        items: string[];
+      };
+    }
   | { type: string; payload: Record<string, unknown> };
 
 function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
+  const assets = useFileAssets(blocks);
+
   return (
-    <div style={{ display: "grid", gap: 16, marginTop: 24 }}>
+    <div className="content-blocks">
       {blocks.map((block, index) => {
         if (block.type === "heading") {
           return <h2 key={index}>{(block.payload as { text: string }).text}</h2>;
@@ -568,6 +587,76 @@ function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
         }
         if (block.type === "paragraph") {
           return <p key={index}>{(block.payload as { markdown: string }).markdown}</p>;
+        }
+        if (block.type === "image") {
+          const payload = block.payload as { fileId: string; caption?: string; altText?: string };
+          return <ImageBlock asset={assets.get(payload.fileId)} altText={payload.altText} caption={payload.caption} key={index} />;
+        }
+        if (block.type === "gallery") {
+          const payload = block.payload as { images: Array<{ fileId: string; caption?: string; altText?: string }> };
+          return (
+            <div className="gallery-block" key={index}>
+              {payload.images.map((image, imageIndex) => (
+                <ImageBlock
+                  asset={assets.get(image.fileId)}
+                  altText={image.altText}
+                  caption={image.caption}
+                  key={`${image.fileId}-${imageIndex}`}
+                />
+              ))}
+            </div>
+          );
+        }
+        if (block.type === "video") {
+          const payload = block.payload as { rutubeUrl: string; caption?: string };
+          const embedUrl = rutubeEmbedUrl(payload.rutubeUrl);
+          return (
+            <figure className="media-block" key={index}>
+              {embedUrl ? (
+                <iframe
+                  allow="clipboard-write; autoplay"
+                  allowFullScreen
+                  src={embedUrl}
+                  title={payload.caption ?? "Видео"}
+                />
+              ) : (
+                <a className="button secondary" href={payload.rutubeUrl} rel="noreferrer" target="_blank">
+                  Открыть видео
+                </a>
+              )}
+              {payload.caption ? <figcaption>{payload.caption}</figcaption> : null}
+            </figure>
+          );
+        }
+        if (block.type === "audio") {
+          const payload = block.payload as { fileId: string; episodeTitle?: string; caption?: string };
+          const asset = assets.get(payload.fileId);
+          return (
+            <figure className="media-block" key={index}>
+              {payload.episodeTitle ? <h3>{payload.episodeTitle}</h3> : null}
+              {asset?.publicUrl ? <audio controls src={asset.publicUrl} /> : <MissingAsset />}
+              {payload.caption ? <figcaption>{payload.caption}</figcaption> : null}
+            </figure>
+          );
+        }
+        if (block.type === "file") {
+          const payload = block.payload as { fileId: string; displayName: string; description?: string };
+          const asset = assets.get(payload.fileId);
+          return (
+            <div className="file-block" key={index}>
+              <div>
+                <strong>{payload.displayName}</strong>
+                {payload.description ? <p>{payload.description}</p> : null}
+              </div>
+              {asset?.publicUrl ? (
+                <a className="button secondary" href={asset.publicUrl} rel="noreferrer" target="_blank">
+                  Скачать
+                </a>
+              ) : (
+                <MissingAsset />
+              )}
+            </div>
+          );
         }
         if (block.type === "checklist") {
           const payload = block.payload as { title: string; style: string; items: string[] };
@@ -586,10 +675,107 @@ function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
             </div>
           );
         }
+        if (block.type === "image_checklist") {
+          const payload = block.payload as {
+            title: string;
+            style: string;
+            image: { fileId: string; caption?: string; altText?: string };
+            items: string[];
+          };
+          return (
+            <div className="image-checklist-block" key={index}>
+              <ImageBlock
+                asset={assets.get(payload.image.fileId)}
+                altText={payload.image.altText}
+                caption={payload.image.caption}
+              />
+              <div
+                className="checklist-block"
+                style={{ borderColor: payload.style === "warning" ? "var(--yellow)" : "var(--green)" }}
+              >
+                <h3>{payload.title}</h3>
+                <ul>
+                  {payload.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          );
+        }
         return null;
       })}
     </div>
   );
+}
+
+function useFileAssets(blocks: RenderableBlock[]) {
+  const { token } = useAuth();
+  const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
+  const ids = useMemo(() => collectFileIds(blocks), [blocks]);
+  const idsKey = ids.join(",");
+
+  useEffect(() => {
+    if (!token || ids.length === 0) {
+      setAssets(new Map());
+      return;
+    }
+
+    apiFetch<FileAsset[]>(`/files?ids=${encodeURIComponent(idsKey)}`, { token })
+      .then((result) => setAssets(new Map(result.map((asset) => [asset.id, asset]))))
+      .catch(() => setAssets(new Map()));
+  }, [ids.length, idsKey, token]);
+
+  return assets;
+}
+
+function collectFileIds(blocks: RenderableBlock[]) {
+  const ids = new Set<string>();
+  for (const block of blocks) {
+    const payload = block.payload as Record<string, unknown>;
+    if (typeof payload.fileId === "string" && payload.fileId) {
+      ids.add(payload.fileId);
+    }
+    if (Array.isArray(payload.images)) {
+      for (const image of payload.images) {
+        if (typeof image === "object" && image && "fileId" in image && typeof image.fileId === "string") {
+          ids.add(image.fileId);
+        }
+      }
+    }
+    if (typeof payload.image === "object" && payload.image && "fileId" in payload.image && typeof payload.image.fileId === "string") {
+      ids.add(payload.image.fileId);
+    }
+  }
+
+  return Array.from(ids).sort();
+}
+
+function ImageBlock({ asset, altText, caption }: { asset: FileAsset | undefined; altText?: string; caption?: string }) {
+  return (
+    <figure className="media-block">
+      {asset?.publicUrl ? <img alt={altText ?? asset.originalName} src={asset.publicUrl} /> : <MissingAsset />}
+      {caption ? <figcaption>{caption}</figcaption> : null}
+    </figure>
+  );
+}
+
+function MissingAsset() {
+  return <p className="page-subtitle">Файл недоступен.</p>;
+}
+
+function rutubeEmbedUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.includes("rutube.ru")) {
+      return null;
+    }
+
+    const match = parsed.pathname.match(/\/video\/([a-zA-Z0-9]+)/);
+    return match?.[1] ? `https://rutube.ru/play/embed/${match[1]}` : null;
+  } catch {
+    return null;
+  }
 }
 
 function MiniChart({ points }: { points: Array<{ price: number }> }) {

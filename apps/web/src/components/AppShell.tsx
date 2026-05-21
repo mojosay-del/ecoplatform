@@ -7,11 +7,9 @@ import {
   Bell,
   BookOpen,
   Boxes,
-  Calendar,
   FileText,
   GraduationCap,
   HelpCircle,
-  Home,
   LineChart,
   MessageCircle,
   Newspaper,
@@ -24,11 +22,12 @@ import { useAuth } from "../lib/auth";
 import { NotificationBell } from "./NotificationBell";
 
 type NavItem = {
-  href: string;
+  href?: string;
   label: string;
   icon: LucideIcon;
   disabled?: boolean;
   roles?: string[];
+  children?: NavItem[];
 };
 
 const nav: Array<{ title: string; items: NavItem[] }> = [
@@ -36,32 +35,53 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
     title: "Главная",
     items: [
       { href: "/news", label: "Новости", icon: Newspaper },
-      { href: "/indices", label: "Индексы цен", icon: Boxes },
-      { href: "#", label: "Видео", icon: Home, disabled: true },
-      { href: "#", label: "Календарь", icon: Calendar, disabled: true },
+      { href: "/indices", label: "Индексы", icon: Boxes },
+      { href: "/education", label: "Обучение", icon: GraduationCap },
     ],
   },
   {
     title: "Сообщество",
     items: [
-      { href: "#", label: "Форум", icon: MessageCircle, disabled: true },
-      { href: "#", label: "Торговая площадка", icon: ShoppingBag, disabled: true },
-      { href: "#", label: "Карта переработчиков", icon: Users, disabled: true },
+      { label: "Торговая площадка", icon: ShoppingBag, disabled: true },
+      { label: "Форум", icon: MessageCircle, disabled: true },
     ],
   },
   {
-    title: "База знаний",
+    title: "Базы",
     items: [
-      { href: "/knowledge-base", label: "Вторсырьё", icon: BookOpen },
-      { href: "/education", label: "Обучение", icon: GraduationCap },
+      {
+        label: "Базы знаний",
+        icon: BookOpen,
+        disabled: true,
+        children: [
+          { href: "/knowledge-base", label: "Сырьё", icon: BookOpen },
+          { label: "Документация", icon: FileText, disabled: true },
+        ],
+      },
     ],
   },
   {
     title: "Инструменты",
     items: [
-      { href: "#", label: "Калькуляторы", icon: FileText, disabled: true },
-      { href: "#", label: "Интеграции", icon: LineChart, disabled: true },
-      { href: "#", label: "Магазин", icon: ShoppingBag, disabled: true },
+      {
+        label: "Карты",
+        icon: Users,
+        disabled: true,
+        children: [
+          { label: "Заводы и заготовители", icon: Users, disabled: true },
+          { label: "Аналитика регионов", icon: LineChart, disabled: true },
+        ],
+      },
+      {
+        label: "Калькуляторы",
+        icon: FileText,
+        disabled: true,
+        children: [
+          { label: "Розничный", icon: FileText, disabled: true },
+          { label: "Оптовый", icon: FileText, disabled: true },
+          { label: "Продажные цены", icon: LineChart, disabled: true },
+        ],
+      },
     ],
   },
   {
@@ -84,6 +104,10 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const visibleNav = nav.map((section) => ({
+    ...section,
+    items: filterVisibleItems(section.items, user?.platformRoles ?? []),
+  }));
 
   return (
     <div className="app-shell">
@@ -92,24 +116,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span className="brand-mark">Э</span>
           <span>ЭкоПлатформа</span>
         </Link>
-        {nav.map((section) => (
+        {visibleNav.map((section) => (
           <nav className="nav-section" key={section.title}>
             <p className="nav-title">{section.title}</p>
-            {section.items.filter((item) => !item.roles || item.roles.some((role) => user?.platformRoles.includes(role))).map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return item.disabled ? (
-                <span className="nav-link disabled" key={item.label}>
-                  <Icon size={19} />
-                  {item.label}
-                </span>
-              ) : (
-                <Link className={`nav-link ${active ? "active" : ""}`} href={item.href} key={item.href}>
-                  <Icon size={19} />
-                  {item.label}
-                </Link>
-              );
-            })}
+            {section.items.map((item) => (
+              <NavEntry item={item} key={item.href ?? item.label} pathname={pathname} />
+            ))}
           </nav>
         ))}
       </aside>
@@ -126,4 +138,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
     </div>
   );
+}
+
+function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: string; child?: boolean }) {
+  const Icon = item.icon;
+  const active = isActiveNavItem(item, pathname);
+  const className = `nav-link ${child ? "nav-link-child" : ""} ${active ? "active" : ""} ${item.disabled ? "disabled" : ""}`;
+  const iconSize = child ? 16 : 19;
+
+  return (
+    <div className="nav-entry">
+      {item.href && !item.disabled ? (
+        <Link className={className} href={item.href}>
+          <Icon size={iconSize} />
+          {item.label}
+        </Link>
+      ) : (
+        <span className={className}>
+          <Icon size={iconSize} />
+          {item.label}
+        </span>
+      )}
+      {item.children?.length ? (
+        <div className="nav-children">
+          {item.children.map((childItem) => (
+            <NavEntry child item={childItem} key={childItem.href ?? childItem.label} pathname={pathname} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function isActiveNavItem(item: NavItem, pathname: string): boolean {
+  const selfActive = Boolean(item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`)));
+  return selfActive || Boolean(item.children?.some((child) => isActiveNavItem(child, pathname)));
+}
+
+function filterVisibleItems(items: NavItem[], roles: string[]): NavItem[] {
+  return items
+    .filter((item) => !item.roles || item.roles.some((role) => roles.includes(role)))
+    .map((item) => ({
+      ...item,
+      children: item.children ? filterVisibleItems(item.children, roles) : undefined,
+    }));
 }

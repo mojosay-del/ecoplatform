@@ -88,7 +88,26 @@ select {
   font-weight: 650;
 }
 
-.nav-link:hover,
+.nav-entry {
+  display: grid;
+  gap: 2px;
+}
+
+.nav-children {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 6px 22px;
+}
+
+.nav-link-child {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.nav-link:not(.disabled):hover,
 .nav-link.active {
   background: rgba(255, 255, 255, 0.85);
 }
@@ -308,6 +327,18 @@ select {
   gap: 12px;
 }
 
+.auth-actions .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.file-upload-field {
+  display: grid;
+  gap: 8px;
+}
+
 .stack-list {
   display: grid;
   gap: 12px;
@@ -361,6 +392,69 @@ select {
   gap: 12px;
   font-size: 18px;
   line-height: 1.65;
+}
+
+.content-blocks {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.media-block {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.media-block img,
+.media-block iframe {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.media-block img {
+  height: auto;
+  max-height: 620px;
+  object-fit: contain;
+}
+
+.media-block iframe {
+  aspect-ratio: 16 / 9;
+}
+
+.media-block audio {
+  width: 100%;
+}
+
+.media-block figcaption {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.gallery-block {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.file-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--panel-soft);
+}
+
+.image-checklist-block {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  align-items: start;
 }
 
 .content-article blockquote {
@@ -473,6 +567,7 @@ select {
   .cms-layout,
   .account-layout,
   .indices-admin-layout,
+  .solutions-layout,
   .moderation-layout,
   .reply-form {
     grid-template-columns: 1fr;
@@ -484,6 +579,35 @@ select {
 
   .card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .solutions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .solutions-cart {
+    position: static;
+  }
+
+  .gallery-block,
+  .image-checklist-block {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .solutions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .solution-card-bottom {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .solution-card-bottom .button,
+  .solutions-checkout {
+    width: 100%;
   }
 }
 
