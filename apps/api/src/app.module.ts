@@ -11,6 +11,7 @@ import { FilesModule } from "./files/files.module";
 import { ModerationModule } from "./moderation/moderation.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { SchedulerModule } from "./scheduler/scheduler.module";
 import { SupportModule } from "./support/support.module";
 
 @Module({
@@ -27,6 +28,7 @@ import { SupportModule } from "./support/support.module";
     FilesModule,
     ModerationModule,
     NotificationsModule,
+    SchedulerModule,
     SupportModule,
   ],
 })

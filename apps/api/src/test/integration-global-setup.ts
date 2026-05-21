@@ -53,6 +53,10 @@ export default async function setup() {
   // 3. Передаём тестовый DATABASE_URL во все воркеры через env.
   process.env.DATABASE_URL = testUrl;
 
+  // 4. Отключаем фоновые cron-задачи на время тестов, чтобы они не дёргали
+  //    реальную БД и не создавали лишних артефактов.
+  process.env.SCHEDULER_DISABLED = "1";
+
   // Экспортируем для возможной teardown-логики (сейчас не используется).
   return async () => {
     /* no-op: оставляем БД для отладки между запусками */
