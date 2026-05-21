@@ -1743,6 +1743,170 @@ describe("Content lifecycle: learning modules", () => {
   });
 });
 
+describe("Content updates (PATCH)", () => {
+  it("PATCH новости меняет title и блоки, оставляет slug прежним", async () => {
+    const adminToken = await loginAdmin();
+    const draft = await ctx.http
+      .post("/api/admin/content/news")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Старый заголовок",
+        lead: "Лид",
+        blocks: [{ type: "paragraph", payload: { markdown: "Старый текст." } }],
+        tags: ["обновление"],
+      });
+    expect(draft.status).toBe(201);
+    const originalSlug = draft.body.slug as string;
+
+    const patched = await ctx.http
+      .patch(`/api/admin/content/news/${draft.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Новый заголовок",
+        lead: "Новый лид",
+        blocks: [
+          { type: "heading", payload: { text: "Заголовок внутри" } },
+          { type: "paragraph", payload: { markdown: "Новый текст." } },
+        ],
+        tags: ["обновление", "после-патча"],
+      });
+    expect(patched.status).toBe(200);
+    expect(patched.body.title).toBe("Новый заголовок");
+    expect(patched.body.slug).toBe(originalSlug);
+    expect(patched.body.blocks).toHaveLength(2);
+    expect(patched.body.tags).toHaveLength(2);
+  });
+
+  it("PATCH модуля обновляет accessLevel и preview", async () => {
+    const adminToken = await loginAdmin();
+    const moduleRes = await ctx.http
+      .post("/api/admin/content/education/modules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Модуль до",
+        summary: "Краткое",
+        description: "Полное",
+        accessLevel: "basic",
+        preview: { promotionalDescription: "Превью до", whatYouWillLearn: [] },
+        chapters: [],
+      });
+    expect(moduleRes.status).toBe(201);
+
+    const patched = await ctx.http
+      .patch(`/api/admin/content/education/modules/${moduleRes.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Модуль после",
+        accessLevel: "extended",
+        preview: { promotionalDescription: "Превью после", whatYouWillLearn: ["Пункт 1", "Пункт 2"] },
+      });
+    expect(patched.status).toBe(200);
+    expect(patched.body.title).toBe("Модуль после");
+    expect(patched.body.accessLevel).toBe("extended");
+    expect(patched.body.preview.whatYouWillLearn).toEqual(["Пункт 1", "Пункт 2"]);
+  });
+
+  it("PATCH главы меняет title и позицию", async () => {
+    const adminToken = await loginAdmin();
+    const moduleRes = await ctx.http
+      .post("/api/admin/content/education/modules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Модуль",
+        summary: "—",
+        description: "—",
+        accessLevel: "basic",
+        preview: { promotionalDescription: "—", whatYouWillLearn: [] },
+        chapters: [],
+      });
+    expect(moduleRes.status).toBe(201);
+
+    const chapter1 = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleRes.body.id}/chapters`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ title: "Глава 1", position: 0 });
+    expect(chapter1.status).toBe(201);
+
+    const chapter2 = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleRes.body.id}/chapters`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ title: "Глава 2", position: 1 });
+    expect(chapter2.status).toBe(201);
+
+    // Поднимем chapter2 на позицию 0 — но position должен оставаться уникальным
+    // в рамках модуля, поэтому сначала сдвинем chapter1 на 2, потом chapter2 на 0.
+    const moveAside = await ctx.http
+      .patch(`/api/admin/content/education/chapters/${chapter1.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ position: 2 });
+    expect(moveAside.status).toBe(200);
+
+    const patched = await ctx.http
+      .patch(`/api/admin/content/education/chapters/${chapter2.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ title: "Глава 2 переименована", position: 0 });
+    expect(patched.status).toBe(200);
+    expect(patched.body.title).toBe("Глава 2 переименована");
+    expect(patched.body.position).toBe(0);
+  });
+
+  it("PATCH урока заменяет блоки и пишет audit log", async () => {
+    const adminToken = await loginAdmin();
+    const moduleRes = await ctx.http
+      .post("/api/admin/content/education/modules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Модуль",
+        summary: "—",
+        description: "—",
+        accessLevel: "basic",
+        preview: { promotionalDescription: "—", whatYouWillLearn: [] },
+        chapters: [],
+      });
+    const chapter = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleRes.body.id}/chapters`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ title: "Глава", position: 0 });
+    const lesson = await ctx.http
+      .post(`/api/admin/content/education/chapters/${chapter.body.id}/lessons`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Урок",
+        position: 0,
+        blocks: [{ type: "paragraph", payload: { markdown: "Версия 1" } }],
+        attachments: [],
+      });
+    expect(lesson.status).toBe(201);
+
+    const patched = await ctx.http
+      .patch(`/api/admin/content/education/lessons/${lesson.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Урок v2",
+        blocks: [
+          { type: "heading", payload: { text: "Глава" } },
+          { type: "paragraph", payload: { markdown: "Версия 2" } },
+        ],
+      });
+    expect(patched.status).toBe(200);
+    expect(patched.body.title).toBe("Урок v2");
+
+    // Сервис updateLesson возвращает только сам урок без вложенных блоков —
+    // проверяем подмену блоков через прямой запрос.
+    const blocks = await ctx.prisma.lessonContentBlock.findMany({
+      where: { lessonId: lesson.body.id },
+      orderBy: { position: "asc" },
+    });
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]?.type).toBe("heading");
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: lesson.body.id, action: { contains: "lesson" } },
+    });
+    expect(log).toBeTruthy();
+  });
+});
+
 describe("Content lifecycle: price indices", () => {
   async function createPriceIndexWithValue(adminToken: string, suffix: string) {
     const category = await ctx.http

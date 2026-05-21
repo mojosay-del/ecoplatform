@@ -548,17 +548,41 @@ function ErrorState({ title, message }: { title: string; message: string | null 
   );
 }
 
-function ContentBlocks({ blocks }: { blocks: any[] }) {
+// Известные типы блоков из shared/content-blocks. Используем минимальные
+// shape-типы вместо BaseContentBlock — здесь только то, что реально рендерим.
+type RenderableBlock =
+  | { type: "heading" | "subheading"; payload: { text: string } }
+  | { type: "paragraph"; payload: { markdown: string } }
+  | { type: "checklist"; payload: { title: string; style: string; items: string[] } }
+  | { type: string; payload: Record<string, unknown> };
+
+function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
   return (
     <div style={{ display: "grid", gap: 16, marginTop: 24 }}>
       {blocks.map((block, index) => {
-        if (block.type === "heading") return <h2 key={index}>{block.payload.text}</h2>;
-        if (block.type === "paragraph") return <p key={index}>{block.payload.markdown}</p>;
+        if (block.type === "heading") {
+          return <h2 key={index}>{(block.payload as { text: string }).text}</h2>;
+        }
+        if (block.type === "subheading") {
+          return <h3 key={index}>{(block.payload as { text: string }).text}</h3>;
+        }
+        if (block.type === "paragraph") {
+          return <p key={index}>{(block.payload as { markdown: string }).markdown}</p>;
+        }
         if (block.type === "checklist") {
+          const payload = block.payload as { title: string; style: string; items: string[] };
           return (
-            <div className="checklist-block" key={index} style={{ borderColor: block.payload.style === "warning" ? "var(--yellow)" : "var(--green)" }}>
-              <h3>{block.payload.title}</h3>
-              <ul>{block.payload.items.map((item: string) => <li key={item}>{item}</li>)}</ul>
+            <div
+              className="checklist-block"
+              key={index}
+              style={{ borderColor: payload.style === "warning" ? "var(--yellow)" : "var(--green)" }}
+            >
+              <h3>{payload.title}</h3>
+              <ul>
+                {payload.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
             </div>
           );
         }
