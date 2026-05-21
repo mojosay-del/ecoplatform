@@ -1,27 +1,5 @@
-import { AdminJsonEditor } from "../../../../src/components/AdminJsonEditor";
-
-const sample = {
-  title: "Новая новость рынка",
-  lead: "Короткое описание для карточки новости.",
-  tags: ["рынок"],
-  blocks: [
-    {
-      type: "paragraph",
-      payload: {
-        markdown: "Текст новости. Можно использовать markdown для списков и ссылок.",
-      },
-    },
-  ],
-};
+import { AdminNewsView } from "../../../../src/components/AdminNewsView";
 
 export default function AdminNewsPage() {
-  return (
-    <AdminJsonEditor
-      title="CMS / Новости"
-      endpoint="/admin/content/news"
-      listEndpoint="/admin/content/news"
-      publishEndpointTemplate="/admin/content/news/:id/publish"
-      sample={sample}
-    />
-  );
+  return <AdminNewsView />;
 }
