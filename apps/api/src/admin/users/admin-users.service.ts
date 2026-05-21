@@ -220,6 +220,16 @@ export class AdminUsersService {
       });
     }
 
+    // Деактивация сотрудника = принудительный логаут: иначе access-токен
+    // продолжит работать до истечения (15 мин), и старый refresh-токен может
+    // выдать новую сессию. Зеркало admin-staff.service.updateStaff.
+    if (currentlyActive && willBeActive === false) {
+      await this.prisma.session.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+
     await this.auditLog.record({
       actorId: actor.id,
       action: "admin.user.platform_roles",
