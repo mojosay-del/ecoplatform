@@ -174,26 +174,56 @@ export class AuthService {
       throw new UnauthorizedException("Refresh token отсутствует.");
     }
 
-    const sessions = await this.prisma.session.findMany({
-      where: {
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      include: { user: true },
+    // Формат токена — `${sessionId}.${tail}`: id сессии нужен, чтобы достать
+    // ровно одну запись и сделать одно bcrypt-сравнение. Без id-привязки
+    // пришлось бы перебирать все активные сессии в системе.
+    const dot = refreshToken.indexOf(".");
+    if (dot <= 0 || dot === refreshToken.length - 1) {
+      throw new UnauthorizedException("Refresh token недействителен.");
+    }
+    const sessionId = refreshToken.slice(0, dot);
+    const tail = refreshToken.slice(dot + 1);
+
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { user: { include: { company: true } } },
     });
 
-    for (const session of sessions) {
-      if (await compare(refreshToken, session.refreshTokenHash)) {
-        await this.prisma.session.update({
-          where: { id: session.id },
-          data: { revokedAt: new Date() },
-        });
-
-        return this.createSession(session.userId, {}, session.rememberMe);
-      }
+    if (!session || session.revokedAt !== null || session.expiresAt <= new Date()) {
+      throw new UnauthorizedException("Refresh token недействителен.");
     }
 
-    throw new UnauthorizedException("Refresh token недействителен.");
+    const ok = await compare(tail, session.refreshTokenHash);
+    if (!ok) {
+      throw new UnauthorizedException("Refresh token недействителен.");
+    }
+
+    // Зеркало login: заблокированный пользователь или компания не должны
+    // получить новую сессию, даже если refresh-токен формально валиден.
+    if (session.user.status === UserStatus.blocked) {
+      await this.prisma.session.update({
+        where: { id: session.id },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException("Учётная запись заблокирована.");
+    }
+    if (
+      session.user.company?.status === CompanyStatus.blocked ||
+      session.user.company?.status === CompanyStatus.archived
+    ) {
+      await this.prisma.session.update({
+        where: { id: session.id },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException("Доступ к кабинету компании закрыт.");
+    }
+
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { revokedAt: new Date() },
+    });
+
+    return this.createSession(session.userId, {}, session.rememberMe);
   }
 
   async logout(sessionId: string): Promise<{ ok: true }> {
@@ -230,8 +260,10 @@ export class AuthService {
     meta: { userAgent?: string; ipAddress?: string },
     rememberMe: boolean,
   ): Promise<SessionTokens> {
-    const refreshToken = randomBytes(48).toString("base64url");
-    const refreshTokenHash = await hash(refreshToken, 12);
+    // Хешируем только случайный хвост; sessionId сам по себе не секрет —
+    // он лишь индекс для поиска сессии при refresh.
+    const tail = randomBytes(48).toString("base64url");
+    const refreshTokenHash = await hash(tail, 12);
     const expiresAt = new Date(Date.now() + (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000);
 
     const session = await this.prisma.session.create({
@@ -244,6 +276,8 @@ export class AuthService {
         ipAddress: meta.ipAddress,
       },
     });
+
+    const refreshToken = `${session.id}.${tail}`;
 
     const accessToken = await this.jwt.signAsync(
       { sub: userId, sessionId: session.id },
