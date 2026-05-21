@@ -42,6 +42,15 @@ export class NotificationsService {
     const domainEventId = input.domainEventId ?? this.buildDomainEventId(input.eventType, input.sourceId ?? input.userId);
     const now = new Date();
 
+    // Email-канал: задел на будущее. Email-провайдера пока нет, поэтому
+    // создаём NotificationDelivery со статусом `queued` — когда появится
+    // воркер отправки, он подберёт эти записи и пометит как delivered/failed.
+    // Дублирование в системной категории и при mute не делаем.
+    const emailQueued =
+      input.category !== NotificationCategory.system &&
+      !(MUTABLE_CATEGORIES.has(input.category) && prefs?.emailMutedCategories.includes(input.category));
+    const emailAddress = await this.lookupEmailAddress(input.userId);
+
     return this.prisma.$transaction(async (tx) => {
       const delivery = await tx.notificationDelivery.upsert({
         where: {
@@ -64,6 +73,28 @@ export class NotificationsService {
         update: {},
       });
 
+      if (emailQueued && emailAddress) {
+        await tx.notificationDelivery.upsert({
+          where: {
+            domainEventId_recipientUserId_channel: {
+              domainEventId,
+              recipientUserId: input.userId,
+              channel: NotificationChannel.email,
+            },
+          },
+          create: {
+            domainEventId,
+            eventType: input.eventType,
+            recipientUserId: input.userId,
+            channel: NotificationChannel.email,
+            address: emailAddress,
+            status: NotificationDeliveryStatus.queued,
+            attempt: 0,
+          },
+          update: {},
+        });
+      }
+
       return tx.inAppNotification.upsert({
         where: { domainEventId_userId: { domainEventId, userId: input.userId } },
         create: {
@@ -81,6 +112,11 @@ export class NotificationsService {
         update: { deliveryId: delivery.id },
       });
     });
+  }
+
+  private async lookupEmailAddress(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    return user?.email ?? null;
   }
 
   async createInAppForAdmins(input: Omit<CreateInAppNotificationInput, "userId">) {

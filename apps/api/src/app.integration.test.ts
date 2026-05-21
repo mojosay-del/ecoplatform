@@ -793,6 +793,62 @@ describe("Admin companies panel", () => {
   });
 });
 
+describe("Email channel queue (задел)", () => {
+  it("при логине создаётся не только in_app, но и email-доставка в статусе queued", async () => {
+    const company = await registerCompany("0700001");
+    const login = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0700001@test.local", password: "User12345" });
+    expect(login.status).toBe(201);
+
+    const deliveries = await ctx.prisma.notificationDelivery.findMany({
+      where: {
+        recipientUserId: company.userId,
+        eventType: { in: ["auth.login", "auth.login.new_device"] },
+      },
+    });
+    // Должно быть две записи: in_app=delivered и email=queued.
+    const inApp = deliveries.find((d) => d.channel === "in_app");
+    const email = deliveries.find((d) => d.channel === "email");
+    expect(inApp?.status).toBe("delivered");
+    expect(email?.status).toBe("queued");
+    expect(email?.address).toBe("user0700001@test.local");
+  });
+
+  it("email-доставка не создаётся, если категория замьючена в email", async () => {
+    const company = await registerCompany("0700002");
+
+    await ctx.http
+      .patch("/api/notifications/preferences")
+      .set("Authorization", `Bearer ${company.token}`)
+      .send({ inAppMutedCategories: [], emailMutedCategories: ["moderation"] });
+
+    // Сгенерируем уведомление категории moderation через жалобу-решение.
+    const adminToken = await loginAdmin();
+    const reporter = await registerCompany("0700003");
+    const { comment } = await createPublishedNewsWithComment(adminToken, company.token);
+    await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${reporter.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "spam" });
+    const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${adminToken}`);
+    const caseId = list.body[0].id as string;
+    await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/decisions`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ type: "warn_company", reasonCode: "valid_complaint" });
+
+    const moderationDeliveries = await ctx.prisma.notificationDelivery.findMany({
+      where: {
+        recipientUserId: company.userId,
+        eventType: "moderation.warning.issued",
+      },
+    });
+    expect(moderationDeliveries.find((d) => d.channel === "in_app")).toBeDefined();
+    expect(moderationDeliveries.find((d) => d.channel === "email")).toBeUndefined();
+  });
+});
+
 describe("Billing notifications (cron)", () => {
   it("уведомление billing.demo.expiring создаётся, когда демо < 3 дней; идемпотентно при повторе", async () => {
     const company = await registerCompany("0600001");
