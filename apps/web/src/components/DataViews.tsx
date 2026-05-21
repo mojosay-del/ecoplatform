@@ -104,28 +104,52 @@ export function NewsView() {
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="Последние обновления" subtitle="Новости рынка вторсырья и изменения в работе участников." />
-        <div className="card-grid">
-          {data.map((post: any) => {
-            const cover = post.coverImageId ? covers.get(post.coverImageId) : null;
-            return (
-              <article className="card news-card" key={post.id}>
-                {cover?.publicUrl ? (
-                  <div className="news-card-cover">
-                    <img alt={cover.originalName ?? post.title} src={cover.publicUrl} />
+        <header className="news-feed-header">
+          <h1>Последние обновления</h1>
+        </header>
+
+        {data.length === 0 ? (
+          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
+            Пока нет публикаций.
+          </p>
+        ) : (
+          <div className="news-masonry">
+            {data.map((post: any) => {
+              const cover = post.coverImageId ? covers.get(post.coverImageId) : null;
+              const hasCover = Boolean(cover?.publicUrl);
+              return (
+                <Link
+                  className={`news-tile ${hasCover ? "news-tile-with-cover" : "news-tile-text"}`}
+                  href={`/news/${post.slug}`}
+                  key={post.id}
+                >
+                  {hasCover ? (
+                    <div className="news-tile-cover">
+                      <img alt={cover?.originalName ?? post.title} src={cover!.publicUrl!} />
+                    </div>
+                  ) : null}
+                  <div className="news-tile-body">
+                    <span className="news-tile-category">Новости</span>
+                    <h2 className="news-tile-title">{post.title}</h2>
+                    <p className="news-tile-lead">{post.lead}</p>
+                    <div className="news-tile-meta">
+                      <span>👍 {post._count?.likes ?? 0}</span>
+                      <span>💬 {post._count?.comments ?? 0}</span>
+                      {post.firstPublishedAt ? (
+                        <span className="news-tile-date">
+                          {new Date(post.firstPublishedAt).toLocaleDateString("ru-RU", {
+                            day: "numeric",
+                            month: "long",
+                          })}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                ) : null}
-                <p className="status-pill">Новости</p>
-                <h2>{post.title}</h2>
-                <p>{post.lead}</p>
-                <p style={{ color: "var(--muted)" }}>👍 {post._count?.likes ?? 0} · 💬 {post._count?.comments ?? 0}</p>
-                <Link className="button secondary" href={`/news/${post.slug}`}>
-                  Открыть
                 </Link>
-              </article>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     </AppShell>
   );
