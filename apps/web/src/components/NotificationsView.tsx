@@ -2,6 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import {
+  CreditCard,
+  HelpCircle,
+  type LucideIcon,
+  MessageSquare,
+  Settings,
+  Shield,
+  ShoppingBag,
+} from "lucide-react";
 import { AppShell } from "./AppShell";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -9,6 +18,7 @@ import { useAuth } from "../lib/auth";
 type Notification = {
   id: string;
   category: string;
+  eventType: string;
   title: string;
   body: string;
   link: string | null;
@@ -29,6 +39,15 @@ const categoryLabels: Record<string, string> = {
   moderation: "Модерация",
   support: "Поддержка",
   system: "Система",
+};
+
+const categoryIcons: Record<string, LucideIcon> = {
+  security: Shield,
+  billing: CreditCard,
+  marketplace: ShoppingBag,
+  moderation: MessageSquare,
+  support: HelpCircle,
+  system: Settings,
 };
 
 const preferenceCategories = ["marketplace", "moderation", "support", "system"];
@@ -119,10 +138,11 @@ export function NotificationsView() {
     }
   }
 
-  async function toggleInAppCategory(category: string) {
+  async function toggleCategoryChannel(category: string, channel: "in_app" | "email") {
     if (!token) return;
 
-    const muted = new Set(preferences.inAppMutedCategories);
+    const field = channel === "in_app" ? "inAppMutedCategories" : "emailMutedCategories";
+    const muted = new Set(preferences[field]);
     if (muted.has(category)) {
       muted.delete(category);
     } else {
@@ -131,11 +151,11 @@ export function NotificationsView() {
 
     const nextPreferences = {
       ...preferences,
-      inAppMutedCategories: [...muted],
+      [field]: [...muted],
     };
 
     setPreferences(nextPreferences);
-    setSavingCategory(category);
+    setSavingCategory(`${category}:${channel}`);
     try {
       const saved = await apiFetch<NotificationPreferences>("/notifications/preferences", {
         method: "PATCH",
@@ -187,10 +207,15 @@ export function NotificationsView() {
               <p className="page-subtitle">Новых уведомлений нет.</p>
             ) : (
               <div className="notification-list">
-                {items.map((item) => (
+                {items.map((item) => {
+                  const Icon = categoryIcons[item.category] ?? Settings;
+                  return (
                   <article className={`notification-card ${item.readAt ? "" : "unread"}`} key={item.id}>
                     <div className="notification-head">
-                      <span className="status-pill">{categoryLabels[item.category] ?? item.category}</span>
+                      <span className="status-pill">
+                        <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+                        {categoryLabels[item.category] ?? item.category}
+                      </span>
                       <time>{new Date(item.createdAt).toLocaleString("ru-RU")}</time>
                     </div>
                     <h2>{item.title}</h2>
@@ -211,32 +236,60 @@ export function NotificationsView() {
                       </button>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             )}
             <section className="notification-preferences">
               <h2>Настройки</h2>
+              <p className="page-subtitle">
+                Управляйте каналами доставки. Email-канал пока в режиме задела:
+                уведомления ставятся в очередь и отправятся, когда подключим почту.
+              </p>
               <div className="preference-list">
                 {preferenceCategories.map((category) => {
-                  const checked = !preferences.inAppMutedCategories.includes(category);
+                  const Icon = categoryIcons[category] ?? Settings;
+                  const inAppOn = !preferences.inAppMutedCategories.includes(category);
+                  const emailOn = !preferences.emailMutedCategories.includes(category);
                   return (
-                    <label className="preference-row" key={category}>
-                      <span>{categoryLabels[category]}</span>
-                      <input
-                        checked={checked}
-                        disabled={savingCategory === category}
-                        onChange={() => toggleInAppCategory(category)}
-                        type="checkbox"
-                      />
-                    </label>
+                    <div className="preference-row" key={category}>
+                      <span>
+                        <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+                        {categoryLabels[category]}
+                      </span>
+                      <label style={{ marginRight: 12 }}>
+                        <input
+                          checked={inAppOn}
+                          disabled={savingCategory === `${category}:in_app`}
+                          onChange={() => toggleCategoryChannel(category, "in_app")}
+                          type="checkbox"
+                        />{" "}
+                        В приложении
+                      </label>
+                      <label>
+                        <input
+                          checked={emailOn}
+                          disabled={savingCategory === `${category}:email`}
+                          onChange={() => toggleCategoryChannel(category, "email")}
+                          type="checkbox"
+                        />{" "}
+                        Email
+                      </label>
+                    </div>
                   );
                 })}
-                {lockedCategories.map((category) => (
-                  <div className="preference-row locked" key={category}>
-                    <span>{categoryLabels[category]}</span>
-                    <span className="status-pill">Всегда включено</span>
-                  </div>
-                ))}
+                {lockedCategories.map((category) => {
+                  const Icon = categoryIcons[category] ?? Settings;
+                  return (
+                    <div className="preference-row locked" key={category}>
+                      <span>
+                        <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+                        {categoryLabels[category]}
+                      </span>
+                      <span className="status-pill">Всегда включено</span>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           </>
