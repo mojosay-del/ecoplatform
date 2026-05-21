@@ -1,9 +1,10 @@
 import { Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
+import { BillingModule } from "../billing/billing.module";
 import { SchedulerService } from "./scheduler.service";
 
 @Module({
-  imports: [ScheduleModule.forRoot()],
+  imports: [ScheduleModule.forRoot(), BillingModule],
   providers: [SchedulerService],
   exports: [SchedulerService],
 })

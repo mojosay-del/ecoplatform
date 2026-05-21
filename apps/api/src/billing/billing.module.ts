@@ -1,11 +1,14 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { NotificationsModule } from "../notifications/notifications.module";
+import { BillingNotificationsService } from "./billing-notifications.service";
 import { BillingController } from "./billing.controller";
 import { BillingService } from "./billing.service";
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, NotificationsModule],
   controllers: [BillingController],
-  providers: [BillingService],
+  providers: [BillingService, BillingNotificationsService],
+  exports: [BillingNotificationsService],
 })
 export class BillingModule {}

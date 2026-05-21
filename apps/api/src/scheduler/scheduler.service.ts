@@ -1,27 +1,35 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
+import { BillingNotificationsService } from "../billing/billing-notifications.service";
 
 /**
  * Координатор регулярных фоновых задач.
  *
- * На этом шаге сервис только пингует логи каждый час — это даёт работающий
- * каркас для последующих коммитов Волны 4, где появится реальная логика
- * (биллинг-уведомления, очистка истёкших lock'ов модерации и пр.).
+ * Сейчас на нём висит одна задача: раз в час BillingNotificationsService
+ * проверяет компании и отправляет уведомления о скором/случившемся
+ * истечении демо и подписки.
  *
  * Запуск задач можно полностью отключить переменной SCHEDULER_DISABLED=1
- * (актуально для unit-/integration-тестов и быстрого dev-режима).
+ * (актуально для integration-тестов — для биллинг-логики используется
+ * прямой вызов runHourlyCheck() с подменённым `now`).
  */
 @Injectable()
 export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
 
+  constructor(private readonly billing: BillingNotificationsService) {}
+
   private get disabled(): boolean {
     return process.env.SCHEDULER_DISABLED === "1";
   }
 
-  @Cron(CronExpression.EVERY_HOUR, { name: "hourly-heartbeat" })
-  async handleHourlyTick() {
+  @Cron(CronExpression.EVERY_HOUR, { name: "billing-hourly-check" })
+  async handleHourlyBillingCheck() {
     if (this.disabled) return;
-    this.logger.log("Hourly tick — scheduler heartbeat");
+    try {
+      await this.billing.runHourlyCheck();
+    } catch (error) {
+      this.logger.error("Hourly billing check failed", error as Error);
+    }
   }
 }

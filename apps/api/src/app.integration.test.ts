@@ -4,7 +4,8 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hash } from "bcryptjs";
-import { CommentStatus, CompanyStatus, ContentStatus, PlatformRole, SanctionType, UserStatus } from "@prisma/client";
+import { CommentStatus, CompanyStatus, ContentStatus, PlatformRole, SanctionType, SubscriptionStatus, UserStatus } from "@prisma/client";
+import { BillingNotificationsService } from "./billing/billing-notifications.service";
 import { createTestApp, resetDb, TestApp } from "./test/test-app";
 
 let ctx: TestApp;
@@ -789,6 +790,112 @@ describe("Admin companies panel", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ status: "demo", reasonCode: "manual_activation" });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("Billing notifications (cron)", () => {
+  it("уведомление billing.demo.expiring создаётся, когда демо < 3 дней; идемпотентно при повторе", async () => {
+    const company = await registerCompany("0600001");
+    // Подвинем демо так, чтобы оно истекало через ~1 день.
+    await ctx.prisma.company.update({
+      where: { id: company.companyId },
+      data: { demoEndsAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+    });
+
+    const service = ctx.app.get(BillingNotificationsService);
+    await service.runHourlyCheck();
+    await service.runHourlyCheck(); // повтор — не должен породить дубликат
+
+    const notes = await ctx.prisma.inAppNotification.findMany({
+      where: { userId: company.userId, eventType: "billing.demo.expiring" },
+    });
+    expect(notes).toHaveLength(1);
+    expect(notes[0].category).toBe("billing");
+  });
+
+  it("истёкшее демо переводит компанию в past_due и шлёт billing.demo.expired", async () => {
+    const company = await registerCompany("0600002");
+    await ctx.prisma.company.update({
+      where: { id: company.companyId },
+      data: { demoEndsAt: new Date(Date.now() - 60 * 60 * 1000) },
+    });
+
+    await ctx.app.get(BillingNotificationsService).runHourlyCheck();
+
+    const updated = await ctx.prisma.company.findUnique({ where: { id: company.companyId } });
+    expect(updated?.status).toBe(CompanyStatus.past_due);
+
+    const note = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId: company.userId, eventType: "billing.demo.expired" },
+    });
+    expect(note).toBeTruthy();
+  });
+
+  it("подписка, истекающая через 5 дней, рождает billing.subscription.expiring", async () => {
+    const adminToken = await loginAdmin();
+    const company = await registerCompany("0600003");
+
+    // Активируем подписку, оканчивающуюся через 5 дней.
+    const fiveDaysLater = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        companyId: company.companyId,
+        plan: "basic",
+        endsAt: fiveDaysLater.toISOString(),
+        reason: "тест",
+      });
+
+    await ctx.app.get(BillingNotificationsService).runHourlyCheck();
+
+    const note = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId: company.userId, eventType: "billing.subscription.expiring" },
+    });
+    expect(note).toBeTruthy();
+    expect(note?.category).toBe("billing");
+  });
+
+  it("истёкшая подписка переводит компанию в past_due, саму подписку в expired, шлёт expired-уведомление", async () => {
+    const adminToken = await loginAdmin();
+    const company = await registerCompany("0600004");
+
+    const futureEndsAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        companyId: company.companyId,
+        plan: "extended",
+        endsAt: futureEndsAt.toISOString(),
+        reason: "тест",
+      });
+
+    // Сдвинем end даты в прошлое (имитация истечения).
+    const pastEndsAt = new Date(Date.now() - 60 * 60 * 1000);
+    await ctx.prisma.company.update({
+      where: { id: company.companyId },
+      data: { subscriptionEndsAt: pastEndsAt },
+    });
+    await ctx.prisma.subscription.updateMany({
+      where: { companyId: company.companyId },
+      data: { endsAt: pastEndsAt },
+    });
+
+    await ctx.app.get(BillingNotificationsService).runHourlyCheck();
+
+    const updatedCompany = await ctx.prisma.company.findUnique({ where: { id: company.companyId } });
+    expect(updatedCompany?.status).toBe(CompanyStatus.past_due);
+
+    const subscription = await ctx.prisma.subscription.findFirst({
+      where: { companyId: company.companyId },
+    });
+    expect(subscription?.status).toBe(SubscriptionStatus.expired);
+
+    const note = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId: company.userId, eventType: "billing.subscription.expired" },
+    });
+    expect(note).toBeTruthy();
   });
 });
 
