@@ -384,6 +384,17 @@ export class ContentController {
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
+  @Patch("admin/content/knowledge-base/:id")
+  async updateKnowledgeArticle(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.content.updateKnowledgeArticle(id, parseBody(knowledgeArticleInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
   @Post("admin/content/knowledge-base/:id/publish")
   async publishKnowledgeArticle(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.content.publishKnowledgeArticle(id, user);

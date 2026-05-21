@@ -1261,6 +1261,52 @@ export class ContentService {
     return article;
   }
 
+  async updateKnowledgeArticle(id: string, input: KnowledgeArticleInput, user: RequestUser) {
+    const check = validateContentBlocks(input.blocks);
+
+    if (!check.ok) {
+      throw new ForbiddenException(check.message);
+    }
+
+    const existing = await this.prisma.knowledgeBaseArticle.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Статья не найдена.");
+    }
+
+    const article = await this.prisma.$transaction(async (tx) => {
+      await tx.knowledgeBaseBlock.deleteMany({ where: { articleId: id } });
+      await tx.knowledgeBaseArticle.update({
+        where: { id },
+        data: {
+          title: input.title,
+          subtitle: input.subtitle,
+          coverImageId: input.coverImageId,
+          iconType: input.iconType,
+          blocks: {
+            create: input.blocks.map((block, position) => ({
+              position,
+              type: block.type,
+              payload: this.payload(block),
+            })),
+          },
+        },
+      });
+      return tx.knowledgeBaseArticle.findUniqueOrThrow({
+        where: { id },
+        include: { blocks: { orderBy: { position: "asc" } } },
+      });
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "knowledge.update",
+      entityType: "KnowledgeBaseArticle",
+      entityId: id,
+    });
+
+    return article;
+  }
+
   async publishKnowledgeArticle(id: string, user: RequestUser) {
     const existing = await this.prisma.knowledgeBaseArticle.findUnique({
       where: { id },
