@@ -792,6 +792,105 @@ describe("Admin companies panel", () => {
   });
 });
 
+describe("Auth security notifications", () => {
+  it("создаёт уведомление о входе после успешного логина", async () => {
+    const company = await registerCompany("0500001");
+    // Регистрация уже создала сессию — уведомления при register не шлются,
+    // но повторный логин должен создать notification.
+    const login = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0500001@test.local", password: "User12345" });
+    expect(login.status).toBe(201);
+
+    const note = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId: company.userId, eventType: { in: ["auth.login", "auth.login.new_device"] } },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(note).toBeTruthy();
+    expect(note?.category).toBe("security");
+  });
+
+  it("второй логин с другим User-Agent помечается как новое устройство", async () => {
+    const company = await registerCompany("0500002");
+
+    const login = await ctx.http
+      .post("/api/auth/login")
+      .set("User-Agent", "DifferentBrowser/1.0")
+      .send({ email: "user0500002@test.local", password: "User12345" });
+    expect(login.status).toBe(201);
+
+    const note = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId: company.userId, eventType: "auth.login.new_device" },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(note).toBeTruthy();
+    expect(note?.title).toContain("нового устройства");
+  });
+
+  it("смена пароля: отзывает другие сессии, создаёт уведомление, новый пароль работает", async () => {
+    const company = await registerCompany("0500003");
+
+    // Открываем вторую сессию параллельно.
+    const second = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0500003@test.local", password: "User12345" });
+    expect(second.status).toBe(201);
+    const secondToken = second.body.accessToken as string;
+
+    // Со второй сессии меняем пароль.
+    const change = await ctx.http
+      .post("/api/auth/change-password")
+      .set("Authorization", `Bearer ${secondToken}`)
+      .send({ currentPassword: "User12345", newPassword: "NewPassw0rd!" });
+    expect(change.status).toBe(201);
+
+    // Первая сессия отозвана — endpoint /auth/me с её токеном вернёт 401.
+    const meFirst = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${company.token}`);
+    expect(meFirst.status).toBe(401);
+
+    // Текущая (вторая) сессия активна.
+    const meSecond = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${secondToken}`);
+    expect(meSecond.status).toBe(200);
+
+    // Логин со старым паролем не работает, с новым — работает.
+    const oldLogin = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0500003@test.local", password: "User12345" });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0500003@test.local", password: "NewPassw0rd!" });
+    expect(newLogin.status).toBe(201);
+
+    const note = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId: company.userId, eventType: "auth.password_changed" },
+    });
+    expect(note).toBeTruthy();
+    expect(note?.category).toBe("security");
+  });
+
+  it("смена пароля с неверным текущим паролем возвращает 401", async () => {
+    const company = await registerCompany("0500004");
+
+    const res = await ctx.http
+      .post("/api/auth/change-password")
+      .set("Authorization", `Bearer ${company.token}`)
+      .send({ currentPassword: "WrongPass", newPassword: "NewPassw0rd!" });
+    expect(res.status).toBe(401);
+  });
+
+  it("смена пароля на слишком короткий — 400", async () => {
+    const company = await registerCompany("0500005");
+
+    const res = await ctx.http
+      .post("/api/auth/change-password")
+      .set("Authorization", `Bearer ${company.token}`)
+      .send({ currentPassword: "User12345", newPassword: "short" });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("Admin journals", () => {
   it("выдаёт журнал действий админу с фильтрами и пагинацией", async () => {
     const adminToken = await loginAdmin();

@@ -19,6 +19,13 @@ export const loginDtoSchema = z.object({
 
 export type LoginDto = z.infer<typeof loginDtoSchema>;
 
+export const changePasswordDtoSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(10).regex(/[A-Za-zА-Яа-яЁё]/).regex(/[0-9]/),
+});
+
+export type ChangePasswordDto = z.infer<typeof changePasswordDtoSchema>;
+
 export const manualSubscriptionDtoSchema = z.object({
   companyId: z.string().min(1),
   plan: z.enum(["basic", "extended"]),

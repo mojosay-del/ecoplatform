@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Req, Res, UseGuards } from "@nestjs/common";
 import type { Request, Response } from "express";
-import { loginDtoSchema, registerDtoSchema } from "@ecoplatform/shared";
+import { changePasswordDtoSchema, loginDtoSchema, registerDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import type { RequestUser } from "../common/request-user";
@@ -45,6 +45,13 @@ export class AuthController {
   @Get("me")
   async me(@CurrentUser() user: RequestUser) {
     return this.auth.me(user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("change-password")
+  async changePassword(@CurrentUser() user: RequestUser, @Body() body: unknown) {
+    const input = parseBody(changePasswordDtoSchema, body);
+    return this.auth.changePassword(user.id, user.sessionId, input);
   }
 
   private setRefreshCookie(response: Response, refreshToken: string) {

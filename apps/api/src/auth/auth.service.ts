@@ -1,10 +1,11 @@
-import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, forwardRef, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { CompanyStatus, UserStatus } from "@prisma/client";
+import { CompanyStatus, NotificationCategory, UserStatus } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 import type { LoginDto, RegisterDto } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 type SessionTokens = {
@@ -18,6 +19,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly settings: PlatformSettingsService,
+    @Inject(forwardRef(() => NotificationsService))
+    private readonly notifications: NotificationsService,
   ) {}
 
   async register(input: RegisterDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {
@@ -73,7 +76,97 @@ export class AuthService {
       throw new UnauthorizedException("Доступ к кабинету компании закрыт.");
     }
 
-    return this.createSession(user.id, meta, Boolean(input.rememberMe));
+    const newDevice = await this.detectNewDevice(user.id, meta);
+    const tokens = await this.createSession(user.id, meta, Boolean(input.rememberMe));
+    await this.notifyLogin(user.id, meta, newDevice).catch(() => undefined);
+
+    return tokens;
+  }
+
+  async changePassword(
+    userId: string,
+    sessionId: string,
+    input: { currentPassword: string; newPassword: string },
+  ): Promise<{ ok: true }> {
+    if (input.newPassword.length < 10) {
+      throw new BadRequestException("Новый пароль должен содержать не менее 10 символов.");
+    }
+    if (input.newPassword === input.currentPassword) {
+      throw new BadRequestException("Новый пароль должен отличаться от текущего.");
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException("Пользователь не найден.");
+    }
+
+    const ok = await compare(input.currentPassword, user.passwordHash);
+    if (!ok) {
+      throw new UnauthorizedException("Текущий пароль указан неверно.");
+    }
+
+    const passwordHash = await hash(input.newPassword, 12);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+      // Все остальные сессии отзываются — это стандартное требование безопасности.
+      await tx.session.updateMany({
+        where: { userId, revokedAt: null, NOT: { id: sessionId } },
+        data: { revokedAt: new Date() },
+      });
+    });
+
+    await this.notifications
+      .createInApp({
+        userId,
+        eventType: "auth.password_changed",
+        sourceId: `${userId}:${Date.now()}`,
+        category: NotificationCategory.security,
+        title: "Пароль изменён",
+        body: "Пароль вашей учётной записи был изменён. Все остальные сессии отозваны.",
+        link: "/account",
+      })
+      .catch(() => undefined);
+
+    return { ok: true };
+  }
+
+  private async detectNewDevice(
+    userId: string,
+    meta: { userAgent?: string; ipAddress?: string },
+  ): Promise<boolean> {
+    const previous = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!previous) return false;
+
+    const sameUa = (previous.userAgent ?? null) === (meta.userAgent ?? null);
+    const sameIp = (previous.ipAddress ?? null) === (meta.ipAddress ?? null);
+    return !(sameUa && sameIp);
+  }
+
+  private async notifyLogin(
+    userId: string,
+    meta: { userAgent?: string; ipAddress?: string },
+    newDevice: boolean,
+  ): Promise<void> {
+    const when = new Date();
+    const stamp = when.toISOString();
+    const where = [meta.ipAddress ?? "—", meta.userAgent ?? "—"].join(" · ");
+
+    await this.notifications.createInApp({
+      userId,
+      eventType: newDevice ? "auth.login.new_device" : "auth.login",
+      sourceId: `${userId}:${stamp}`,
+      category: NotificationCategory.security,
+      title: newDevice ? "Вход с нового устройства" : "Новый вход в аккаунт",
+      body: newDevice
+        ? `Зафиксирован вход с устройства, отличного от предыдущего: ${where}.`
+        : `Вход в аккаунт выполнен ${when.toLocaleString("ru-RU")}.`,
+      link: "/account",
+      payload: { ipAddress: meta.ipAddress ?? null, userAgent: meta.userAgent ?? null, newDevice },
+    });
   }
 
   async refresh(refreshToken: string | undefined): Promise<SessionTokens> {
