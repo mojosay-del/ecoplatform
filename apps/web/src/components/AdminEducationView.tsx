@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { Block, BlocksEditor, LESSON_BLOCK_KINDS } from "./BlocksEditor";
+import { FileUploadField } from "./FileUploadField";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -265,9 +266,17 @@ function ChaptersList({
     await onMutate(`/admin/content/education/chapters/${chapter.id}`, "DELETE");
   }
 
+  async function moveChapter(chapter: Chapter, direction: -1 | 1) {
+    const newPosition = chapter.position + direction;
+    if (newPosition < 0 || newPosition >= module.chapters.length) return;
+    await onMutate(`/admin/content/education/chapters/${chapter.id}`, "PATCH", {
+      position: newPosition,
+    });
+  }
+
   return (
     <div className="stack-list" style={{ marginTop: 8, paddingLeft: 12 }}>
-      {module.chapters.map((chapter) => (
+      {module.chapters.map((chapter, index) => (
         <div key={chapter.id}>
           <article
             className={`moderation-case-row ${
@@ -280,11 +289,27 @@ function ChaptersList({
               style={{ all: "unset", cursor: "pointer", width: "100%" }}
             >
               <strong>{chapter.title}</strong>
-              <small style={{ display: "block" }}>
-                Уроков: {chapter.lessons.length} · Позиция: {chapter.position}
-              </small>
+              <small style={{ display: "block" }}>Уроков: {chapter.lessons.length}</small>
             </button>
             <div className="auth-actions" style={{ marginTop: 6 }}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => moveChapter(chapter, -1)}
+                disabled={index === 0}
+                title="Выше"
+              >
+                ↑
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => moveChapter(chapter, 1)}
+                disabled={index === module.chapters.length - 1}
+                title="Ниже"
+              >
+                ↓
+              </button>
               <button className="button secondary" type="button" onClick={() => removeChapter(chapter)}>
                 Удалить главу
               </button>
@@ -325,9 +350,17 @@ function LessonsList({
     await onMutate(`/admin/content/education/lessons/${lesson.id}`, "DELETE");
   }
 
+  async function moveLesson(lesson: Lesson, direction: -1 | 1) {
+    const newPosition = lesson.position + direction;
+    if (newPosition < 0 || newPosition >= chapter.lessons.length) return;
+    await onMutate(`/admin/content/education/lessons/${lesson.id}`, "PATCH", {
+      position: newPosition,
+    });
+  }
+
   return (
     <div className="stack-list" style={{ marginTop: 6, paddingLeft: 12 }}>
-      {chapter.lessons.map((lesson) => (
+      {chapter.lessons.map((lesson, index) => (
         <article
           key={lesson.id}
           className={`moderation-case-row ${
@@ -346,6 +379,24 @@ function LessonsList({
             </small>
           </button>
           <div className="auth-actions" style={{ marginTop: 6 }}>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => moveLesson(lesson, -1)}
+              disabled={index === 0}
+              title="Выше"
+            >
+              ↑
+            </button>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => moveLesson(lesson, 1)}
+              disabled={index === chapter.lessons.length - 1}
+              title="Ниже"
+            >
+              ↓
+            </button>
             <button className="button secondary" type="button" onClick={() => removeLesson(lesson)}>
               Удалить урок
             </button>
@@ -471,14 +522,13 @@ function ModuleForm({
           required
         />
       </label>
-      <label className="form-field">
-        <span>fileId обложки (необязательно)</span>
-        <input
-          className="input"
-          value={draft.coverImageId}
-          onChange={(event) => setDraft((prev) => ({ ...prev, coverImageId: event.target.value }))}
-        />
-      </label>
+      <FileUploadField
+        accept="image/*"
+        buttonLabel="Загрузить обложку"
+        label="ID обложки (необязательно)"
+        value={draft.coverImageId}
+        onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+      />
       <label className="form-field">
         <span>Уровень доступа</span>
         <select
@@ -587,18 +637,16 @@ function ChapterForm({
   onMutate: (path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) => Promise<boolean>;
 }) {
   const [title, setTitle] = useState(chapter.title);
-  const [position, setPosition] = useState(chapter.position);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setTitle(chapter.title);
-    setPosition(chapter.position);
-  }, [chapter.id, chapter.title, chapter.position]);
+  }, [chapter.id, chapter.title]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    await onMutate(`/admin/content/education/chapters/${chapter.id}`, "PATCH", { title, position });
+    await onMutate(`/admin/content/education/chapters/${chapter.id}`, "PATCH", { title });
     setSaving(false);
   }
 
@@ -614,16 +662,7 @@ function ChapterForm({
           required
         />
       </label>
-      <label className="form-field">
-        <span>Позиция</span>
-        <input
-          className="input"
-          type="number"
-          min={0}
-          value={position}
-          onChange={(event) => setPosition(Number(event.target.value))}
-        />
-      </label>
+      <p className="page-subtitle">Порядок глав меняется стрелками ↑↓ в списке слева.</p>
       <button className="button" type="submit" disabled={saving}>
         {saving ? "Сохраняю…" : "Сохранить главу"}
       </button>
@@ -642,7 +681,6 @@ function LessonForm({
 }) {
   const [draft, setDraft] = useState({
     title: lesson.title,
-    position: lesson.position,
     blocks: lesson.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
     attachments: lesson.attachments.map((a) => ({ ...a })),
   });
@@ -651,18 +689,16 @@ function LessonForm({
   useEffect(() => {
     setDraft({
       title: lesson.title,
-      position: lesson.position,
       blocks: lesson.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
       attachments: lesson.attachments.map((a) => ({ ...a })),
     });
-  }, [lesson.id, lesson.title, lesson.position, lesson.blocks, lesson.attachments]);
+  }, [lesson.id, lesson.title, lesson.blocks, lesson.attachments]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     await onMutate(`/admin/content/education/lessons/${lesson.id}`, "PATCH", {
       title: draft.title,
-      position: draft.position,
       blocks: draft.blocks,
       attachments: draft.attachments,
     });
@@ -689,11 +725,11 @@ function LessonForm({
   }
 
   async function publishToggle() {
-    if (lesson.status === "published") {
-      await onMutate(`/admin/content/education/lessons/${lesson.id}/unpublish`, "POST");
-    }
-    // публикация урока сейчас не на отдельном эндпойнте — публикуется через PATCH модуля
-    // или вместе с модулем; в MVP ограничимся unpublish.
+    const path =
+      lesson.status === "published"
+        ? `/admin/content/education/lessons/${lesson.id}/unpublish`
+        : `/admin/content/education/lessons/${lesson.id}/publish`;
+    await onMutate(path, "POST");
   }
 
   return (
@@ -708,16 +744,7 @@ function LessonForm({
           required
         />
       </label>
-      <label className="form-field">
-        <span>Позиция</span>
-        <input
-          className="input"
-          type="number"
-          min={0}
-          value={draft.position}
-          onChange={(event) => setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))}
-        />
-      </label>
+      <p className="page-subtitle">Порядок уроков меняется стрелками ↑↓ в списке слева.</p>
 
       <div className="form-field">
         <span>Блоки контента</span>
@@ -734,11 +761,16 @@ function LessonForm({
           {draft.attachments.map((attachment, index) => (
             <div className="list-row" key={index}>
               <div className="form" style={{ gap: 4, flex: 1 }}>
-                <input
-                  className="input"
-                  placeholder="fileId"
+                <FileUploadField
+                  buttonLabel="Загрузить файл"
+                  label="ID файла"
                   value={attachment.fileId}
-                  onChange={(event) => updateAttachment(index, { fileId: event.target.value })}
+                  onChange={(fileId, asset) =>
+                    updateAttachment(index, {
+                      fileId,
+                      displayName: attachment.displayName || asset?.originalName || "",
+                    })
+                  }
                 />
                 <input
                   className="input"
@@ -762,11 +794,9 @@ function LessonForm({
         <button className="button" type="submit" disabled={saving}>
           {saving ? "Сохраняю…" : "Сохранить урок"}
         </button>
-        {lesson.status === "published" ? (
-          <button className="button secondary" type="button" onClick={publishToggle}>
-            Снять с публикации
-          </button>
-        ) : null}
+        <button className="button secondary" type="button" onClick={publishToggle}>
+          {lesson.status === "published" ? "Снять с публикации" : "Опубликовать урок"}
+        </button>
         <button
           className="button secondary"
           type="button"

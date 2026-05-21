@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { CommentStatus, ContentStatus, Prisma } from "@prisma/client";
+import { CommentStatus, ContentStatus, LearningAccessLevel, Prisma } from "@prisma/client";
 import {
   BaseContentBlock,
   canAccessLearningLevel,
@@ -61,9 +61,21 @@ export class ContentService {
   private assertFunctionalAccess(user: RequestUser) {
     // Эта проверка центральная для MVP: после истечения demo пользователь может
     // войти в аккаунт, но рабочие разделы закрываются до ручной активации подписки.
+    if (user.platformRoles.length > 0) {
+      return;
+    }
+
     if (!user.company || !canOpenFunctionalSections(user.company)) {
       throw new ForbiddenException("Доступ к разделу ограничен. Активируйте подписку в кабинете.");
     }
+  }
+
+  private hasLearningAccess(user: RequestUser, accessLevel: LearningAccessLevel) {
+    if (user.platformRoles.length > 0) {
+      return true;
+    }
+
+    return user.company ? canAccessLearningLevel(user.company, accessLevel) : false;
   }
 
   private payload(block: BaseContentBlock): Prisma.InputJsonValue {
@@ -696,7 +708,7 @@ export class ContentService {
 
     return modules.map((module) => ({
       ...module,
-      hasAccess: user.company ? canAccessLearningLevel(user.company, module.accessLevel) : false,
+      hasAccess: this.hasLearningAccess(user, module.accessLevel),
     }));
   }
 
@@ -726,7 +738,7 @@ export class ContentService {
       throw new NotFoundException("Модуль не найден.");
     }
 
-    const hasAccess = user.company ? canAccessLearningLevel(user.company, module.accessLevel) : false;
+    const hasAccess = this.hasLearningAccess(user, module.accessLevel);
     return { ...module, hasAccess };
   }
 
@@ -984,7 +996,19 @@ export class ContentService {
       throw new NotFoundException("Глава не найдена.");
     }
 
-    const chapter = await this.prisma.chapter.update({ where: { id }, data: input });
+    const positionChanged = input.position !== undefined && input.position !== existing.position;
+
+    const chapter = await this.prisma.$transaction(async (tx) => {
+      if (positionChanged) {
+        await this.repositionChapter(tx, existing.moduleId, id, input.position!);
+      }
+      const data: Prisma.ChapterUpdateInput = {};
+      if (input.title !== undefined) data.title = input.title;
+      if (Object.keys(data).length === 0 && !positionChanged) {
+        return existing;
+      }
+      return tx.chapter.update({ where: { id }, data });
+    });
 
     await this.auditLog.record({
       actorId: user.id,
@@ -1081,10 +1105,15 @@ export class ContentService {
       }
     }
 
+    const positionChanged = input.position !== undefined && input.position !== existing.position;
+
     const lesson = await this.prisma.$transaction(async (tx) => {
+      if (positionChanged) {
+        await this.repositionLesson(tx, existing.chapterId, id, input.position!);
+      }
+
       const data: Prisma.LessonUpdateInput = {};
       if (input.title !== undefined) data.title = input.title;
-      if (input.position !== undefined) data.position = input.position;
 
       if (input.blocks) {
         await tx.lessonContentBlock.deleteMany({ where: { lessonId: id } });
@@ -1163,6 +1192,36 @@ export class ContentService {
     return lesson;
   }
 
+  async publishLesson(id: string, user: RequestUser) {
+    const existing = await this.prisma.lesson.findUnique({
+      where: { id },
+      include: { _count: { select: { blocks: true } } },
+    });
+    if (!existing) {
+      throw new NotFoundException("Урок не найден.");
+    }
+    if (existing._count.blocks === 0) {
+      throw new ForbiddenException("Нельзя опубликовать урок без блоков.");
+    }
+
+    const lesson = await this.prisma.lesson.update({
+      where: { id },
+      data: {
+        status: ContentStatus.published,
+        firstPublishedAt: existing.firstPublishedAt ?? new Date(),
+      },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "learning.lesson.publish",
+      entityType: "Lesson",
+      entityId: id,
+    });
+
+    return lesson;
+  }
+
   async completeLesson(lessonId: string, user: RequestUser) {
     this.assertFunctionalAccess(user);
     return this.prisma.lessonProgress.upsert({
@@ -1178,10 +1237,18 @@ export class ContentService {
       where: { parentId: null, status: ContentStatus.published },
       orderBy: { position: "asc" },
       include: {
+        blocks: { orderBy: { position: "asc" } },
         children: {
           where: { status: ContentStatus.published },
           orderBy: { position: "asc" },
-          include: { children: { where: { status: ContentStatus.published }, orderBy: { position: "asc" } } },
+          include: {
+            blocks: { orderBy: { position: "asc" } },
+            children: {
+              where: { status: ContentStatus.published },
+              orderBy: { position: "asc" },
+              include: { blocks: { orderBy: { position: "asc" } } },
+            },
+          },
         },
       },
     });
@@ -1375,9 +1442,30 @@ export class ContentService {
 
     await this.assertKnowledgeDepth(input.parentId, id);
 
-    const article = await this.prisma.knowledgeBaseArticle.update({
-      where: { id },
-      data: { parentId: input.parentId, position: input.position },
+    const parentChanged = existing.parentId !== input.parentId;
+    const positionChanged = existing.position !== input.position;
+
+    const article = await this.prisma.$transaction(async (tx) => {
+      if (parentChanged) {
+        // При смене родителя сначала отпускаем место в старой группе, чтобы
+        // соседи перенумеровались без дыр в position. Затем вставляем в новую.
+        await tx.knowledgeBaseArticle.update({
+          where: { id },
+          data: { position: -1_000_000 - existing.position },
+        });
+        await this.compactKnowledgeAfterRemoval(tx, existing.parentId, existing.position);
+        await this.repositionKnowledgeInGroup(tx, input.parentId, id, input.position, true);
+      } else if (positionChanged) {
+        await this.repositionKnowledgeInGroup(tx, input.parentId, id, input.position, false);
+      }
+
+      if (parentChanged) {
+        return tx.knowledgeBaseArticle.update({
+          where: { id },
+          data: { parentId: input.parentId },
+        });
+      }
+      return tx.knowledgeBaseArticle.findUniqueOrThrow({ where: { id } });
     });
 
     await this.auditLog.record({
@@ -1476,5 +1564,117 @@ export class ContentService {
     }
     const depths = await Promise.all(children.map((child) => this.subtreeDepth(child.id)));
     return 1 + Math.max(...depths);
+  }
+
+  // Перепаковка позиций внутри группы (главы модуля).
+  // Уникальный индекс @@unique([moduleId, position]) не позволяет двум главам
+  // занимать одну позицию — даже временно. Поэтому сначала уводим всех соседей
+  // в заведомо свободную зону отрицательных значений, а потом раздаём финальные
+  // номера 0..N-1 уже в нужном порядке.
+  private async repositionChapter(
+    tx: Prisma.TransactionClient,
+    moduleId: string,
+    itemId: string,
+    newPosition: number,
+  ) {
+    const siblings = await tx.chapter.findMany({
+      where: { moduleId, id: { not: itemId } },
+      orderBy: { position: "asc" },
+      select: { id: true },
+    });
+
+    await tx.chapter.update({ where: { id: itemId }, data: { position: -1 } });
+    for (let i = 0; i < siblings.length; i++) {
+      await tx.chapter.update({ where: { id: siblings[i]!.id }, data: { position: -(i + 2) } });
+    }
+
+    const ordered = siblings.map((s) => s.id);
+    const clamped = Math.max(0, Math.min(newPosition, ordered.length));
+    ordered.splice(clamped, 0, itemId);
+
+    for (let i = 0; i < ordered.length; i++) {
+      await tx.chapter.update({ where: { id: ordered[i]! }, data: { position: i } });
+    }
+  }
+
+  private async repositionLesson(
+    tx: Prisma.TransactionClient,
+    chapterId: string,
+    itemId: string,
+    newPosition: number,
+  ) {
+    const siblings = await tx.lesson.findMany({
+      where: { chapterId, id: { not: itemId } },
+      orderBy: { position: "asc" },
+      select: { id: true },
+    });
+
+    await tx.lesson.update({ where: { id: itemId }, data: { position: -1 } });
+    for (let i = 0; i < siblings.length; i++) {
+      await tx.lesson.update({ where: { id: siblings[i]!.id }, data: { position: -(i + 2) } });
+    }
+
+    const ordered = siblings.map((s) => s.id);
+    const clamped = Math.max(0, Math.min(newPosition, ordered.length));
+    ordered.splice(clamped, 0, itemId);
+
+    for (let i = 0; i < ordered.length; i++) {
+      await tx.lesson.update({ where: { id: ordered[i]! }, data: { position: i } });
+    }
+  }
+
+  // Для статьи базы знаний: возможно потребовать вставку с уже «выведенным» из
+  // старой группы элементом (skipItemInGroup=true) — в этом случае ищем соседей
+  // без него и вставляем его как новичка. Полезно при смене родителя.
+  private async repositionKnowledgeInGroup(
+    tx: Prisma.TransactionClient,
+    parentId: string | null,
+    itemId: string,
+    newPosition: number,
+    isNewcomer: boolean,
+  ) {
+    const siblings = await tx.knowledgeBaseArticle.findMany({
+      where: { parentId, id: { not: itemId } },
+      orderBy: { position: "asc" },
+      select: { id: true },
+    });
+
+    if (!isNewcomer) {
+      await tx.knowledgeBaseArticle.update({ where: { id: itemId }, data: { position: -1 } });
+    }
+    for (let i = 0; i < siblings.length; i++) {
+      await tx.knowledgeBaseArticle.update({
+        where: { id: siblings[i]!.id },
+        data: { position: -(i + 2) },
+      });
+    }
+
+    const ordered = siblings.map((s) => s.id);
+    const clamped = Math.max(0, Math.min(newPosition, ordered.length));
+    ordered.splice(clamped, 0, itemId);
+
+    for (let i = 0; i < ordered.length; i++) {
+      await tx.knowledgeBaseArticle.update({ where: { id: ordered[i]! }, data: { position: i } });
+    }
+  }
+
+  // При переходе статьи в другую родительскую группу — нужно «закрыть дыру»,
+  // которую она оставила: оставшиеся соседи перенумеровываются без неё.
+  private async compactKnowledgeAfterRemoval(
+    tx: Prisma.TransactionClient,
+    parentId: string | null,
+    removedPosition: number,
+  ) {
+    const remaining = await tx.knowledgeBaseArticle.findMany({
+      where: { parentId, position: { gt: removedPosition } },
+      orderBy: { position: "asc" },
+      select: { id: true, position: true },
+    });
+    for (const node of remaining) {
+      await tx.knowledgeBaseArticle.update({
+        where: { id: node.id },
+        data: { position: node.position - 1 },
+      });
+    }
   }
 }

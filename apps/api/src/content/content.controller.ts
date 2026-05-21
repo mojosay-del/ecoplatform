@@ -370,6 +370,13 @@ export class ContentController {
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
+  @Post("admin/content/education/lessons/:id/publish")
+  async publishLesson(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.content.publishLesson(id, user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
   @Get("admin/content/knowledge-base")
   async adminKnowledge() {
     return this.content.adminListKnowledge();
