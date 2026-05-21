@@ -48,7 +48,14 @@ function useApiData<T>(path: string | null, initial: T) {
       })
       .catch((error) => {
         if (!isActive) return;
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        // 401 централизованно ловит apiFetch: чистит localStorage и редиректит
+        // на /login, поэтому здесь обрабатываем только 403 — реальный отказ
+        // в доступе (демо истекло, модуль не оплачен).
+        if (error instanceof ApiError && error.status === 401) {
+          setState("unauthenticated");
+          return;
+        }
+        if (error instanceof ApiError && error.status === 403) {
           setState("forbidden");
           return;
         }
