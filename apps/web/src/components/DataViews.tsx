@@ -346,37 +346,240 @@ export function EducationView() {
       <section className="page">
         <PageHeader title="Обучение" subtitle="MVP-модули: закупка сырья и склад." />
         <div className="card-grid">
-          {data.map((module: any) => (
-            <article className="card" key={module.id}>
-              <p className="status-pill">{module.hasAccess ? "Доступен" : "Нужна подписка"}</p>
-              <h2>{module.title}</h2>
-              <p>{module.summary}</p>
-              <p style={{ color: "var(--muted)" }}>Уроков: {module.chapters?.reduce((sum: number, chapter: any) => sum + (chapter.lessons?.length ?? 0), 0)}</p>
-            </article>
-          ))}
+          {data.map((module: any) => {
+            const lessonsCount = module.chapters?.reduce(
+              (sum: number, chapter: any) => sum + (chapter.lessons?.length ?? 0),
+              0,
+            );
+            return (
+              <article className="card" key={module.id}>
+                <p className="status-pill">{module.hasAccess ? "Доступен" : "Нужна подписка"}</p>
+                <h2>{module.title}</h2>
+                <p>{module.summary}</p>
+                <p style={{ color: "var(--muted)" }}>Уроков: {lessonsCount}</p>
+                <Link className="button secondary" href={`/education/${module.id}`}>
+                  Открыть
+                </Link>
+              </article>
+            );
+          })}
         </div>
       </section>
     </AppShell>
   );
 }
 
-export function KnowledgeBaseView() {
-  const { data, state, errorMessage } = useApiData<any[]>("/knowledge-base", []);
-  const [selectedId, setSelectedId] = useState(data[0]?.id);
-  const selected = useMemo(() => data.find((article: any) => article.id === selectedId) ?? data[0], [data, selectedId]);
+export function LearningModuleView({ moduleId }: { moduleId: string }) {
+  const { data, state, errorMessage } = useApiData<any | null>(
+    `/education/modules/${moduleId}`,
+    null,
+  );
+
+  if (state === "unauthenticated") {
+    return <AuthRequired title="Обучение" />;
+  }
+  if (state === "forbidden") {
+    return <AccessClosed title="Обучение" />;
+  }
+  if (state === "error") {
+    return <ErrorState title="Обучение" message={errorMessage} />;
+  }
+  if (!data) {
+    return (
+      <AppShell>
+        <section className="page">
+          <PageHeader title="Обучение" subtitle="Загружаем модуль…" />
+        </section>
+      </AppShell>
+    );
+  }
+
+  const hasAccess = Boolean(data.hasAccess);
+
+  return (
+    <AppShell>
+      <section className="page">
+        <PageHeader title={data.title} subtitle={data.summary} />
+        <article className="card">
+          <p className="status-pill">{hasAccess ? "Доступен" : "Нужна подписка"}</p>
+          <p>{data.description}</p>
+          {!hasAccess && data.preview ? (
+            <div className="stack-list" style={{ marginTop: 16 }}>
+              <h3>Что внутри</h3>
+              <p>{data.preview.promotionalDescription}</p>
+              <ul>
+                {data.preview.whatYouWillLearn.map((item: string, index: number) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+              <Link className="button" href="/account">
+                Активировать подписку
+              </Link>
+            </div>
+          ) : null}
+        </article>
+
+        {hasAccess
+          ? (data.chapters ?? []).map((chapter: any) => (
+              <article className="card" key={chapter.id}>
+                <h2>{chapter.title}</h2>
+                <div className="stack-list">
+                  {(chapter.lessons ?? []).length === 0 ? (
+                    <p className="page-subtitle">В этой главе пока нет уроков.</p>
+                  ) : null}
+                  {(chapter.lessons ?? []).map((lesson: any) => (
+                    <div className="list-row" key={lesson.id}>
+                      <strong>{lesson.title}</strong>
+                      <Link
+                        className="button secondary"
+                        href={`/education/${moduleId}/${lesson.id}`}
+                      >
+                        Открыть урок
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))
+          : null}
+      </section>
+    </AppShell>
+  );
+}
+
+export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId: string }) {
+  const { token } = useAuth();
+  const { data, state, errorMessage } = useApiData<any | null>(
+    `/education/modules/${moduleId}`,
+    null,
+  );
+  const [completed, setCompleted] = useState(false);
+  const [completing, setCompleting] = useState(false);
+
+  if (state === "unauthenticated") {
+    return <AuthRequired title="Урок" />;
+  }
+  if (state === "forbidden") {
+    return <AccessClosed title="Урок" />;
+  }
+  if (state === "error") {
+    return <ErrorState title="Урок" message={errorMessage} />;
+  }
+  if (!data) {
+    return (
+      <AppShell>
+        <section className="page">
+          <PageHeader title="Урок" subtitle="Загружаем…" />
+        </section>
+      </AppShell>
+    );
+  }
+
+  const chapter = (data.chapters ?? []).find((c: any) =>
+    (c.lessons ?? []).some((l: any) => l.id === lessonId),
+  );
+  const lesson = chapter ? (chapter.lessons ?? []).find((l: any) => l.id === lessonId) : null;
+
+  if (!lesson) {
+    return <ErrorState title="Урок" message="Урок не найден или не опубликован." />;
+  }
+
+  if (!data.hasAccess) {
+    return <AccessClosed title={lesson.title} />;
+  }
+
+  async function markCompleted() {
+    if (!token || completing) return;
+    setCompleting(true);
+    try {
+      await apiFetch(`/education/lessons/${lessonId}/complete`, { method: "POST", token });
+      setCompleted(true);
+    } catch {
+      // молча — кнопка просто остаётся доступной
+    } finally {
+      setCompleting(false);
+    }
+  }
+
+  return (
+    <AppShell>
+      <section className="page">
+        <p className="page-subtitle">
+          <Link href="/education">Обучение</Link> /{" "}
+          <Link href={`/education/${moduleId}`}>{data.title}</Link> / {chapter.title}
+        </p>
+        <PageHeader title={lesson.title} subtitle="" />
+
+        <article className="card">
+          <ContentBlocks blocks={lesson.blocks ?? []} />
+        </article>
+
+        {(lesson.attachments ?? []).length > 0 ? (
+          <article className="card">
+            <h3>Прикреплённые файлы</h3>
+            <LessonAttachments attachments={lesson.attachments} />
+          </article>
+        ) : null}
+
+        <div className="auth-actions">
+          <button className="button" type="button" onClick={markCompleted} disabled={completed || completing}>
+            {completed ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
+          </button>
+          <Link className="button secondary" href={`/education/${moduleId}`}>
+            ← К модулю
+          </Link>
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+function LessonAttachments({ attachments }: { attachments: Array<{ fileId: string; displayName: string }> }) {
+  const { token } = useAuth();
+  const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
+  const ids = attachments.map((a) => a.fileId).filter(Boolean).sort();
+  const idsKey = ids.join(",");
 
   useEffect(() => {
-    setSelectedId(data[0]?.id);
-  }, [data]);
+    if (!token || ids.length === 0) {
+      setAssets(new Map());
+      return;
+    }
+    apiFetch<FileAsset[]>(`/files?ids=${encodeURIComponent(idsKey)}`, { token })
+      .then((result) => setAssets(new Map(result.map((asset) => [asset.id, asset]))))
+      .catch(() => setAssets(new Map()));
+  }, [idsKey, ids.length, token]);
+
+  return (
+    <div className="stack-list">
+      {attachments.map((attachment, index) => {
+        const asset = assets.get(attachment.fileId);
+        return (
+          <div className="list-row" key={index}>
+            <strong>{attachment.displayName}</strong>
+            {asset?.publicUrl ? (
+              <a className="button secondary" href={asset.publicUrl} rel="noreferrer" target="_blank">
+                Скачать
+              </a>
+            ) : (
+              <span className="page-subtitle">Файл недоступен</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function KnowledgeBaseView() {
+  const { data, state, errorMessage } = useApiData<any[]>("/knowledge-base", []);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="База знаний" />;
   }
-
   if (state === "forbidden") {
     return <AccessClosed title="База знаний" />;
   }
-
   if (state === "error") {
     return <ErrorState title="База знаний" message={errorMessage} />;
   }
@@ -385,21 +588,120 @@ export function KnowledgeBaseView() {
     <AppShell>
       <section className="page">
         <PageHeader title="База знаний" subtitle="Навигация по сырью и карточки номенклатуры." />
-        <div className="knowledge-layout">
-          <aside className="card">
-            <h3>Навигация по сырью</h3>
-            {data.map((article: any) => (
-              <button className={`tree-item ${article.id === selected?.id ? "active" : ""}`} onClick={() => setSelectedId(article.id)} key={article.id}>
-                {article.title}
-              </button>
-            ))}
-          </aside>
-          <article className="card">
-            <h1>{selected?.title}</h1>
-            <p className="page-subtitle">{selected?.subtitle}</p>
-            <ContentBlocks blocks={selected?.blocks ?? []} />
-          </article>
+        <div className="card">
+          {data.length === 0 ? (
+            <p className="page-subtitle">Статей пока нет.</p>
+          ) : (
+            <KnowledgeTree nodes={data} depth={0} />
+          )}
         </div>
+      </section>
+    </AppShell>
+  );
+}
+
+function KnowledgeTree({ nodes, depth }: { nodes: any[]; depth: number }) {
+  return (
+    <ul className="kb-tree" style={{ paddingLeft: depth === 0 ? 0 : 16 }}>
+      {nodes.map((node) => (
+        <KnowledgeTreeNode key={node.id} node={node} depth={depth} />
+      ))}
+    </ul>
+  );
+}
+
+function KnowledgeTreeNode({ node, depth }: { node: any; depth: number }) {
+  const [open, setOpen] = useState(depth === 0);
+  const children = (node.children ?? []) as any[];
+  const hasChildren = children.length > 0;
+
+  return (
+    <li>
+      <div className="list-row" style={{ alignItems: "center" }}>
+        {hasChildren ? (
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => setOpen((v) => !v)}
+            style={{ padding: "4px 8px", minWidth: 32 }}
+            aria-label={open ? "Свернуть" : "Развернуть"}
+          >
+            {open ? "▾" : "▸"}
+          </button>
+        ) : (
+          <span style={{ display: "inline-block", width: 32 }} />
+        )}
+        <Link href={`/knowledge-base/${node.slug}`} style={{ flex: 1 }}>
+          <strong>{node.title}</strong>
+          {node.subtitle ? <small style={{ display: "block", color: "var(--muted)" }}>{node.subtitle}</small> : null}
+        </Link>
+      </div>
+      {hasChildren && open ? <KnowledgeTree nodes={children} depth={depth + 1} /> : null}
+    </li>
+  );
+}
+
+export function KnowledgeArticleView({ slug }: { slug: string }) {
+  const { data, state, errorMessage } = useApiData<any | null>(
+    `/knowledge-base/${slug}`,
+    null,
+  );
+
+  if (state === "unauthenticated") {
+    return <AuthRequired title="База знаний" />;
+  }
+  if (state === "forbidden") {
+    return <AccessClosed title="База знаний" />;
+  }
+  if (state === "error") {
+    return <ErrorState title="База знаний" message={errorMessage} />;
+  }
+  if (!data) {
+    return (
+      <AppShell>
+        <section className="page">
+          <PageHeader title="База знаний" subtitle="Загружаем статью…" />
+        </section>
+      </AppShell>
+    );
+  }
+
+  const breadcrumbs: Array<{ title: string; slug: string }> = [];
+  if (data.parent?.parent) {
+    breadcrumbs.push({ title: data.parent.parent.title, slug: data.parent.parent.slug });
+  }
+  if (data.parent) {
+    breadcrumbs.push({ title: data.parent.title, slug: data.parent.slug });
+  }
+
+  return (
+    <AppShell>
+      <section className="page">
+        <p className="page-subtitle">
+          <Link href="/knowledge-base">База знаний</Link>
+          {breadcrumbs.map((crumb) => (
+            <span key={crumb.slug}>
+              {" / "}
+              <Link href={`/knowledge-base/${crumb.slug}`}>{crumb.title}</Link>
+            </span>
+          ))}
+        </p>
+        <PageHeader title={data.title} subtitle={data.subtitle ?? ""} />
+        <article className="card">
+          <ContentBlocks blocks={data.blocks ?? []} />
+        </article>
+        {(data.children ?? []).length > 0 ? (
+          <article className="card">
+            <h3>Подразделы</h3>
+            <ul className="kb-tree">
+              {(data.children ?? []).map((child: any) => (
+                <li key={child.id}>
+                  <Link href={`/knowledge-base/${child.slug}`}>{child.title}</Link>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ) : null}
       </section>
     </AppShell>
   );
@@ -661,11 +963,7 @@ function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
         if (block.type === "checklist") {
           const payload = block.payload as { title: string; style: string; items: string[] };
           return (
-            <div
-              className="checklist-block"
-              key={index}
-              style={{ borderColor: payload.style === "warning" ? "var(--yellow)" : "var(--green)" }}
-            >
+            <div className={`checklist-block checklist-${payload.style}`} key={index}>
               <h3>{payload.title}</h3>
               <ul>
                 {payload.items.map((item) => (
@@ -689,10 +987,7 @@ function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
                 altText={payload.image.altText}
                 caption={payload.image.caption}
               />
-              <div
-                className="checklist-block"
-                style={{ borderColor: payload.style === "warning" ? "var(--yellow)" : "var(--green)" }}
-              >
+              <div className={`checklist-block checklist-${payload.style}`}>
                 <h3>{payload.title}</h3>
                 <ul>
                   {payload.items.map((item) => (
