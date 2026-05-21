@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { UserStatus } from "@prisma/client";
 import type { Request } from "express";
 import { PrismaService } from "../prisma/prisma.service";
 import type { RequestUser } from "./request-user";
@@ -43,9 +44,18 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException("Сессия не найдена.");
       }
 
+      if (user.status === UserStatus.blocked) {
+        throw new UnauthorizedException("Учётная запись заблокирована.");
+      }
+
       if (user.company?.status === "blocked" || user.company?.status === "archived") {
         throw new UnauthorizedException("Доступ к компании закрыт.");
       }
+
+      // Деактивированный сотрудник теряет платформенные роли, но может остаться
+      // обычным пользователем компании. Если он одновременно и стафф, и член компании,
+      // его кабинет продолжает работать — пропадают только админ-роуты.
+      const platformRoles = user.platformStaff?.isActive ? user.platformStaff.roles : [];
 
       request.user = {
         id: user.id,
@@ -54,7 +64,7 @@ export class JwtAuthGuard implements CanActivate {
         lastName: user.lastName,
         phone: user.phone,
         companyId: user.companyId,
-        platformRoles: user.platformStaff?.roles ?? [],
+        platformRoles,
         company: user.company
           ? {
               status: user.company.status,
