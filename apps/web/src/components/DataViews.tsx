@@ -803,7 +803,7 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
 }
 
 export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId: string }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { data, state, errorMessage } = useApiData<any | null>(
     `/education/modules/${moduleId}`,
     null,
@@ -856,33 +856,109 @@ export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId:
     }
   }
 
+  const totalLessons = (data.chapters ?? []).reduce(
+    (sum: number, ch: any) => sum + (ch.lessons ?? []).length,
+    0,
+  );
+  // Реальный прогресс по урокам пока не отдаётся бэкендом — показываем
+  // только текущий урок как «1 в работе». Когда появится LessonProgress в API,
+  // здесь будет фактический счёт пройденных уроков пользователя.
+  const completedLessons = completed ? 1 : 0;
+  const progressPercent = totalLessons === 0 ? 0 : Math.round((completedLessons / totalLessons) * 100);
+
+  const upgradeCta = resolveUpgradeCta(user);
+
   return (
     <AppShell>
-      <section className="page">
-        <p className="page-subtitle">
-          <Link href="/education">Обучение</Link> /{" "}
-          <Link href={`/education/${moduleId}`}>{data.title}</Link> / {chapter.title}
-        </p>
-        <PageHeader title={lesson.title} subtitle="" />
+      <section className="page lesson-page">
+        <nav className="lesson-breadcrumb">
+          <Link href="/education">Главная</Link>
+          <span>/</span>
+          <Link href="/education">Курсы</Link>
+          <span>/</span>
+          <Link href={`/education/${moduleId}`}>{data.title}</Link>
+          <span>/</span>
+          <span className="lesson-breadcrumb-current">{lesson.title}</span>
+        </nav>
 
-        <article className="card">
-          <ContentBlocks blocks={lesson.blocks ?? []} />
-        </article>
-
-        {(lesson.attachments ?? []).length > 0 ? (
-          <article className="card">
-            <h3>Прикреплённые файлы</h3>
-            <LessonAttachments attachments={lesson.attachments} />
-          </article>
+        {upgradeCta ? (
+          <div className="lesson-upgrade-banner">
+            <div>
+              <strong>{upgradeCta.title}</strong>
+              <p>{upgradeCta.description}</p>
+            </div>
+            <Link className="button" href="/account">
+              {upgradeCta.buttonLabel}
+            </Link>
+          </div>
         ) : null}
 
-        <div className="auth-actions">
-          <button className="button" type="button" onClick={markCompleted} disabled={completed || completing}>
-            {completed ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
-          </button>
-          <Link className="button secondary" href={`/education/${moduleId}`}>
-            ← К модулю
-          </Link>
+        <div className="lesson-layout">
+          <article className="lesson-main">
+            <h1 className="lesson-title">{lesson.title}</h1>
+            <div className="content-blocks lesson-blocks">
+              <ContentBlocks blocks={lesson.blocks ?? []} />
+            </div>
+            <div className="auth-actions" style={{ marginTop: 24 }}>
+              <button
+                className="button"
+                type="button"
+                onClick={markCompleted}
+                disabled={completed || completing}
+              >
+                {completed ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
+              </button>
+              <Link className="button secondary" href={`/education/${moduleId}`}>
+                ← К модулю
+              </Link>
+            </div>
+          </article>
+
+          <aside className="lesson-sidebar">
+            <div className="lesson-side-card">
+              <div className="lesson-side-card-header">Прогресс курса</div>
+              <div className="lesson-progress">
+                <div className="lesson-progress-ring" style={{ ["--progress" as any]: progressPercent }}>
+                  <span>{progressPercent}%</span>
+                </div>
+                <div className="lesson-progress-meta">
+                  <strong>{data.title}</strong>
+                  <span>Уроки завершены: {completedLessons} из {totalLessons}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="lesson-side-card">
+              <div className="lesson-side-card-header">Задания урока</div>
+              <ul className="lesson-task-list">
+                <li className={completed ? "done" : ""}>
+                  <span className="lesson-task-icon">
+                    {completed ? "✓" : "1"}
+                  </span>
+                  <div>
+                    <strong>Посмотреть урок</strong>
+                    <span>{completed ? "Урок завершён" : "Дочитайте до конца"}</span>
+                  </div>
+                </li>
+                <li className={completed ? "done" : ""}>
+                  <span className="lesson-task-icon">
+                    {completed ? "✓" : "2"}
+                  </span>
+                  <div>
+                    <strong>Отметить пройденным</strong>
+                    <span>{completed ? "Готово" : "Кнопка под уроком"}</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            {(lesson.attachments ?? []).length > 0 ? (
+              <div className="lesson-side-card">
+                <div className="lesson-side-card-header">Материалы урока</div>
+                <LessonAttachments attachments={lesson.attachments} />
+              </div>
+            ) : null}
+          </aside>
         </div>
       </section>
     </AppShell>
@@ -1076,6 +1152,35 @@ const COMPANY_STATUS_LABELS: Record<string, string> = {
   blocked: "Заблокирована",
   archived: "В архиве",
 };
+
+// Какую CTA «обновления тарифа» показывать сверху урока:
+// — нет компании (стафф) или extended-подписка → ничего;
+// — basic-подписка → предложить Расширенный доступ;
+// — demo/past_due/blocked → предложить Полный доступ.
+function resolveUpgradeCta(user: ReturnType<typeof useAuth>["user"]):
+  | { title: string; description: string; buttonLabel: string }
+  | null {
+  if (!user || !user.company || (user.platformRoles?.length ?? 0) > 0) {
+    return null;
+  }
+  const status = user.company.status;
+  const plan = user.company.subscriptionPlan;
+  if (status === "active" && plan === "extended") {
+    return null;
+  }
+  if (status === "active" && plan === "basic") {
+    return {
+      title: "Расширенный доступ",
+      description: "Откройте продвинутые модули обучения и дополнительные материалы.",
+      buttonLabel: "Расширенный доступ",
+    };
+  }
+  return {
+    title: "Полный доступ",
+    description: "Активируйте подписку, чтобы открыть все модули обучения.",
+    buttonLabel: "Полный доступ",
+  };
+}
 
 function describeSubscription(billing: { status?: string; subscriptionPlan?: string | null; demoEndsAt?: string | null; subscriptionEndsAt?: string | null } | null) {
   if (!billing) {

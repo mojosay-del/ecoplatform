@@ -387,6 +387,227 @@ select {
   padding: 0;
 }
 
+/* Страница урока: двухколоночный layout с правым sidebar (прогресс,
+   задания, материалы). Хлебные крошки сверху, баннер «Полный/Расширенный
+   доступ» — между крошками и контентом. */
+.lesson-page {
+  max-width: 1320px;
+}
+
+.lesson-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.lesson-breadcrumb a {
+  color: var(--muted);
+  transition: color 120ms ease;
+}
+
+.lesson-breadcrumb a:hover {
+  color: var(--text);
+}
+
+.lesson-breadcrumb-current {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.lesson-upgrade-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 24px;
+  padding: 18px 22px;
+  background: linear-gradient(135deg, var(--primary-soft), var(--primary-soft-strong));
+  border-radius: var(--radius-card);
+}
+
+.lesson-upgrade-banner strong {
+  font-size: 16px;
+  color: var(--text);
+}
+
+.lesson-upgrade-banner p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6e5742;
+}
+
+.lesson-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 28px;
+  align-items: start;
+}
+
+.lesson-main {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 28px 32px 32px;
+}
+
+.lesson-title {
+  margin: 0 0 18px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.lesson-blocks {
+  margin-top: 0;
+}
+
+.lesson-sidebar {
+  display: grid;
+  gap: 16px;
+  position: sticky;
+  top: 80px;
+}
+
+.lesson-side-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 18px;
+}
+
+.lesson-side-card-header {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.lesson-progress {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.lesson-progress-ring {
+  --progress: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: conic-gradient(var(--primary) calc(var(--progress) * 1%), var(--primary-soft) 0);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.lesson-progress-ring::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: var(--panel);
+}
+
+.lesson-progress-ring span {
+  position: relative;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-hover);
+}
+
+.lesson-progress-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lesson-progress-meta strong {
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-progress-meta span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.lesson-task-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.lesson-task-list li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.lesson-task-list li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lesson-task-list strong {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.lesson-task-list span:not(.lesson-task-icon) {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.lesson-task-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--panel);
+}
+
+.lesson-task-list li.done .lesson-task-icon {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.lesson-task-list li.done strong {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+@media (max-width: 1100px) {
+  .lesson-layout {
+    grid-template-columns: 1fr;
+  }
+  .lesson-sidebar {
+    position: static;
+  }
+}
+
 /* Модалка просмотра новости поверх размытого фона.
    Без классической полупрозрачной маски — backdrop-filter blur, как в
    дизайнерских макетах. */
