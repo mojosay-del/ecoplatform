@@ -15,13 +15,16 @@ import {
   Leaf,
   LineChart,
   Map,
+  Menu,
   MessageCircle,
   Newspaper,
   Settings,
   Shield,
   ShoppingBag,
   Users,
+  X,
 } from "lucide-react";
+import { useState } from "react";
 import { useAuth } from "../lib/auth";
 import { NotificationBell } from "./NotificationBell";
 
@@ -85,6 +88,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, token, ready } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Любой защищённый раздел оборачивается в AppShell. Если AuthProvider уже
   // проверил localStorage и токена нет — отправляем на /login. До ready
@@ -95,6 +99,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       router.replace("/login");
     }
   }, [ready, token, router]);
+
+  // При смене страницы — закрываем мобильное меню, иначе остаётся
+  // открыто после перехода.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   if (!ready || !token) {
     return null;
@@ -107,13 +117,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <Link className="brand" href="/news">
-          <span className="brand-mark">
-            <Leaf size={28} strokeWidth={2.2} />
-          </span>
-          <span>ЭкоПлатформа</span>
-        </Link>
+      <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
+        <div className="sidebar-head">
+          <Link className="brand" href="/news">
+            <span className="brand-mark">
+              <Leaf size={28} strokeWidth={2.2} />
+            </span>
+            <span>ЭкоПлатформа</span>
+          </Link>
+          <button
+            className="sidebar-close"
+            type="button"
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Закрыть меню"
+          >
+            <X size={20} />
+          </button>
+        </div>
         {visibleNav.map((section) => (
           <nav className="nav-section" key={section.title}>
             <p className="nav-title">{section.title}</p>
@@ -123,8 +143,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         ))}
       </aside>
+      {mobileNavOpen ? (
+        <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
+      ) : null}
       <main className="main">
         <header className="topbar">
+          <button
+            className="icon-button mobile-menu-button"
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Открыть меню"
+          >
+            <Menu size={20} />
+          </button>
+          <div className="topbar-spacer" />
           <NotificationBell />
           <Link className="icon-button" href="/admin/support" title="Помощь">
             <HelpCircle size={20} />

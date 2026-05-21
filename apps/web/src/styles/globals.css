@@ -1254,13 +1254,92 @@ select {
   }
 }
 
+/* Хедер сайдбара со скрытой кнопкой закрытия — она появляется только в
+   мобильном overlay-режиме. На desktop ничего не меняется. */
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.sidebar-head .brand {
+  margin-bottom: 0;
+}
+
+.sidebar-close {
+  display: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.mobile-menu-button {
+  display: none;
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
 @media (max-width: 880px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
 
   .sidebar {
-    position: static;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    z-index: 1100;
+    transform: translateX(-100%);
+    transition: transform 220ms ease;
+    box-shadow: 6px 0 28px rgba(15, 23, 42, 0.12);
+    overflow-y: auto;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-close {
+    display: grid;
+    place-items: center;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    background: rgba(15, 23, 42, 0.32);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .mobile-menu-button {
+    display: grid;
+    place-items: center;
+  }
+
+  .main {
+    padding: 0 18px 32px;
+  }
+
+  .topbar {
+    height: 64px;
+    margin: 0 -18px 20px;
+    padding: 0 18px;
+    gap: 10px;
   }
 
   .card-grid {
@@ -1278,6 +1357,14 @@ select {
   .gallery-block,
   .image-checklist-block {
     grid-template-columns: 1fr;
+  }
+
+  .news-feed-header h1 {
+    font-size: 26px;
+  }
+
+  .page-title {
+    font-size: 22px;
   }
 }
 
