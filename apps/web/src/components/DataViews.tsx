@@ -627,14 +627,24 @@ export function NewsPostView({ slug }: { slug: string }) {
   );
 }
 
+type IndexPeriod = "1M" | "3M" | "1Y";
+
+const INDEX_PERIOD_LABELS: Record<IndexPeriod, string> = {
+  "1M": "1 мес.",
+  "3M": "3 мес.",
+  "1Y": "1 год",
+};
+
 export function IndicesView() {
   const { data, state, errorMessage } = useApiData<any[]>("/indices", []);
-  const [activeSlug, setActiveSlug] = useState(data[0]?.slug);
+  const [activeSlug, setActiveSlug] = useState<string | undefined>(undefined);
   const active = data.find((category: any) => category.slug === activeSlug) ?? data[0];
 
   useEffect(() => {
-    setActiveSlug(data[0]?.slug);
-  }, [data]);
+    if (!activeSlug && data[0]?.slug) {
+      setActiveSlug(data[0].slug);
+    }
+  }, [data, activeSlug]);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Индексы цен" />;
@@ -651,33 +661,181 @@ export function IndicesView() {
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="Индексы цен на вторсырьё" subtitle="Актуальные ценовые индексы по основным категориям сырья." />
-        <div className="tabs">
+        <PageHeader
+          title="Индексы цен на вторсырьё"
+          subtitle="Актуальные ценовые индексы по основным категориям сырья."
+        />
+        <div className="indices-categories">
           {data.map((category: any) => (
-            <button className={`tab ${category.slug === active?.slug ? "active" : ""}`} onClick={() => setActiveSlug(category.slug)} key={category.id}>
+            <button
+              className={`indices-category-tab ${category.slug === active?.slug ? "active" : ""}`}
+              onClick={() => setActiveSlug(category.slug)}
+              key={category.id}
+              type="button"
+            >
               {category.name}
             </button>
           ))}
         </div>
-        <div className="card-grid">
-          {active?.nomenclatures?.map((item: any) => (
-            <article className="card" key={item.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                <div>
-                  <h2>{item.name}</h2>
-                  <p style={{ color: "var(--muted)" }}>{item.code}</p>
-                </div>
-                <strong style={{ fontSize: 26 }}>{Number(item.summary.currentPrice).toLocaleString("ru-RU")} {item.unit}</strong>
-              </div>
-              <p style={{ color: item.summary.weeklyChange >= 0 ? "var(--green)" : "var(--red)", fontWeight: 800 }}>
-                {item.summary.weeklyChange > 0 ? "+" : ""}{item.summary.weeklyChange}% за неделю
-              </p>
-              <MiniChart points={item.chart?.["3M"] ?? []} />
-            </article>
-          ))}
-        </div>
+        {!active || (active.nomenclatures ?? []).length === 0 ? (
+          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
+            В этой категории пока нет опубликованных индексов.
+          </p>
+        ) : (
+          <div className="indices-grid">
+            {active.nomenclatures.map((item: any) => (
+              <IndexCard key={item.id} item={item} />
+            ))}
+          </div>
+        )}
       </section>
     </AppShell>
+  );
+}
+
+function IndexCard({ item }: { item: any }) {
+  const [period, setPeriod] = useState<IndexPeriod>("3M");
+
+  // Если в выбранном периоде истории меньше, чем нужно (например, спросили
+  // «1 год», а есть только 4 месяца), берём всё, что есть. На бэке
+  // filterPriceIndexPoints уже отдаёт сколько накопилось — здесь только
+  // фолбэк, если фронт получил пустой массив.
+  const chart = item.chart ?? {};
+  const points: Array<{ date: string | Date; price: number }> =
+    chart[period]?.length > 0
+      ? chart[period]
+      : chart["1Y"]?.length > 0
+        ? chart["1Y"]
+        : chart["3M"]?.length > 0
+          ? chart["3M"]
+          : chart["1M"] ?? [];
+
+  const currentPrice = Number(item.summary?.currentPrice ?? points[points.length - 1]?.price ?? 0);
+  const weeklyChange = Number(item.summary?.weeklyChange ?? 0);
+
+  return (
+    <article className="index-card">
+      <div className="index-card-head">
+        <div className="index-period-tabs">
+          {(Object.keys(INDEX_PERIOD_LABELS) as IndexPeriod[]).map((value) => (
+            <button
+              className={`index-period-tab ${period === value ? "active" : ""}`}
+              key={value}
+              onClick={() => setPeriod(value)}
+              type="button"
+            >
+              {INDEX_PERIOD_LABELS[value]}
+            </button>
+          ))}
+        </div>
+        <div className="index-current-price">
+          <strong>{currentPrice.toLocaleString("ru-RU")}</strong>
+          <span>{item.unit ?? "₽/т"}</span>
+        </div>
+      </div>
+
+      <div className="index-card-body">
+        <h2 className="index-card-title">{item.name}</h2>
+        <p className="index-card-subtitle">
+          {item.code}
+          {weeklyChange !== 0 ? (
+            <>
+              {" · "}
+              <span className={weeklyChange >= 0 ? "index-change-positive" : "index-change-negative"}>
+                {weeklyChange > 0 ? "+" : ""}
+                {weeklyChange}% за неделю
+              </span>
+            </>
+          ) : null}
+        </p>
+      </div>
+
+      <IndexChart points={points} period={period} />
+    </article>
+  );
+}
+
+const MONTH_LABELS = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+function IndexChart({
+  points,
+  period,
+}: {
+  points: Array<{ date: string | Date; price: number }>;
+  period: IndexPeriod;
+}) {
+  // Хук всегда вызывается, до раннего return — иначе сломается порядок hooks.
+  const gradientId = useMemo(() => `index-grad-${Math.random().toString(36).slice(2, 9)}`, []);
+
+  if (points.length === 0) {
+    return <div className="index-chart-empty">Нет данных для графика</div>;
+  }
+
+  const width = 720;
+  const height = 200;
+  const padding = { top: 24, right: 32, bottom: 32, left: 32 };
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+
+  const prices = points.map((p) => p.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || max || 1;
+
+  const xs = points.map((_, i) =>
+    points.length === 1 ? padding.left + innerWidth / 2 : padding.left + (i / (points.length - 1)) * innerWidth,
+  );
+  const ys = points.map((p) => padding.top + innerHeight - ((p.price - min) / range) * innerHeight);
+
+  const linePath = xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i]!.toFixed(1)}`).join(" ");
+  const lastIndex = points.length - 1;
+  const areaPath = `${linePath} L${xs[lastIndex]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} L${xs[0]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} Z`;
+
+  // Подписи на оси X: для 1M примерно по неделям, для 3M раз в месяц, для 1Y раз в 2 месяца.
+  const labelStep = period === "1M" ? Math.max(1, Math.floor(points.length / 4)) : period === "3M" ? Math.max(1, Math.floor(points.length / 4)) : Math.max(1, Math.floor(points.length / 6));
+  const labels: Array<{ x: number; text: string }> = [];
+  points.forEach((p, i) => {
+    if (i % labelStep === 0 || i === lastIndex) {
+      const date = new Date(p.date);
+      const text = period === "1Y"
+        ? `${MONTH_LABELS[date.getMonth()]}`
+        : `${date.getDate()} ${MONTH_LABELS[date.getMonth()]}`;
+      labels.push({ x: xs[i]!, text });
+    }
+  });
+
+  const lastX = xs[lastIndex]!;
+  const lastY = ys[lastIndex]!;
+  const lastPrice = prices[lastIndex]!;
+
+  return (
+    <div className="index-chart-wrap">
+      <svg className="index-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill={`url(#${gradientId})`} />
+        <path d={linePath} fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={lastX} cy={lastY} r="5" fill="var(--primary)" stroke="white" strokeWidth="2" />
+
+        {/* Метка с последним значением — небольшая тёмная плашка. */}
+        <g transform={`translate(${lastX}, ${Math.max(lastY - 18, padding.top - 2)})`}>
+          <rect x="-30" y="-18" width="60" height="22" rx="11" fill="#1a202e" />
+          <text x="0" y="-3" textAnchor="middle" fontSize="11" fontWeight="700" fill="white">
+            {Math.round(lastPrice).toLocaleString("ru-RU")}
+          </text>
+        </g>
+
+        {labels.map((label, i) => (
+          <text key={i} x={label.x} y={height - 8} textAnchor="middle" fontSize="11" fill="var(--muted)">
+            {label.text}
+          </text>
+        ))}
+      </svg>
+    </div>
   );
 }
 

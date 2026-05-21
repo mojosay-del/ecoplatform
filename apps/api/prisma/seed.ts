@@ -65,50 +65,128 @@ async function main() {
     },
   });
 
-  const category = await prisma.nomenclatureCategory.upsert({
+  // Категории номенклатуры и их позиции в выдаче.
+  // Все категории upsert по slug, чтобы повторный seed не падал.
+  const paperCategory = await prisma.nomenclatureCategory.upsert({
     where: { slug: "makulatura" },
-    update: {},
+    update: { name: "Макулатура", position: 0 },
     create: { name: "Макулатура", slug: "makulatura", position: 0 },
   });
 
-  const cardboard = await prisma.nomenclature.upsert({
-    where: { code: "МКР-КРТ-001" },
-    update: {},
-    create: {
-      code: "МКР-КРТ-001",
-      name: "Гофрокартон",
-      unit: "₽/т",
-      description: "Гофрированный картон, коробки, ящики.",
-      categoryId: category.id,
-    },
+  const filmsCategory = await prisma.nomenclatureCategory.upsert({
+    where: { slug: "plenki" },
+    update: { name: "Плёнки", position: 1 },
+    create: { name: "Плёнки", slug: "plenki", position: 1 },
   });
 
-  const index = await prisma.priceIndex.upsert({
-    where: { nomenclatureId: cardboard.id },
-    update: {},
-    create: {
-      nomenclatureId: cardboard.id,
-      description: "Демо-индекс для первого экрана.",
-      status: ContentStatus.published,
-      firstPublishedAt: new Date(),
-      createdById: admin.id,
-    },
+  const plasticsCategory = await prisma.nomenclatureCategory.upsert({
+    where: { slug: "plastiki" },
+    update: { name: "Пластики", position: 2 },
+    create: { name: "Пластики", slug: "plastiki", position: 2 },
   });
 
-  for (let offset = 90; offset >= 0; offset -= 10) {
-    const date = new Date();
-    date.setUTCDate(date.getUTCDate() - offset);
-    date.setUTCHours(0, 0, 0, 0);
-    await prisma.priceIndexValue.upsert({
-      where: { priceIndexId_date: { priceIndexId: index.id, date } },
-      update: {},
+  // Полная номенклатура трёх категорий. Коды детерминированные, чтобы при
+  // повторном seed не дублировались записи (upsert по code).
+  const nomenclatureSeed: Array<{ code: string; name: string; categoryId: string }> = [
+    // Макулатура
+    { code: "МКР-КРТ-001", name: "Гофрокартон", categoryId: paperCategory.id },
+    { code: "МКЛ-001", name: "Картон", categoryId: paperCategory.id },
+    { code: "МКЛ-002", name: "Бумага", categoryId: paperCategory.id },
+    { code: "МКЛ-003", name: "Архив", categoryId: paperCategory.id },
+    { code: "МКЛ-004", name: "Газета", categoryId: paperCategory.id },
+    { code: "МКЛ-005", name: "МС6-Б", categoryId: paperCategory.id },
+    { code: "МКЛ-006", name: "МС9-В", categoryId: paperCategory.id },
+    { code: "МКЛ-007", name: "МС11-В", categoryId: paperCategory.id },
+    { code: "МКЛ-008", name: "МС13-В", categoryId: paperCategory.id },
+    // Плёнки
+    { code: "ПЛН-001", name: "Стрейч первичный", categoryId: filmsCategory.id },
+    { code: "ПЛН-002", name: "Стрейч вторичный", categoryId: filmsCategory.id },
+    { code: "ПЛН-003", name: "ПВД прозрачный", categoryId: filmsCategory.id },
+    { code: "ПЛН-004", name: "ПВД цветной", categoryId: filmsCategory.id },
+    { code: "ПЛН-005", name: "Микс прозрачный", categoryId: filmsCategory.id },
+    { code: "ПЛН-006", name: "Микс цветной", categoryId: filmsCategory.id },
+    { code: "ПЛН-007", name: "ПНД плёнка", categoryId: filmsCategory.id },
+    { code: "ПЛН-008", name: "ПП плёнка", categoryId: filmsCategory.id },
+    { code: "ПЛН-009", name: "БОПП", categoryId: filmsCategory.id },
+    // Пластики
+    { code: "ПЛС-001", name: "Труба ГОСТ", categoryId: plasticsCategory.id },
+    { code: "ПЛС-002", name: "Биг-Бэг 2", categoryId: plasticsCategory.id },
+    { code: "ПЛС-003", name: "Биг-Бэг 4", categoryId: plasticsCategory.id },
+    { code: "ПЛС-004", name: "Биг-Бэг микс", categoryId: plasticsCategory.id },
+    { code: "ПЛС-005", name: "Канистра", categoryId: plasticsCategory.id },
+    { code: "ПЛС-006", name: "Флакон", categoryId: plasticsCategory.id },
+    { code: "ПЛС-007", name: "ПЭТ бутылка", categoryId: plasticsCategory.id },
+    { code: "ПЛС-008", name: "ПЭТ масло", categoryId: plasticsCategory.id },
+    { code: "ПЛС-009", name: "ПЭТ молочный", categoryId: plasticsCategory.id },
+    { code: "ПЛС-010", name: "Преформа голубая", categoryId: plasticsCategory.id },
+    { code: "ПЛС-011", name: "Преформа зелёная", categoryId: plasticsCategory.id },
+    { code: "ПЛС-012", name: "Преформа коричневая", categoryId: plasticsCategory.id },
+    { code: "ПЛС-013", name: "Преформа прозрачная", categoryId: plasticsCategory.id },
+    { code: "ПЛС-014", name: "ПП Ящик", categoryId: plasticsCategory.id },
+    { code: "ПЛС-015", name: "ПНД Ящик", categoryId: plasticsCategory.id },
+    { code: "ПЛС-016", name: "Капля однолетняя", categoryId: plasticsCategory.id },
+  ];
+
+  const nomenclatureByCode: Record<string, { id: string }> = {};
+  for (const item of nomenclatureSeed) {
+    const created = await prisma.nomenclature.upsert({
+      where: { code: item.code },
+      update: { name: item.name, categoryId: item.categoryId },
       create: {
-        priceIndexId: index.id,
-        date,
-        price: 12000 + (90 - offset) * 25,
+        code: item.code,
+        name: item.name,
+        unit: "₽/т",
+        categoryId: item.categoryId,
+      },
+    });
+    nomenclatureByCode[item.code] = created;
+  }
+
+  // Демо-индексы с историей — по одному в каждой категории, чтобы публичные
+  // /indices сразу что-то показывали. Реальные индексы для остальных
+  // номенклатур заводит контент-менеджер через CMS.
+  type DemoIndex = { code: string; basePrice: number; description: string };
+  const demoIndexes: DemoIndex[] = [
+    { code: "МКР-КРТ-001", basePrice: 12000, description: "Гофрокартон — рыночный индекс закупки." },
+    { code: "ПЛН-001", basePrice: 65000, description: "Стрейч первичный — рыночный индекс закупки." },
+    { code: "ПЛС-007", basePrice: 28000, description: "ПЭТ бутылка — рыночный индекс закупки." },
+  ];
+
+  // Генерируем историю с ~365 дней назад, плавный синусоидальный дрейф плюс
+  // линейный тренд — выглядит правдоподобно как в дизайнерском макете.
+  for (const demo of demoIndexes) {
+    const nomenclature = nomenclatureByCode[demo.code];
+    if (!nomenclature) continue;
+    const priceIndex = await prisma.priceIndex.upsert({
+      where: { nomenclatureId: nomenclature.id },
+      update: { description: demo.description },
+      create: {
+        nomenclatureId: nomenclature.id,
+        description: demo.description,
+        status: ContentStatus.published,
+        firstPublishedAt: new Date(),
         createdById: admin.id,
       },
     });
+
+    for (let offset = 365; offset >= 0; offset -= 7) {
+      const date = new Date();
+      date.setUTCDate(date.getUTCDate() - offset);
+      date.setUTCHours(0, 0, 0, 0);
+      const trend = (365 - offset) * (demo.basePrice * 0.0003);
+      const wave = Math.sin((365 - offset) / 24) * demo.basePrice * 0.04;
+      const price = Math.round(demo.basePrice + trend + wave);
+      await prisma.priceIndexValue.upsert({
+        where: { priceIndexId_date: { priceIndexId: priceIndex.id, date } },
+        update: { price },
+        create: {
+          priceIndexId: priceIndex.id,
+          date,
+          price,
+          createdById: admin.id,
+        },
+      });
+    }
   }
 
   const newsSlug = slugify("Завод приостанавливает работу на майские праздники");

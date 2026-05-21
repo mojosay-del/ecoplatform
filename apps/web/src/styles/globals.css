@@ -387,6 +387,170 @@ select {
   padding: 0;
 }
 
+/* Индексы цен: список категорий + сетка карточек.
+   Каждая карточка — отдельный индекс со своим периодом и графиком. */
+.indices-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.indices-category-tab {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  padding: 8px 16px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.indices-category-tab:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.indices-category-tab.active {
+  background: var(--text);
+  color: white;
+  border-color: var(--text);
+}
+
+.indices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 20px;
+}
+
+.index-card {
+  display: grid;
+  gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px 22px 4px;
+}
+
+.index-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.index-period-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  padding: 3px;
+}
+
+.index-period-tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.index-period-tab:hover {
+  color: var(--text);
+}
+
+.index-period-tab.active {
+  background: var(--text);
+  color: white;
+}
+
+.index-current-price {
+  text-align: right;
+  display: grid;
+  gap: 2px;
+}
+
+.index-current-price strong {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.index-current-price span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.index-card-body {
+  display: grid;
+  gap: 4px;
+}
+
+.index-card-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.index-card-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.index-change-positive {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.index-change-negative {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.index-chart-wrap {
+  width: 100%;
+  margin: 0 -8px;
+}
+
+.index-chart {
+  width: calc(100% + 16px);
+  height: auto;
+  display: block;
+}
+
+.index-chart-empty {
+  padding: 36px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 720px) {
+  .indices-grid {
+    grid-template-columns: 1fr;
+  }
+  .index-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .index-current-price {
+    text-align: left;
+  }
+}
+
 /* Страница урока: двухколоночный layout с правым sidebar (прогресс,
    задания, материалы). Хлебные крошки сверху, баннер «Полный/Расширенный
    доступ» — между крошками и контентом. */
