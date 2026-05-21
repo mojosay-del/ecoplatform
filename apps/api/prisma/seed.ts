@@ -4,9 +4,9 @@ import { resolve } from "path";
 // Сид может запускаться отдельно от приложения, поэтому загружаем .env здесь же.
 loadEnv({ path: resolve(__dirname, "../../../.env") });
 
-import { PrismaClient, CompanyStatus, ContentStatus, LearningAccessLevel, PlatformRole, SubscriptionPlan } from "@prisma/client";
+import { PrismaClient, CompanyStatus, ContentStatus, LearningAccessLevel, PlatformRole } from "@prisma/client";
 import { hash } from "bcryptjs";
-import { demoEndsAt, slugify } from "@ecoplatform/shared";
+import { slugify } from "@ecoplatform/shared";
 
 const prisma = new PrismaClient();
 
@@ -31,15 +31,24 @@ async function main() {
     },
   });
 
+  // Демо-длительность в seed специально берём с большим запасом (30 дней),
+  // чтобы локальные сценарии не падали из-за истёкшего демо. Реальное
+  // значение для регистраций тянется из настройки `demo.duration_hours`.
+  // subscriptionPlan намеренно null — в статусе demo тариф ещё не активирован,
+  // и UI кабинета не должен показывать «basic» при активной демо-фазе.
+  const seedDemoEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const company = await prisma.company.upsert({
     where: { id: "demo-company" },
-    update: {},
+    update: {
+      status: CompanyStatus.demo,
+      demoEndsAt: seedDemoEndsAt,
+      subscriptionPlan: null,
+    },
     create: {
       id: "demo-company",
       organizationName: "ООО ВторРесурс Demo",
       status: CompanyStatus.demo,
-      demoEndsAt: demoEndsAt(),
-      subscriptionPlan: SubscriptionPlan.basic,
+      demoEndsAt: seedDemoEndsAt,
     },
   });
 
