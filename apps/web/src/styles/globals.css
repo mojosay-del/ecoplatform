@@ -1,14 +1,33 @@
 :root {
-  --bg: #f4f6f8;
+  /* База — мягкая нейтральная палитра, как на дизайнерских макетах. */
+  --bg: #f5f6f8;
   --panel: #ffffff;
-  --panel-soft: #f8fafc;
-  --line: #dfe5ec;
-  --text: #19202e;
-  --muted: #7a8291;
+  --panel-soft: #fafbfc;
+  --line: #e7eaef;
+  --line-strong: #d6dae2;
+  --text: #1a202e;
+  --muted: #8a8f9b;
+
+  /* Primary — тёплый оранжевый (как кнопки «Полный доступ» / «Написать» в макетах). */
+  --primary: #f5773e;
+  --primary-hover: #e0682f;
+  --primary-soft: #fee9dc;
+  --primary-soft-strong: #fcd3b9;
+
+  /* Акценты для статусов. */
   --green: #5da45c;
+  --green-soft: #e3f0db;
   --blue: #4d73d8;
   --red: #ef6b5b;
   --yellow: #e9b949;
+  --highlight: #ffe785;
+
+  /* Тени и закругления. */
+  --shadow-card: 0 2px 10px rgba(15, 23, 42, 0.05);
+  --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.09);
+  --radius-card: 14px;
+  --radius-button: 10px;
+  --radius-chip: 999px;
 }
 
 * {
@@ -36,127 +55,164 @@ select {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   min-height: 100vh;
 }
 
 .sidebar {
-  background: #eef1f5;
+  background: var(--panel);
   border-right: 1px solid var(--line);
-  padding: 28px 20px;
+  padding: 22px 16px 28px;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 36px;
+  margin-bottom: 28px;
   font-weight: 800;
-  font-size: 20px;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #78c85e, #2f9f9a);
-  color: white;
+  width: 32px;
+  height: 32px;
+  color: #2f9f5e;
+}
+
+.brand-mark svg {
+  width: 100%;
+  height: 100%;
 }
 
 .nav-section {
-  margin: 22px 0;
+  margin: 16px 0;
 }
 
 .nav-title {
-  margin: 0 0 10px;
-  color: #9aa1ad;
-  font-size: 13px;
+  margin: 0 0 6px;
+  padding: 0 12px;
+  color: #a1a6b0;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nav-entry {
+  display: grid;
+  gap: 1px;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 38px;
-  padding: 8px 10px;
+  gap: 12px;
+  min-height: 36px;
+  padding: 7px 12px;
   border-radius: 8px;
-  color: #16203a;
-  font-weight: 650;
+  color: #4b5363;
+  font-weight: 500;
+  font-size: 14px;
+  transition: background 120ms ease, color 120ms ease;
 }
 
-.nav-entry {
-  display: grid;
-  gap: 2px;
+.nav-link svg {
+  flex-shrink: 0;
 }
 
 .nav-children {
   display: grid;
-  gap: 2px;
-  margin: 2px 0 6px 22px;
+  gap: 1px;
+  margin: 1px 0 4px 24px;
 }
 
 .nav-link-child {
   min-height: 32px;
   padding: 6px 10px;
   font-size: 13px;
-  font-weight: 600;
-  line-height: 1.25;
+  font-weight: 500;
 }
 
-.nav-link:not(.disabled):hover,
+.nav-link:not(.disabled):hover {
+  background: var(--panel-soft);
+  color: var(--text);
+}
+
 .nav-link.active {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+  font-weight: 600;
 }
 
 .nav-link.disabled {
-  color: #a7adba;
+  color: #c0c4cc;
+  cursor: not-allowed;
 }
 
 .main {
   min-width: 0;
-  padding: 0 28px 40px;
+  padding: 0 32px 48px;
 }
 
 .topbar {
-  height: 88px;
+  height: 72px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 22px;
-  border-bottom: 1px solid var(--line);
-  margin: 0 -28px 38px;
-  padding: 0 28px;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.topbar-search {
-  width: 180px;
-  height: 46px;
-  border: 2px solid #cbd4e2;
-  border-radius: 28px;
-  background: #f6f8fb;
+  gap: 14px;
+  margin: 0 -32px 28px;
+  padding: 0 32px;
+  background: transparent;
 }
 
 .icon-button {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  position: relative;
+  width: 40px;
+  height: 40px;
   border: 0;
   border-radius: 12px;
-  background: transparent;
-  color: #243047;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: #495264;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.icon-button:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.icon-button .icon-button-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
 }
 
 .avatar {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f1b083, #6d84cb);
+  background: linear-gradient(135deg, #f6b58d, #6d84cb);
+  border: 1px solid var(--line);
+  display: block;
 }
 
 .page {
@@ -165,32 +221,35 @@ select {
 }
 
 .page-header {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .page-title {
-  margin: 0 0 8px;
-  font-size: 34px;
-  line-height: 1.1;
+  margin: 0 0 6px;
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .page-subtitle {
   margin: 0;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 .card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  gap: 18px;
 }
 
 .card {
   background: var(--panel);
-  border: 1px solid #edf0f5;
-  border-radius: 8px;
-  box-shadow: 0 18px 40px rgba(35, 42, 61, 0.08);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
   padding: 20px;
 }
 
@@ -231,18 +290,53 @@ select {
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 0;
-  border-radius: 8px;
-  padding: 12px 16px;
-  background: #1e293b;
+  border-radius: var(--radius-button);
+  padding: 11px 18px;
+  background: var(--primary);
   color: #fff;
-  font-weight: 750;
+  font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
+  transition: background 120ms ease, transform 80ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .button.secondary {
-  background: #edf2f7;
-  color: #1e293b;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.button.secondary:hover:not(:disabled) {
+  background: var(--panel-soft);
+  border-color: var(--line-strong);
+}
+
+.button.ghost {
+  background: transparent;
+  color: var(--text);
+  padding: 8px 12px;
+}
+
+.button.ghost:hover:not(:disabled) {
+  background: var(--panel-soft);
 }
 
 .input,
@@ -250,14 +344,26 @@ select {
 .select {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  padding: 12px 14px;
+  border-radius: var(--radius-button);
+  background: var(--panel);
+  padding: 11px 14px;
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .textarea {
-  min-height: 180px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  min-height: 140px;
+  font-family: inherit;
+  resize: vertical;
 }
 
 .textarea.small {
@@ -288,12 +394,13 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-radius: 999px;
-  padding: 7px 10px;
-  background: #edf7ed;
+  border-radius: var(--radius-chip);
+  padding: 4px 10px;
+  background: var(--green-soft);
   color: #2f7b39;
-  font-size: 13px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .tabs {
@@ -750,18 +857,19 @@ select {
 
 .notification-badge {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: -4px;
+  right: -4px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  border-radius: 9px;
-  background: #ef4444;
+  border-radius: 999px;
+  background: var(--primary);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
   line-height: 18px;
   text-align: center;
+  border: 2px solid var(--bg);
 }
 
 .notifications-toolbar {

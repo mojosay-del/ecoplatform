@@ -8,10 +8,13 @@ import {
   Bell,
   BookOpen,
   Boxes,
+  Calculator,
   FileText,
   GraduationCap,
   HelpCircle,
+  Leaf,
   LineChart,
+  Map,
   MessageCircle,
   Newspaper,
   Settings,
@@ -36,53 +39,29 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
     title: "Главная",
     items: [
       { href: "/news", label: "Новости", icon: Newspaper },
-      { href: "/indices", label: "Индексы", icon: Boxes },
+      { href: "/indices", label: "Индексы цен", icon: LineChart },
       { href: "/education", label: "Обучение", icon: GraduationCap },
     ],
   },
   {
     title: "Сообщество",
     items: [
-      { label: "Торговая площадка", icon: ShoppingBag, disabled: true },
       { label: "Форум", icon: MessageCircle, disabled: true },
+      { label: "Торговая площадка", icon: ShoppingBag, disabled: true },
     ],
   },
   {
-    title: "Базы",
+    title: "Базы знаний",
     items: [
-      {
-        label: "Базы знаний",
-        icon: BookOpen,
-        disabled: true,
-        children: [
-          { href: "/knowledge-base", label: "Сырьё", icon: BookOpen },
-          { label: "Документация", icon: FileText, disabled: true },
-        ],
-      },
+      { href: "/knowledge-base", label: "Сырьё", icon: BookOpen },
+      { label: "Документация", icon: FileText, disabled: true },
     ],
   },
   {
     title: "Инструменты",
     items: [
-      {
-        label: "Карты",
-        icon: Users,
-        disabled: true,
-        children: [
-          { label: "Заводы и заготовители", icon: Users, disabled: true },
-          { label: "Аналитика регионов", icon: LineChart, disabled: true },
-        ],
-      },
-      {
-        label: "Калькуляторы",
-        icon: FileText,
-        disabled: true,
-        children: [
-          { label: "Розничный", icon: FileText, disabled: true },
-          { label: "Оптовый", icon: FileText, disabled: true },
-          { label: "Продажные цены", icon: LineChart, disabled: true },
-        ],
-      },
+      { label: "Карты", icon: Map, disabled: true },
+      { label: "Калькуляторы", icon: Calculator, disabled: true },
     ],
   },
   {
@@ -130,7 +109,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="app-shell">
       <aside className="sidebar">
         <Link className="brand" href="/news">
-          <span className="brand-mark">Э</span>
+          <span className="brand-mark">
+            <Leaf size={28} strokeWidth={2.2} />
+          </span>
           <span>ЭкоПлатформа</span>
         </Link>
         {visibleNav.map((section) => (
@@ -144,12 +125,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
       <main className="main">
         <header className="topbar">
-          <div className="topbar-search" />
           <NotificationBell />
-          <button className="icon-button" title="Настройки">
-            <Settings size={25} />
-          </button>
-          <Link className="avatar" title={user ? `${user.firstName} ${user.lastName}` : "Войти"} href={user ? "/account" : "/login"} />
+          <Link className="icon-button" href="/admin/support" title="Помощь">
+            <HelpCircle size={20} />
+          </Link>
+          <Link className="icon-button" href="/account" title="Настройки">
+            <Settings size={20} />
+          </Link>
+          <Link
+            className="avatar"
+            title={user ? `${user.firstName} ${user.lastName}` : "Войти"}
+            href={user ? "/account" : "/login"}
+          />
         </header>
         {children}
       </main>
