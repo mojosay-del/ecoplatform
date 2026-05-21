@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { ALL_BLOCK_KINDS, Block, BlocksEditor } from "./BlocksEditor";
+import { FileUploadField } from "./FileUploadField";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -180,7 +181,7 @@ export function AdminKnowledgeView() {
 
   async function remove(article: Article) {
     if (!token) return;
-    if (!confirm(`Удалить статью «${article.title}»? Дочерние статьи также будут удалены.`)) return;
+    if (!confirm(`Удалить статью «${article.title}»? Если есть дочерние статьи — сначала переместите или удалите их.`)) return;
     try {
       await apiFetch(`/admin/content/knowledge-base/${article.id}`, { method: "DELETE", token });
       await loadList();
@@ -308,14 +309,13 @@ export function AdminKnowledgeView() {
                 />
               </label>
 
-              <label className="form-field">
-                <span>fileId обложки (необязательно)</span>
-                <input
-                  className="input"
-                  value={draft.coverImageId}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, coverImageId: event.target.value }))}
-                />
-              </label>
+              <FileUploadField
+                accept="image/*"
+                buttonLabel="Загрузить обложку"
+                label="ID обложки (необязательно)"
+                value={draft.coverImageId}
+                onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+              />
 
               <div className="form-field">
                 <span>Блоки контента</span>
