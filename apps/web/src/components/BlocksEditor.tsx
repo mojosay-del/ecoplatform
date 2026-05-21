@@ -86,7 +86,7 @@ function defaultPayload(kind: BlockKind): Record<string, unknown> {
     case "gallery":
       return { images: [{ fileId: "", caption: "", altText: "" }] };
     case "video":
-      return { rutubeUrl: "", caption: "" };
+      return { fileId: "", rutubeUrl: "", caption: "" };
     case "audio":
       return { fileId: "", episodeTitle: "", caption: "" };
     case "file":
@@ -238,9 +238,20 @@ function BlockBody({ block, onUpdate }: { block: Block; onUpdate: (patch: Record
     case "video":
       return (
         <div className="form" style={{ gap: 6 }}>
+          <FileUploadField
+            accept="video/*"
+            buttonLabel="Загрузить видео"
+            label="Видеофайл"
+            value={(block.payload.fileId as string) ?? ""}
+            onChange={(fileId) => onUpdate({ fileId })}
+          />
+          <p className="page-subtitle" style={{ fontSize: 13 }}>
+            Можно вместо загрузки указать ссылку на Rutube (если видео уже размещено там).
+            Загруженный файл имеет приоритет.
+          </p>
           <input
             className="input"
-            placeholder="URL Rutube (https://rutube.ru/video/…)"
+            placeholder="URL Rutube (необязательно)"
             value={(block.payload.rutubeUrl as string) ?? ""}
             onChange={(event) => onUpdate({ rutubeUrl: event.target.value })}
           />

@@ -1013,21 +1013,28 @@ function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
           );
         }
         if (block.type === "video") {
-          const payload = block.payload as { rutubeUrl: string; caption?: string };
-          const embedUrl = rutubeEmbedUrl(payload.rutubeUrl);
+          const payload = block.payload as { fileId?: string; rutubeUrl?: string; caption?: string };
+          // Приоритет — собственный загруженный файл (без рекламы). Если файла
+          // нет, fallback на старую rutube-ссылку для совместимости.
+          const asset = payload.fileId ? assets.get(payload.fileId) : null;
+          const embedUrl = payload.rutubeUrl ? rutubeEmbedUrl(payload.rutubeUrl) : null;
           return (
             <figure className="media-block" key={index}>
-              {embedUrl ? (
+              {asset?.publicUrl ? (
+                <video controls preload="metadata" src={asset.publicUrl} />
+              ) : embedUrl ? (
                 <iframe
                   allow="clipboard-write; autoplay"
                   allowFullScreen
                   src={embedUrl}
                   title={payload.caption ?? "Видео"}
                 />
-              ) : (
+              ) : payload.rutubeUrl ? (
                 <a className="button secondary" href={payload.rutubeUrl} rel="noreferrer" target="_blank">
                   Открыть видео
                 </a>
+              ) : (
+                <MissingAsset />
               )}
               {payload.caption ? <figcaption>{payload.caption}</figcaption> : null}
             </figure>

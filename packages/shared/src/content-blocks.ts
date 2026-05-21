@@ -44,10 +44,18 @@ export const baseContentBlockSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("video"),
-    payload: z.object({
-      rutubeUrl: z.string().url(),
-      caption: z.string().optional(),
-    }),
+    // Видео-блок: либо собственный файл (fileId, приоритет — без сторонней
+    // рекламы), либо ссылка на Rutube (rutubeUrl, для старых публикаций).
+    // Хотя бы одно поле должно быть заполнено.
+    payload: z
+      .object({
+        fileId: z.string().min(1).optional(),
+        rutubeUrl: z.string().url().optional(),
+        caption: z.string().optional(),
+      })
+      .refine((value) => Boolean(value.fileId) || Boolean(value.rutubeUrl), {
+        message: "Загрузите видеофайл или укажите ссылку на Rutube.",
+      }),
   }),
   z.object({
     type: z.literal("audio"),

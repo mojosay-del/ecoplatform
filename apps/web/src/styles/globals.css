@@ -513,11 +513,16 @@ select {
 }
 
 .media-block img,
-.media-block iframe {
+.media-block iframe,
+.media-block video {
   width: 100%;
   border: 0;
   border-radius: 8px;
   background: var(--panel-soft);
+}
+
+.media-block video {
+  max-height: 620px;
 }
 
 .media-block img {
