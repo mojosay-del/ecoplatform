@@ -19,12 +19,18 @@ type StaffItem = {
     phone: string;
     firstName: string;
     lastName: string;
+    gender: "male" | "female";
     status: string;
     createdAt: string;
   };
 };
 
 const allRoles = ["admin", "moderator", "content_manager"] as const;
+
+const genderOptions = [
+  { value: "male", label: "Мужской" },
+  { value: "female", label: "Женский" },
+] as const;
 
 export function AdminStaffView() {
   const { token } = useAuth();
@@ -38,6 +44,7 @@ export function AdminStaffView() {
     phone: "",
     firstName: "",
     lastName: "",
+    gender: "male",
     password: "",
     roles: ["moderator"] as string[],
   });
@@ -74,6 +81,7 @@ export function AdminStaffView() {
         phone: "",
         firstName: "",
         lastName: "",
+        gender: "male",
         password: "",
         roles: ["moderator"],
       });
@@ -168,6 +176,19 @@ export function AdminStaffView() {
               required
               value={createForm.lastName}
             />
+            <label className="field-label">
+              Пол
+              <select
+                className="select"
+                onChange={(event) => setCreateForm((form) => ({ ...form, gender: event.target.value }))}
+                required
+                value={createForm.gender}
+              >
+                {genderOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
             <input
               className="input"
               minLength={10}
@@ -204,12 +225,20 @@ export function AdminStaffView() {
         <div className="stack-list">
           {items.map((staff) => (
             <article className="checklist-block" key={staff.id}>
-              <strong>
-                {staff.user.firstName} {staff.user.lastName}
-              </strong>
-              <p>
-                {staff.user.email} · {staff.user.phone}
-              </p>
+              <div className="staff-profile">
+                <img className="staff-avatar" alt="" src={resolvePlatformAvatarUrl(staff.roles, staff.user.gender)} />
+                <div>
+                  <strong>
+                    {staff.user.firstName} {staff.user.lastName}
+                  </strong>
+                  <p>
+                    {staff.user.email} · {staff.user.phone}
+                  </p>
+                  <p className="page-subtitle">
+                    Пол: {staff.user.gender === "female" ? "Женский" : "Мужской"}
+                  </p>
+                </div>
+              </div>
               <p>
                 <span className="status-pill">{staff.isActive ? "Активен" : "Деактивирован"}</span>{" "}
                 Роли: {staff.roles.join(", ") || "—"}
@@ -248,4 +277,11 @@ export function AdminStaffView() {
       </section>
     </AppShell>
   );
+}
+
+function resolvePlatformAvatarUrl(roles: string[], gender: string): string {
+  const suffix = gender === "female" ? "woman" : "man";
+  const prefix = roles.includes("admin") ? "a" : "m";
+
+  return `/avatars/platform/${prefix}${suffix}.png`;
 }

@@ -39,6 +39,7 @@ export class AuthService {
     const company = await this.prisma.company.create({
       data: {
         organizationName: input.organizationName,
+        type: input.companyType,
         status: CompanyStatus.demo,
         demoEndsAt: new Date(Date.now() + demoHours * 60 * 60 * 1000),
       },
@@ -50,6 +51,7 @@ export class AuthService {
         phone: input.phone,
         firstName: input.firstName,
         lastName: input.lastName,
+        gender: input.gender,
         passwordHash,
         companyId: company.id,
       },
@@ -244,14 +246,19 @@ export class AuthService {
       },
     });
 
+    const platformRoles = user.platformStaff?.roles ?? [];
+
     return {
       id: user.id,
       email: user.email,
       phone: user.phone,
       firstName: user.firstName,
       lastName: user.lastName,
+      gender: user.gender,
+      avatarUrl: resolveProfileAvatarUrl(platformRoles, user.company?.type ?? null, user.gender),
+      companyId: user.companyId,
       company: user.company,
-      platformRoles: user.platformStaff?.roles ?? [],
+      platformRoles,
     };
   }
 
@@ -290,3 +297,32 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 }
+
+function resolveProfileAvatarUrl(platformRoles: string[], companyType: string | null, gender: string): string | null {
+  const platformPrefix = platformRoles.includes("admin")
+    ? "a"
+    : platformRoles.includes("moderator") || platformRoles.includes("content_manager")
+      ? "m"
+      : null;
+  const suffix = avatarSuffixByGender[gender];
+
+  if (platformPrefix && suffix) {
+    return `/avatars/platform/${platformPrefix}${suffix}.png`;
+  }
+
+  const companyPrefix = companyType ? companyAvatarPrefixByType[companyType] : null;
+  if (!companyPrefix || !suffix) return null;
+
+  return `/avatars/company/${companyPrefix}${suffix}.png`;
+}
+
+const companyAvatarPrefixByType: Record<string, string> = {
+  collector: "z",
+  trader: "t",
+  processor: "p",
+};
+
+const avatarSuffixByGender: Record<string, string> = {
+  male: "man",
+  female: "woman",
+};

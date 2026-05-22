@@ -20,6 +20,8 @@ export function FileUploadField({
   buttonLabel = "Загрузить",
   accessLevel = "public",
   onChange,
+  hideLabel,
+  compact,
 }: {
   value: string;
   accept?: string;
@@ -27,6 +29,8 @@ export function FileUploadField({
   buttonLabel?: string;
   accessLevel?: FileAsset["accessLevel"];
   onChange: (fileId: string, asset?: FileAsset) => void;
+  hideLabel?: boolean;
+  compact?: boolean;
 }) {
   const { token } = useAuth();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -88,8 +92,8 @@ export function FileUploadField({
   const hasFile = Boolean(uploaded);
 
   return (
-    <div className="file-upload-field">
-      <span className="file-upload-label">{label}</span>
+    <div className={`file-upload-field${compact ? " is-compact" : ""}`}>
+      {hideLabel ? null : <span className="file-upload-label">{label}</span>}
       <input
         accept={accept}
         hidden

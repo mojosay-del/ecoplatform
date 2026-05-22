@@ -311,6 +311,37 @@ describe("Content publish", () => {
       });
     expect(res.status).toBe(400);
   });
+
+  it("пользователь может поставить и снять лайк с комментария к новости", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0000021");
+    const reader = await registerCompany("0000022");
+    const news = await createPublishedNews(adminToken, "comment-like");
+
+    const comment = await ctx.http
+      .post(`/api/news/${news.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Комментарий для лайка" });
+    expect(comment.status).toBe(201);
+
+    const like = await ctx.http
+      .post(`/api/news/comments/${comment.body.id}/like`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(like.status).toBe(201);
+    expect(like.body).toEqual({ liked: true, likesCount: 1 });
+
+    const publicNews = await ctx.http.get(`/api/news/${news.slug}`).set("Authorization", `Bearer ${reader.token}`);
+    expect(publicNews.status).toBe(200);
+    const publicComment = publicNews.body.comments.find((item: { id: string }) => item.id === comment.body.id);
+    expect(publicComment.likedByMe).toBe(true);
+    expect(publicComment._count.likes).toBe(1);
+
+    const unlike = await ctx.http
+      .post(`/api/news/comments/${comment.body.id}/like`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(unlike.status).toBe(201);
+    expect(unlike.body).toEqual({ liked: false, likesCount: 0 });
+  });
 });
 
 describe("Support ownership", () => {

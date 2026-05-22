@@ -1,11 +1,14 @@
 import { z } from "zod";
+import { companyTypes, userGenders } from "./domain";
 
 export const registerDtoSchema = z.object({
-  organizationName: z.string().min(2),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  phone: z.string().min(10),
-  email: z.string().email(),
+  organizationName: z.string().trim().min(2),
+  companyType: z.enum(companyTypes),
+  firstName: z.string().trim().min(1),
+  lastName: z.string().trim().min(1),
+  gender: z.enum(userGenders),
+  phone: z.string().trim().min(10),
+  email: z.string().trim().email(),
   password: z.string().min(8).regex(/[A-Za-zА-Яа-яЁё]/).regex(/[0-9]/),
 });
 

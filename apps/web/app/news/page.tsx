@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { NewsView } from "../../src/components/DataViews";
 
 export default function NewsPage() {
-  return <NewsView />;
+  return (
+    <Suspense fallback={null}>
+      <NewsView />
+    </Suspense>
+  );
 }

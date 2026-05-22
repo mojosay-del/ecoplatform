@@ -67,6 +67,7 @@ export class JwtAuthGuard implements CanActivate {
         platformRoles,
         company: user.company
           ? {
+              type: user.company.type,
               status: user.company.status,
               demoEndsAt: user.company.demoEndsAt,
               subscriptionPlan: user.company.subscriptionPlan,

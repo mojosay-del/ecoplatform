@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Bell } from "lucide-react";
+import { BellRing } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -11,6 +11,7 @@ const POLL_INTERVAL_MS = 60_000;
 export function NotificationBell() {
   const { token } = useAuth();
   const [count, setCount] = useState(0);
+  const badgeLabel = count > 99 ? "99+" : String(count);
 
   useEffect(() => {
     if (!token) {
@@ -41,8 +42,8 @@ export function NotificationBell() {
 
   return (
     <Link className="icon-button notification-bell" href="/notifications" title="Уведомления">
-      <Bell size={25} />
-      {count > 0 ? <span className="notification-badge">{count > 99 ? "99+" : count}</span> : null}
+      <BellRing className="notification-bell-icon" size={21} strokeWidth={2.15} />
+      {count > 0 ? <span className={`notification-badge ${count > 9 ? "wide" : ""}`}>{badgeLabel}</span> : null}
     </Link>
   );
 }

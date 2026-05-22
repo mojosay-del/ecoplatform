@@ -45,6 +45,11 @@ export class ContentController {
     return this.content.toggleNewsLike(id, user);
   }
 
+  @Post("news/comments/:id/like")
+  async likeNewsComment(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.content.toggleNewsCommentLike(id, user);
+  }
+
   @Post("news/:id/comments")
   async commentNews(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(commentInputSchema, body);

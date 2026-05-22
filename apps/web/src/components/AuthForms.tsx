@@ -5,6 +5,17 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { useAuth } from "../lib/auth";
 
+const companyTypeOptions = [
+  { value: "collector", label: "Заготовитель" },
+  { value: "trader", label: "Трейдер" },
+  { value: "processor", label: "Переработчик" },
+];
+
+const genderOptions = [
+  { value: "male", label: "Мужской" },
+  { value: "female", label: "Женский" },
+];
+
 export function LoginForm() {
   const router = useRouter();
   const { login } = useAuth();
@@ -47,8 +58,10 @@ export function RegisterForm() {
     try {
       await register({
         organizationName: String(form.get("organizationName")),
+        companyType: String(form.get("companyType")),
         lastName: String(form.get("lastName")),
         firstName: String(form.get("firstName")),
+        gender: String(form.get("gender")),
         phone: String(form.get("phone")),
         email: String(form.get("email")),
         password: String(form.get("password")),
@@ -64,12 +77,28 @@ export function RegisterForm() {
       <form className="auth-card form" onSubmit={onSubmit}>
         <h1 className="page-title">Регистрация</h1>
         <p className="page-subtitle">После регистрации компания получает demo-доступ на 24 часа.</p>
-        <input className="input" name="organizationName" placeholder="Наименование организации" />
-        <input className="input" name="lastName" placeholder="Фамилия" />
-        <input className="input" name="firstName" placeholder="Имя" />
-        <input className="input" name="phone" placeholder="Телефон" />
-        <input className="input" name="email" placeholder="Email" type="email" />
-        <input className="input" name="password" placeholder="Пароль" type="password" />
+        <input className="input" name="organizationName" placeholder="Наименование организации" required />
+        <label className="field-label">
+          Тип компании
+          <select className="select" name="companyType" defaultValue="collector" required>
+            {companyTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+        <input className="input" name="lastName" placeholder="Фамилия" required />
+        <input className="input" name="firstName" placeholder="Имя" required />
+        <label className="field-label">
+          Пол
+          <select className="select" name="gender" defaultValue="male" required>
+            {genderOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+        <input className="input" name="phone" placeholder="Телефон" required />
+        <input className="input" name="email" placeholder="Email" type="email" required />
+        <input className="input" name="password" placeholder="Пароль" type="password" required />
         {error ? <p style={{ color: "var(--red)" }}>{error}</p> : null}
         <button className="button" type="submit">Создать demo</button>
         <Link href="/login">Уже есть аккаунт</Link>

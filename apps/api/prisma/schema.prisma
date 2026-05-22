@@ -29,6 +29,17 @@ enum SubscriptionStatus {
   expired
 }
 
+enum CompanyType {
+  collector
+  trader
+  processor
+}
+
+enum UserGender {
+  male
+  female
+}
+
 enum PlatformRole {
   admin
   moderator
@@ -147,6 +158,7 @@ model User {
   phone                   String                       @unique
   firstName               String
   lastName                String
+  gender                  UserGender                   @default(male)
   passwordHash            String
   status                  UserStatus                   @default(active)
   companyId               String?
@@ -171,6 +183,7 @@ model User {
 model Company {
   id                   String            @id @default(cuid())
   organizationName     String
+  type                 CompanyType       @default(collector)
   status               CompanyStatus     @default(demo)
   demoEndsAt           DateTime?
   subscriptionPlan     SubscriptionPlan?

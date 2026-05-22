@@ -30,6 +30,7 @@ export class AdminStaffService {
             phone: true,
             firstName: true,
             lastName: true,
+            gender: true,
             status: true,
             createdAt: true,
           },
@@ -60,6 +61,7 @@ export class AdminStaffService {
         phone: input.phone,
         firstName: input.firstName,
         lastName: input.lastName,
+        gender: input.gender,
         passwordHash,
         platformStaff: {
           create: { roles: input.roles, isActive: true },
@@ -73,7 +75,7 @@ export class AdminStaffService {
       action: "admin.staff.create",
       entityType: "User",
       entityId: created.id,
-      payload: { roles: input.roles, email: normalizedEmail },
+      payload: { roles: input.roles, email: normalizedEmail, gender: input.gender },
     });
 
     return created;

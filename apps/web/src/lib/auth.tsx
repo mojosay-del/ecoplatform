@@ -8,8 +8,12 @@ type User = {
   email: string;
   firstName: string;
   lastName: string;
+  gender: string;
+  avatarUrl: string | null;
+  companyId?: string | null;
   company?: {
     organizationName: string;
+    type: string;
     status: string;
     demoEndsAt?: string;
     subscriptionPlan?: string;

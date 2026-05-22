@@ -14,7 +14,6 @@ import {
   FileText,
   GraduationCap,
   HelpCircle,
-  Leaf,
   LineChart,
   Map,
   Menu,
@@ -72,8 +71,8 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
   {
     title: "Служебное",
     items: [
-      { href: "/account", label: "Личный кабинет", icon: Settings },
-      { href: "/notifications", label: "Уведомления", icon: Bell },
+      // Личный кабинет и уведомления уже доступны через иконки в топбаре —
+      // здесь дублировать не нужно. Секция показывается только админам.
       { href: "/admin/content/news", label: "Админ / CMS", icon: Shield, roles: ["admin", "content_manager"] },
       { href: "/admin/moderation", label: "Модерация", icon: Shield, roles: ["admin", "moderator"] },
       { href: "/admin/users", label: "Пользователи", icon: Users, roles: ["admin"] },
@@ -134,10 +133,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  const visibleNav = nav.map((section) => ({
-    ...section,
-    items: filterVisibleItems(section.items, user?.platformRoles ?? []),
-  }));
+  const visibleNav = nav
+    .map((section) => ({
+      ...section,
+      items: filterVisibleItems(section.items, user?.platformRoles ?? []),
+    }))
+    // Если в секции не осталось ни одного пункта (например, «Служебное»
+    // для обычного пользователя без админских ролей) — секцию не показываем.
+    .filter((section) => section.items.length > 0);
 
   return (
     <div className="app-shell" data-collapsed={collapsed ? "true" : "false"}>
@@ -145,7 +148,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="sidebar-head">
           <Link className="brand" href="/news">
             <span className="brand-mark">
-              <Leaf size={28} strokeWidth={2.2} />
+              <img alt="" decoding="async" height={32} src="/brand/logo.webp" width={32} />
             </span>
             <span className="brand-text">ЭкоПлатформа</span>
           </Link>

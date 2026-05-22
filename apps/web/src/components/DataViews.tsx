@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Flag, MessageCircle, Send, ThumbsUp, X, type LucideIcon } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { ApiError, apiFetch, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -13,6 +13,111 @@ import { useCoverAssets } from "../lib/use-cover-assets";
 
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 const emptyTickets: any[] = [];
+
+function formatNewsDate(value: string | Date) {
+  return new Date(value).toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatCommentDate(value: string | Date) {
+  return new Date(value).toLocaleString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getCommentAuthor(user: any) {
+  const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
+  return name || "Участник";
+}
+
+function getCommentInitials(user: any) {
+  const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("").toUpperCase();
+  return initials || "У";
+}
+
+function CommentAvatar({
+  user,
+  current = false,
+}: {
+  user: { avatarUrl?: string | null; firstName?: string; lastName?: string } | null | undefined;
+  current?: boolean;
+}) {
+  return (
+    <div className={`comment-avatar ${current ? "is-current" : ""} ${user?.avatarUrl ? "has-image" : ""}`} aria-hidden="true">
+      {user?.avatarUrl ? <img alt="" src={user.avatarUrl} /> : current ? "Вы" : getCommentInitials(user)}
+    </div>
+  );
+}
+
+type LikeResult = {
+  liked: boolean;
+  likesCount: number;
+};
+
+function withUpdatedNewsLike(post: any, result: LikeResult) {
+  return {
+    ...post,
+    likedByMe: result.liked,
+    _count: {
+      ...(post._count ?? {}),
+      likes: result.likesCount,
+    },
+  };
+}
+
+function updateCommentLikeInList(comments: any[], commentId: string, result: LikeResult): any[] {
+  return comments.map((comment: any) => {
+    const nextComment =
+      comment.id === commentId
+        ? {
+            ...comment,
+            likedByMe: result.liked,
+            _count: {
+              ...(comment._count ?? {}),
+              likes: result.likesCount,
+            },
+          }
+        : comment;
+
+    if (!nextComment.replies?.length) {
+      return nextComment;
+    }
+
+    return {
+      ...nextComment,
+      replies: updateCommentLikeInList(nextComment.replies, commentId, result),
+    };
+  });
+}
+
+function withUpdatedCommentLike(post: any, commentId: string, result: LikeResult) {
+  return {
+    ...post,
+    comments: updateCommentLikeInList(post.comments ?? [], commentId, result),
+  };
+}
+
+function NewsMetaItem({ count, icon: Icon, label }: { count: number; icon: LucideIcon; label: string }) {
+  return (
+    <span className="news-meta-item" aria-label={`${label}: ${count}`}>
+      <Icon aria-hidden="true" size={14} strokeWidth={2} />
+      <span>{count}</span>
+    </span>
+  );
+}
+
+function getNewsFeedSnapshot(post: any) {
+  return {
+    _count: post._count,
+    likedByMe: post.likedByMe,
+  };
+}
 
 function useApiData<T>(path: string | null, initial: T) {
   const { token } = useAuth();
@@ -72,11 +177,11 @@ function useApiData<T>(path: string | null, initial: T) {
     };
   }, [path, token]);
 
-  return { data, state, errorMessage };
+  return { data, setData, state, errorMessage };
 }
 
 export function NewsView() {
-  const { data, state, errorMessage } = useApiData<any[]>("/news", []);
+  const { data, setData, state, errorMessage } = useApiData<any[]>("/news", []);
   const covers = useCoverAssets(data);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -92,6 +197,14 @@ export function NewsView() {
 
   function closePost() {
     router.push("/news", { scroll: false });
+  }
+
+  function updatePostInFeed(updatedPost: any) {
+    setData((current) =>
+      current.map((post: any) =>
+        post.id === updatedPost.id ? { ...post, ...getNewsFeedSnapshot(updatedPost) } : post,
+      ),
+    );
   }
 
   if (state === "unauthenticated") {
@@ -122,6 +235,7 @@ export function NewsView() {
             {data.map((post: any) => {
               const cover = post.coverImageId ? covers.get(post.coverImageId) : null;
               const hasCover = Boolean(cover?.publicUrl);
+              const publishedDate = post.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
               return (
                 <button
                   className={`news-tile ${hasCover ? "news-tile-with-cover" : "news-tile-text"}`}
@@ -139,15 +253,12 @@ export function NewsView() {
                     <h2 className="news-tile-title">{post.title}</h2>
                     <p className="news-tile-lead">{post.lead}</p>
                     <div className="news-tile-meta">
-                      <span>👍 {post._count?.likes ?? 0}</span>
-                      <span>💬 {post._count?.comments ?? 0}</span>
-                      {post.firstPublishedAt ? (
-                        <span className="news-tile-date">
-                          {new Date(post.firstPublishedAt).toLocaleDateString("ru-RU", {
-                            day: "numeric",
-                            month: "long",
-                          })}
-                        </span>
+                      <NewsMetaItem count={post._count?.likes ?? 0} icon={ThumbsUp} label="Лайки" />
+                      <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
+                      {publishedDate ? (
+                        <time className="news-tile-date" dateTime={publishedDate.toISOString()}>
+                          {formatNewsDate(publishedDate)}
+                        </time>
                       ) : null}
                     </div>
                   </div>
@@ -157,12 +268,20 @@ export function NewsView() {
           </div>
         )}
       </section>
-      {openedSlug ? <NewsModal slug={openedSlug} onClose={closePost} /> : null}
+      {openedSlug ? <NewsModal slug={openedSlug} onClose={closePost} onPostUpdate={updatePostInFeed} /> : null}
     </AppShell>
   );
 }
 
-function NewsModal({ slug, onClose }: { slug: string; onClose: () => void }) {
+function NewsModal({
+  slug,
+  onClose,
+  onPostUpdate,
+}: {
+  slug: string;
+  onClose: () => void;
+  onPostUpdate?: (post: any) => void;
+}) {
   const { token } = useAuth();
   const [post, setPost] = useState<any | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error" | "forbidden">("loading");
@@ -172,6 +291,8 @@ function NewsModal({ slug, onClose }: { slug: string; onClose: () => void }) {
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("offensive_content");
   const [reportComment, setReportComment] = useState("");
+  const [likePending, setLikePending] = useState(false);
+  const [commentLikePendingId, setCommentLikePendingId] = useState<string | null>(null);
 
   async function load() {
     if (!token) {
@@ -183,6 +304,7 @@ function NewsModal({ slug, onClose }: { slug: string; onClose: () => void }) {
     try {
       const data = await apiFetch<any>(`/news/${slug}`, { token });
       setPost(data);
+      onPostUpdate?.(data);
       setState("ready");
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
@@ -224,6 +346,38 @@ function NewsModal({ slug, onClose }: { slug: string; onClose: () => void }) {
     setCommentText("");
     setResultMessage("Комментарий опубликован.");
     await load();
+  }
+
+  async function togglePostLike() {
+    if (!token || !post || likePending) return;
+
+    setLikePending(true);
+    try {
+      const result = await apiFetch<LikeResult>(`/news/${post.id}/like`, {
+        method: "POST",
+        token,
+      });
+      const updatedPost = withUpdatedNewsLike(post, result);
+      setPost(updatedPost);
+      onPostUpdate?.(updatedPost);
+    } finally {
+      setLikePending(false);
+    }
+  }
+
+  async function toggleCommentLike(commentId: string) {
+    if (!token || !post || commentLikePendingId) return;
+
+    setCommentLikePendingId(commentId);
+    try {
+      const result = await apiFetch<LikeResult>(`/news/comments/${commentId}/like`, {
+        method: "POST",
+        token,
+      });
+      setPost((current: any | null) => (current ? withUpdatedCommentLike(current, commentId, result) : current));
+    } finally {
+      setCommentLikePendingId(null);
+    }
   }
 
   async function submitComplaint(event: FormEvent<HTMLFormElement>) {
@@ -282,6 +436,10 @@ function NewsModal({ slug, onClose }: { slug: string; onClose: () => void }) {
             reportComment={reportComment}
             setReportComment={setReportComment}
             onSubmitComplaint={submitComplaint}
+            onTogglePostLike={togglePostLike}
+            likePending={likePending}
+            onToggleCommentLike={toggleCommentLike}
+            commentLikePendingId={commentLikePendingId}
           />
         )}
       </div>
@@ -303,6 +461,10 @@ type NewsArticleProps = {
   reportComment: string;
   setReportComment: (value: string) => void;
   onSubmitComplaint: (event: FormEvent<HTMLFormElement>) => void;
+  onTogglePostLike: () => void;
+  likePending: boolean;
+  onToggleCommentLike: (commentId: string) => void;
+  commentLikePendingId: string | null;
 };
 
 function NewsArticleContent({
@@ -318,9 +480,14 @@ function NewsArticleContent({
   reportComment,
   setReportComment,
   onSubmitComplaint,
+  onTogglePostLike,
+  likePending,
+  onToggleCommentLike,
+  commentLikePendingId,
 }: NewsArticleProps) {
   const { token } = useAuth();
   const [cover, setCover] = useState<FileAsset | null>(null);
+  const publishedDate = post.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
   useEffect(() => {
     if (!token || !post?.coverImageId) {
       setCover(null);
@@ -346,90 +513,283 @@ function NewsArticleContent({
           <ContentBlocks blocks={post.blocks ?? []} />
         </div>
         <div className="news-article-meta">
-          {post.firstPublishedAt ? (
-            <span>{new Date(post.firstPublishedAt).toLocaleString("ru-RU")}</span>
+          {publishedDate ? (
+            <time dateTime={publishedDate.toISOString()}>{formatNewsDate(publishedDate)}</time>
           ) : null}
-          <span>👍 {post._count?.likes ?? 0}</span>
-          <span>💬 {post._count?.comments ?? 0}</span>
+          <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
+          <NewsLikeButton post={post} pending={likePending} onToggle={onTogglePostLike} />
         </div>
 
-        <section className="comments-section">
-          <h2>Комментарии</h2>
-          {resultMessage ? <p className="status-pill">{resultMessage}</p> : null}
-          <form className="reply-form" onSubmit={onSubmitComment}>
-            <textarea
-              className="textarea small"
-              onChange={(event) => onCommentTextChange(event.target.value)}
-              placeholder="Написать комментарий"
-              value={commentText}
-            />
-            <button className="button" type="submit">
-              Отправить
-            </button>
-          </form>
-          <div className="comment-list">
-            {post.comments?.map((comment: any) => (
-              <article className="comment-item" key={comment.id}>
-                <div className="comment-head">
-                  <strong>
-                    {comment.user.firstName} {comment.user.lastName}
-                  </strong>
-                  <button
-                    className="button secondary"
-                    onClick={() => setReportingCommentId(comment.id)}
-                    type="button"
-                  >
-                    Пожаловаться
-                  </button>
-                </div>
-                <p>{comment.text}</p>
-                {reportingCommentId === comment.id ? (
-                  <form className="form report-form" onSubmit={onSubmitComplaint}>
-                    <select
-                      className="select"
-                      onChange={(event) => setReportReason(event.target.value)}
-                      value={reportReason}
-                    >
-                      {complaintReasons.map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                    <textarea
-                      className="textarea small"
-                      onChange={(event) => setReportComment(event.target.value)}
-                      placeholder="Комментарий к жалобе"
-                      value={reportComment}
-                    />
-                    <div className="auth-actions">
-                      <button className="button" type="submit">
-                        Отправить жалобу
-                      </button>
-                      <button
-                        className="button secondary"
-                        onClick={() => setReportingCommentId(null)}
-                        type="button"
-                      >
-                        Отмена
-                      </button>
-                    </div>
-                  </form>
-                ) : null}
-                {comment.replies?.map((reply: any) => (
-                  <article className="comment-item reply" key={reply.id}>
-                    <strong>
-                      {reply.user.firstName} {reply.user.lastName}
-                    </strong>
-                    <p>{reply.text}</p>
-                  </article>
-                ))}
-              </article>
-            ))}
-          </div>
-        </section>
+        <CommentsSection
+          comments={post.comments ?? []}
+          commentsCount={post._count?.comments ?? 0}
+          commentText={commentText}
+          onCommentTextChange={onCommentTextChange}
+          onSubmitComment={onSubmitComment}
+          resultMessage={resultMessage}
+          reportingCommentId={reportingCommentId}
+          setReportingCommentId={setReportingCommentId}
+          reportReason={reportReason}
+          setReportReason={setReportReason}
+          reportComment={reportComment}
+          setReportComment={setReportComment}
+          onSubmitComplaint={onSubmitComplaint}
+          onToggleCommentLike={onToggleCommentLike}
+          commentLikePendingId={commentLikePendingId}
+        />
       </div>
     </div>
+  );
+}
+
+function formatCommentCount(count: number) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} комментарий`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} комментария`;
+  return `${count} комментариев`;
+}
+
+function NewsLikeButton({
+  post,
+  pending,
+  onToggle,
+}: {
+  post: any;
+  pending: boolean;
+  onToggle: () => void;
+}) {
+  const likesCount = post._count?.likes ?? 0;
+
+  return (
+    <button
+      className={`news-like-button ${post.likedByMe ? "active" : ""}`}
+      disabled={pending}
+      onClick={onToggle}
+      type="button"
+      aria-pressed={Boolean(post.likedByMe)}
+    >
+      <ThumbsUp aria-hidden="true" size={16} strokeWidth={2.2} />
+      <span>{post.likedByMe ? "Нравится" : "Поставить лайк"}</span>
+      <strong>{likesCount}</strong>
+    </button>
+  );
+}
+
+type CommentsSectionProps = {
+  comments: any[];
+  commentsCount: number;
+  commentText: string;
+  onCommentTextChange: (value: string) => void;
+  onSubmitComment: (event: FormEvent<HTMLFormElement>) => void;
+  resultMessage: string | null;
+  reportingCommentId: string | null;
+  setReportingCommentId: (id: string | null) => void;
+  reportReason: string;
+  setReportReason: (value: string) => void;
+  reportComment: string;
+  setReportComment: (value: string) => void;
+  onSubmitComplaint: (event: FormEvent<HTMLFormElement>) => void;
+  onToggleCommentLike: (commentId: string) => void;
+  commentLikePendingId: string | null;
+};
+
+function CommentsSection({
+  comments,
+  commentsCount,
+  commentText,
+  onCommentTextChange,
+  onSubmitComment,
+  resultMessage,
+  reportingCommentId,
+  setReportingCommentId,
+  reportReason,
+  setReportReason,
+  reportComment,
+  setReportComment,
+  onSubmitComplaint,
+  onToggleCommentLike,
+  commentLikePendingId,
+}: CommentsSectionProps) {
+  const { user } = useAuth();
+
+  return (
+    <section className="comments-section" aria-labelledby="comments-title">
+      <div className="comments-section-head">
+        <div>
+          <span className="comments-kicker">Обсуждение</span>
+          <h2 id="comments-title">Комментарии</h2>
+        </div>
+        <span className="comments-counter">{formatCommentCount(commentsCount)}</span>
+      </div>
+
+      {resultMessage ? <p className="status-pill comments-status">{resultMessage}</p> : null}
+
+      <div className="comment-list">
+        {comments.length === 0 ? (
+          <div className="comments-empty">Пока никто не написал комментарий.</div>
+        ) : (
+          comments.map((comment: any) => (
+            <CommentCard
+              comment={comment}
+              key={comment.id}
+              reportingCommentId={reportingCommentId}
+              setReportingCommentId={setReportingCommentId}
+              reportReason={reportReason}
+              setReportReason={setReportReason}
+              reportComment={reportComment}
+              setReportComment={setReportComment}
+              onSubmitComplaint={onSubmitComplaint}
+              onToggleCommentLike={onToggleCommentLike}
+              commentLikePendingId={commentLikePendingId}
+            />
+          ))
+        )}
+      </div>
+
+      <form className="comment-composer" onSubmit={onSubmitComment}>
+        <CommentAvatar current user={user} />
+        <div className="comment-composer-body">
+          <textarea
+            className="comment-textarea"
+            onChange={(event) => onCommentTextChange(event.target.value)}
+            placeholder="Продолжить обсуждение"
+            rows={3}
+            value={commentText}
+          />
+          <div className="comment-composer-footer">
+            <span>Комментарий появится после отправки</span>
+            <button className="button comment-submit" disabled={!commentText.trim()} type="submit">
+              <Send aria-hidden="true" size={16} />
+              Опубликовать
+            </button>
+          </div>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function CommentCard({
+  comment,
+  isReply = false,
+  reportingCommentId,
+  setReportingCommentId,
+  reportReason,
+  setReportReason,
+  reportComment,
+  setReportComment,
+  onSubmitComplaint,
+  onToggleCommentLike,
+  commentLikePendingId,
+}: {
+  comment: any;
+  isReply?: boolean;
+  reportingCommentId: string | null;
+  setReportingCommentId: (id: string | null) => void;
+  reportReason: string;
+  setReportReason: (value: string) => void;
+  reportComment: string;
+  setReportComment: (value: string) => void;
+  onSubmitComplaint: (event: FormEvent<HTMLFormElement>) => void;
+  onToggleCommentLike: (commentId: string) => void;
+  commentLikePendingId: string | null;
+}) {
+  const isReporting = reportingCommentId === comment.id;
+  const author = getCommentAuthor(comment.user);
+  const likesCount = comment._count?.likes ?? 0;
+  const commentDate = comment.createdAt ? new Date(comment.createdAt) : null;
+
+  function closeReportForm() {
+    setReportingCommentId(null);
+    setReportComment("");
+  }
+
+  return (
+    <article className={`comment-card ${isReply ? "is-reply" : ""}`}>
+      <CommentAvatar user={comment.user} />
+      <div className="comment-bubble">
+        <header className="comment-card-head">
+          <div className="comment-author-meta">
+            <strong>{author}</strong>
+          </div>
+        </header>
+        <p className="comment-text">{comment.text}</p>
+        <footer className="comment-card-footer">
+          <div className="comment-card-actions" aria-label={`Действия с комментарием, лайков: ${likesCount}`}>
+            {commentDate ? <time dateTime={commentDate.toISOString()}>{formatCommentDate(commentDate)}</time> : null}
+            <button
+              className={`comment-like-button ${comment.likedByMe ? "active" : ""}`}
+              disabled={commentLikePendingId === comment.id}
+              onClick={() => onToggleCommentLike(comment.id)}
+              type="button"
+              aria-label={comment.likedByMe ? `Убрать лайк, сейчас ${likesCount}` : `Поставить лайк, сейчас ${likesCount}`}
+              aria-pressed={Boolean(comment.likedByMe)}
+            >
+              <ThumbsUp aria-hidden="true" size={14} />
+              <span>{likesCount}</span>
+            </button>
+            <button
+              className="comment-report-button"
+              onClick={() => setReportingCommentId(isReporting ? null : comment.id)}
+              type="button"
+              aria-expanded={isReporting}
+              aria-label="Пожаловаться"
+              title="Пожаловаться"
+            >
+              <Flag aria-hidden="true" size={14} />
+            </button>
+          </div>
+        </footer>
+
+        {isReporting ? (
+          <form className="comment-report-form" onSubmit={onSubmitComplaint}>
+            <select className="select" onChange={(event) => setReportReason(event.target.value)} value={reportReason}>
+              {complaintReasons.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="textarea small"
+              onChange={(event) => setReportComment(event.target.value)}
+              placeholder="Комментарий к жалобе"
+              value={reportComment}
+            />
+            <div className="report-actions">
+              <button className="button" type="submit">
+                Отправить жалобу
+              </button>
+              <button className="button ghost" onClick={closeReportForm} type="button">
+                Отмена
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {comment.replies?.length ? (
+          <div className="comment-replies">
+            {comment.replies.map((reply: any) => (
+              <CommentCard
+                comment={reply}
+                isReply
+                key={reply.id}
+                reportingCommentId={reportingCommentId}
+                setReportingCommentId={setReportingCommentId}
+                reportReason={reportReason}
+                setReportReason={setReportReason}
+                reportComment={reportComment}
+                setReportComment={setReportComment}
+                onSubmitComplaint={onSubmitComplaint}
+                onToggleCommentLike={onToggleCommentLike}
+                commentLikePendingId={commentLikePendingId}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </article>
   );
 }
 
@@ -452,6 +812,8 @@ export function NewsPostView({ slug }: { slug: string }) {
   const [reportReason, setReportReason] = useState("offensive_content");
   const [reportComment, setReportComment] = useState("");
   const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [likePending, setLikePending] = useState(false);
+  const [commentLikePendingId, setCommentLikePendingId] = useState<string | null>(null);
 
   async function load() {
     if (!token) {
@@ -515,6 +877,36 @@ export function NewsPostView({ slug }: { slug: string }) {
     setResultMessage("Жалоба отправлена модератору.");
   }
 
+  async function togglePostLike() {
+    if (!token || !post || likePending) return;
+
+    setLikePending(true);
+    try {
+      const result = await apiFetch<LikeResult>(`/news/${post.id}/like`, {
+        method: "POST",
+        token,
+      });
+      setPost((current: any | null) => (current ? withUpdatedNewsLike(current, result) : current));
+    } finally {
+      setLikePending(false);
+    }
+  }
+
+  async function toggleCommentLike(commentId: string) {
+    if (!token || !post || commentLikePendingId) return;
+
+    setCommentLikePendingId(commentId);
+    try {
+      const result = await apiFetch<LikeResult>(`/news/comments/${commentId}/like`, {
+        method: "POST",
+        token,
+      });
+      setPost((current: any | null) => (current ? withUpdatedCommentLike(current, commentId, result) : current));
+    } finally {
+      setCommentLikePendingId(null);
+    }
+  }
+
   if (state === "unauthenticated") {
     return <AuthRequired title="Новости" />;
   }
@@ -526,6 +918,8 @@ export function NewsPostView({ slug }: { slug: string }) {
   if (state === "error") {
     return <ErrorState title="Новости" message={errorMessage} />;
   }
+
+  const publishedDate = post?.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
 
   return (
     <AppShell>
@@ -544,69 +938,30 @@ export function NewsPostView({ slug }: { slug: string }) {
             <article className="content-article">
               <ContentBlocks blocks={post.blocks ?? []} />
             </article>
-            <section className="comments-section">
-              <h2>Комментарии</h2>
-              {resultMessage ? <p className="status-pill">{resultMessage}</p> : null}
-              <form className="reply-form" onSubmit={submitComment}>
-                <textarea
-                  className="textarea small"
-                  onChange={(event) => setCommentText(event.target.value)}
-                  placeholder="Написать комментарий"
-                  value={commentText}
-                />
-                <button className="button" type="submit">
-                  Отправить
-                </button>
-              </form>
-              <div className="comment-list">
-                {post.comments?.map((comment: any) => (
-                  <article className="comment-item" key={comment.id}>
-                    <div className="comment-head">
-                      <strong>
-                        {comment.user.firstName} {comment.user.lastName}
-                      </strong>
-                      <button className="button secondary" onClick={() => setReportingCommentId(comment.id)}>
-                        Пожаловаться
-                      </button>
-                    </div>
-                    <p>{comment.text}</p>
-                    {reportingCommentId === comment.id ? (
-                      <form className="form report-form" onSubmit={submitComplaint}>
-                        <select className="select" onChange={(event) => setReportReason(event.target.value)} value={reportReason}>
-                          {complaintReasons.map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                        <textarea
-                          className="textarea small"
-                          onChange={(event) => setReportComment(event.target.value)}
-                          placeholder="Комментарий к жалобе"
-                          value={reportComment}
-                        />
-                        <div className="auth-actions">
-                          <button className="button" type="submit">
-                            Отправить жалобу
-                          </button>
-                          <button className="button secondary" onClick={() => setReportingCommentId(null)} type="button">
-                            Отмена
-                          </button>
-                        </div>
-                      </form>
-                    ) : null}
-                    {comment.replies?.map((reply: any) => (
-                      <article className="comment-item reply" key={reply.id}>
-                        <strong>
-                          {reply.user.firstName} {reply.user.lastName}
-                        </strong>
-                        <p>{reply.text}</p>
-                      </article>
-                    ))}
-                  </article>
-                ))}
-              </div>
-            </section>
+            <div className="news-article-meta news-article-meta-page">
+              {publishedDate ? (
+                <time dateTime={publishedDate.toISOString()}>{formatNewsDate(publishedDate)}</time>
+              ) : null}
+              <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
+              <NewsLikeButton post={post} pending={likePending} onToggle={togglePostLike} />
+            </div>
+            <CommentsSection
+              comments={post.comments ?? []}
+              commentsCount={post._count?.comments ?? 0}
+              commentText={commentText}
+              onCommentTextChange={setCommentText}
+              onSubmitComment={submitComment}
+              resultMessage={resultMessage}
+              reportingCommentId={reportingCommentId}
+              setReportingCommentId={setReportingCommentId}
+              reportReason={reportReason}
+              setReportReason={setReportReason}
+              reportComment={reportComment}
+              setReportComment={setReportComment}
+              onSubmitComplaint={submitComplaint}
+              onToggleCommentLike={toggleCommentLike}
+              commentLikePendingId={commentLikePendingId}
+            />
           </>
         )}
       </section>
@@ -752,7 +1107,36 @@ function IndexChart({
   period: IndexPeriod;
 }) {
   // Хук всегда вызывается, до раннего return — иначе сломается порядок hooks.
-  const gradientId = useMemo(() => `index-grad-${Math.random().toString(36).slice(2, 9)}`, []);
+  const uid = useMemo(() => Math.random().toString(36).slice(2, 9), []);
+  const lineGradId = `index-line-${uid}`;
+  const areaGradId = `index-area-${uid}`;
+  const fadeMaskId = `index-fade-${uid}`;
+  const fadeGradId = `index-fadegrad-${uid}`;
+
+  // Индекс точки под курсором (null = курсор не над графиком, тогда плашка
+  // показывает последнее значение, как раньше).
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  useEffect(() => {
+    setHoverIndex(null);
+  }, [period]);
+
+  useEffect(() => {
+    if (hoverIndex === null) return;
+
+    function handleDocumentMouseMove(event: MouseEvent) {
+      const svg = svgRef.current;
+      const target = event.target;
+      if (svg && target instanceof Node && svg.contains(target)) return;
+      setHoverIndex(null);
+    }
+
+    document.addEventListener("mousemove", handleDocumentMouseMove);
+    return () => {
+      document.removeEventListener("mousemove", handleDocumentMouseMove);
+    };
+  }, [hoverIndex]);
 
   if (points.length === 0) {
     return <div className="index-chart-empty">Нет данных для графика</div>;
@@ -778,6 +1162,12 @@ function IndexChart({
   const lastIndex = points.length - 1;
   const areaPath = `${linePath} L${xs[lastIndex]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} L${xs[0]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} Z`;
 
+  // Направление градиента: при росте — «прошлое = оранжевый, настоящее = синий»,
+  // при падении наоборот. Так визуально подсказываем направление за период.
+  const isGrowth = (prices[lastIndex] ?? 0) >= (prices[0] ?? 0);
+  const startColor = isGrowth ? "#f5773e" : "#4d73d8";
+  const endColor = isGrowth ? "#4d73d8" : "#f5773e";
+
   // Подписи на оси X: для 1M примерно по неделям, для 3M раз в месяц, для 1Y раз в 2 месяца.
   const labelStep = period === "1M" ? Math.max(1, Math.floor(points.length / 4)) : period === "3M" ? Math.max(1, Math.floor(points.length / 4)) : Math.max(1, Math.floor(points.length / 6));
   const labels: Array<{ x: number; text: string }> = [];
@@ -793,26 +1183,109 @@ function IndexChart({
 
   const lastX = xs[lastIndex]!;
   const lastY = ys[lastIndex]!;
-  const lastPrice = prices[lastIndex]!;
+
+  // Активная точка: или под курсором (если курсор на графике), или последняя.
+  const activeIndex =
+    hoverIndex !== null && hoverIndex >= 0 && hoverIndex <= lastIndex ? hoverIndex : lastIndex;
+  const activeX = xs[activeIndex]!;
+  const activeY = ys[activeIndex]!;
+  const activePrice = prices[activeIndex]!;
+  const activeDate = new Date(points[activeIndex]!.date);
+  const activeDateLabel = `${activeDate.getDate()} ${MONTH_LABELS[activeDate.getMonth()]}`;
+
+  function handleMouseMove(event: React.MouseEvent<SVGSVGElement>) {
+    const svg = event.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width === 0) return;
+    // Перевод координаты курсора в систему viewBox (SVG растягивается через
+    // preserveAspectRatio="none", поэтому масштаб только горизонтальный).
+    const svgX = ((event.clientX - rect.left) / rect.width) * width;
+    if (points.length === 1) {
+      setHoverIndex((current) => (current === 0 ? current : 0));
+      return;
+    }
+    // Ищем ближайшую точку по X.
+    let nearest = 0;
+    let bestDistance = Math.abs(svgX - xs[0]!);
+    for (let i = 1; i < xs.length; i += 1) {
+      const distance = Math.abs(svgX - xs[i]!);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        nearest = i;
+      }
+    }
+    setHoverIndex((current) => (current === nearest ? current : nearest));
+  }
+
+  // Ширина плашки масштабируем под содержимое: «20 мая · 31 635».
+  const tooltipText = `${activeDateLabel} · ${Math.round(activePrice).toLocaleString("ru-RU")}`;
+  const tooltipWidth = Math.max(64, tooltipText.length * 6.4 + 16);
+  const tooltipX = Math.min(Math.max(activeX, tooltipWidth / 2 + 4), width - tooltipWidth / 2 - 4);
+  const tooltipY = Math.max(activeY - 18, padding.top - 2);
+  const isHoveringChart = hoverIndex !== null;
 
   return (
     <div className="index-chart-wrap">
-      <svg className="index-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      <svg
+        className="index-chart"
+        onMouseLeave={() => setHoverIndex(null)}
+        onMouseMove={handleMouseMove}
+        preserveAspectRatio="none"
+        ref={svgRef}
+        viewBox={`0 0 ${width} ${height}`}
+      >
         <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+          {/* Горизонтальный градиент для самой линии. */}
+          <linearGradient id={lineGradId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={startColor} />
+            <stop offset="100%" stopColor={endColor} />
           </linearGradient>
+          {/* Тот же горизонтальный градиент для заливки области. */}
+          <linearGradient id={areaGradId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={startColor} />
+            <stop offset="100%" stopColor={endColor} />
+          </linearGradient>
+          {/* Вертикальная маска: непрозрачная сверху, прозрачная внизу —
+              чтобы заливка плавно угасала к оси X, как было раньше. */}
+          <linearGradient id={fadeGradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="white" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </linearGradient>
+          <mask id={fadeMaskId}>
+            <rect x="0" y="0" width={width} height={height} fill={`url(#${fadeGradId})`} />
+          </mask>
         </defs>
-        <path d={areaPath} fill={`url(#${gradientId})`} />
-        <path d={linePath} fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={lastX} cy={lastY} r="5" fill="var(--primary)" stroke="white" strokeWidth="2" />
+        <rect x="0" y="0" width={width} height={height} fill="transparent" />
+        <path d={areaPath} fill={`url(#${areaGradId})`} mask={`url(#${fadeMaskId})`} />
+        {isHoveringChart ? (
+          <line
+            x1={activeX}
+            x2={activeX}
+            y1={padding.top}
+            y2={padding.top + innerHeight}
+            stroke="#1a202e"
+            strokeDasharray="3 4"
+            strokeOpacity="0.18"
+          />
+        ) : null}
+        <path
+          d={linePath}
+          fill="none"
+          stroke={`url(#${lineGradId})`}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx={lastX} cy={lastY} r="5" fill={endColor} stroke="white" strokeWidth="2" />
+        {isHoveringChart && activeIndex !== lastIndex ? (
+          <circle cx={activeX} cy={activeY} r="5" fill="#1a202e" stroke="white" strokeWidth="2" />
+        ) : null}
 
-        {/* Метка с последним значением — небольшая тёмная плашка. */}
-        <g transform={`translate(${lastX}, ${Math.max(lastY - 18, padding.top - 2)})`}>
-          <rect x="-30" y="-18" width="60" height="22" rx="11" fill="#1a202e" />
+        {/* Метка активной точки: без hover показывает последнее значение. */}
+        <g transform={`translate(${tooltipX}, ${tooltipY})`}>
+          <rect x={-tooltipWidth / 2} y="-18" width={tooltipWidth} height="22" rx="11" fill="#1a202e" />
           <text x="0" y="-3" textAnchor="middle" fontSize="11" fontWeight="700" fill="white">
-            {Math.round(lastPrice).toLocaleString("ru-RU")}
+            {tooltipText}
           </text>
         </g>
 

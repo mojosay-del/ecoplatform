@@ -50,6 +50,31 @@ type LessonInput = z.infer<typeof lessonInputSchema>;
 type LessonUpdateInput = z.infer<typeof lessonUpdateInputSchema>;
 type KnowledgeArticleInput = z.infer<typeof knowledgeArticleInputSchema>;
 
+const commentAuthorSelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  gender: true,
+  company: { select: { type: true } },
+  platformStaff: { select: { roles: true, isActive: true } },
+} satisfies Prisma.UserSelect;
+
+type NewsCommentAuthor = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  gender: string;
+  company: { type: string } | null;
+  platformStaff: { roles: string[]; isActive: boolean } | null;
+};
+
+type NewsCommentPayload = {
+  user: NewsCommentAuthor;
+  likes?: Array<{ id: string }>;
+  replies?: NewsCommentPayload[];
+  [key: string]: unknown;
+};
+
 @Injectable()
 export class ContentService {
   constructor(
@@ -103,14 +128,17 @@ export class ContentService {
   async listNews(user: RequestUser) {
     this.assertFunctionalAccess(user);
 
-    return this.prisma.newsPost.findMany({
+    const posts = await this.prisma.newsPost.findMany({
       where: { status: ContentStatus.published },
       orderBy: { firstPublishedAt: "desc" },
       include: {
         tags: { include: { newsTag: true } },
+        likes: { where: { userId: user.id }, select: { id: true } },
         _count: { select: { likes: true, comments: { where: { status: CommentStatus.published } } } },
       },
     });
+
+    return posts.map(({ likes, ...post }) => ({ ...post, likedByMe: likes.length > 0 }));
   }
 
   async getNews(slug: string, user: RequestUser) {
@@ -121,16 +149,22 @@ export class ContentService {
       include: {
         blocks: { orderBy: { position: "asc" } },
         tags: { include: { newsTag: true } },
+        likes: { where: { userId: user.id }, select: { id: true } },
         comments: {
           where: { parentCommentId: null, status: CommentStatus.published },
           orderBy: { createdAt: "desc" },
           include: {
-            user: { select: { id: true, firstName: true, lastName: true } },
             replies: {
               where: { status: CommentStatus.published },
               orderBy: { createdAt: "asc" },
-              include: { user: { select: { id: true, firstName: true, lastName: true } }, _count: { select: { likes: true } } },
+              include: {
+                user: { select: commentAuthorSelect },
+                likes: { where: { userId: user.id }, select: { id: true } },
+                _count: { select: { likes: true } },
+              },
             },
+            user: { select: commentAuthorSelect },
+            likes: { where: { userId: user.id }, select: { id: true } },
             _count: { select: { likes: true } },
           },
         },
@@ -142,7 +176,40 @@ export class ContentService {
       throw new NotFoundException("Новость не найдена.");
     }
 
-    return post;
+    const { likes, ...payload } = post;
+    return {
+      ...payload,
+      comments: payload.comments.map((comment) => this.decorateNewsComment(comment)),
+      likedByMe: likes.length > 0,
+    };
+  }
+
+  private decorateNewsComment(comment: NewsCommentPayload): Record<string, unknown> {
+    const { likes = [], replies, ...publicComment } = comment;
+
+    return {
+      ...publicComment,
+      likedByMe: likes.length > 0,
+      user: this.decorateCommentAuthor(comment.user),
+      replies: replies?.map((reply) => this.decorateNewsComment(reply)),
+    };
+  }
+
+  private decorateCommentAuthor(user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    gender: string;
+    company: { type: string } | null;
+    platformStaff: { roles: string[]; isActive: boolean } | null;
+  }) {
+    const { company, platformStaff, ...publicUser } = user;
+    const platformRoles = platformStaff?.isActive ? platformStaff.roles : [];
+
+    return {
+      ...publicUser,
+      avatarUrl: resolveProfileAvatarUrl(platformRoles, company?.type ?? null, user.gender),
+    };
   }
 
   async createNews(input: NewsInput, user: RequestUser) {
@@ -375,15 +442,51 @@ export class ContentService {
 
   async toggleNewsLike(id: string, user: RequestUser) {
     this.assertFunctionalAccess(user);
+    const post = await this.prisma.newsPost.findUnique({ where: { id }, select: { id: true, status: true } });
+    if (!post || post.status !== ContentStatus.published) {
+      throw new NotFoundException("Новость не найдена.");
+    }
+
     const existing = await this.prisma.newsLike.findUnique({ where: { userId_newsPostId: { userId: user.id, newsPostId: id } } });
+    let liked = false;
 
     if (existing) {
       await this.prisma.newsLike.delete({ where: { id: existing.id } });
-      return { liked: false };
+    } else {
+      await this.prisma.newsLike.create({ data: { userId: user.id, newsPostId: id } });
+      liked = true;
     }
 
-    await this.prisma.newsLike.create({ data: { userId: user.id, newsPostId: id } });
-    return { liked: true };
+    const likesCount = await this.prisma.newsLike.count({ where: { newsPostId: id } });
+    return { liked, likesCount };
+  }
+
+  async toggleNewsCommentLike(id: string, user: RequestUser) {
+    this.assertFunctionalAccess(user);
+    await this.moduleAccess.assertModuleAccess(user.id, "comments");
+
+    const comment = await this.prisma.comment.findUnique({
+      where: { id },
+      select: { id: true, status: true, newsPost: { select: { status: true } } },
+    });
+    if (!comment || comment.status !== CommentStatus.published || comment.newsPost.status !== ContentStatus.published) {
+      throw new NotFoundException("Комментарий не найден.");
+    }
+
+    const existing = await this.prisma.commentLike.findUnique({
+      where: { userId_commentId: { userId: user.id, commentId: id } },
+    });
+    let liked = false;
+
+    if (existing) {
+      await this.prisma.commentLike.delete({ where: { id: existing.id } });
+    } else {
+      await this.prisma.commentLike.create({ data: { userId: user.id, commentId: id } });
+      liked = true;
+    }
+
+    const likesCount = await this.prisma.commentLike.count({ where: { commentId: id } });
+    return { liked, likesCount };
   }
 
   async addNewsComment(newsPostId: string, user: RequestUser, input: { text: string; parentCommentId?: string }) {
@@ -1682,3 +1785,32 @@ export class ContentService {
     }
   }
 }
+
+function resolveProfileAvatarUrl(platformRoles: string[], companyType: string | null, gender: string): string | null {
+  const platformPrefix = platformRoles.includes("admin")
+    ? "a"
+    : platformRoles.includes("moderator") || platformRoles.includes("content_manager")
+      ? "m"
+      : null;
+  const suffix = avatarSuffixByGender[gender];
+
+  if (platformPrefix && suffix) {
+    return `/avatars/platform/${platformPrefix}${suffix}.png`;
+  }
+
+  const companyPrefix = companyType ? companyAvatarPrefixByType[companyType] : null;
+  if (!companyPrefix || !suffix) return null;
+
+  return `/avatars/company/${companyPrefix}${suffix}.png`;
+}
+
+const companyAvatarPrefixByType: Record<string, string> = {
+  collector: "z",
+  trader: "t",
+  processor: "p",
+};
+
+const avatarSuffixByGender: Record<string, string> = {
+  male: "man",
+  female: "woman",
+};
