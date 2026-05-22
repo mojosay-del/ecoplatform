@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
+import { CmsTabs } from "./CmsTabs";
 import { Block, BlocksEditor, LESSON_BLOCK_KINDS } from "./BlocksEditor";
 import { FileUploadField } from "./FileUploadField";
 import { ApiError, apiFetch } from "../lib/api";
@@ -137,9 +138,10 @@ export function AdminEducationView() {
     <AppShell>
       <section className="page">
         <header className="page-header">
-          <h1 className="page-title">CMS / Обучение</h1>
+          <h1 className="page-title">CMS</h1>
           <p className="page-subtitle">Модули, главы и уроки. Структура справа — детали слева.</p>
         </header>
+        <CmsTabs />
         {message ? <p className="status-pill">{message}</p> : null}
 
         <div className="moderation-layout">

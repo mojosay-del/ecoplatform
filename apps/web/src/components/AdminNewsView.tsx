@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
+import { CmsTabs } from "./CmsTabs";
 import { Block, BlocksEditor, NEWS_BLOCK_KINDS } from "./BlocksEditor";
 import { FileUploadField } from "./FileUploadField";
 import { ApiError, apiFetch } from "../lib/api";
@@ -205,9 +206,10 @@ export function AdminNewsView() {
     <AppShell>
       <section className="page">
         <header className="page-header">
-          <h1 className="page-title">CMS / Новости</h1>
+          <h1 className="page-title">CMS</h1>
           <p className="page-subtitle">Создание и редактирование новостных публикаций.</p>
         </header>
+        <CmsTabs />
         {message ? <p className="status-pill">{message}</p> : null}
 
         <div className="moderation-layout">

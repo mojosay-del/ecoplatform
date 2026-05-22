@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
+import { CmsTabs } from "./CmsTabs";
 import { ALL_BLOCK_KINDS, Block, BlocksEditor } from "./BlocksEditor";
 import { FileUploadField } from "./FileUploadField";
 import { ApiError, apiFetch } from "../lib/api";
@@ -223,9 +224,10 @@ export function AdminKnowledgeView() {
     <AppShell>
       <section className="page">
         <header className="page-header">
-          <h1 className="page-title">CMS / База знаний</h1>
+          <h1 className="page-title">CMS</h1>
           <p className="page-subtitle">Иерархическая структура статей. Глубина — до 3 уровней.</p>
         </header>
+        <CmsTabs />
         {message ? <p className="status-pill">{message}</p> : null}
 
         <div className="moderation-layout">

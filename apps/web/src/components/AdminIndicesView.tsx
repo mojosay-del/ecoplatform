@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
+import { CmsTabs } from "./CmsTabs";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -79,9 +80,10 @@ export function AdminIndicesView() {
     <AppShell>
       <section className="page">
         <header className="page-header">
-          <h1 className="page-title">CMS / Индексы цен</h1>
+          <h1 className="page-title">CMS</h1>
           <p className="page-subtitle">Категории, номенклатура, индексы и значения — всё в одном экране.</p>
         </header>
+        <CmsTabs />
         {message ? <p className="status-pill">{message}</p> : null}
         <div className="indices-admin-layout">
           <div className="stack-list">

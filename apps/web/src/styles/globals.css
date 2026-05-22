@@ -379,6 +379,38 @@ select {
   margin-left: auto;
 }
 
+/* Подменю CMS: 4 раздела сверху каждого экрана редактирования контента,
+   чтобы КМ/админу не приходилось бегать по прямым URL. */
+.cms-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -8px 0 22px;
+  padding: 4px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  width: fit-content;
+}
+
+.cms-tab {
+  padding: 8px 16px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.cms-tab:hover {
+  color: var(--text);
+}
+
+.cms-tab.active {
+  background: var(--text);
+  color: white;
+}
+
 /* Кликабельная плитка — это <button> без браузерного скина, чтобы вся
    карточка реагировала на клик и при этом не ломала layout. */
 .news-tile {
