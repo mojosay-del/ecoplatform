@@ -8,6 +8,8 @@ import { X } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { ApiError, apiFetch, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { sanitizeParagraphHtml } from "../lib/sanitize-html";
+import { useCoverAssets } from "../lib/use-cover-assets";
 
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 const emptyTickets: any[] = [];
@@ -71,28 +73,6 @@ function useApiData<T>(path: string | null, initial: T) {
   }, [path, token]);
 
   return { data, state, errorMessage };
-}
-
-function useCoverAssets(items: Array<{ coverImageId?: string | null }>) {
-  const { token } = useAuth();
-  const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
-  const ids = useMemo(
-    () => Array.from(new Set(items.map((item) => item.coverImageId).filter((id): id is string => Boolean(id)))).sort(),
-    [items],
-  );
-  const idsKey = ids.join(",");
-
-  useEffect(() => {
-    if (!token || ids.length === 0) {
-      setAssets(new Map());
-      return;
-    }
-    apiFetch<FileAsset[]>(`/files?ids=${encodeURIComponent(idsKey)}`, { token })
-      .then((result) => setAssets(new Map(result.map((asset) => [asset.id, asset]))))
-      .catch(() => setAssets(new Map()));
-  }, [idsKey, token, ids.length]);
-
-  return assets;
 }
 
 export function NewsView() {
@@ -848,6 +828,7 @@ function IndexChart({
 
 export function EducationView() {
   const { data, state, errorMessage } = useApiData<any[]>("/education/modules", []);
+  const covers = useCoverAssets(data);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Обучение" />;
@@ -865,20 +846,31 @@ export function EducationView() {
     <AppShell>
       <section className="page">
         <PageHeader title="Обучение" subtitle="MVP-модули: закупка сырья и склад." />
-        <div className="card-grid">
+        <div className="education-grid">
           {data.map((module: any) => {
             const lessonsCount = module.chapters?.reduce(
               (sum: number, chapter: any) => sum + (chapter.lessons?.length ?? 0),
               0,
-            );
+            ) ?? 0;
+            const cover = module.coverImageId ? covers.get(module.coverImageId) : null;
+            const coverUrl = cover?.publicUrl;
             return (
-              <article className="card" key={module.id}>
-                <p className="status-pill">{module.hasAccess ? "Доступен" : "Нужна подписка"}</p>
-                <h2>{module.title}</h2>
-                <p>{module.summary}</p>
-                <p style={{ color: "var(--muted)" }}>Уроков: {lessonsCount}</p>
-                <Link className="button secondary" href={`/education/${module.id}`}>
-                  Открыть
+              <article className="education-card" key={module.id}>
+                <Link className="education-card-link" href={`/education/${module.id}`}>
+                  <div className="education-card-cover">
+                    {coverUrl ? <img alt="" src={coverUrl} /> : <div className="education-card-cover-fallback" />}
+                    <div className="education-card-cover-meta">
+                      <h2 className="education-card-title-badge">{module.title}</h2>
+                      <span className="education-card-lessons-badge">Уроков: {lessonsCount}</span>
+                    </div>
+                  </div>
+                  <span className={`education-card-status ${module.hasAccess ? "" : "locked"}`}>
+                    {module.hasAccess ? "Доступен" : "Нужна подписка"}
+                  </span>
+                  <div className="education-card-panel">
+                    <p>{module.summary}</p>
+                  </div>
+                  <span className="education-card-open-overlay" aria-hidden="true">Открыть</span>
                 </Link>
               </article>
             );
@@ -894,6 +886,8 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
     `/education/modules/${moduleId}`,
     null,
   );
+  // Используем тот же хук, что и каталог модулей, чтобы подтянуть URL обложки.
+  const covers = useCoverAssets(data ? [data] : []);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Обучение" />;
@@ -915,53 +909,130 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
   }
 
   const hasAccess = Boolean(data.hasAccess);
+  const coverUrl = data.coverImageId ? covers.get(data.coverImageId)?.publicUrl : null;
+  const totalLessons =
+    (data.chapters ?? []).reduce(
+      (sum: number, chapter: any) => sum + (chapter.lessons?.length ?? 0),
+      0,
+    );
+  const firstLessonHref = (() => {
+    for (const chapter of data.chapters ?? []) {
+      const first = chapter.lessons?.[0];
+      if (first) return `/education/${moduleId}/${first.id}`;
+    }
+    return null;
+  })();
+
+  const accessLabel =
+    data.accessLevel === "basic"
+      ? "Базовая подписка"
+      : data.accessLevel === "extended"
+        ? "Расширенная подписка"
+        : "Разовая покупка";
 
   return (
     <AppShell>
-      <section className="page">
-        <PageHeader title={data.title} subtitle={data.summary} />
-        <article className="card">
-          <p className="status-pill">{hasAccess ? "Доступен" : "Нужна подписка"}</p>
-          <p>{data.description}</p>
-          {!hasAccess && data.preview ? (
-            <div className="stack-list" style={{ marginTop: 16 }}>
-              <h3>Что внутри</h3>
-              <p>{data.preview.promotionalDescription}</p>
-              <ul>
-                {data.preview.whatYouWillLearn.map((item: string, index: number) => (
-                  <li key={index}>{item}</li>
-                ))}
-              </ul>
-              <Link className="button" href="/account">
-                Активировать подписку
+      <section className="page module-page">
+        <header className={`module-hero${coverUrl ? "" : " no-cover"}`}>
+          <div className="module-hero-cover">
+            {coverUrl ? (
+              <img alt={data.title} src={coverUrl} />
+            ) : (
+              <div className="module-hero-cover-fallback" />
+            )}
+          </div>
+          <div className="module-hero-body">
+            <span className={`module-hero-status${hasAccess ? " is-open" : " is-locked"}`}>
+              {hasAccess ? "Доступен" : "Нужна подписка"}
+              <span className="module-hero-status-sub">· {accessLabel}</span>
+            </span>
+            <h1 className="module-hero-title">{data.title}</h1>
+            <p className="module-hero-summary">{data.summary}</p>
+            <p className="module-hero-description">{data.description}</p>
+            <div className="module-hero-meta">
+              <span>
+                {(data.chapters ?? []).length}{" "}
+                {pluralizeRu((data.chapters ?? []).length, "глава", "главы", "глав")}
+              </span>
+              <span aria-hidden>·</span>
+              <span>
+                {totalLessons} {pluralizeRu(totalLessons, "урок", "урока", "уроков")}
+              </span>
+            </div>
+            <div className="module-hero-actions">
+              {hasAccess && firstLessonHref ? (
+                <Link className="button" href={firstLessonHref}>
+                  Начать обучение
+                </Link>
+              ) : !hasAccess ? (
+                <Link className="button" href="/account">
+                  Активировать подписку
+                </Link>
+              ) : null}
+              <Link className="button secondary" href="/education">
+                ← К курсам
               </Link>
             </div>
-          ) : null}
-        </article>
+          </div>
+        </header>
 
-        {hasAccess
-          ? (data.chapters ?? []).map((chapter: any) => (
-              <article className="card" key={chapter.id}>
-                <h2>{chapter.title}</h2>
-                <div className="stack-list">
-                  {(chapter.lessons ?? []).length === 0 ? (
-                    <p className="page-subtitle">В этой главе пока нет уроков.</p>
-                  ) : null}
-                  {(chapter.lessons ?? []).map((lesson: any) => (
-                    <div className="list-row" key={lesson.id}>
-                      <strong>{lesson.title}</strong>
-                      <Link
-                        className="button secondary"
-                        href={`/education/${moduleId}/${lesson.id}`}
-                      >
-                        Открыть урок
-                      </Link>
+        {!hasAccess && data.preview ? (
+          <section className="module-preview-card">
+            <h2>Что внутри курса</h2>
+            <p>{data.preview.promotionalDescription}</p>
+            <ul className="module-preview-list">
+              {data.preview.whatYouWillLearn.map((item: string, index: number) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {hasAccess ? (
+          <section className="module-chapters">
+            <h2 className="module-chapters-title">Программа курса</h2>
+            <div className="chapters-list">
+              {(data.chapters ?? []).map((chapter: any, index: number) => (
+                <article className="chapter-card" key={chapter.id}>
+                  <header className="chapter-card-header">
+                    <span className="chapter-number">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <div className="chapter-card-info">
+                      <h3 className="chapter-card-title">{chapter.title}</h3>
+                      <p className="chapter-card-meta">
+                        {(chapter.lessons ?? []).length}{" "}
+                        {pluralizeRu((chapter.lessons ?? []).length, "урок", "урока", "уроков")}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </article>
-            ))
-          : null}
+                  </header>
+                  {(chapter.lessons ?? []).length === 0 ? (
+                    <p className="chapter-card-empty">В этой главе пока пусто.</p>
+                  ) : (
+                    <ol className="lesson-list">
+                      {(chapter.lessons ?? []).map((lesson: any, lessonIndex: number) => (
+                        <li className="lesson-item" key={lesson.id}>
+                          <Link
+                            className="lesson-item-link"
+                            href={`/education/${moduleId}/${lesson.id}`}
+                          >
+                            <span className="lesson-item-index">
+                              {index + 1}.{lessonIndex + 1}
+                            </span>
+                            <span className="lesson-item-title">{lesson.title}</span>
+                            <span className="lesson-item-arrow" aria-hidden>
+                              →
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </section>
     </AppShell>
   );
@@ -1169,6 +1240,7 @@ function LessonAttachments({ attachments }: { attachments: Array<{ fileId: strin
 
 export function KnowledgeBaseView() {
   const { data, state, errorMessage } = useApiData<any[]>("/knowledge-base", []);
+  const activeNode = useMemo(() => findFirstKnowledgeNode(data), [data]);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="База знаний" />;
@@ -1181,78 +1253,27 @@ export function KnowledgeBaseView() {
   }
 
   return (
-    <AppShell>
-      <section className="page">
-        <PageHeader title="База знаний" subtitle="Навигация по сырью и карточки номенклатуры." />
-        <div className="card">
-          {data.length === 0 ? (
-            <p className="page-subtitle">Статей пока нет.</p>
-          ) : (
-            <KnowledgeTree nodes={data} depth={0} />
-          )}
-        </div>
-      </section>
-    </AppShell>
-  );
-}
-
-function KnowledgeTree({ nodes, depth }: { nodes: any[]; depth: number }) {
-  return (
-    <ul className="kb-tree" style={{ paddingLeft: depth === 0 ? 0 : 16 }}>
-      {nodes.map((node) => (
-        <KnowledgeTreeNode key={node.id} node={node} depth={depth} />
-      ))}
-    </ul>
-  );
-}
-
-function KnowledgeTreeNode({ node, depth }: { node: any; depth: number }) {
-  const [open, setOpen] = useState(depth === 0);
-  const children = (node.children ?? []) as any[];
-  const hasChildren = children.length > 0;
-
-  return (
-    <li>
-      <div className="list-row" style={{ alignItems: "center" }}>
-        {hasChildren ? (
-          <button
-            type="button"
-            className="button secondary"
-            onClick={() => setOpen((v) => !v)}
-            style={{ padding: "4px 8px", minWidth: 32 }}
-            aria-label={open ? "Свернуть" : "Развернуть"}
-          >
-            {open ? "▾" : "▸"}
-          </button>
-        ) : (
-          <span style={{ display: "inline-block", width: 32 }} />
-        )}
-        <Link href={`/knowledge-base/${node.slug}`} style={{ flex: 1 }}>
-          <strong>{node.title}</strong>
-          {node.subtitle ? <small style={{ display: "block", color: "var(--muted)" }}>{node.subtitle}</small> : null}
-        </Link>
-      </div>
-      {hasChildren && open ? <KnowledgeTree nodes={children} depth={depth + 1} /> : null}
-    </li>
+    <KnowledgeBaseLayout tree={data} activeArticle={activeNode} activeSlug={activeNode?.slug} />
   );
 }
 
 export function KnowledgeArticleView({ slug }: { slug: string }) {
-  const { data, state, errorMessage } = useApiData<any | null>(
+  const tree = useApiData<any[]>("/knowledge-base", []);
+  const article = useApiData<any | null>(
     `/knowledge-base/${slug}`,
     null,
   );
 
-  if (state === "unauthenticated") {
+  if (tree.state === "unauthenticated" || article.state === "unauthenticated") {
     return <AuthRequired title="База знаний" />;
   }
-  if (state === "forbidden") {
+  if (tree.state === "forbidden" || article.state === "forbidden") {
     return <AccessClosed title="База знаний" />;
   }
-  if (state === "error") {
-    return <ErrorState title="База знаний" message={errorMessage} />;
+  if (tree.state === "error" || article.state === "error") {
+    return <ErrorState title="База знаний" message={tree.errorMessage ?? article.errorMessage} />;
   }
-  if (!data) {
+  if (!article.data) {
     return (
       <AppShell>
         <section className="page">
@@ -1262,45 +1283,154 @@ export function KnowledgeArticleView({ slug }: { slug: string }) {
     );
   }
 
-  const breadcrumbs: Array<{ title: string; slug: string }> = [];
-  if (data.parent?.parent) {
-    breadcrumbs.push({ title: data.parent.parent.title, slug: data.parent.parent.slug });
-  }
-  if (data.parent) {
-    breadcrumbs.push({ title: data.parent.title, slug: data.parent.slug });
-  }
+  return (
+    <KnowledgeBaseLayout tree={tree.data} activeArticle={article.data} activeSlug={slug} />
+  );
+}
+
+function KnowledgeBaseLayout({
+  tree,
+  activeArticle,
+  activeSlug,
+}: {
+  tree: any[];
+  activeArticle?: any | null;
+  activeSlug?: string;
+}) {
+  const fallbackActive = useMemo(() => findFirstKnowledgeNode(tree), [tree]);
+  const active = activeArticle ?? fallbackActive;
+  const activeChildren = (active?.children ?? []) as any[];
+  const breadcrumbs = active ? buildKnowledgeBreadcrumbs(tree, active) : [];
 
   return (
     <AppShell>
-      <section className="page">
-        <p className="page-subtitle">
-          <Link href="/knowledge-base">База знаний</Link>
-          {breadcrumbs.map((crumb) => (
-            <span key={crumb.slug}>
-              {" / "}
-              <Link href={`/knowledge-base/${crumb.slug}`}>{crumb.title}</Link>
-            </span>
-          ))}
-        </p>
-        <PageHeader title={data.title} subtitle={data.subtitle ?? ""} />
-        <article className="card">
-          <ContentBlocks blocks={data.blocks ?? []} />
-        </article>
-        {(data.children ?? []).length > 0 ? (
-          <article className="card">
-            <h3>Подразделы</h3>
-            <ul className="kb-tree">
-              {(data.children ?? []).map((child: any) => (
-                <li key={child.id}>
-                  <Link href={`/knowledge-base/${child.slug}`}>{child.title}</Link>
-                </li>
-              ))}
-            </ul>
-          </article>
-        ) : null}
+      <section className="page knowledge-page">
+        <div className="knowledge-workspace">
+          <aside className="knowledge-nav-panel" aria-label="Навигация по базе знаний">
+            <div className="knowledge-nav-heading">
+              <span className="knowledge-nav-kicker">База знаний</span>
+              <h1>Навигация по сырью</h1>
+            </div>
+            {tree.length === 0 ? (
+              <p className="page-subtitle">Статей пока нет.</p>
+            ) : (
+              <nav className="knowledge-nav-list">
+                {tree.map((node: any) => (
+                  <KnowledgeNavNode key={node.id} node={node} activeSlug={activeSlug ?? active?.slug} />
+                ))}
+              </nav>
+            )}
+          </aside>
+
+          <main className="knowledge-content-panel">
+            {!active ? (
+              <article className="knowledge-article-card">
+                <p className="page-subtitle">Выберите материал в навигации слева.</p>
+              </article>
+            ) : (
+              <>
+                <div className="knowledge-content-head">
+                  <div className="knowledge-title-row">
+                    <span className="knowledge-material-icon" aria-hidden="true" />
+                    <div>
+                      {breadcrumbs.length > 0 ? (
+                        <p className="knowledge-breadcrumbs">
+                          {breadcrumbs.map((crumb, index) => (
+                            <span key={crumb.slug}>
+                              {index > 0 ? " / " : ""}
+                              <Link href={`/knowledge-base/${crumb.slug}`}>{crumb.title}</Link>
+                            </span>
+                          ))}
+                        </p>
+                      ) : null}
+                      <h1>{active.title}</h1>
+                      {active.subtitle ? <p>{active.subtitle}</p> : null}
+                    </div>
+                  </div>
+                </div>
+
+                <article className="knowledge-article-card content-article">
+                  {(active.blocks ?? []).length > 0 ? (
+                    <ContentBlocks blocks={active.blocks ?? []} />
+                  ) : (
+                    <p className="page-subtitle">Описание появится после наполнения материала.</p>
+                  )}
+                </article>
+
+                {activeChildren.length > 0 ? (
+                  <section className="knowledge-child-section" aria-label="Материалы раздела">
+                    <h2>Материалы раздела</h2>
+                    <div className="knowledge-child-grid">
+                      {activeChildren.map((child: any) => (
+                        <Link className="knowledge-child-card" href={`/knowledge-base/${child.slug}`} key={child.id}>
+                          <strong>{child.title}</strong>
+                          {child.subtitle ? <span>{child.subtitle}</span> : null}
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+              </>
+            )}
+          </main>
+        </div>
       </section>
     </AppShell>
   );
+}
+
+function KnowledgeNavNode({ node, activeSlug }: { node: any; activeSlug?: string }) {
+  const children = (node.children ?? []) as any[];
+  const isActive = node.slug === activeSlug;
+  const hasActiveChild = children.some((child) => knowledgeNodeContainsSlug(child, activeSlug));
+
+  return (
+    <div className={`knowledge-nav-group ${hasActiveChild ? "has-active-child" : ""}`}>
+      <Link className={`knowledge-nav-link ${isActive ? "active" : ""}`} href={`/knowledge-base/${node.slug}`}>
+        <span className={`knowledge-nav-dot ${children.length > 0 ? "category" : ""}`} aria-hidden="true" />
+        <span>{node.title}</span>
+      </Link>
+      {children.length > 0 ? (
+        <div className="knowledge-nav-children">
+          {children.map((child) => (
+            <KnowledgeNavNode activeSlug={activeSlug} key={child.id} node={child} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function findFirstKnowledgeNode(nodes: any[]): any | null {
+  for (const node of nodes) {
+    if ((node.blocks ?? []).length > 0 || (node.children ?? []).length === 0) {
+      return node;
+    }
+    const child = findFirstKnowledgeNode(node.children ?? []);
+    if (child) return child;
+  }
+  return nodes[0] ?? null;
+}
+
+function knowledgeNodeContainsSlug(node: any, slug?: string): boolean {
+  if (!slug) return false;
+  if (node.slug === slug) return true;
+  return ((node.children ?? []) as any[]).some((child) => knowledgeNodeContainsSlug(child, slug));
+}
+
+function buildKnowledgeBreadcrumbs(nodes: any[], active: any): Array<{ title: string; slug: string }> {
+  const path = findKnowledgePath(nodes, active.slug) ?? [];
+  return path.slice(0, -1).map((node) => ({ title: node.title, slug: node.slug }));
+}
+
+function findKnowledgePath(nodes: any[], slug?: string): any[] | null {
+  if (!slug) return null;
+  for (const node of nodes) {
+    if (node.slug === slug) return [node];
+    const childPath = findKnowledgePath(node.children ?? [], slug);
+    if (childPath) return [node, ...childPath];
+  }
+  return null;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -1316,6 +1446,17 @@ const COMPANY_STATUS_LABELS: Record<string, string> = {
   suspended: "Приостановлена",
   blocked: "Заблокирована",
   archived: "В архиве",
+};
+
+const COMPANY_TYPE_LABELS: Record<string, string> = {
+  collector: "Заготовитель",
+  trader: "Трейдер",
+  processor: "Переработчик",
+};
+
+const GENDER_LABELS: Record<string, string> = {
+  male: "Мужской",
+  female: "Женский",
 };
 
 // Какую CTA «обновления тарифа» показывать сверху урока:
@@ -1420,8 +1561,18 @@ export function AccountView() {
         <div className="card-grid">
           <article className="card">
             <h2>Профиль</h2>
-            <p>{user ? `${user.firstName} ${user.lastName}` : "Не авторизован"}</p>
-            <p>{user?.email}</p>
+            <div className="profile-summary">
+              {user?.avatarUrl ? (
+                <img className="profile-avatar" alt="" src={user.avatarUrl} />
+              ) : (
+                <div className="profile-avatar profile-avatar-placeholder" aria-hidden="true" />
+              )}
+              <div>
+                <p>{user ? `${user.firstName} ${user.lastName}` : "Не авторизован"}</p>
+                <p>{user?.email}</p>
+                {user?.gender ? <p className="page-subtitle">Пол: {GENDER_LABELS[user.gender] ?? user.gender}</p> : null}
+              </div>
+            </div>
             <button className="button secondary" onClick={logout}>Выйти</button>
           </article>
           {isPlatformStaff ? (
@@ -1439,6 +1590,7 @@ export function AccountView() {
               <article className="card">
                 <h2>Компания</h2>
                 <p>{billing?.organizationName ?? user?.company?.organizationName ?? "Данные появятся после входа"}</p>
+                {user?.company?.type ? <p>{COMPANY_TYPE_LABELS[user.company.type] ?? user.company.type}</p> : null}
                 {companyStatusLabel ? <p className="status-pill">{companyStatusLabel}</p> : null}
               </article>
               <article className="card">
@@ -1545,7 +1697,7 @@ function ErrorState({ title, message }: { title: string; message: string | null 
 // shape-типы вместо BaseContentBlock — здесь только то, что реально рендерим.
 type RenderableBlock =
   | { type: "heading" | "subheading"; payload: { text: string } }
-  | { type: "paragraph"; payload: { markdown: string } }
+  | { type: "paragraph"; payload: { html: string } }
   | { type: "image"; payload: { fileId: string; caption?: string; altText?: string } }
   | { type: "gallery"; payload: { images: Array<{ fileId: string; caption?: string; altText?: string }> } }
   | { type: "video"; payload: { rutubeUrl: string; caption?: string } }
@@ -1563,7 +1715,7 @@ type RenderableBlock =
     }
   | { type: string; payload: Record<string, unknown> };
 
-function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
+export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
   const assets = useFileAssets(blocks);
 
   return (
@@ -1576,7 +1728,14 @@ function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
           return <h3 key={index}>{(block.payload as { text: string }).text}</h3>;
         }
         if (block.type === "paragraph") {
-          return <p key={index}>{(block.payload as { markdown: string }).markdown}</p>;
+          const html = (block.payload as { html: string }).html;
+          return (
+            <div
+              className="rendered-html"
+              key={index}
+              dangerouslySetInnerHTML={{ __html: sanitizeParagraphHtml(html) }}
+            />
+          );
         }
         if (block.type === "image") {
           const payload = block.payload as { fileId: string; caption?: string; altText?: string };
@@ -1792,4 +1951,13 @@ function MiniChart({ points }: { points: Array<{ price: number }> }) {
       <circle cx="340" cy="40" r="6" fill="#1e293b" />
     </svg>
   );
+}
+
+function pluralizeRu(count: number, one: string, few: string, many: string) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
 }

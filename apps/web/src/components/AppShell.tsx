@@ -9,6 +9,8 @@ import {
   BookOpen,
   Boxes,
   Calculator,
+  ChevronsLeft,
+  ChevronsRight,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -89,6 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, token, ready } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   // Любой защищённый раздел оборачивается в AppShell. Если AuthProvider уже
   // проверил localStorage и токена нет — отправляем на /login. До ready
@@ -106,6 +109,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setMobileNavOpen(false);
   }, [pathname]);
 
+  // Запоминаем свёртку сайдбара между сессиями (только desktop-режим).
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem("eco_sidebar_collapsed") === "1");
+    } catch {
+      // ignore (private mode)
+    }
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("eco_sidebar_collapsed", next ? "1" : "0");
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
+
   if (!ready || !token) {
     return null;
   }
@@ -116,14 +140,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }));
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-collapsed={collapsed ? "true" : "false"}>
       <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
         <div className="sidebar-head">
           <Link className="brand" href="/news">
             <span className="brand-mark">
               <Leaf size={28} strokeWidth={2.2} />
             </span>
-            <span>ЭкоПлатформа</span>
+            <span className="brand-text">ЭкоПлатформа</span>
           </Link>
           <button
             className="sidebar-close"
@@ -132,6 +156,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Закрыть меню"
           >
             <X size={20} />
+          </button>
+          <button
+            className="sidebar-collapse"
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
+            title={collapsed ? "Развернуть меню" : "Свернуть меню"}
+          >
+            {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
           </button>
         </div>
         {visibleNav.map((section) => (
@@ -156,6 +189,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Menu size={20} />
           </button>
+          <Breadcrumb nav={visibleNav} pathname={pathname} />
           <div className="topbar-spacer" />
           <NotificationBell />
           <Link className="icon-button" href="/admin/support" title="Помощь">
@@ -165,12 +199,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Settings size={20} />
           </Link>
           <Link
-            className="avatar"
+            className={`avatar ${user?.avatarUrl ? "avatar-with-image" : ""}`}
             title={user ? `${user.firstName} ${user.lastName}` : "Войти"}
             href={user ? "/account" : "/login"}
-          />
+          >
+            {user?.avatarUrl ? <img alt="" src={user.avatarUrl} /> : null}
+          </Link>
         </header>
-        {children}
+        <div className="page-surface">{children}</div>
       </main>
     </div>
   );
@@ -185,14 +221,14 @@ function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: 
   return (
     <div className="nav-entry">
       {item.href && !item.disabled ? (
-        <Link className={className} href={item.href}>
+        <Link className={className} href={item.href} title={item.label}>
           <Icon size={iconSize} />
-          {item.label}
+          <span className="nav-label">{item.label}</span>
         </Link>
       ) : (
-        <span className={className}>
+        <span className={className} title={item.label}>
           <Icon size={iconSize} />
-          {item.label}
+          <span className="nav-label">{item.label}</span>
         </span>
       )}
       {item.children?.length ? (
@@ -209,6 +245,55 @@ function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: 
 function isActiveNavItem(item: NavItem, pathname: string): boolean {
   const selfActive = Boolean(item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`)));
   return selfActive || Boolean(item.children?.some((child) => isActiveNavItem(child, pathname)));
+}
+
+// Хлебные крошки в топбаре: ищем в навигации активный пункт и показываем
+// «Категория / Пункт» (например, «Главная / Обучение»). Если ничего не нашли —
+// прячем (на /login и подобных страницах AppShell всё равно не отрисуется).
+function Breadcrumb({
+  nav,
+  pathname,
+}: {
+  nav: Array<{ title: string; items: NavItem[] }>;
+  pathname: string;
+}) {
+  let sectionTitle: string | null = null;
+  let activeItem: NavItem | null = null;
+  let activeHref: string | null = null;
+  for (const section of nav) {
+    for (const item of section.items) {
+      if (isActiveNavItem(item, pathname)) {
+        sectionTitle = section.title;
+        activeItem = item;
+        activeHref = item.href ?? null;
+        break;
+      }
+    }
+    if (activeItem) break;
+  }
+
+  if (!sectionTitle || !activeItem) return null;
+  const Icon = activeItem.icon;
+
+  return (
+    <nav className="topbar-breadcrumb" aria-label="Хлебные крошки">
+      <span className="topbar-breadcrumb-section">{sectionTitle}</span>
+      <span className="topbar-breadcrumb-sep" aria-hidden>
+        /
+      </span>
+      {activeHref ? (
+        <Link className="topbar-breadcrumb-current" href={activeHref}>
+          <Icon size={15} />
+          <span>{activeItem.label}</span>
+        </Link>
+      ) : (
+        <span className="topbar-breadcrumb-current">
+          <Icon size={15} />
+          <span>{activeItem.label}</span>
+        </span>
+      )}
+    </nav>
+  );
 }
 
 function filterVisibleItems(items: NavItem[], roles: string[]): NavItem[] {

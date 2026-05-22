@@ -4,7 +4,15 @@ import { resolve } from "path";
 // Сид может запускаться отдельно от приложения, поэтому загружаем .env здесь же.
 loadEnv({ path: resolve(__dirname, "../../../.env") });
 
-import { PrismaClient, CompanyStatus, ContentStatus, LearningAccessLevel, PlatformRole } from "@prisma/client";
+import {
+  CompanyStatus,
+  CompanyType,
+  ContentStatus,
+  LearningAccessLevel,
+  PlatformRole,
+  PrismaClient,
+  UserGender,
+} from "@prisma/client";
 import { hash } from "bcryptjs";
 import { slugify } from "@ecoplatform/shared";
 
@@ -22,6 +30,7 @@ async function main() {
       phone: "+79990000001",
       firstName: "Админ",
       lastName: "Платформы",
+      gender: UserGender.male,
       passwordHash: adminPasswordHash,
       platformStaff: {
         create: {
@@ -41,12 +50,14 @@ async function main() {
     where: { id: "demo-company" },
     update: {
       status: CompanyStatus.demo,
+      type: CompanyType.collector,
       demoEndsAt: seedDemoEndsAt,
       subscriptionPlan: null,
     },
     create: {
       id: "demo-company",
       organizationName: "ООО ВторРесурс Demo",
+      type: CompanyType.collector,
       status: CompanyStatus.demo,
       demoEndsAt: seedDemoEndsAt,
     },
@@ -60,6 +71,7 @@ async function main() {
       phone: "+79990000002",
       firstName: "Иван",
       lastName: "Заготовитель",
+      gender: UserGender.male,
       passwordHash: userPasswordHash,
       companyId: company.id,
     },
@@ -206,8 +218,8 @@ async function main() {
             position: 0,
             type: "paragraph",
             payload: {
-              markdown:
-                "Компания «ВторРесурс» будет приостанавливать работу перерабатывающего завода с 1 по 10 мая включительно. После возобновления работы графики поставок будут восстановлены.",
+              html:
+                "<p>Компания «ВторРесурс» будет приостанавливать работу перерабатывающего завода с 1 по 10 мая включительно. После возобновления работы графики поставок будут восстановлены.</p>",
             },
           },
         ],
@@ -262,7 +274,7 @@ async function main() {
                         {
                           position: 0,
                           type: "paragraph",
-                          payload: { markdown: "Проверьте вид сырья, влажность, засор, форму поставки и документы." },
+                          payload: { html: "<p>Проверьте вид сырья, влажность, засор, форму поставки и документы.</p>" },
                         },
                       ],
                     },
@@ -310,7 +322,7 @@ async function main() {
                         {
                           position: 0,
                           type: "paragraph",
-                          payload: { markdown: "Отделяйте мокрое сырьё от сухого, а спорные партии маркируйте отдельно." },
+                          payload: { html: "<p>Отделяйте мокрое сырьё от сухого, а спорные партии маркируйте отдельно.</p>" },
                         },
                       ],
                     },
@@ -339,11 +351,11 @@ async function main() {
       blocks: {
         create: [
           { position: 0, type: "heading", payload: { text: "ГОСТы" } },
-          { position: 1, type: "paragraph", payload: { markdown: "Ориентируйтесь на внутренние регламенты приёмки и требования конкретного завода." } },
+          { position: 1, type: "paragraph", payload: { html: "<p>Ориентируйтесь на внутренние регламенты приёмки и требования конкретного завода.</p>" } },
           { position: 2, type: "checklist", payload: { title: "Принимается", style: "positive", items: ["Сухой чистый картон", "Без плёнки", "Прессованные кипы"] } },
           { position: 3, type: "checklist", payload: { title: "Риски", style: "warning", items: ["Повышенная влажность", "Снижение цены за засор", "Пересортировка на складе"] } },
           { position: 4, type: "heading", payload: { text: "Нюансы и лайфхаки" } },
-          { position: 5, type: "paragraph", payload: { markdown: "Поддерживайте влажность до 12% и отделяйте картон с плёнкой до прессования." } },
+          { position: 5, type: "paragraph", payload: { html: "<p>Поддерживайте влажность до 12% и отделяйте картон с плёнкой до прессования.</p>" } },
         ],
       },
     },

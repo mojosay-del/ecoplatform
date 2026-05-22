@@ -44,8 +44,10 @@ async function loginAdmin(): Promise<string> {
 async function registerCompany(suffix: string): Promise<{ token: string; companyId: string; userId: string }> {
   const res = await ctx.http.post("/api/auth/register").send({
     organizationName: `ООО Тест ${suffix}`,
+    companyType: "collector",
     firstName: "Иван",
     lastName: "Тестов",
+    gender: "male",
     phone: `+7900${suffix}`,
     email: `user${suffix}@test.local`,
     password: "User12345",
@@ -55,6 +57,7 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
 
   const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
   expect(me.status).toBe(200);
+  expect(me.body.avatarUrl).toBe("/avatars/company/zman.png");
   return { token, companyId: me.body.company.id, userId: me.body.id };
 }
 
@@ -84,7 +87,7 @@ async function createPublishedNewsWithComment(adminToken: string, authorToken: s
     .send({
       title: "Новость для модерации",
       lead: "Лид новости",
-      blocks: [{ type: "paragraph", payload: { markdown: "Тело новости." } }],
+      blocks: [{ type: "paragraph", payload: { html: "<p>Тело новости.</p>" } }],
       tags: ["moderation"],
     });
   expect(draft.status).toBe(201);
@@ -110,7 +113,7 @@ async function createPublishedNews(adminToken: string, suffix: string) {
     .send({
       title: `Новость для модерации ${suffix}`,
       lead: "Лид новости",
-      blocks: [{ type: "paragraph", payload: { markdown: "Тело новости." } }],
+      blocks: [{ type: "paragraph", payload: { html: "<p>Тело новости.</p>" } }],
       tags: [`moderation-${suffix}`],
     });
   expect(draft.status).toBe(201);
@@ -130,7 +133,7 @@ async function createPublishedKnowledgeArticle(adminToken: string, suffix: strin
     .send({
       title: `Статья ${suffix}`,
       position: 0,
-      blocks: [{ type: "paragraph", payload: { markdown: "Тело статьи." } }],
+      blocks: [{ type: "paragraph", payload: { html: "<p>Тело статьи.</p>" } }],
     });
   expect(draft.status).toBe(201);
 
@@ -149,16 +152,48 @@ describe("Auth", () => {
 
     const company = await ctx.prisma.company.findUnique({ where: { id: companyId } });
     expect(company?.status).toBe(CompanyStatus.demo);
+    expect(company?.type).toBe("collector");
     expect(company?.demoEndsAt).toBeInstanceOf(Date);
     expect(company!.demoEndsAt!.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("системному администратору назначается аватар по роли и полу", async () => {
+    const adminToken = await loginAdmin();
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+
+    expect(me.status).toBe(200);
+    expect(me.body.gender).toBe("male");
+    expect(me.body.avatarUrl).toBe("/avatars/platform/aman.png");
+  });
+
+  it("регистрация сохраняет тип компании и пол для аватара профиля", async () => {
+    const res = await ctx.http.post("/api/auth/register").send({
+      organizationName: "ООО Трейд Жен",
+      companyType: "trader",
+      firstName: "Анна",
+      lastName: "Тестова",
+      gender: "female",
+      phone: "+71111111112",
+      email: "trader-female@test.local",
+      password: "User12345",
+    });
+    expect(res.status).toBe(201);
+
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${res.body.accessToken}`);
+    expect(me.status).toBe(200);
+    expect(me.body.gender).toBe("female");
+    expect(me.body.company.type).toBe("trader");
+    expect(me.body.avatarUrl).toBe("/avatars/company/twoman.png");
   });
 
   it("повторная регистрация с тем же email отбивается 409", async () => {
     await registerCompany("0000002");
     const dup = await ctx.http.post("/api/auth/register").send({
       organizationName: "ООО Дубль",
+      companyType: "collector",
       firstName: "А",
       lastName: "Б",
+      gender: "male",
       phone: "+71111111111",
       email: "user0000002@test.local",
       password: "User12345",
@@ -241,7 +276,7 @@ describe("Content publish", () => {
       .send({
         title: "Тестовая новость интеграции",
         lead: "Лид новости",
-        blocks: [{ type: "paragraph", payload: { markdown: "Тело новости." } }],
+        blocks: [{ type: "paragraph", payload: { html: "<p>Тело новости.</p>" } }],
         tags: ["test"],
       });
     expect(draft.status).toBe(201);
@@ -263,7 +298,7 @@ describe("Content publish", () => {
     expect(after.body.find((n: { slug: string }) => n.slug === slug)).toBeTruthy();
   });
 
-  it("новость с некорректным блоком (paragraph без markdown) отбивается 400", async () => {
+  it("новость с некорректным блоком (paragraph без html) отбивается 400", async () => {
     const adminToken = await loginAdmin();
     const res = await ctx.http
       .post("/api/admin/content/news")
@@ -1250,16 +1285,21 @@ describe("Admin staff panel", () => {
         phone: "+79991234567",
         firstName: "Новый",
         lastName: "Модератор",
+        gender: "female",
         password: "Moder12345!",
         roles: ["moderator"],
       });
     expect(res.status).toBe(201);
+    expect(res.body.gender).toBe("female");
     expect(res.body.platformStaff.roles).toEqual(["moderator"]);
 
     const login = await ctx.http
       .post("/api/auth/login")
       .send({ email: "moder.new@test.local", password: "Moder12345!" });
     expect(login.status).toBe(201);
+
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${login.body.accessToken}`);
+    expect(me.body.avatarUrl).toBe("/avatars/platform/mwoman.png");
   });
 
   it("отбивает создание с занятым email/phone", async () => {
@@ -1273,6 +1313,7 @@ describe("Admin staff panel", () => {
         phone: "+79991234999",
         firstName: "А",
         lastName: "Б",
+        gender: "male",
         password: "Password1!",
         roles: ["moderator"],
       });
@@ -1289,6 +1330,7 @@ describe("Admin staff panel", () => {
         phone: "+79991234500",
         firstName: "К",
         lastName: "М",
+        gender: "male",
         password: "Password1!",
         roles: ["content_manager"],
       });
@@ -1317,6 +1359,7 @@ describe("Admin staff panel", () => {
         phone: "+79991234501",
         firstName: "К",
         lastName: "М",
+        gender: "male",
         password: "Password1!",
         roles: ["moderator"],
       });
@@ -1617,7 +1660,7 @@ describe("Content lifecycle: knowledge base", () => {
       .send({
         title: "Статья для PATCH",
         position: 0,
-        blocks: [{ type: "paragraph", payload: { markdown: "Старый текст." } }],
+        blocks: [{ type: "paragraph", payload: { html: "<p>Старый текст.</p>" } }],
       });
     expect(draft.status).toBe(201);
 
@@ -1629,7 +1672,7 @@ describe("Content lifecycle: knowledge base", () => {
         position: 0,
         blocks: [
           { type: "heading", payload: { text: "Новый заголовок" } },
-          { type: "paragraph", payload: { markdown: "Новый текст." } },
+          { type: "paragraph", payload: { html: "<p>Новый текст.</p>" } },
         ],
       });
     expect(patched.status).toBe(200);
@@ -1671,7 +1714,7 @@ describe("Content lifecycle: learning modules", () => {
       .send({
         title: "Урок 1",
         position: 0,
-        blocks: [{ type: "paragraph", payload: { markdown: "Тело урока." } }],
+        blocks: [{ type: "paragraph", payload: { html: "<p>Тело урока.</p>" } }],
         attachments: [],
       });
     expect(lessonRes.status).toBe(201);
@@ -1752,7 +1795,7 @@ describe("Content updates (PATCH)", () => {
       .send({
         title: "Старый заголовок",
         lead: "Лид",
-        blocks: [{ type: "paragraph", payload: { markdown: "Старый текст." } }],
+        blocks: [{ type: "paragraph", payload: { html: "<p>Старый текст.</p>" } }],
         tags: ["обновление"],
       });
     expect(draft.status).toBe(201);
@@ -1766,7 +1809,7 @@ describe("Content updates (PATCH)", () => {
         lead: "Новый лид",
         blocks: [
           { type: "heading", payload: { text: "Заголовок внутри" } },
-          { type: "paragraph", payload: { markdown: "Новый текст." } },
+          { type: "paragraph", payload: { html: "<p>Новый текст.</p>" } },
         ],
         tags: ["обновление", "после-патча"],
       });
@@ -1797,11 +1840,13 @@ describe("Content updates (PATCH)", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({
         title: "Модуль после",
+        coverImageId: "test-learning-cover",
         accessLevel: "extended",
         preview: { promotionalDescription: "Превью после", whatYouWillLearn: ["Пункт 1", "Пункт 2"] },
       });
     expect(patched.status).toBe(200);
     expect(patched.body.title).toBe("Модуль после");
+    expect(patched.body.coverImageId).toBe("test-learning-cover");
     expect(patched.body.accessLevel).toBe("extended");
     expect(patched.body.preview.whatYouWillLearn).toEqual(["Пункт 1", "Пункт 2"]);
   });
@@ -1873,7 +1918,7 @@ describe("Content updates (PATCH)", () => {
       .send({
         title: "Урок",
         position: 0,
-        blocks: [{ type: "paragraph", payload: { markdown: "Версия 1" } }],
+        blocks: [{ type: "paragraph", payload: { html: "<p>Версия 1</p>" } }],
         attachments: [],
       });
     expect(lesson.status).toBe(201);
@@ -1885,7 +1930,7 @@ describe("Content updates (PATCH)", () => {
         title: "Урок v2",
         blocks: [
           { type: "heading", payload: { text: "Глава" } },
-          { type: "paragraph", payload: { markdown: "Версия 2" } },
+          { type: "paragraph", payload: { html: "<p>Версия 2</p>" } },
         ],
       });
     expect(patched.status).toBe(200);

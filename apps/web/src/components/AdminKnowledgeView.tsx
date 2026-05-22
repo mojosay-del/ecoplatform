@@ -1,10 +1,12 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { BookOpen, ChevronRight, FileText, FolderOpen, Plus } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { ALL_BLOCK_KINDS, Block, BlocksEditor } from "./BlocksEditor";
 import { FileUploadField } from "./FileUploadField";
+import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -45,7 +47,7 @@ const EMPTY_DRAFT: DraftState = {
   coverImageId: "",
   iconType: "",
   position: 0,
-  blocks: [{ type: "paragraph", payload: { markdown: "" } }],
+  blocks: [{ type: "paragraph", payload: { html: "" } }],
 };
 
 export function AdminKnowledgeView() {
@@ -55,11 +57,33 @@ export function AdminKnowledgeView() {
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // Дерево статей: топ-уровень + детям детей; пока с глубиной до 3 в БД.
   const tree = useMemo(() => buildTree(items), [items]);
 
-  // Все статьи доступны как parent (кроме самой редактируемой и её потомков).
+  // Авто-раскрытие предков выбранной статьи.
+  useEffect(() => {
+    if (!draft.id) return;
+    const parents: string[] = [];
+    let current = items.find((item) => item.id === draft.id);
+    while (current?.parentId) {
+      parents.push(current.parentId);
+      current = items.find((item) => item.id === current!.parentId);
+    }
+    if (parents.length === 0) return;
+    setExpanded((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of parents) {
+        if (!next.has(id)) {
+          next.add(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [draft.id, items]);
+
   const parentOptions = useMemo(() => {
     const forbidden = new Set<string>();
     if (draft.id) {
@@ -77,6 +101,31 @@ export function AdminKnowledgeView() {
     }
     return items.filter((item) => !forbidden.has(item.id));
   }, [items, draft.id]);
+
+  const original = useMemo(
+    () => (draft.id ? items.find((item) => item.id === draft.id) ?? null : null),
+    [draft.id, items],
+  );
+
+  const hasChanges = useMemo(() => {
+    if (!draft.id) {
+      return draft.title.trim().length > 0 || draft.blocks.length > 0;
+    }
+    if (!original) return false;
+    if (draft.title !== original.title) return true;
+    if (draft.subtitle !== (original.subtitle ?? "")) return true;
+    if ((draft.coverImageId || "") !== (original.coverImageId ?? "")) return true;
+    if ((draft.iconType || "") !== (original.iconType ?? "")) return true;
+    if (draft.parentId !== original.parentId) return true;
+    if (draft.position !== original.position) return true;
+    if (
+      JSON.stringify(draft.blocks) !==
+      JSON.stringify(original.blocks.map((b) => ({ type: b.type, payload: b.payload })))
+    ) {
+      return true;
+    }
+    return false;
+  }, [draft, original]);
 
   async function loadList() {
     if (!token) {
@@ -101,11 +150,7 @@ export function AdminKnowledgeView() {
 
   function startNew(parentId: string | null = null) {
     const siblings = items.filter((item) => item.parentId === parentId);
-    setDraft({
-      ...EMPTY_DRAFT,
-      parentId,
-      position: siblings.length,
-    });
+    setDraft({ ...EMPTY_DRAFT, parentId, position: siblings.length });
   }
 
   function startEdit(article: Article) {
@@ -118,6 +163,15 @@ export function AdminKnowledgeView() {
       iconType: article.iconType ?? "",
       position: article.position,
       blocks: article.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
+    });
+  }
+
+  function toggleExpand(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   }
 
@@ -143,9 +197,8 @@ export function AdminKnowledgeView() {
           token,
           body,
         });
-        // Если изменили parentId или position — нужен отдельный move-вызов.
-        const original = items.find((item) => item.id === draft.id);
-        if (original && (original.parentId !== draft.parentId || original.position !== draft.position)) {
+        const orig = items.find((item) => item.id === draft.id);
+        if (orig && (orig.parentId !== draft.parentId || orig.position !== draft.position)) {
           await apiFetch(`/admin/content/knowledge-base/${draft.id}/move`, {
             method: "PATCH",
             token,
@@ -182,7 +235,12 @@ export function AdminKnowledgeView() {
 
   async function remove(article: Article) {
     if (!token) return;
-    if (!confirm(`Удалить статью «${article.title}»? Если есть дочерние статьи — сначала переместите или удалите их.`)) return;
+    if (
+      !confirm(
+        `Удалить статью «${article.title}»? Если есть дочерние статьи — сначала переместите или удалите их.`,
+      )
+    )
+      return;
     try {
       await apiFetch(`/admin/content/knowledge-base/${article.id}`, { method: "DELETE", token });
       await loadList();
@@ -220,107 +278,131 @@ export function AdminKnowledgeView() {
     );
   }
 
+  const isEditingNew = draft.id === null;
+
   return (
     <AppShell>
       <section className="page">
         <header className="page-header">
           <h1 className="page-title">CMS</h1>
-          <p className="page-subtitle">Иерархическая структура статей. Глубина — до 3 уровней.</p>
+          <p className="page-subtitle">Иерархическая структура статей — до 3 уровней.</p>
         </header>
         <CmsTabs />
-        {message ? <p className="status-pill">{message}</p> : null}
+        {message ? <p className="cms-flash">{message}</p> : null}
 
         <div className="moderation-layout">
-          <div className="stack-list">
-            <div className="auth-actions">
-              <button className="button" type="button" onClick={() => startNew(null)}>
-                + Новая статья на верхнем уровне
+          <div className="education-tree">
+            <div className="education-tree-header">
+              <span className="education-tree-title">Все статьи</span>
+              <button
+                className="education-tree-add"
+                type="button"
+                onClick={() => startNew(null)}
+                title="Новая статья"
+                aria-label="Новая статья"
+              >
+                <Plus size={14} />
               </button>
             </div>
-            {tree.length === 0 ? <p className="page-subtitle">Статей пока нет.</p> : null}
-            <TreeView
-              nodes={tree}
-              activeId={draft.id}
-              onSelect={startEdit}
-              onPublishToggle={publishToggle}
-              onRemove={remove}
-              onAddChild={(parentId) => startNew(parentId)}
-            />
+            {tree.length === 0 ? (
+              <p className="education-tree-empty">Статей пока нет.</p>
+            ) : null}
+            <ul className="tree" role="tree">
+              {tree.map((node) => (
+                <KnowledgeNode
+                  key={node.id}
+                  node={node}
+                  level={0}
+                  draftId={draft.id}
+                  expanded={expanded}
+                  onToggle={toggleExpand}
+                  onSelect={startEdit}
+                  onPublishToggle={publishToggle}
+                  onAddChild={(parentId) => startNew(parentId)}
+                  onRemove={remove}
+                />
+              ))}
+            </ul>
           </div>
 
           <div className="moderation-detail">
-            <form className="form" onSubmit={submit}>
-              <h2>{draft.id ? "Редактирование статьи" : "Новая статья"}</h2>
+            <form className="form news-form" onSubmit={submit}>
+              <div className="news-form-head">
+                <span className="news-form-mode">
+                  {isEditingNew ? "Новая статья" : "Редактирование"}
+                </span>
+              </div>
+
+              <FileUploadField
+                accept="image/*"
+                buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+                label="Обложка статьи"
+                value={draft.coverImageId}
+                onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+              />
+
+              <input
+                className="news-form-title"
+                placeholder="Заголовок статьи…"
+                value={draft.title}
+                onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+                required
+              />
 
               <label className="form-field">
-                <span>Родительская статья</span>
-                <select
-                  className="select"
-                  value={draft.parentId ?? ""}
-                  onChange={(event) =>
-                    setDraft((prev) => ({ ...prev, parentId: event.target.value || null }))
-                  }
-                >
-                  <option value="">— верхний уровень —</option>
-                  {parentOptions.map((parent) => (
-                    <option key={parent.id} value={parent.id}>
-                      {indentTitle(items, parent)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="form-field">
-                <span>Заголовок</span>
+                <span>Подзаголовок</span>
                 <input
                   className="input"
-                  value={draft.title}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label className="form-field">
-                <span>Подзаголовок (необязательно)</span>
-                <input
-                  className="input"
+                  placeholder="Короткое уточнение (необязательно)"
                   value={draft.subtitle}
                   onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
                 />
               </label>
 
-              <label className="form-field">
-                <span>Позиция среди соседей</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  value={draft.position}
-                  onChange={(event) =>
-                    setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))
-                  }
-                />
-              </label>
+              <div className="form-grid-2">
+                <label className="form-field">
+                  <span>Раздел (родитель)</span>
+                  <select
+                    className="select"
+                    value={draft.parentId ?? ""}
+                    onChange={(event) =>
+                      setDraft((prev) => ({ ...prev, parentId: event.target.value || null }))
+                    }
+                  >
+                    <option value="">— верхний уровень —</option>
+                    {parentOptions.map((parent) => (
+                      <option key={parent.id} value={parent.id}>
+                        {indentTitle(items, parent)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>Позиция среди соседей</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    value={draft.position}
+                    onChange={(event) =>
+                      setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))
+                    }
+                  />
+                </label>
+              </div>
 
               <label className="form-field">
                 <span>Иконка (paper, plastic, glass, …)</span>
                 <input
                   className="input"
+                  placeholder="Опционально, для каталога"
                   value={draft.iconType}
                   onChange={(event) => setDraft((prev) => ({ ...prev, iconType: event.target.value }))}
                 />
               </label>
 
-              <FileUploadField
-                accept="image/*"
-                buttonLabel="Загрузить обложку"
-                label="ID обложки (необязательно)"
-                value={draft.coverImageId}
-                onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
-              />
-
               <div className="form-field">
-                <span>Блоки контента</span>
+                <span>Содержание статьи</span>
                 <BlocksEditor
                   blocks={draft.blocks}
                   onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks }))}
@@ -328,15 +410,43 @@ export function AdminKnowledgeView() {
                 />
               </div>
 
-              <div className="auth-actions">
-                <button className="button" type="submit" disabled={submitting}>
-                  {submitting ? "Сохраняю…" : draft.id ? "Сохранить" : "Создать черновик"}
-                </button>
-                {draft.id ? (
-                  <button className="button secondary" type="button" onClick={() => startNew()}>
-                    Отмена
+              <div className="lesson-save-bar">
+                <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>
+                  {submitting
+                    ? "Сохраняю…"
+                    : hasChanges
+                      ? isEditingNew
+                        ? "Новый черновик"
+                        : "Есть несохранённые изменения"
+                      : "Всё сохранено"}
+                </span>
+                <div className="lesson-save-bar-actions">
+                  {!isEditingNew ? (
+                    <button className="button secondary" type="button" onClick={() => startNew()}>
+                      Отмена
+                    </button>
+                  ) : null}
+                  {!isEditingNew && original ? (
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => publishToggle(original)}
+                    >
+                      {original.status === "published" ? "Снять с публикации" : "Опубликовать"}
+                    </button>
+                  ) : null}
+                  <button
+                    className="button"
+                    type="submit"
+                    disabled={submitting || !hasChanges}
+                  >
+                    {submitting
+                      ? "Сохраняю…"
+                      : isEditingNew
+                        ? "Создать черновик"
+                        : "Сохранить"}
                   </button>
-                ) : null}
+                </div>
               </div>
             </form>
           </div>
@@ -378,67 +488,96 @@ function indentTitle(items: Article[], target: Article): string {
   return `${"— ".repeat(depth)}${target.title}`;
 }
 
-function TreeView({
-  nodes,
-  activeId,
+function KnowledgeNode({
+  node,
+  level,
+  draftId,
+  expanded,
+  onToggle,
   onSelect,
   onPublishToggle,
-  onRemove,
   onAddChild,
-  level = 0,
+  onRemove,
 }: {
-  nodes: TreeNode[];
-  activeId: string | null;
+  node: TreeNode;
+  level: number;
+  draftId: string | null;
+  expanded: Set<string>;
+  onToggle: (id: string) => void;
   onSelect: (article: Article) => void;
   onPublishToggle: (article: Article) => void;
-  onRemove: (article: Article) => void;
   onAddChild: (parentId: string) => void;
-  level?: number;
+  onRemove: (article: Article) => void;
 }) {
+  const isExpanded = expanded.has(node.id);
+  const hasChildren = node.children.length > 0;
+  const Icon = level === 0 ? FolderOpen : level === 1 ? BookOpen : FileText;
+
+  const actions: ActionItem[] = [
+    {
+      label: node.status === "published" ? "Снять с публикации" : "Опубликовать",
+      onClick: () => onPublishToggle(node),
+    },
+  ];
+  if (level < 2) {
+    actions.push({
+      label: "Добавить подстатью",
+      onClick: () => {
+        onAddChild(node.id);
+        if (!isExpanded) onToggle(node.id);
+      },
+    });
+  }
+  actions.push({ label: "Удалить", onClick: () => onRemove(node), danger: true });
+
   return (
-    <div className="stack-list">
-      {nodes.map((node) => (
-        <div key={node.id} style={{ paddingLeft: level * 12 }}>
-          <article className={`moderation-case-row ${activeId === node.id ? "active" : ""}`}>
-            <button
-              type="button"
-              onClick={() => onSelect(node)}
-              style={{ all: "unset", cursor: "pointer", width: "100%" }}
-            >
-              <span className="status-pill">{node.status === "published" ? "Опубликовано" : "Черновик"}</span>
-              <strong style={{ display: "block", marginTop: 4 }}>{node.title}</strong>
-              {node.subtitle ? <span style={{ display: "block" }}>{node.subtitle}</span> : null}
-              <small>
-                Позиция: {node.position} · /{node.slug}
-              </small>
-            </button>
-            <div className="auth-actions" style={{ marginTop: 8 }}>
-              <button className="button secondary" type="button" onClick={() => onPublishToggle(node)}>
-                {node.status === "published" ? "Снять" : "Опубликовать"}
-              </button>
-              {level < 2 ? (
-                <button className="button secondary" type="button" onClick={() => onAddChild(node.id)}>
-                  + Подстатья
-                </button>
-              ) : null}
-              <button className="button secondary" type="button" onClick={() => onRemove(node)}>
-                Удалить
-              </button>
-            </div>
-          </article>
-          {node.children.length > 0 ? (
-            <TreeView
-              nodes={node.children}
-              activeId={activeId}
+    <li role="treeitem" aria-expanded={hasChildren ? isExpanded : undefined}>
+      <div className={`tree-row depth-${level}${draftId === node.id ? " is-active" : ""}`}>
+        <button
+          type="button"
+          className="tree-row-chevron"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggle(node.id);
+          }}
+          disabled={!hasChildren}
+          aria-label={isExpanded ? "Свернуть" : "Развернуть"}
+        >
+          {hasChildren ? (
+            <ChevronRight size={14} className={isExpanded ? "is-expanded" : ""} />
+          ) : null}
+        </button>
+        <button type="button" className="tree-row-main" onClick={() => onSelect(node)}>
+          <span className="tree-row-icon">
+            <Icon size={16} />
+          </span>
+          <span
+            className={`tree-row-dot${node.status === "published" ? " is-published" : ""}`}
+            aria-hidden
+          />
+          <span className="tree-row-title">{node.title}</span>
+          {node.subtitle ? <span className="tree-row-meta">{node.subtitle}</span> : null}
+        </button>
+        <RowKebab actions={actions} />
+      </div>
+      {hasChildren && isExpanded ? (
+        <ul className="tree-children" role="group">
+          {node.children.map((child) => (
+            <KnowledgeNode
+              key={child.id}
+              node={child}
+              level={level + 1}
+              draftId={draftId}
+              expanded={expanded}
+              onToggle={onToggle}
               onSelect={onSelect}
               onPublishToggle={onPublishToggle}
-              onRemove={onRemove}
               onAddChild={onAddChild}
-              level={level + 1}
+              onRemove={onRemove}
             />
-          ) : null}
-        </div>
-      ))}
-    </div>
+          ))}
+        </ul>
+      ) : null}
+    </li>
   );
 }

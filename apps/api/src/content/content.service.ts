@@ -15,6 +15,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { AdminActionLogService } from "../common/admin-action-log.service";
 import { ModuleAccessService } from "../common/module-access.service";
+import { sanitizeParagraphHtml } from "../common/sanitize-html";
 import type { RequestUser } from "../common/request-user";
 import type {
   categoryInputSchema,
@@ -79,6 +80,10 @@ export class ContentService {
   }
 
   private payload(block: BaseContentBlock): Prisma.InputJsonValue {
+    if (block.type === "paragraph") {
+      const { html } = block.payload as { html: string };
+      return { html: sanitizeParagraphHtml(html) } as Prisma.InputJsonValue;
+    }
     return block.payload as Prisma.InputJsonValue;
   }
 

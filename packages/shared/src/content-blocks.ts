@@ -32,7 +32,7 @@ export const baseContentBlockSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("paragraph"),
-    payload: z.object({ markdown: z.string().min(1) }),
+    payload: z.object({ html: z.string().min(1) }),
   }),
   z.object({
     type: z.literal("image"),
