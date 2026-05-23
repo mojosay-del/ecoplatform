@@ -1,11 +1,12 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { apiFetch } from "./api";
+import { apiFetch, clearAccessToken, getAccessToken, setAccessToken, subscribeAccessToken } from "./api";
 
 type User = {
   id: string;
   email: string;
+  phone?: string | null;
   firstName: string;
   lastName: string;
   gender: string;
@@ -26,7 +27,7 @@ type AuthContextValue = {
   token: string | null;
   user: User | null;
   ready: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (input: Record<string, string>) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
@@ -42,7 +43,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("ecoplatform.accessToken");
+    return subscribeAccessToken((nextToken) => {
+      setToken(nextToken);
+      if (!nextToken) {
+        setUser(null);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const saved = getAccessToken();
     if (!saved) {
       setReady(true);
       return;
@@ -50,9 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(saved);
     loadMe(saved)
       .catch(() => {
-        window.localStorage.removeItem("ecoplatform.accessToken");
-        setToken(null);
-        setUser(null);
+        clearAccessToken();
       })
       .finally(() => setReady(true));
   }, []);
@@ -62,13 +70,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(me);
   }
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, rememberMe = true) {
     const result = await apiFetch<{ accessToken: string }>("/auth/login", {
       method: "POST",
-      body: { email, password, rememberMe: true },
+      body: { email, password, rememberMe },
     });
-    window.localStorage.setItem("ecoplatform.accessToken", result.accessToken);
-    setToken(result.accessToken);
+    setAccessToken(result.accessToken);
     await loadMe(result.accessToken);
   }
 
@@ -77,8 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: "POST",
       body: input,
     });
-    window.localStorage.setItem("ecoplatform.accessToken", result.accessToken);
-    setToken(result.accessToken);
+    setAccessToken(result.accessToken);
     await loadMe(result.accessToken);
   }
 
@@ -86,9 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token) {
       await apiFetch("/auth/logout", { method: "POST", token }).catch(() => undefined);
     }
-    window.localStorage.removeItem("ecoplatform.accessToken");
-    setToken(null);
-    setUser(null);
+    clearAccessToken();
     // Полный переход на /login: гарантированно сбрасывает любой кешированный
     // состояния React-страницы и не даёт пользователю остаться на защищённом url.
     window.location.assign("/login");
@@ -97,9 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function refreshMe() {
     if (token) {
       await loadMe(token).catch(() => {
-        window.localStorage.removeItem("ecoplatform.accessToken");
-        setToken(null);
-        setUser(null);
+        clearAccessToken();
       });
     }
   }

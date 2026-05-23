@@ -80,6 +80,25 @@ async function loginModerator(): Promise<string> {
   return res.body.accessToken as string;
 }
 
+async function loginContentManager(): Promise<string> {
+  await ctx.prisma.user.create({
+    data: {
+      email: "content-manager@test.local",
+      firstName: "Контент",
+      lastName: "Менеджер",
+      phone: "+70000000003",
+      passwordHash: await hash("Content12345", 4),
+      platformStaff: { create: { roles: [PlatformRole.content_manager], isActive: true } },
+    },
+  });
+
+  const res = await ctx.http
+    .post("/api/auth/login")
+    .send({ email: "content-manager@test.local", password: "Content12345" });
+  expect(res.status).toBe(201);
+  return res.body.accessToken as string;
+}
+
 async function createPublishedNewsWithComment(adminToken: string, authorToken: string) {
   const draft = await ctx.http
     .post("/api/admin/content/news")
@@ -310,6 +329,34 @@ describe("Content publish", () => {
         tags: [],
       });
     expect(res.status).toBe(400);
+  });
+
+  it("админский список тегов возвращает сохранённые теги для автокомплита", async () => {
+    const adminToken = await loginAdmin();
+    for (const [title, tags] of [
+      ["Новость с рынком", ["рынок", "переработка"]],
+      ["Новость с повтором", ["рынок", "экология"]],
+    ] as const) {
+      const draft = await ctx.http
+        .post("/api/admin/content/news")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          title,
+          lead: "Лид",
+          blocks: [{ type: "paragraph", payload: { html: "<p>Тело новости.</p>" } }],
+          tags,
+        });
+      expect(draft.status).toBe(201);
+    }
+
+    const res = await ctx.http
+      .get("/api/admin/content/news/tags")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.map((tag: { name: string }) => tag.name)).toEqual(
+      expect.arrayContaining(["рынок", "переработка", "экология"]),
+    );
+    expect(res.body.find((tag: { name: string }) => tag.name === "рынок").usageCount).toBe(2);
   });
 
   it("пользователь может поставить и снять лайк с комментария к новости", async () => {
@@ -1631,17 +1678,28 @@ describe("Admin sanctions", () => {
 });
 
 describe("Content lifecycle: news", () => {
-  it("delete новости убирает её из публичной ленты", async () => {
+  it("delete новости полностью удаляет её и связанные данные", async () => {
     const adminToken = await loginAdmin();
+    const contentManagerToken = await loginContentManager();
     const reader = await registerCompany("0800001");
-    const news = await createPublishedNews(adminToken, "delete-news");
+    const { news, comment } = await createPublishedNewsWithComment(adminToken, reader.token);
+
+    const likePost = await ctx.http
+      .post(`/api/news/${news.id}/like`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(likePost.status).toBe(201);
+
+    const likeComment = await ctx.http
+      .post(`/api/news/comments/${comment.id}/like`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(likeComment.status).toBe(201);
 
     const before = await ctx.http.get("/api/news").set("Authorization", `Bearer ${reader.token}`);
     expect(before.body.find((item: { id: string }) => item.id === news.id)).toBeTruthy();
 
     const del = await ctx.http
       .delete(`/api/admin/content/news/${news.id}`)
-      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Authorization", `Bearer ${contentManagerToken}`)
       .send({ reason: "тест удаления" });
     expect(del.status).toBe(200);
 
@@ -1650,6 +1708,22 @@ describe("Content lifecycle: news", () => {
 
     const direct = await ctx.http.get(`/api/news/${news.slug}`).set("Authorization", `Bearer ${reader.token}`);
     expect(direct.status).toBe(404);
+
+    const [post, blockCount, postTagCount, postLikeCount, commentCount, commentLikeCount] =
+      await Promise.all([
+        ctx.prisma.newsPost.findUnique({ where: { id: news.id } }),
+        ctx.prisma.newsContentBlock.count({ where: { newsPostId: news.id } }),
+        ctx.prisma.newsPostTag.count({ where: { newsPostId: news.id } }),
+        ctx.prisma.newsLike.count({ where: { newsPostId: news.id } }),
+        ctx.prisma.comment.count({ where: { newsPostId: news.id } }),
+        ctx.prisma.commentLike.count({ where: { commentId: comment.id } }),
+      ]);
+    expect(post).toBeNull();
+    expect(blockCount).toBe(0);
+    expect(postTagCount).toBe(0);
+    expect(postLikeCount).toBe(0);
+    expect(commentCount).toBe(0);
+    expect(commentLikeCount).toBe(0);
   });
 });
 
@@ -1750,7 +1824,7 @@ describe("Content lifecycle: learning modules", () => {
       });
     expect(lessonRes.status).toBe(201);
 
-    return { moduleId: moduleRes.body.id as string };
+    return { moduleId: moduleRes.body.id as string, lessonId: lessonRes.body.id as string };
   }
 
   it("publish модуля делает его видимым в публичной выдаче, unpublish — скрывает, delete — удаляет", async () => {
@@ -1792,6 +1866,42 @@ describe("Content lifecycle: learning modules", () => {
 
     const found = await ctx.prisma.learningModule.findUnique({ where: { id: moduleId } });
     expect(found).toBeNull();
+  });
+
+  it("модуль в разработке остаётся опубликованным, но закрывает доступ к урокам", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800011");
+    const { moduleId, lessonId } = await createLearningModuleWithLesson(adminToken, "development");
+
+    const publish = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleId}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publish.status).toBe(201);
+
+    const markDevelopment = await ctx.http
+      .patch(`/api/admin/content/education/modules/${moduleId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ isInDevelopment: true });
+    expect(markDevelopment.status).toBe(200);
+    expect(markDevelopment.body.isInDevelopment).toBe(true);
+
+    const list = await ctx.http
+      .get("/api/education/modules")
+      .set("Authorization", `Bearer ${reader.token}`);
+    const item = list.body.find((module: { id: string }) => module.id === moduleId);
+    expect(item).toMatchObject({ isInDevelopment: true, hasAccess: false });
+
+    const detail = await ctx.http
+      .get(`/api/education/modules/${moduleId}`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.hasAccess).toBe(false);
+    expect(detail.body.chapters[0].lessons[0].blocks).toBeUndefined();
+
+    const complete = await ctx.http
+      .post(`/api/education/lessons/${lessonId}/complete`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(complete.status).toBe(403);
   });
 
   it("publish модуля без уроков отбивается 403", async () => {
@@ -2051,5 +2161,27 @@ describe("Content lifecycle: price indices", () => {
 
     const found = await ctx.prisma.priceIndex.findUnique({ where: { id: indexId } });
     expect(found).toBeNull();
+  });
+
+  it("delete номенклатуры удаляет связанный индекс и всю историю цен", async () => {
+    const adminToken = await loginAdmin();
+    const { indexId, nomenclatureId } = await createPriceIndexWithValue(adminToken, "cascade-delete");
+
+    await expect(ctx.prisma.priceIndexValue.count({ where: { priceIndexId: indexId } })).resolves.toBe(1);
+
+    const del = await ctx.http
+      .delete(`/api/admin/content/indices/nomenclature/${nomenclatureId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "тест полного удаления" });
+    expect(del.status).toBe(200);
+
+    await expect(ctx.prisma.nomenclature.findUnique({ where: { id: nomenclatureId } })).resolves.toBeNull();
+    await expect(ctx.prisma.priceIndex.findUnique({ where: { id: indexId } })).resolves.toBeNull();
+    await expect(ctx.prisma.priceIndexValue.count({ where: { priceIndexId: indexId } })).resolves.toBe(0);
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: nomenclatureId, action: "indices.nomenclature.delete" },
+    });
+    expect(log?.payload).toMatchObject({ priceIndexId: indexId, priceValuesDeleted: 1 });
   });
 });

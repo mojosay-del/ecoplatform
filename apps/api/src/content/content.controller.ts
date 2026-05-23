@@ -100,6 +100,13 @@ export class ContentController {
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
+  @Get("admin/content/news/tags")
+  async adminNewsTags() {
+    return this.content.adminListNewsTags();
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
   @Post("admin/content/news")
   async createNews(@Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(newsInputSchema, body);
@@ -133,7 +140,7 @@ export class ContentController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles("admin")
+  @Roles("admin", "content_manager")
   @Delete("admin/content/news/:id")
   async deleteNews(
     @Param("id") id: string,

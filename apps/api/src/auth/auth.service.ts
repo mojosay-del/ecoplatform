@@ -132,20 +132,56 @@ export class AuthService {
     return { ok: true };
   }
 
+  // Сворачиваем User-Agent к стабильной паре «браузер/ОС». Нужно, чтобы
+  // обновление версии Chrome или смена IP (Wi-Fi → мобильная сеть) НЕ
+  // считались «новым устройством» — пользователь не хочет десятки уведомлений
+  // об одном и том же ноутбуке.
+  private fingerprintUserAgent(ua: string | undefined | null): string {
+    if (!ua) return "unknown/unknown";
+    const browser = /Edg\//i.test(ua)
+      ? "Edge"
+      : /OPR\/|Opera/i.test(ua)
+        ? "Opera"
+        : /Firefox\//i.test(ua)
+          ? "Firefox"
+          : /Chrome\//i.test(ua)
+            ? "Chrome"
+            : /Safari\//i.test(ua)
+              ? "Safari"
+              : "Other";
+    const os = /Windows NT/i.test(ua)
+      ? "Windows"
+      : /iPhone|iPad|iOS/i.test(ua)
+        ? "iOS"
+        : /Mac OS X|Macintosh/i.test(ua)
+          ? "macOS"
+          : /Android/i.test(ua)
+            ? "Android"
+            : /Linux/i.test(ua)
+              ? "Linux"
+              : "Unknown";
+    return `${browser}/${os}`;
+  }
+
   private async detectNewDevice(
     userId: string,
     meta: { userAgent?: string; ipAddress?: string },
   ): Promise<boolean> {
-    const previous = await this.prisma.session.findFirst({
-      where: { userId },
+    const currentFp = this.fingerprintUserAgent(meta.userAgent);
+    // Сравниваем с сессиями за последние 30 дней. IP сознательно не учитываем —
+    // мобильные операторы и Wi-Fi-роуминг постоянно меняют IP при том же
+    // физическом устройстве.
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const sessions = await this.prisma.session.findMany({
+      where: { userId, createdAt: { gte: thirtyDaysAgo } },
+      select: { userAgent: true },
+      take: 50,
       orderBy: { createdAt: "desc" },
     });
-
-    if (!previous) return false;
-
-    const sameUa = (previous.userAgent ?? null) === (meta.userAgent ?? null);
-    const sameIp = (previous.ipAddress ?? null) === (meta.ipAddress ?? null);
-    return !(sameUa && sameIp);
+    // Самая первая сессия в жизни аккаунта — не считаем «новым устройством»,
+    // иначе после регистрации пользователю прилетает странное уведомление.
+    if (sessions.length === 0) return false;
+    return !sessions.some((s) => this.fingerprintUserAgent(s.userAgent) === currentFp);
   }
 
   private async notifyLogin(
@@ -153,21 +189,30 @@ export class AuthService {
     meta: { userAgent?: string; ipAddress?: string },
     newDevice: boolean,
   ): Promise<void> {
+    // Дедуп: одно уведомление о входе с конкретного fingerprint в сутки.
+    // `createInApp` делает upsert по (domainEventId, userId) — стабильный
+    // sourceId сам подавит повторы без доп. запросов.
+    const fp = this.fingerprintUserAgent(meta.userAgent);
+    const dayBucket = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
     const when = new Date();
-    const stamp = when.toISOString();
     const where = [meta.ipAddress ?? "—", meta.userAgent ?? "—"].join(" · ");
 
     await this.notifications.createInApp({
       userId,
       eventType: newDevice ? "auth.login.new_device" : "auth.login",
-      sourceId: `${userId}:${stamp}`,
+      sourceId: `${newDevice ? "new_device" : "login"}:${fp}:${dayBucket}`,
       category: NotificationCategory.security,
       title: newDevice ? "Вход с нового устройства" : "Новый вход в аккаунт",
       body: newDevice
-        ? `Зафиксирован вход с устройства, отличного от предыдущего: ${where}.`
+        ? `Зафиксирован вход с устройства, отличного от предыдущих: ${where}.`
         : `Вход в аккаунт выполнен ${when.toLocaleString("ru-RU")}.`,
       link: "/account",
-      payload: { ipAddress: meta.ipAddress ?? null, userAgent: meta.userAgent ?? null, newDevice },
+      payload: {
+        ipAddress: meta.ipAddress ?? null,
+        userAgent: meta.userAgent ?? null,
+        fingerprint: fp,
+        newDevice,
+      },
     });
   }
 
@@ -235,6 +280,57 @@ export class AuthService {
     });
 
     return { ok: true };
+  }
+
+  async listSessions(userId: string, currentSessionId: string) {
+    const sessions = await this.prisma.session.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        userAgent: true,
+        ipAddress: true,
+        rememberMe: true,
+        expiresAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return sessions.map((session) => ({
+      ...session,
+      current: session.id === currentSessionId,
+    }));
+  }
+
+  async revokeSession(
+    userId: string,
+    currentSessionId: string,
+    sessionId: string,
+  ): Promise<{ ok: true; revokedCurrent: boolean }> {
+    const result = await this.prisma.session.updateMany({
+      where: { id: sessionId, userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException("Сессия уже завершена или не найдена.");
+    }
+
+    return { ok: true, revokedCurrent: sessionId === currentSessionId };
+  }
+
+  async logoutAllSessions(userId: string): Promise<{ ok: true; revoked: number }> {
+    const result = await this.prisma.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    return { ok: true, revoked: result.count };
   }
 
   async me(userId: string) {

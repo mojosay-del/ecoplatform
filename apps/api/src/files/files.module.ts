@@ -7,5 +7,6 @@ import { FilesService } from "./files.service";
   imports: [AuthModule],
   controllers: [FilesController],
   providers: [FilesService],
+  exports: [FilesService],
 })
 export class FilesModule {}

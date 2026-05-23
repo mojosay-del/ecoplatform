@@ -7,7 +7,7 @@ export const registerDtoSchema = z.object({
   firstName: z.string().trim().min(1),
   lastName: z.string().trim().min(1),
   gender: z.enum(userGenders),
-  phone: z.string().trim().min(10),
+  phone: z.string().trim().regex(/^\+7\d{10}$/, "Телефон должен быть в формате +7XXXXXXXXXX"),
   email: z.string().trim().email(),
   password: z.string().min(8).regex(/[A-Za-zА-Яа-яЁё]/).regex(/[0-9]/),
 });

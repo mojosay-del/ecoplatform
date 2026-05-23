@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Upload, X } from "lucide-react";
-import { apiFetch, apiUploadFile, type FileAsset } from "../lib/api";
+import { apiDeleteFile, apiFetch, apiUploadFile, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 // Показываем миниатюру для image-MIME и для любого file, у которого
@@ -19,6 +19,7 @@ export function FileUploadField({
   label = "Файл",
   buttonLabel = "Загрузить",
   accessLevel = "public",
+  imagePreset,
   onChange,
   hideLabel,
   compact,
@@ -28,6 +29,7 @@ export function FileUploadField({
   label?: string;
   buttonLabel?: string;
   accessLevel?: FileAsset["accessLevel"];
+  imagePreset?: "cover";
   onChange: (fileId: string, asset?: FileAsset) => void;
   hideLabel?: boolean;
   compact?: boolean;
@@ -69,7 +71,7 @@ export function FileUploadField({
 
     setStatus("Загружаю…");
     try {
-      const asset = await apiUploadFile(file, { token, accessLevel });
+      const asset = await apiUploadFile(file, { token, accessLevel, imagePreset });
       setUploaded(asset);
       onChange(asset.id, asset);
       setStatus(null);
@@ -82,10 +84,21 @@ export function FileUploadField({
     }
   }
 
-  function clear() {
+  async function clear() {
+    const fileId = uploaded?.id;
     setUploaded(null);
     setStatus(null);
     onChange("");
+
+    if (!fileId || !token) {
+      return;
+    }
+
+    try {
+      await apiDeleteFile(fileId, { token });
+    } catch {
+      setStatus("Файл отвязан, но удалить его из хранилища не удалось.");
+    }
   }
 
   const imageMode = isImageAsset(uploaded);
@@ -110,7 +123,7 @@ export function FileUploadField({
                 <Upload size={16} />
                 Заменить
               </button>
-              <button className="button secondary" onClick={clear} type="button">
+              <button className="button secondary" onClick={() => void clear()} type="button">
                 <X size={16} />
                 Убрать
               </button>
@@ -129,7 +142,7 @@ export function FileUploadField({
                 <Upload size={16} />
                 Заменить
               </button>
-              <button className="button secondary" onClick={clear} type="button">
+              <button className="button secondary" onClick={() => void clear()} type="button">
                 <X size={16} />
                 Убрать
               </button>

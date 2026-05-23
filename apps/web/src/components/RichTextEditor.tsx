@@ -57,6 +57,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       Link.configure({
         openOnClick: false,
         autolink: true,
+        defaultProtocol: "https",
         HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
       }),
       Placeholder.configure({ placeholder: placeholder ?? "Начните вводить текст…" }),
@@ -224,13 +225,33 @@ function Toolbar({ editor }: { editor: Editor }) {
           active={editor.isActive("link")}
           onClick={() => {
             const previous = (editor.getAttributes("link") as { href?: string }).href ?? "";
-            const url = window.prompt("URL ссылки", previous);
-            if (url === null) return;
-            if (url === "") {
+            const raw = window.prompt("URL ссылки", previous);
+            if (raw === null) return;
+            const trimmed = raw.trim();
+            if (trimmed === "") {
               editor.chain().focus().extendMarkRange("link").unsetLink().run();
               return;
             }
-            editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+            // Нормализуем URL: если пользователь ввёл «example.com» без схемы —
+            // подставляем https://, иначе TipTap-валидация молча отвергнет ссылку.
+            const hasScheme = /^(https?:|mailto:|tel:|ftp:)/i.test(trimmed);
+            const href = hasScheme ? trimmed : `https://${trimmed}`;
+            // Если выделение пустое (просто стоит курсор) — extendMarkRange("link")
+            // ничего не расширит, и пользователь получит ощущение что «не работает».
+            // В этом случае вставляем сам URL как текст с link-mark'ом.
+            if (editor.state.selection.empty && !editor.isActive("link")) {
+              editor
+                .chain()
+                .focus()
+                .insertContent({
+                  type: "text",
+                  text: trimmed,
+                  marks: [{ type: "link", attrs: { href } }],
+                })
+                .run();
+              return;
+            }
+            editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
           }}
           title="Ссылка"
           aria-label="Ссылка"

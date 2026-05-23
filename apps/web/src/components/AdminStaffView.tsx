@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -135,6 +136,7 @@ export function AdminStaffView() {
           <h1 className="page-title">Сотрудники</h1>
           <p className="page-subtitle">Платформенные роли: админ, модератор, контент-менеджер.</p>
         </header>
+        <AdminPeopleTabs />
 
         {errorMessage ? <p className="status-pill">{errorMessage}</p> : null}
         {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}

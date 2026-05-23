@@ -18,6 +18,10 @@ type NewsTag = {
   name: string;
 };
 
+type NewsTagOption = NewsTag & {
+  usageCount: number;
+};
+
 type NewsItem = {
   id: string;
   title: string;
@@ -51,10 +55,14 @@ const EMPTY_DRAFT: DraftState = {
   blocks: [{ type: "paragraph", payload: { html: "" } }],
 };
 
+const NEWS_LIST_STEP = 5;
+
 export function AdminNewsView() {
   const { token } = useAuth();
   const [state, setState] = useState<ViewState>("unauthenticated");
   const [items, setItems] = useState<NewsItem[]>([]);
+  const [visibleNewsCount, setVisibleNewsCount] = useState(NEWS_LIST_STEP);
+  const [tagOptions, setTagOptions] = useState<NewsTagOption[]>([]);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [message, setMessage] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState("");
@@ -63,14 +71,27 @@ export function AdminNewsView() {
 
   const covers = useCoverAssets(items);
 
-  // Все теги, которые встречались в новостях — основа автокомплита.
+  const sortedItems = useMemo(
+    () =>
+      [...items].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() ||
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
+    [items],
+  );
+  const visibleItems = sortedItems.slice(0, visibleNewsCount);
+  const hasMoreNews = visibleNewsCount < sortedItems.length;
+
+  // Все сохранённые теги — основа автокомплита. Теги из списка новостей
+  // оставляем как локальный fallback, если список тегов ещё обновляется.
   const knownTags = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set(tagOptions.map((tag) => tag.name));
     for (const item of items) {
       for (const tag of item.tags) set.add(tag.newsTag.name);
     }
-    return [...set].sort();
-  }, [items]);
+    return [...set].sort((a, b) => a.localeCompare(b, "ru"));
+  }, [items, tagOptions]);
 
   const filteredSuggestions = useMemo(() => {
     if (!tagDraft.trim()) return [];
@@ -116,8 +137,13 @@ export function AdminNewsView() {
     setState("loading");
     setMessage(null);
     try {
-      const data = await apiFetch<NewsItem[]>("/admin/content/news", { token });
+      const [data, tags] = await Promise.all([
+        apiFetch<NewsItem[]>("/admin/content/news", { token }),
+        apiFetch<NewsTagOption[]>("/admin/content/news/tags", { token }),
+      ]);
       setItems(data);
+      setVisibleNewsCount(NEWS_LIST_STEP);
+      setTagOptions(tags);
       setState("ready");
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
@@ -166,7 +192,7 @@ export function AdminNewsView() {
       const body = {
         title: draft.title.trim(),
         lead: draft.lead.trim(),
-        coverImageId: draft.coverImageId.trim() || undefined,
+        coverImageId: draft.coverImageId.trim() || null,
         tags: draft.tags,
         blocks: draft.blocks,
       };
@@ -202,7 +228,7 @@ export function AdminNewsView() {
 
   async function remove(item: NewsItem) {
     if (!token) return;
-    if (!confirm(`Удалить новость «${item.title}»? Действие необратимо.`)) return;
+    if (!confirm(`Полностью удалить новость «${item.title}»? Действие необратимо.`)) return;
     try {
       await apiFetch(`/admin/content/news/${item.id}`, { method: "DELETE", token });
       await loadList();
@@ -257,7 +283,7 @@ export function AdminNewsView() {
         <CmsTabs />
         {message ? <p className="cms-flash">{message}</p> : null}
 
-        <div className="moderation-layout">
+        <div className="moderation-layout cms-vertical-layout">
           <div className="education-tree">
             <div className="education-tree-header">
               <h2 className="education-tree-title">Все новости</h2>
@@ -275,7 +301,7 @@ export function AdminNewsView() {
               <p className="education-tree-empty">Новостей пока нет.</p>
             ) : null}
             <div className="news-list">
-              {items.map((item) => {
+              {visibleItems.map((item) => {
                 const coverUrl = item.coverImageId ? covers.get(item.coverImageId)?.publicUrl : null;
                 const actions: ActionItem[] = [
                   {
@@ -334,6 +360,15 @@ export function AdminNewsView() {
                 );
               })}
             </div>
+            {hasMoreNews ? (
+              <button
+                className="button secondary news-list-more"
+                type="button"
+                onClick={() => setVisibleNewsCount((count) => count + NEWS_LIST_STEP)}
+              >
+                Показать больше
+              </button>
+            ) : null}
           </div>
 
           <div className="moderation-detail">
@@ -347,6 +382,7 @@ export function AdminNewsView() {
               <FileUploadField
                 accept="image/*"
                 buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+                imagePreset="cover"
                 label="Обложка новости"
                 value={draft.coverImageId}
                 onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
@@ -464,6 +500,15 @@ export function AdminNewsView() {
                       {original.status === "published" ? "Снять с публикации" : "Опубликовать"}
                     </button>
                   ) : null}
+                  {!isEditingNew && original ? (
+                    <button
+                      className="button secondary danger"
+                      type="button"
+                      onClick={() => remove(original)}
+                    >
+                      Удалить полностью
+                    </button>
+                  ) : null}
                   <button
                     className="button secondary"
                     type="button"
@@ -527,7 +572,14 @@ function NewsPreviewModal({
       if (event.key === "Escape") onClose();
     }
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.body.classList.add("news-modal-open");
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      document.body.classList.remove("news-modal-open");
+    };
   }, [onClose]);
 
   if (typeof document === "undefined") return null;

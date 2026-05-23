@@ -4,7 +4,7 @@ import { baseContentBlockSchema, lessonBlockSchema, newsBlockSchema } from "@eco
 export const newsInputSchema = z.object({
   title: z.string().min(1),
   lead: z.string().min(1),
-  coverImageId: z.string().optional(),
+  coverImageId: z.string().nullable().optional(),
   slug: z.string().optional(),
   blocks: z.array(newsBlockSchema).default([]),
   tags: z.array(z.string().min(1)).default([]),
@@ -55,6 +55,7 @@ export const learningModuleInputSchema = z.object({
   coverImageId: z.string().optional(),
   accessLevel: z.enum(["basic", "extended", "one_time"]).default("basic"),
   oneTimePrice: z.number().int().positive().optional(),
+  isInDevelopment: z.boolean().default(false),
   preview: z.object({
     promotionalDescription: z.string().min(1),
     whatYouWillLearn: z.array(z.string()).default([]),
@@ -84,7 +85,7 @@ export const knowledgeArticleInputSchema = z.object({
   parentId: z.string().nullable().optional(),
   title: z.string().min(1),
   subtitle: z.string().optional(),
-  coverImageId: z.string().optional(),
+  coverImageId: z.string().nullable().optional(),
   slug: z.string().optional(),
   position: z.number().int().nonnegative(),
   iconType: z.string().optional(),
@@ -108,6 +109,8 @@ export const learningModuleUpdateInputSchema = z.object({
   coverImageId: z.string().nullable().optional(),
   accessLevel: z.enum(["basic", "extended", "one_time"]).optional(),
   oneTimePrice: z.number().int().positive().nullable().optional(),
+  isInDevelopment: z.boolean().optional(),
+  position: z.number().int().nonnegative().optional(),
   preview: z
     .object({
       promotionalDescription: z.string().min(1),

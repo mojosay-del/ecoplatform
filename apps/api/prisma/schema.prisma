@@ -429,6 +429,8 @@ model LearningModule {
   coverImageId     String?
   accessLevel      LearningAccessLevel    @default(basic)
   oneTimePrice     Int?
+  isInDevelopment  Boolean                @default(false)
+  position         Int                    @default(0)
   status           ContentStatus          @default(draft)
   firstPublishedAt DateTime?
   createdById      String

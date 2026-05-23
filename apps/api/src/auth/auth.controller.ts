@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { changePasswordDtoSchema, loginDtoSchema, registerDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
@@ -39,6 +39,33 @@ export class AuthController {
   async logout(@CurrentUser() user: RequestUser, @Res({ passthrough: true }) response: Response) {
     response.clearCookie("refreshToken");
     return this.auth.logout(user.sessionId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("sessions")
+  async sessions(@CurrentUser() user: RequestUser) {
+    return this.auth.listSessions(user.id, user.sessionId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("sessions/:id/revoke")
+  async revokeSession(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.auth.revokeSession(user.id, user.sessionId, id);
+    if (result.revokedCurrent) {
+      response.clearCookie("refreshToken");
+    }
+    return result;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("sessions/logout-all")
+  async logoutAll(@CurrentUser() user: RequestUser, @Res({ passthrough: true }) response: Response) {
+    response.clearCookie("refreshToken");
+    return this.auth.logoutAllSessions(user.id);
   }
 
   @UseGuards(JwtAuthGuard)

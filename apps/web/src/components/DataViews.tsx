@@ -3,10 +3,26 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Flag, MessageCircle, Send, ThumbsUp, X, type LucideIcon } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Bell,
+  Building2,
+  CreditCard,
+  Flag,
+  KeyRound,
+  LifeBuoy,
+  LogOut,
+  MessageCircle,
+  Send,
+  ShieldCheck,
+  Smartphone,
+  ThumbsUp,
+  UserRound,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { AppShell } from "./AppShell";
-import { ApiError, apiFetch, type FileAsset } from "../lib/api";
+import { ApiError, apiFetch, clearAccessToken, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { sanitizeParagraphHtml } from "../lib/sanitize-html";
 import { useCoverAssets } from "../lib/use-cover-assets";
@@ -245,7 +261,12 @@ export function NewsView() {
                 >
                   {hasCover ? (
                     <div className="news-tile-cover">
-                      <img alt={cover?.originalName ?? post.title} src={cover!.publicUrl!} />
+                      <img
+                        alt={cover?.originalName ?? post.title}
+                        decoding="async"
+                        loading="lazy"
+                        src={cover!.publicUrl!}
+                      />
                     </div>
                   ) : null}
                   <div className="news-tile-body">
@@ -321,7 +342,7 @@ function NewsModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, token]);
 
-  // Закрытие по Esc, блокируем прокрутку фона пока модалка открыта.
+  // Закрытие по Esc, блокируем прокрутку и расфокусируем фон пока модалка открыта.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -329,9 +350,11 @@ function NewsModal({
     document.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.body.classList.add("news-modal-open");
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
+      document.body.classList.remove("news-modal-open");
     };
   }, [onClose]);
 
@@ -969,12 +992,16 @@ export function NewsPostView({ slug }: { slug: string }) {
   );
 }
 
-type IndexPeriod = "1M" | "3M" | "1Y";
+type IndexPeriod = "2W" | "1M" | "3M" | "6M" | "1Y" | "2Y" | "3Y";
 
 const INDEX_PERIOD_LABELS: Record<IndexPeriod, string> = {
+  "2W": "2 нед.",
   "1M": "1 мес.",
   "3M": "3 мес.",
+  "6M": "6 мес.",
   "1Y": "1 год",
+  "2Y": "2 года",
+  "3Y": "3 года",
 };
 
 export function IndicesView() {
@@ -1046,11 +1073,19 @@ function IndexCard({ item }: { item: any }) {
   const points: Array<{ date: string | Date; price: number }> =
     chart[period]?.length > 0
       ? chart[period]
-      : chart["1Y"]?.length > 0
-        ? chart["1Y"]
-        : chart["3M"]?.length > 0
-          ? chart["3M"]
-          : chart["1M"] ?? [];
+      : chart["3Y"]?.length > 0
+        ? chart["3Y"]
+        : chart["2Y"]?.length > 0
+          ? chart["2Y"]
+          : chart["1Y"]?.length > 0
+            ? chart["1Y"]
+            : chart["6M"]?.length > 0
+              ? chart["6M"]
+              : chart["3M"]?.length > 0
+                ? chart["3M"]
+                : chart["1M"]?.length > 0
+                  ? chart["1M"]
+                  : chart["2W"] ?? [];
 
   const currentPrice = Number(item.summary?.currentPrice ?? points[points.length - 1]?.price ?? 0);
   const weeklyChange = Number(item.summary?.weeklyChange ?? 0);
@@ -1058,46 +1093,139 @@ function IndexCard({ item }: { item: any }) {
   return (
     <article className="index-card">
       <div className="index-card-head">
-        <div className="index-period-tabs">
-          {(Object.keys(INDEX_PERIOD_LABELS) as IndexPeriod[]).map((value) => (
-            <button
-              className={`index-period-tab ${period === value ? "active" : ""}`}
-              key={value}
-              onClick={() => setPeriod(value)}
-              type="button"
-            >
-              {INDEX_PERIOD_LABELS[value]}
-            </button>
-          ))}
+        <div className="index-card-body">
+          <h2 className="index-card-title">{item.name}</h2>
+          <p className="index-card-subtitle">
+            {item.code}
+            {weeklyChange !== 0 ? (
+              <>
+                {" · "}
+                <span className={weeklyChange >= 0 ? "index-change-positive" : "index-change-negative"}>
+                  {weeklyChange > 0 ? "+" : ""}
+                  {weeklyChange}% за неделю
+                </span>
+              </>
+            ) : null}
+          </p>
         </div>
         <div className="index-current-price">
-          <strong>{currentPrice.toLocaleString("ru-RU")}</strong>
+          <strong>{formatIndexPrice(currentPrice)}</strong>
           <span>{item.unit ?? "₽/т"}</span>
         </div>
       </div>
 
-      <div className="index-card-body">
-        <h2 className="index-card-title">{item.name}</h2>
-        <p className="index-card-subtitle">
-          {item.code}
-          {weeklyChange !== 0 ? (
-            <>
-              {" · "}
-              <span className={weeklyChange >= 0 ? "index-change-positive" : "index-change-negative"}>
-                {weeklyChange > 0 ? "+" : ""}
-                {weeklyChange}% за неделю
-              </span>
-            </>
-          ) : null}
-        </p>
-      </div>
-
       <IndexChart points={points} period={period} />
+
+      <div className="index-period-tabs" aria-label="Период графика">
+        {(Object.keys(INDEX_PERIOD_LABELS) as IndexPeriod[]).map((value) => (
+          <button
+            className={`index-period-tab ${period === value ? "active" : ""}`}
+            key={value}
+            onClick={() => setPeriod(value)}
+            type="button"
+          >
+            {INDEX_PERIOD_LABELS[value]}
+          </button>
+        ))}
+      </div>
     </article>
   );
 }
 
 const MONTH_LABELS = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+function formatIndexPrice(value: number) {
+  return value.toLocaleString("ru-RU", {
+    maximumFractionDigits: 1,
+  });
+}
+
+function formatIndexDateLabel(date: Date, period: IndexPeriod) {
+  const month = MONTH_LABELS[date.getMonth()];
+  return ["1Y", "2Y", "3Y"].includes(period)
+    ? `${month} ${date.getFullYear()}`
+    : `${date.getDate()} ${month} ${date.getFullYear()}`;
+}
+
+function formatIndexTooltipDate(date: Date) {
+  const month = MONTH_LABELS[date.getMonth()];
+  return `${date.getDate()} ${month} ${date.getFullYear()}`;
+}
+
+function buildSmoothChartPath(xs: number[], ys: number[]) {
+  if (xs.length === 0) return "";
+  if (xs.length === 1) return `M${xs[0]!.toFixed(1)},${ys[0]!.toFixed(1)}`;
+
+  const h = xs.slice(0, -1).map((x, i) => xs[i + 1]! - x);
+  const slopes = h.map((distance, i) => (ys[i + 1]! - ys[i]!) / distance);
+  const tangents = ys.map((_, i) => {
+    if (i === 0) return slopes[0] ?? 0;
+    if (i === ys.length - 1) return slopes[slopes.length - 1] ?? 0;
+
+    const previousSlope = slopes[i - 1] ?? 0;
+    const nextSlope = slopes[i] ?? 0;
+    if (previousSlope * nextSlope <= 0) return 0;
+
+    const previousDistance = h[i - 1] ?? 0;
+    const nextDistance = h[i] ?? 0;
+    const weightA = 2 * nextDistance + previousDistance;
+    const weightB = nextDistance + 2 * previousDistance;
+    return (weightA + weightB) / (weightA / previousSlope + weightB / nextSlope);
+  });
+
+  const commands = [`M${xs[0]!.toFixed(1)},${ys[0]!.toFixed(1)}`];
+  for (let i = 0; i < xs.length - 1; i += 1) {
+    const x1 = xs[i]!;
+    const y1 = ys[i]!;
+    const x2 = xs[i + 1]!;
+    const y2 = ys[i + 1]!;
+    const distance = x2 - x1;
+
+    const cp1x = x1 + distance / 3;
+    const cp1y = y1 + (tangents[i] ?? 0) * distance / 3;
+    const cp2x = x2 - distance / 3;
+    const cp2y = y2 - (tangents[i + 1] ?? 0) * distance / 3;
+
+    commands.push(
+      `C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`,
+    );
+  }
+
+  return commands.join(" ");
+}
+
+function smoothPricesForScale(prices: number[], period: IndexPeriod, innerWidth: number) {
+  if (prices.length < 5 || period === "2W" || period === "1M") return prices;
+
+  const pointGap = innerWidth / Math.max(1, prices.length - 1);
+  const isLongPeriod = period === "1Y" || period === "2Y" || period === "3Y";
+  const targetGap = isLongPeriod ? 28 : 14;
+  const maxRadius = isLongPeriod ? 18 : 6;
+  const radius = Math.min(
+    maxRadius,
+    Math.max(1, Math.round(targetGap / Math.max(1, pointGap))),
+    Math.max(1, Math.floor(prices.length / 8)),
+  );
+
+  if (radius <= 0) return prices;
+
+  return prices.map((price, index) => {
+    if (index === 0 || index === prices.length - 1) return price;
+
+    let weightedSum = 0;
+    let weightTotal = 0;
+    for (let offset = -radius; offset <= radius; offset += 1) {
+      const sourceIndex = index + offset;
+      if (sourceIndex < 0 || sourceIndex >= prices.length) continue;
+
+      const weight = radius + 1 - Math.abs(offset);
+      weightedSum += prices[sourceIndex]! * weight;
+      weightTotal += weight;
+    }
+
+    return weightedSum / weightTotal;
+  });
+}
 
 function IndexChart({
   points,
@@ -1143,8 +1271,8 @@ function IndexChart({
   }
 
   const width = 720;
-  const height = 200;
-  const padding = { top: 24, right: 32, bottom: 32, left: 32 };
+  const height = 260;
+  const padding = { top: 40, right: 36, bottom: 42, left: 36 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
 
@@ -1152,13 +1280,18 @@ function IndexChart({
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const range = max - min || max || 1;
+  const domainPadding = range * (period === "1M" ? 0.22 : 0.14);
+  const domainMin = min - domainPadding;
+  const domainMax = max + domainPadding;
+  const domainRange = domainMax - domainMin || 1;
+  const displayPrices = smoothPricesForScale(prices, period, innerWidth);
 
   const xs = points.map((_, i) =>
     points.length === 1 ? padding.left + innerWidth / 2 : padding.left + (i / (points.length - 1)) * innerWidth,
   );
-  const ys = points.map((p) => padding.top + innerHeight - ((p.price - min) / range) * innerHeight);
+  const ys = displayPrices.map((price) => padding.top + innerHeight - ((price - domainMin) / domainRange) * innerHeight);
 
-  const linePath = xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i]!.toFixed(1)}`).join(" ");
+  const linePath = buildSmoothChartPath(xs, ys);
   const lastIndex = points.length - 1;
   const areaPath = `${linePath} L${xs[lastIndex]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} L${xs[0]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} Z`;
 
@@ -1168,16 +1301,23 @@ function IndexChart({
   const startColor = isGrowth ? "#f5773e" : "#4d73d8";
   const endColor = isGrowth ? "#4d73d8" : "#f5773e";
 
-  // Подписи на оси X: для 1M примерно по неделям, для 3M раз в месяц, для 1Y раз в 2 месяца.
-  const labelStep = period === "1M" ? Math.max(1, Math.floor(points.length / 4)) : period === "3M" ? Math.max(1, Math.floor(points.length / 4)) : Math.max(1, Math.floor(points.length / 6));
+  // Подписи на оси X: короткие периоды чаще, длинные — реже, чтобы даты не наезжали.
+  const labelDivisor = period === "2W" || period === "1M" || period === "3M" ? 4 : 6;
+  const labelStep = Math.max(1, Math.floor(points.length / labelDivisor));
   const labels: Array<{ x: number; text: string }> = [];
+  const minLabelGap = 112;
   points.forEach((p, i) => {
     if (i % labelStep === 0 || i === lastIndex) {
       const date = new Date(p.date);
-      const text = period === "1Y"
-        ? `${MONTH_LABELS[date.getMonth()]}`
-        : `${date.getDate()} ${MONTH_LABELS[date.getMonth()]}`;
-      labels.push({ x: xs[i]!, text });
+      const text = formatIndexDateLabel(date, period);
+      const x = xs[i]!;
+      const previous = labels[labels.length - 1];
+      if (i === lastIndex && previous && (x - previous.x < minLabelGap || previous.text === text)) {
+        labels.pop();
+      }
+      if (labels.length === 0 || x - labels[labels.length - 1]!.x >= minLabelGap || i === lastIndex) {
+        labels.push({ x, text });
+      }
     }
   });
 
@@ -1191,14 +1331,13 @@ function IndexChart({
   const activeY = ys[activeIndex]!;
   const activePrice = prices[activeIndex]!;
   const activeDate = new Date(points[activeIndex]!.date);
-  const activeDateLabel = `${activeDate.getDate()} ${MONTH_LABELS[activeDate.getMonth()]}`;
+  const activeDateLabel = formatIndexTooltipDate(activeDate);
 
   function handleMouseMove(event: React.MouseEvent<SVGSVGElement>) {
     const svg = event.currentTarget;
     const rect = svg.getBoundingClientRect();
     if (rect.width === 0) return;
-    // Перевод координаты курсора в систему viewBox (SVG растягивается через
-    // preserveAspectRatio="none", поэтому масштаб только горизонтальный).
+    // Перевод координаты курсора в систему viewBox.
     const svgX = ((event.clientX - rect.left) / rect.width) * width;
     if (points.length === 1) {
       setHoverIndex((current) => (current === 0 ? current : 0));
@@ -1218,10 +1357,10 @@ function IndexChart({
   }
 
   // Ширина плашки масштабируем под содержимое: «20 мая · 31 635».
-  const tooltipText = `${activeDateLabel} · ${Math.round(activePrice).toLocaleString("ru-RU")}`;
-  const tooltipWidth = Math.max(64, tooltipText.length * 6.4 + 16);
-  const tooltipX = Math.min(Math.max(activeX, tooltipWidth / 2 + 4), width - tooltipWidth / 2 - 4);
-  const tooltipY = Math.max(activeY - 18, padding.top - 2);
+  const tooltipText = `${activeDateLabel} · ${formatIndexPrice(activePrice)}`;
+  const tooltipWidth = Math.max(82, tooltipText.length * 7 + 20);
+  const tooltipX = Math.min(Math.max(activeX, tooltipWidth / 2 + 6), width - tooltipWidth / 2 - 6);
+  const tooltipY = Math.max(activeY - 24, padding.top + 2);
   const isHoveringChart = hoverIndex !== null;
 
   return (
@@ -1230,7 +1369,7 @@ function IndexChart({
         className="index-chart"
         onMouseLeave={() => setHoverIndex(null)}
         onMouseMove={handleMouseMove}
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
       >
@@ -1265,32 +1404,32 @@ function IndexChart({
             y2={padding.top + innerHeight}
             stroke="#1a202e"
             strokeDasharray="3 4"
-            strokeOpacity="0.18"
+            strokeOpacity="0.2"
           />
         ) : null}
         <path
           d={linePath}
           fill="none"
           stroke={`url(#${lineGradId})`}
-          strokeWidth="2.5"
+          strokeWidth="3.2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        <circle cx={lastX} cy={lastY} r="5" fill={endColor} stroke="white" strokeWidth="2" />
+        <circle cx={lastX} cy={lastY} r="6.5" fill={endColor} stroke="white" strokeWidth="2.4" />
         {isHoveringChart && activeIndex !== lastIndex ? (
-          <circle cx={activeX} cy={activeY} r="5" fill="#1a202e" stroke="white" strokeWidth="2" />
+          <circle cx={activeX} cy={activeY} r="6.5" fill="#1a202e" stroke="white" strokeWidth="2.4" />
         ) : null}
 
         {/* Метка активной точки: без hover показывает последнее значение. */}
         <g transform={`translate(${tooltipX}, ${tooltipY})`}>
-          <rect x={-tooltipWidth / 2} y="-18" width={tooltipWidth} height="22" rx="11" fill="#1a202e" />
-          <text x="0" y="-3" textAnchor="middle" fontSize="11" fontWeight="700" fill="white">
+          <rect x={-tooltipWidth / 2} y="-23" width={tooltipWidth} height="28" rx="14" fill="#1a202e" />
+          <text x="0" y="-5" textAnchor="middle" fontSize="13" fontWeight="700" fill="white">
             {tooltipText}
           </text>
         </g>
 
         {labels.map((label, i) => (
-          <text key={i} x={label.x} y={height - 8} textAnchor="middle" fontSize="11" fill="var(--muted)">
+          <text key={i} x={label.x} y={height - 12} textAnchor="middle" fontSize="13" fill="var(--muted)">
             {label.text}
           </text>
         ))}
@@ -1318,32 +1457,41 @@ export function EducationView() {
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="Обучение" subtitle="MVP-модули: закупка сырья и склад." />
+        <PageHeader title="Обучение" />
         <div className="education-grid">
           {data.map((module: any) => {
             const lessonsCount = module.chapters?.reduce(
               (sum: number, chapter: any) => sum + (chapter.lessons?.length ?? 0),
               0,
             ) ?? 0;
+            const isInDevelopment = Boolean(module.isInDevelopment);
             const cover = module.coverImageId ? covers.get(module.coverImageId) : null;
             const coverUrl = cover?.publicUrl;
             return (
               <article className="education-card" key={module.id}>
                 <Link className="education-card-link" href={`/education/${module.id}`}>
                   <div className="education-card-cover">
-                    {coverUrl ? <img alt="" src={coverUrl} /> : <div className="education-card-cover-fallback" />}
+                    {coverUrl ? (
+                      <img alt="" decoding="async" loading="lazy" src={coverUrl} />
+                    ) : (
+                      <div className="education-card-cover-fallback" />
+                    )}
                     <div className="education-card-cover-meta">
                       <h2 className="education-card-title-badge">{module.title}</h2>
                       <span className="education-card-lessons-badge">Уроков: {lessonsCount}</span>
                     </div>
                   </div>
-                  <span className={`education-card-status ${module.hasAccess ? "" : "locked"}`}>
-                    {module.hasAccess ? "Доступен" : "Нужна подписка"}
+                  <span
+                    className={`education-card-status ${module.hasAccess ? "" : "locked"}${isInDevelopment ? " in-development" : ""}`}
+                  >
+                    {isInDevelopment ? "В разработке" : module.hasAccess ? "Доступен" : "Нужна подписка"}
                   </span>
                   <div className="education-card-panel">
                     <p>{module.summary}</p>
                   </div>
-                  <span className="education-card-open-overlay" aria-hidden="true">Открыть</span>
+                  <span className="education-card-open-overlay" aria-hidden="true">
+                    {isInDevelopment ? "В разработке" : "Открыть"}
+                  </span>
                 </Link>
               </article>
             );
@@ -1381,7 +1529,8 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
     );
   }
 
-  const hasAccess = Boolean(data.hasAccess);
+  const isInDevelopment = Boolean(data.isInDevelopment);
+  const hasAccess = !isInDevelopment && Boolean(data.hasAccess);
   const coverUrl = data.coverImageId ? covers.get(data.coverImageId)?.publicUrl : null;
   const totalLessons =
     (data.chapters ?? []).reduce(
@@ -1409,14 +1558,16 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
         <header className={`module-hero${coverUrl ? "" : " no-cover"}`}>
           <div className="module-hero-cover">
             {coverUrl ? (
-              <img alt={data.title} src={coverUrl} />
+              <img alt={data.title} decoding="async" src={coverUrl} />
             ) : (
               <div className="module-hero-cover-fallback" />
             )}
           </div>
           <div className="module-hero-body">
-            <span className={`module-hero-status${hasAccess ? " is-open" : " is-locked"}`}>
-              {hasAccess ? "Доступен" : "Нужна подписка"}
+            <span
+              className={`module-hero-status${hasAccess ? " is-open" : " is-locked"}${isInDevelopment ? " is-development" : ""}`}
+            >
+              {isInDevelopment ? "В разработке" : hasAccess ? "Доступен" : "Нужна подписка"}
               <span className="module-hero-status-sub">· {accessLabel}</span>
             </span>
             <h1 className="module-hero-title">{data.title}</h1>
@@ -1437,7 +1588,7 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
                 <Link className="button" href={firstLessonHref}>
                   Начать обучение
                 </Link>
-              ) : !hasAccess ? (
+              ) : !hasAccess && !isInDevelopment ? (
                 <Link className="button" href="/account">
                   Активировать подписку
                 </Link>
@@ -1449,7 +1600,7 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
           </div>
         </header>
 
-        {!hasAccess && data.preview ? (
+        {!hasAccess && !isInDevelopment && data.preview ? (
           <section className="module-preview-card">
             <h2>Что внутри курса</h2>
             <p>{data.preview.promotionalDescription}</p>
@@ -1546,6 +1697,10 @@ export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId:
 
   if (!lesson) {
     return <ErrorState title="Урок" message="Урок не найден или не опубликован." />;
+  }
+
+  if (data.isInDevelopment) {
+    return <AccessClosed title="В разработке" />;
   }
 
   if (!data.hasAccess) {
@@ -1774,6 +1929,9 @@ function KnowledgeBaseLayout({
   const active = activeArticle ?? fallbackActive;
   const activeChildren = (active?.children ?? []) as any[];
   const breadcrumbs = active ? buildKnowledgeBreadcrumbs(tree, active) : [];
+  const coverItems = useMemo(() => (active ? [active, ...((active.children ?? []) as any[])] : []), [active]);
+  const covers = useCoverAssets(coverItems);
+  const activeCover = active?.coverImageId ? covers.get(active.coverImageId) : null;
 
   return (
     <AppShell>
@@ -1822,6 +1980,12 @@ function KnowledgeBaseLayout({
                   </div>
                 </div>
 
+                {activeCover?.publicUrl ? (
+                  <figure className="knowledge-cover">
+                    <img alt={activeCover.originalName ?? active.title} decoding="async" src={activeCover.publicUrl} />
+                  </figure>
+                ) : null}
+
                 <article className="knowledge-article-card content-article">
                   {(active.blocks ?? []).length > 0 ? (
                     <ContentBlocks blocks={active.blocks ?? []} />
@@ -1834,12 +1998,28 @@ function KnowledgeBaseLayout({
                   <section className="knowledge-child-section" aria-label="Материалы раздела">
                     <h2>Материалы раздела</h2>
                     <div className="knowledge-child-grid">
-                      {activeChildren.map((child: any) => (
-                        <Link className="knowledge-child-card" href={`/knowledge-base/${child.slug}`} key={child.id}>
-                          <strong>{child.title}</strong>
-                          {child.subtitle ? <span>{child.subtitle}</span> : null}
-                        </Link>
-                      ))}
+                      {activeChildren.map((child: any) => {
+                        const childCover = child.coverImageId ? covers.get(child.coverImageId) : null;
+                        return (
+                          <Link
+                            className={`knowledge-child-card${childCover?.publicUrl ? " has-cover" : ""}`}
+                            href={`/knowledge-base/${child.slug}`}
+                            key={child.id}
+                          >
+                            {childCover?.publicUrl ? (
+                              <img
+                                alt=""
+                                className="knowledge-child-card-cover"
+                                decoding="async"
+                                loading="lazy"
+                                src={childCover.publicUrl}
+                              />
+                            ) : null}
+                            <strong>{child.title}</strong>
+                            {child.subtitle ? <span>{child.subtitle}</span> : null}
+                          </Link>
+                        );
+                      })}
                     </div>
                   </section>
                 ) : null}
@@ -1990,121 +2170,749 @@ function describeSubscription(billing: { status?: string; subscriptionPlan?: str
   return { tariff: "не активирован", note: "Подписка не активна" };
 }
 
+type AccountTab = "profile" | "company" | "billing" | "security" | "notifications" | "support";
+
+type AccountSession = {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  rememberMe: boolean;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  current: boolean;
+};
+
+type NotificationPreferences = {
+  inAppMutedCategories: string[];
+  emailMutedCategories: string[];
+};
+
+type AccountSupportTicket = {
+  id: string;
+  category: string;
+  subject: string;
+  status: string;
+  updatedAt: string;
+};
+
+const ACCOUNT_TABS: Array<{ id: AccountTab; label: string; icon: LucideIcon; companyOnly?: boolean }> = [
+  { id: "profile", label: "Профиль", icon: UserRound },
+  { id: "company", label: "Компания", icon: Building2, companyOnly: true },
+  { id: "billing", label: "Подписка", icon: CreditCard, companyOnly: true },
+  { id: "security", label: "Безопасность", icon: ShieldCheck },
+  { id: "notifications", label: "Уведомления", icon: Bell },
+  { id: "support", label: "Поддержка", icon: LifeBuoy, companyOnly: true },
+];
+
+const NOTIFICATION_ROWS: Array<{
+  category: string;
+  label: string;
+  description: string;
+  locked?: boolean;
+  companyOnly?: boolean;
+}> = [
+  {
+    category: "security",
+    label: "Безопасность",
+    description: "Входы, смена пароля и отзыв сессий.",
+    locked: true,
+  },
+  {
+    category: "billing",
+    label: "Биллинг",
+    description: "Счета, платежи, документы и статусы подписки.",
+    locked: true,
+    companyOnly: true,
+  },
+  {
+    category: "marketplace",
+    label: "Торговая площадка",
+    description: "Объявления, предложения и статусы сделок.",
+    companyOnly: true,
+  },
+  {
+    category: "moderation",
+    label: "Модерация",
+    description: "Решения по жалобам, ограничения и предупреждения.",
+  },
+  {
+    category: "support",
+    label: "Поддержка",
+    description: "Ответы администратора и статусы обращений.",
+  },
+  {
+    category: "system",
+    label: "Системные",
+    description: "Правила, обновления и технические работы.",
+  },
+];
+
+const SUPPORT_CATEGORY_LABELS: Record<string, string> = {
+  billing: "Биллинг",
+  moderation_review: "Модерация",
+  company_management: "Компания",
+  technical: "Технический вопрос",
+  data_deletion: "Удаление данных",
+  other: "Другое",
+};
+
+const SUPPORT_STATUS_LABELS: Record<string, string> = {
+  new: "Новое",
+  open: "Открыт",
+  in_progress: "В работе",
+  awaiting_user: "Ждёт ответа",
+  resolved: "Решён",
+  closed: "Закрыт",
+};
+
+function accountDash(value: ReactNode) {
+  return value || <span className="account-muted">Не заполнено</span>;
+}
+
+function formatAccountDateTime(value?: string | Date | null) {
+  return value ? new Date(value).toLocaleString("ru-RU") : "—";
+}
+
+function formatAccountDate(value?: string | Date | null) {
+  return value ? new Date(value).toLocaleDateString("ru-RU") : "—";
+}
+
+function describeSessionDevice(userAgent?: string | null) {
+  if (!userAgent) return "Неизвестное устройство";
+  const browser = /Edg\//i.test(userAgent)
+    ? "Edge"
+    : /Firefox\//i.test(userAgent)
+      ? "Firefox"
+      : /Chrome\//i.test(userAgent)
+        ? "Chrome"
+        : /Safari\//i.test(userAgent)
+          ? "Safari"
+          : "Браузер";
+  const os = /Windows NT/i.test(userAgent)
+    ? "Windows"
+    : /Mac OS X|Macintosh/i.test(userAgent)
+      ? "macOS"
+      : /Android/i.test(userAgent)
+        ? "Android"
+        : /iPhone|iPad/i.test(userAgent)
+          ? "iOS"
+          : /Linux/i.test(userAgent)
+            ? "Linux"
+            : "ОС";
+  return `${browser} · ${os}`;
+}
+
+function AccountDetailList({ rows }: { rows: Array<{ label: string; value: ReactNode }> }) {
+  return (
+    <dl className="account-detail-list">
+      {rows.map((row) => (
+        <div className="account-detail-row" key={row.label}>
+          <dt>{row.label}</dt>
+          <dd>{accountDash(row.value)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function getAccountModuleCards(companyType?: string | null, status?: string | null, plan?: string | null) {
+  const locked = status === "suspended" || status === "blocked" || status === "archived";
+  const baseAccess = locked ? "Закрыто" : "Доступно";
+  const buyerRole = companyType === "collector" ? "Мои объявления" : "Мои предложения";
+
+  return [
+    {
+      title: "Торговая площадка",
+      state: locked ? "Закрыто" : companyType === "collector" ? "Продавец" : "Покупатель",
+      description: companyType ? buyerRole : "Сценарий зависит от типа компании.",
+    },
+    {
+      title: "Новости и индексы",
+      state: baseAccess,
+      description: "Открыты в демо, базовой и расширенной подписке.",
+    },
+    {
+      title: "База знаний",
+      state: baseAccess,
+      description: "Сырьё, справочники и документация по рынку.",
+    },
+    {
+      title: "Обучение",
+      state: plan === "extended" ? "Расширенное" : locked ? "Закрыто" : "Базовое",
+      description: "Расширенные модули требуют расширенной подписки или разовой покупки.",
+    },
+    {
+      title: "Калькуляторы и инструменты",
+      state: locked ? "Закрыто" : "По доступу",
+      description: "Часть инструментов открывается подпиской, часть — разовой покупкой.",
+    },
+    {
+      title: "Магазин и форум",
+      state: locked ? "Закрыто" : "В кабинете",
+      description: "Покупки доступны активным компаниям; форум входит в общий контур.",
+    },
+  ];
+}
+
 export function AccountView() {
   const { user, token, logout } = useAuth();
   const isPlatformStaff = (user?.platformRoles?.length ?? 0) > 0;
   const { data: billing } = useApiData<any | null>(isPlatformStaff ? null : "/billing/status", null);
-  const { data: tickets } = useApiData<any[]>(isPlatformStaff ? null : "/support/tickets", emptyTickets);
-  const [supportResult, setSupportResult] = useState("");
+  const {
+    data: sessions,
+    setData: setSessions,
+    state: sessionsState,
+  } = useApiData<AccountSession[]>("/auth/sessions", []);
+  const {
+    data: notificationPreferences,
+    setData: setNotificationPreferences,
+    state: notificationPreferencesState,
+  } = useApiData<NotificationPreferences | null>("/notifications/preferences", null);
+  const { data: supportTickets, state: supportState } = useApiData<AccountSupportTicket[]>(
+    isPlatformStaff ? null : "/support/tickets",
+    [],
+  );
+  const [activeTab, setActiveTab] = useState<AccountTab>("profile");
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
+  const [notificationBusyKey, setNotificationBusyKey] = useState<string | null>(null);
 
-  async function onSupportSubmit(event: FormEvent<HTMLFormElement>) {
+  const tabs = useMemo(
+    () => ACCOUNT_TABS.filter((tab) => !tab.companyOnly || !isPlatformStaff),
+    [isPlatformStaff],
+  );
+
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(tabs[0]?.id ?? "profile");
+    }
+  }, [activeTab, tabs]);
+
+  // Подписка и статус компании теперь рендерятся в отдельных карточках —
+  // форма поддержки переехала в drawer (иконка «?» в шапке), чтобы личный
+  // кабинет был спокойной страницей профиля, а не свалкой всех функций.
+  const subscription = describeSubscription(billing);
+  const companyStatusLabel = billing?.status ? COMPANY_STATUS_LABELS[billing.status] ?? billing.status : null;
+  const fullName = user ? `${user.firstName} ${user.lastName}` : "Не авторизован";
+  const initials = user
+    ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase()
+    : "";
+  const company = billing ?? user?.company ?? null;
+  const latestSubscription = billing?.subscriptions?.[0] ?? null;
+  const supportPreview = supportTickets.slice(0, 4);
+
+  function openSupport() {
+    window.dispatchEvent(new Event("support:open"));
+  }
+
+  async function onChangePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!token) return;
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const currentPassword = String(formData.get("currentPassword") ?? "");
+    const newPassword = String(formData.get("newPassword") ?? "");
+    const repeatPassword = String(formData.get("repeatPassword") ?? "");
 
-    if (!token) {
-      setSupportResult("Сначала войдите в аккаунт.");
+    setPasswordMessage(null);
+    if (newPassword !== repeatPassword) {
+      setPasswordMessage("Новый пароль и повтор не совпадают.");
       return;
     }
 
-    const form = new FormData(event.currentTarget);
-
+    setPasswordSaving(true);
     try {
-      await apiFetch("/support/tickets", {
+      await apiFetch("/auth/change-password", {
         method: "POST",
         token,
-        body: {
-          category: String(form.get("category")),
-          subject: String(form.get("subject")),
-          text: String(form.get("text")),
-        },
+        body: { currentPassword, newPassword },
       });
-      event.currentTarget.reset();
-      setSupportResult("Обращение создано. Оно появится в списке после обновления данных.");
+      form.reset();
+      setPasswordMessage("Пароль изменён. Остальные активные сессии отозваны.");
+      setSessions((current) => current.filter((session) => session.current));
+      window.dispatchEvent(new Event("notifications:changed"));
     } catch (error) {
-      setSupportResult(error instanceof Error ? error.message : "Не удалось создать обращение.");
+      setPasswordMessage(error instanceof Error ? error.message : "Не удалось изменить пароль.");
+    } finally {
+      setPasswordSaving(false);
     }
   }
 
-  const subscription = describeSubscription(billing);
-  const companyStatusLabel = billing?.status ? COMPANY_STATUS_LABELS[billing.status] ?? billing.status : null;
+  async function revokeSession(sessionId: string) {
+    if (!token) return;
+    setSessionBusyId(sessionId);
+    try {
+      const result = await apiFetch<{ revokedCurrent: boolean }>(`/auth/sessions/${sessionId}/revoke`, {
+        method: "POST",
+        token,
+      });
+      if (result.revokedCurrent) {
+        clearAccessToken();
+        window.location.assign("/login");
+        return;
+      }
+      setSessions((current) => current.filter((session) => session.id !== sessionId));
+    } finally {
+      setSessionBusyId(null);
+    }
+  }
+
+  async function logoutEverywhere() {
+    if (!token) return;
+    const ok = window.confirm("Завершить все активные сессии и перейти на страницу входа?");
+    if (!ok) return;
+    setSessionBusyId("all");
+    try {
+      await apiFetch("/auth/sessions/logout-all", { method: "POST", token });
+      clearAccessToken();
+      window.location.assign("/login");
+    } finally {
+      setSessionBusyId(null);
+    }
+  }
+
+  function notificationEnabled(category: string, channel: "in_app" | "email") {
+    if (category === "security" || category === "billing") return true;
+    const muted =
+      channel === "in_app"
+        ? notificationPreferences?.inAppMutedCategories ?? []
+        : notificationPreferences?.emailMutedCategories ?? [];
+    return !muted.includes(category);
+  }
+
+  async function updateNotificationPreference(category: string, channel: "in_app" | "email", enabled: boolean) {
+    if (!token || category === "security" || category === "billing") return;
+    const field = channel === "in_app" ? "inAppMutedCategories" : "emailMutedCategories";
+    const currentPreferences = notificationPreferences ?? {
+      inAppMutedCategories: [],
+      emailMutedCategories: [],
+    };
+    const currentMuted = currentPreferences[field];
+    const nextMuted = enabled
+      ? currentMuted.filter((item) => item !== category)
+      : [...new Set([...currentMuted, category])];
+    const nextPreferences = {
+      ...currentPreferences,
+      [field]: nextMuted,
+    };
+    const busyKey = `${category}:${channel}`;
+    setNotificationBusyKey(busyKey);
+    setNotificationPreferences(nextPreferences);
+    try {
+      const saved = await apiFetch<NotificationPreferences>("/notifications/preferences", {
+        method: "PATCH",
+        token,
+        body: nextPreferences,
+      });
+      setNotificationPreferences(saved);
+    } finally {
+      setNotificationBusyKey(null);
+    }
+  }
 
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="Личный кабинет" subtitle="Профиль, подписка, реквизиты, уведомления и поддержка." />
-        <div className="card-grid">
-          <article className="card">
-            <h2>Профиль</h2>
-            <div className="profile-summary">
+        {/* Hero: крупный аватар и основная идентификация пользователя.
+            Раньше аватар был 40px и терялся среди карточек. */}
+        <header className="account-hero">
+          <div className="account-hero-profile">
+            <div className="account-hero-avatar" aria-hidden={!user?.avatarUrl}>
               {user?.avatarUrl ? (
-                <img className="profile-avatar" alt="" src={user.avatarUrl} />
+                <img alt="" src={user.avatarUrl} />
               ) : (
-                <div className="profile-avatar profile-avatar-placeholder" aria-hidden="true" />
+                <span className="account-hero-initials">{initials || "?"}</span>
               )}
-              <div>
-                <p>{user ? `${user.firstName} ${user.lastName}` : "Не авторизован"}</p>
-                <p>{user?.email}</p>
-                {user?.gender ? <p className="page-subtitle">Пол: {GENDER_LABELS[user.gender] ?? user.gender}</p> : null}
-              </div>
             </div>
             <button className="button secondary" onClick={logout}>Выйти</button>
-          </article>
-          {isPlatformStaff ? (
-            <article className="card">
-              <h2>Сотрудник платформы</h2>
-              <p>Этот аккаунт не привязан к компании.</p>
-              <div className="auth-actions" style={{ marginTop: 8 }}>
-                {user?.platformRoles?.map((role) => (
-                  <span className="status-pill" key={role}>{ROLE_LABELS[role] ?? role}</span>
-                ))}
+          </div>
+          <div className="account-hero-info">
+            <h1 className="account-hero-name">{fullName}</h1>
+            {user?.email ? <p className="account-hero-email">{user.email}</p> : null}
+            <div className="account-hero-meta">
+              {user?.gender ? (
+                <span className="status-pill">{GENDER_LABELS[user.gender] ?? user.gender}</span>
+              ) : null}
+              {isPlatformStaff
+                ? user?.platformRoles?.map((role) => (
+                    <span className="status-pill primary" key={role}>
+                      {ROLE_LABELS[role] ?? role}
+                    </span>
+                  ))
+                : null}
+              {companyStatusLabel && !isPlatformStaff ? (
+                <span className="status-pill">{companyStatusLabel}</span>
+              ) : null}
+            </div>
+            <p className="account-hero-hint">
+              Фото профиля подбирается автоматически по типу компании. Возможность
+              загрузить своё появится в следующих обновлениях.
+            </p>
+          </div>
+        </header>
+
+        <nav className="account-tabs" aria-label="Разделы личного кабинета">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                className={`account-tab ${activeTab === tab.id ? "active" : ""}`}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                type="button"
+              >
+                <Icon size={16} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {activeTab === "profile" ? (
+          <div className="account-section-grid">
+            <article className="card account-card">
+              <h2>Пользователь</h2>
+              <AccountDetailList
+                rows={[
+                  { label: "Имя", value: fullName },
+                  { label: "Email", value: user?.email },
+                  { label: "Телефон", value: user?.phone },
+                  { label: "Статус", value: <span className="status-pill">Активен</span> },
+                ]}
+              />
+            </article>
+            <article className="card account-card">
+              <h2>Контакты</h2>
+              <p className="page-subtitle">
+                Email используется для безопасности, биллинга и уведомлений. Телефон нужен для SMS-кодов.
+              </p>
+              <div className="account-action-list">
+                <button className="button secondary" type="button" disabled>
+                  Сменить email
+                </button>
+                <button className="button secondary" type="button" disabled>
+                  Сменить телефон
+                </button>
               </div>
             </article>
-          ) : (
-            <>
-              <article className="card">
+            {isPlatformStaff ? (
+              <article className="card account-card">
+                <h2>Сотрудник платформы</h2>
+                <p className="page-subtitle">Этот аккаунт не привязан к клиентской компании.</p>
+                <div className="account-pill-row">
+                  {user?.platformRoles?.map((role) => (
+                    <span className="status-pill primary" key={role}>
+                      {ROLE_LABELS[role] ?? role}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeTab === "company" && !isPlatformStaff ? (
+          <div className="account-panel-stack">
+            <div className="account-section-grid">
+              <article className="card account-card">
                 <h2>Компания</h2>
-                <p>{billing?.organizationName ?? user?.company?.organizationName ?? "Данные появятся после входа"}</p>
-                {user?.company?.type ? <p>{COMPANY_TYPE_LABELS[user.company.type] ?? user.company.type}</p> : null}
-                {companyStatusLabel ? <p className="status-pill">{companyStatusLabel}</p> : null}
+                <AccountDetailList
+                  rows={[
+                    { label: "Название", value: company?.organizationName },
+                    {
+                      label: "Тип",
+                      value: company?.type ? COMPANY_TYPE_LABELS[company.type] ?? company.type : null,
+                    },
+                    {
+                      label: "Статус",
+                      value: company?.status ? (
+                        <span className="status-pill">{COMPANY_STATUS_LABELS[company.status] ?? company.status}</span>
+                      ) : null,
+                    },
+                  ]}
+                />
               </article>
-              <article className="card">
-                <h2>Подписка</h2>
-                <p>Тариф: {subscription.tariff}</p>
-                <p className="page-subtitle">{subscription.note}</p>
+              <article className="card account-card">
+                <h2>Реквизиты</h2>
+                <AccountDetailList
+                  rows={[
+                    { label: "ИНН", value: company?.billingInn },
+                    { label: "КПП", value: company?.billingKpp },
+                    { label: "Юридический адрес", value: company?.legalAddress },
+                    { label: "Банк", value: company?.bankName },
+                    { label: "БИК", value: company?.bankBik },
+                    { label: "Расчётный счёт", value: company?.bankAccount },
+                    { label: "Корр. счёт", value: company?.correspondentAccount },
+                  ]}
+                />
+                <div className="account-action-list">
+                  <button className="button secondary" type="button" disabled>
+                    Редактировать реквизиты
+                  </button>
+                </div>
               </article>
-            </>
-          )}
-        </div>
-        {isPlatformStaff ? null : (
-          <div className="account-layout">
-            <form className="card form" onSubmit={onSupportSubmit}>
-              <h2>Новое обращение</h2>
-              <select className="select" name="category" defaultValue="technical">
-                <option value="billing">Биллинг</option>
-                <option value="moderation_review">Модерация</option>
-                <option value="company_management">Компания</option>
-                <option value="technical">Технический вопрос</option>
-                <option value="data_deletion">Удаление данных</option>
-                <option value="other">Другое</option>
-              </select>
-              <input className="input" name="subject" placeholder="Тема" />
-              <textarea className="textarea" name="text" placeholder="Опишите вопрос" />
-              <button className="button" type="submit">Отправить</button>
-              {supportResult ? <p>{supportResult}</p> : null}
-            </form>
-            <article className="card">
-              <h2>Мои обращения</h2>
-              <div className="stack-list">
-                {tickets.length === 0 ? <p className="page-subtitle">Пока нет обращений.</p> : null}
-                {tickets.map((ticket: any) => (
-                  <div className="list-row" key={ticket.id}>
-                    <strong>{ticket.subject}</strong>
-                    <span className="status-pill">{ticket.status}</span>
+            </div>
+            <section className="account-module-grid" aria-label="Доступные модули">
+              {getAccountModuleCards(company?.type, company?.status, company?.subscriptionPlan).map((item) => (
+                <article className="account-module-card" key={item.title}>
+                  <div>
+                    <h2>{item.title}</h2>
+                    <p>{item.description}</p>
+                  </div>
+                  <span className="status-pill">{item.state}</span>
+                </article>
+              ))}
+            </section>
+          </div>
+        ) : null}
+
+        {activeTab === "billing" && !isPlatformStaff ? (
+          <div className="account-panel-stack">
+            {company?.status === "demo" || company?.status === "past_due" || company?.status === "suspended" ? (
+              <div className={`account-state-banner status-${company.status}`}>
+                <strong>{subscription.tariff}</strong>
+                <span>{subscription.note}</span>
+              </div>
+            ) : null}
+            <div className="account-section-grid">
+              <article className="card account-card">
+                <h2>Текущий тариф</h2>
+                <AccountDetailList
+                  rows={[
+                    { label: "Тариф", value: subscription.tariff },
+                    { label: "Статус", value: companyStatusLabel },
+                    { label: "Начало периода", value: formatAccountDate(latestSubscription?.startsAt) },
+                    {
+                      label: "Окончание периода",
+                      value: formatAccountDate(company?.subscriptionEndsAt ?? latestSubscription?.endsAt ?? company?.demoEndsAt),
+                    },
+                    { label: "Автопродление", value: <span className="account-muted">Отключено</span> },
+                  ]}
+                />
+                <div className="account-action-list">
+                  <button className="button" type="button" disabled>
+                    Оплатить / продлить
+                  </button>
+                  <button className="button secondary" type="button" disabled>
+                    Сменить тариф
+                  </button>
+                  <button className="button secondary" type="button" onClick={openSupport}>
+                    Связаться по биллингу
+                  </button>
+                </div>
+              </article>
+              <article className="card account-card">
+                <h2>Покупки и документы</h2>
+                <div className="account-doc-grid">
+                  <div>
+                    <strong>Покупки компании</strong>
+                    <p className="page-subtitle">Появятся после покупки модулей, инструментов или готовых решений.</p>
+                  </div>
+                  <div>
+                    <strong>Финансовые документы</strong>
+                    <p className="page-subtitle">Счета, чеки и акты будут доступны после первой оплаты.</p>
+                  </div>
+                </div>
+              </article>
+            </div>
+            <article className="card account-card">
+              <h2>История подписок</h2>
+              {billing?.subscriptions?.length ? (
+                <div className="account-history-list">
+                  {billing.subscriptions.map((item: any) => (
+                    <div className="account-history-row" key={item.id}>
+                      <div>
+                        <strong>{item.plan === "basic" ? "Базовая подписка" : "Расширенная подписка"}</strong>
+                        <span>
+                          {formatAccountDate(item.startsAt)} — {formatAccountDate(item.endsAt)}
+                        </span>
+                      </div>
+                      <span className="status-pill">{item.status}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="page-subtitle">История появится после активации подписки.</p>
+              )}
+            </article>
+          </div>
+        ) : null}
+
+        {activeTab === "security" ? (
+          <div className="account-panel-stack">
+            <div className="account-section-grid">
+              <article className="card account-card">
+                <h2>Смена пароля</h2>
+                <form className="account-form" onSubmit={onChangePassword}>
+                  <label>
+                    <span>Текущий пароль</span>
+                    <input className="input" name="currentPassword" type="password" autoComplete="current-password" required />
+                  </label>
+                  <label>
+                    <span>Новый пароль</span>
+                    <input className="input" name="newPassword" type="password" autoComplete="new-password" minLength={10} required />
+                  </label>
+                  <label>
+                    <span>Повтор нового пароля</span>
+                    <input className="input" name="repeatPassword" type="password" autoComplete="new-password" minLength={10} required />
+                  </label>
+                  {passwordMessage ? <p className="account-form-message">{passwordMessage}</p> : null}
+                  <button className="button" type="submit" disabled={passwordSaving}>
+                    <KeyRound size={16} />
+                    {passwordSaving ? "Сохраняем..." : "Сменить пароль"}
+                  </button>
+                </form>
+              </article>
+              <article className="card account-card">
+                <h2>Дополнительная защита</h2>
+                <div className="account-security-actions">
+                  <div>
+                    <Smartphone size={20} />
+                    <span>Двухфакторная аутентификация по SMS</span>
+                  </div>
+                  <button className="button secondary" type="button" disabled>
+                    Включить
+                  </button>
+                </div>
+                <button className="button secondary" type="button" onClick={logout}>
+                  <LogOut size={16} />
+                  Завершить эту сессию
+                </button>
+              </article>
+            </div>
+            <article className="card account-card">
+              <div className="account-card-head">
+                <div>
+                  <h2>Активные сессии</h2>
+                  <p className="page-subtitle">Устройства, с которых сейчас открыт кабинет.</p>
+                </div>
+                <button
+                  className="button secondary danger"
+                  onClick={logoutEverywhere}
+                  type="button"
+                  disabled={sessionBusyId === "all"}
+                >
+                  Выйти со всех устройств
+                </button>
+              </div>
+              {sessionsState === "loading" ? <p className="page-subtitle">Загружаем сессии...</p> : null}
+              <div className="account-session-list">
+                {sessions.map((session) => (
+                  <div className="account-session-row" key={session.id}>
+                    <div>
+                      <strong>
+                        {describeSessionDevice(session.userAgent)}
+                        {session.current ? <span className="status-pill primary">Текущая</span> : null}
+                      </strong>
+                      <span>
+                        IP {session.ipAddress ?? "—"} · последний раз {formatAccountDateTime(session.updatedAt)} · до{" "}
+                        {formatAccountDateTime(session.expiresAt)}
+                      </span>
+                    </div>
+                    {!session.current ? (
+                      <button
+                        className="button secondary"
+                        onClick={() => void revokeSession(session.id)}
+                        type="button"
+                        disabled={sessionBusyId === session.id}
+                      >
+                        Отозвать
+                      </button>
+                    ) : null}
                   </div>
                 ))}
+                {sessionsState !== "loading" && sessions.length === 0 ? (
+                  <p className="page-subtitle">Активных сессий не найдено.</p>
+                ) : null}
               </div>
             </article>
           </div>
-        )}
+        ) : null}
+
+        {activeTab === "notifications" ? (
+          <article className="card account-card">
+            <h2>Настройки уведомлений</h2>
+            <div className="account-notification-table">
+              <div className="account-notification-head">
+                <span>Категория</span>
+                <span>В кабинете</span>
+                <span>Email</span>
+              </div>
+              {NOTIFICATION_ROWS.filter((row) => !row.companyOnly || !isPlatformStaff).map((row) => (
+                <div className="account-notification-row" key={row.category}>
+                  <div>
+                    <strong>{row.label}</strong>
+                    <p>{row.description}</p>
+                  </div>
+                  {(["in_app", "email"] as const).map((channel) => {
+                    const busyKey = `${row.category}:${channel}`;
+                    return (
+                      <label className="account-toggle" key={channel}>
+                        <input
+                          checked={notificationEnabled(row.category, channel)}
+                          disabled={
+                            row.locked ||
+                            notificationPreferencesState === "loading" ||
+                            notificationBusyKey === busyKey
+                          }
+                          onChange={(event) =>
+                            void updateNotificationPreference(row.category, channel, event.currentTarget.checked)
+                          }
+                          type="checkbox"
+                        />
+                        <span>{row.locked ? "Всегда" : notificationEnabled(row.category, channel) ? "Вкл" : "Выкл"}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {notificationPreferencesState === "error" ? (
+              <p className="account-form-message">Не удалось загрузить настройки уведомлений.</p>
+            ) : null}
+          </article>
+        ) : null}
+
+        {activeTab === "support" && !isPlatformStaff ? (
+          <div className="account-section-grid">
+            <article className="card account-card">
+              <h2>Поддержка</h2>
+              <p className="page-subtitle">
+                Создайте обращение или продолжите переписку с администратором платформы.
+              </p>
+              <div className="account-action-list">
+                <button className="button" type="button" onClick={openSupport}>
+                  <LifeBuoy size={16} />
+                  Открыть поддержку
+                </button>
+              </div>
+            </article>
+            <article className="card account-card">
+              <h2>Последние обращения</h2>
+              {supportState === "loading" ? <p className="page-subtitle">Загружаем обращения...</p> : null}
+              {supportPreview.length > 0 ? (
+                <div className="account-history-list">
+                  {supportPreview.map((ticket) => (
+                    <button className="account-ticket-row" key={ticket.id} type="button" onClick={openSupport}>
+                      <div>
+                        <strong>{ticket.subject}</strong>
+                        <span>
+                          {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
+                          {formatAccountDateTime(ticket.updatedAt)}
+                        </span>
+                      </div>
+                      <span className="status-pill">{SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : supportState !== "loading" ? (
+                <p className="page-subtitle">Обращений пока нет.</p>
+              ) : null}
+            </article>
+          </div>
+        ) : null}
       </section>
     </AppShell>
   );
@@ -2143,11 +2951,11 @@ function AccessClosed({ title }: { title: string }) {
   );
 }
 
-function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
+function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <header className="page-header">
       <h1 className="page-title">{title}</h1>
-      <p className="page-subtitle">{subtitle}</p>
+      {subtitle ? <p className="page-subtitle">{subtitle}</p> : null}
     </header>
   );
 }

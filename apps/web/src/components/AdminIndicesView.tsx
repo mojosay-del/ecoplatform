@@ -120,6 +120,22 @@ export function AdminIndicesView() {
     return categories.find((c) => c.id === selection.id) ?? null;
   }, [selection, categories]);
 
+  async function deleteNomenclature(nomenclature: Nomenclature) {
+    const valuesCount = nomenclature.priceIndex?.values.length ?? 0;
+    const indexWarning = nomenclature.priceIndex
+      ? `\n\nБудет удалён связанный индекс и ${formatPriceValuesCount(valuesCount)}.`
+      : "";
+    const okToDelete = confirm(
+      `Удалить номенклатуру «${nomenclature.name}» полностью?${indexWarning}\n\nЭто действие нельзя отменить.`,
+    );
+    if (!okToDelete) return;
+
+    const ok = await mutate(`/admin/content/indices/nomenclature/${nomenclature.id}`, "DELETE");
+    if (ok && selection.kind === "nomenclature" && selection.id === nomenclature.id) {
+      setSelection({ kind: "none" });
+    }
+  }
+
   return (
     <AppShell>
       <section className="page">
@@ -132,7 +148,7 @@ export function AdminIndicesView() {
         <CmsTabs />
         {message ? <p className="cms-flash">{message}</p> : null}
 
-        <div className="moderation-layout">
+        <div className="moderation-layout cms-vertical-layout">
           <div className="education-tree">
             <div className="education-tree-header">
               <span className="education-tree-title">Каталог</span>
@@ -231,16 +247,7 @@ export function AdminIndicesView() {
                             {
                               label: "Удалить номенклатуру",
                               danger: true,
-                              onClick: () => {
-                                if (
-                                  confirm(`Удалить номенклатуру «${nomenclature.name}»?`)
-                                ) {
-                                  void mutate(
-                                    `/admin/content/indices/nomenclature/${nomenclature.id}`,
-                                    "DELETE",
-                                  );
-                                }
-                              },
+                              onClick: () => void deleteNomenclature(nomenclature),
                             },
                           ];
                           return (
@@ -328,6 +335,7 @@ export function AdminIndicesView() {
                 category={activeNomenclature.category}
                 nomenclature={activeNomenclature.nomenclature}
                 onMutate={mutate}
+                onDeleteNomenclature={deleteNomenclature}
                 categories={categories}
               />
             ) : activeCategory ? (
@@ -351,6 +359,26 @@ export function AdminIndicesView() {
       </section>
     </AppShell>
   );
+}
+
+function formatPriceValuesCount(count: number) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} значение истории цен`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} значения истории цен`;
+  }
+  return `${count} значений истории цен`;
+}
+
+function formatIndexPrice(value: string | number) {
+  return Number(value).toLocaleString("ru-RU", {
+    maximumFractionDigits: 1,
+  });
+}
+
+function parseIndexPrice(value: string) {
+  return Number(value.replace(",", "."));
 }
 
 function CategoryCreateForm({
@@ -546,11 +574,13 @@ function PriceIndexCard({
   category,
   nomenclature,
   onMutate,
+  onDeleteNomenclature,
   categories,
 }: {
   category: Category;
   nomenclature: Nomenclature;
   onMutate: (path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) => Promise<boolean>;
+  onDeleteNomenclature: (nomenclature: Nomenclature) => Promise<void>;
   categories: Category[];
 }) {
   const [draft, setDraft] = useState({
@@ -595,8 +625,8 @@ function PriceIndexCard({
   const values = priceIndex?.values ?? [];
   const latestValue = values[values.length - 1];
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function saveNomenclature() {
+    if (!draft.code.trim() || !draft.name.trim()) return;
     setSaving(true);
     await onMutate(`/admin/content/indices/nomenclature/${nomenclature.id}`, "PATCH", {
       categoryId: draft.categoryId,
@@ -622,9 +652,12 @@ function PriceIndexCard({
   async function addValue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!priceIndex || !valueDraft.date || !valueDraft.price) return;
+    const price = parseIndexPrice(valueDraft.price);
+    if (!Number.isFinite(price) || price <= 0) return;
+
     const ok = await onMutate(`/admin/content/indices/${priceIndex.id}/values`, "POST", {
       date: `${valueDraft.date}T00:00:00.000Z`,
-      price: Number(valueDraft.price),
+      price,
     });
     if (ok) setValueDraft({ date: "", price: "" });
   }
@@ -651,7 +684,7 @@ function PriceIndexCard({
   }
 
   return (
-    <form className="form news-form" onSubmit={submit}>
+    <div className="form news-form">
       <div className="news-form-head">
         <span className="news-form-mode">
           {category.name} · {nomenclature.code}
@@ -748,7 +781,7 @@ function PriceIndexCard({
                 <span>Последнее</span>
                 <strong>
                   {latestValue
-                    ? `${Number(latestValue.price).toLocaleString("ru-RU")} ${nomenclature.unit}`
+                    ? `${formatIndexPrice(latestValue.price)} ${nomenclature.unit}`
                     : "—"}
                 </strong>
               </div>
@@ -766,7 +799,7 @@ function PriceIndexCard({
                         {new Date(value.date).toLocaleDateString("ru-RU")}
                       </span>
                       <strong className="indices-value-price">
-                        {Number(value.price).toLocaleString("ru-RU")} {nomenclature.unit}
+                        {formatIndexPrice(value.price)} {nomenclature.unit}
                       </strong>
                       <button
                         type="button"
@@ -783,13 +816,7 @@ function PriceIndexCard({
               )}
             </div>
 
-            <form
-              className="indices-value-form"
-              onSubmit={(event) => {
-                event.stopPropagation();
-                addValue(event);
-              }}
-            >
+            <form className="indices-value-form" onSubmit={addValue}>
               <input
                 className="input"
                 type="date"
@@ -802,7 +829,9 @@ function PriceIndexCard({
               <input
                 className="input"
                 type="number"
-                min="1"
+                inputMode="decimal"
+                min="0.1"
+                step="0.1"
                 placeholder="Цена"
                 value={valueDraft.price}
                 onChange={(event) =>
@@ -823,6 +852,13 @@ function PriceIndexCard({
           {saving ? "Сохраняю…" : hasChanges ? "Есть несохранённые изменения" : "Всё сохранено"}
         </span>
         <div className="lesson-save-bar-actions">
+          <button
+            className="button secondary danger"
+            type="button"
+            onClick={() => void onDeleteNomenclature(nomenclature)}
+          >
+            Удалить номенклатуру
+          </button>
           {priceIndex ? (
             <>
               <button className="button secondary" type="button" onClick={removeIndex}>
@@ -833,11 +869,16 @@ function PriceIndexCard({
               </button>
             </>
           ) : null}
-          <button className="button" type="submit" disabled={!hasChanges || saving}>
+          <button
+            className="button"
+            type="button"
+            disabled={!hasChanges || saving}
+            onClick={saveNomenclature}
+          >
             {saving ? "Сохраняю…" : "Сохранить"}
           </button>
         </div>
       </div>
-    </form>
+    </div>
   );
 }

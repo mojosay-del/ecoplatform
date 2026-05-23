@@ -31,7 +31,11 @@ type JournalList = {
   items: JournalEntry[];
 };
 
-export function AdminJournalsView() {
+type AdminJournalsViewProps = {
+  embedded?: boolean;
+};
+
+export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) {
   const { token } = useAuth();
   const [state, setState] = useState<ApiState>("unauthenticated");
   const [list, setList] = useState<JournalList | null>(null);
@@ -86,129 +90,145 @@ export function AdminJournalsView() {
   }, [token]);
 
   if (state === "unauthenticated") {
-    return (
+    const content = (
+      <>
+        <h1 className="page-title">Журнал</h1>
+        <p className="page-subtitle">Войдите как администратор.</p>
+      </>
+    );
+    return embedded ? (
+      <div className="settings-pane">{content}</div>
+    ) : (
       <AppShell>
-        <section className="page">
-          <h1 className="page-title">Журнал</h1>
-          <p className="page-subtitle">Войдите как администратор.</p>
-        </section>
+        <section className="page">{content}</section>
       </AppShell>
     );
   }
 
   if (state === "forbidden") {
-    return (
+    const content = (
+      <>
+        <h1 className="page-title">Журнал</h1>
+        <p className="page-subtitle">Раздел доступен только администратору.</p>
+      </>
+    );
+    return embedded ? (
+      <div className="settings-pane">{content}</div>
+    ) : (
       <AppShell>
-        <section className="page">
-          <h1 className="page-title">Журнал</h1>
-          <p className="page-subtitle">Раздел доступен только администратору.</p>
-        </section>
+        <section className="page">{content}</section>
       </AppShell>
     );
   }
 
-  return (
-    <AppShell>
-      <section className="page">
-        <header className="page-header">
-          <h1 className="page-title">Журнал действий администраторов</h1>
-          <p className="page-subtitle">Все изменения в админке фиксируются и доступны для аудита.</p>
-        </header>
+  const content = (
+    <>
+      <header className="page-header">
+        <h1 className="page-title">Журнал действий администраторов</h1>
+        <p className="page-subtitle">Все изменения в админке фиксируются и доступны для аудита.</p>
+      </header>
 
-        <form className="form" onSubmit={submit}>
+      <form className="form" onSubmit={submit}>
+        <div className="auth-actions">
+          <input
+            className="input"
+            onChange={(event) => setAction(event.target.value)}
+            placeholder="Действие (например, admin.user.block)"
+            value={action}
+          />
+          <input
+            className="input"
+            onChange={(event) => setEntityType(event.target.value)}
+            placeholder="Тип сущности (User, Company, PlatformSetting…)"
+            value={entityType}
+          />
+          <input
+            className="input"
+            onChange={(event) => setActorId(event.target.value)}
+            placeholder="ID администратора"
+            value={actorId}
+          />
+          <input
+            className="input"
+            onChange={(event) => setFrom(event.target.value)}
+            placeholder="С даты"
+            type="datetime-local"
+            value={from}
+          />
+          <input
+            className="input"
+            onChange={(event) => setTo(event.target.value)}
+            placeholder="По дату"
+            type="datetime-local"
+            value={to}
+          />
+          <button className="button" type="submit">
+            Применить
+          </button>
+        </div>
+      </form>
+
+      {errorMessage ? <p className="status-pill">{errorMessage}</p> : null}
+      {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
+
+      {list ? (
+        <div className="stack-list">
+          <p className="page-subtitle">
+            Всего записей: {list.total}, страница {list.page}.
+          </p>
+          {list.items.map((entry) => (
+            <article className="checklist-block" key={entry.id}>
+              <strong>{entry.action}</strong>
+              <p>
+                {entry.entityType} · ID: {entry.entityId}
+              </p>
+              <p>
+                {new Date(entry.createdAt).toLocaleString("ru-RU")}
+                {entry.actor ? ` · ${entry.actor.firstName} ${entry.actor.lastName} (${entry.actor.email})` : ""}
+              </p>
+              {entry.comment ? <p>«{entry.comment}»</p> : null}
+              {entry.payload ? (
+                <pre className="json-preview">{JSON.stringify(entry.payload, null, 2)}</pre>
+              ) : null}
+            </article>
+          ))}
+
           <div className="auth-actions">
-            <input
-              className="input"
-              onChange={(event) => setAction(event.target.value)}
-              placeholder="Действие (например, admin.user.block)"
-              value={action}
-            />
-            <input
-              className="input"
-              onChange={(event) => setEntityType(event.target.value)}
-              placeholder="Тип сущности (User, Company, PlatformSetting…)"
-              value={entityType}
-            />
-            <input
-              className="input"
-              onChange={(event) => setActorId(event.target.value)}
-              placeholder="ID администратора"
-              value={actorId}
-            />
-            <input
-              className="input"
-              onChange={(event) => setFrom(event.target.value)}
-              placeholder="С даты"
-              type="datetime-local"
-              value={from}
-            />
-            <input
-              className="input"
-              onChange={(event) => setTo(event.target.value)}
-              placeholder="По дату"
-              type="datetime-local"
-              value={to}
-            />
-            <button className="button" type="submit">
-              Применить
+            <button
+              className="button secondary"
+              disabled={list.page <= 1}
+              onClick={() => {
+                const next = list.page - 1;
+                setPage(next);
+                void loadList({ page: next });
+              }}
+              type="button"
+            >
+              ← Назад
+            </button>
+            <button
+              className="button secondary"
+              disabled={list.page * list.take >= list.total}
+              onClick={() => {
+                const next = list.page + 1;
+                setPage(next);
+                void loadList({ page: next });
+              }}
+              type="button"
+            >
+              Дальше →
             </button>
           </div>
-        </form>
+        </div>
+      ) : null}
+    </>
+  );
 
-        {errorMessage ? <p className="status-pill">{errorMessage}</p> : null}
-        {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
-
-        {list ? (
-          <div className="stack-list">
-            <p className="page-subtitle">
-              Всего записей: {list.total}, страница {list.page}.
-            </p>
-            {list.items.map((entry) => (
-              <article className="checklist-block" key={entry.id}>
-                <strong>{entry.action}</strong>
-                <p>
-                  {entry.entityType} · ID: {entry.entityId}
-                </p>
-                <p>
-                  {new Date(entry.createdAt).toLocaleString("ru-RU")}
-                  {entry.actor ? ` · ${entry.actor.firstName} ${entry.actor.lastName} (${entry.actor.email})` : ""}
-                </p>
-                {entry.comment ? <p>«{entry.comment}»</p> : null}
-                {entry.payload ? (
-                  <pre className="json-preview">{JSON.stringify(entry.payload, null, 2)}</pre>
-                ) : null}
-              </article>
-            ))}
-
-            <div className="auth-actions">
-              <button
-                className="button secondary"
-                disabled={list.page <= 1}
-                onClick={() => {
-                  const next = list.page - 1;
-                  setPage(next);
-                  void loadList({ page: next });
-                }}
-                type="button"
-              >
-                ← Назад
-              </button>
-              <button
-                className="button secondary"
-                disabled={list.page * list.take >= list.total}
-                onClick={() => {
-                  const next = list.page + 1;
-                  setPage(next);
-                  void loadList({ page: next });
-                }}
-                type="button"
-              >
-                Дальше →
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </section>
+  return embedded ? (
+    <div className="settings-pane settings-pane-wide">{content}</div>
+  ) : (
+    <AppShell>
+      <section className="page">{content}</section>
     </AppShell>
   );
 }

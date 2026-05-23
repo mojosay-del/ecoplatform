@@ -2,10 +2,25 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   BookOpen,
   ChevronRight,
   FileText,
   FolderOpen,
+  GripVertical,
   Paperclip,
   Plus,
   Trash2,
@@ -48,6 +63,8 @@ type LearningModule = {
   coverImageId: string | null;
   accessLevel: "basic" | "extended" | "one_time";
   oneTimePrice: number | null;
+  isInDevelopment: boolean;
+  position: number;
   status: "draft" | "published";
   preview: Preview | null;
   chapters: Chapter[];
@@ -154,7 +171,7 @@ export function AdminEducationView() {
         <CmsTabs />
         {message ? <p className="status-pill">{message}</p> : null}
 
-        <div className="moderation-layout">
+        <div className="moderation-layout cms-vertical-layout">
           <div className="education-tree">
             <EducationTree
               modules={modules}
@@ -192,6 +209,7 @@ function EducationTree({
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   // Авто-раскрытие ветки, в которой находится текущий выбор.
   useEffect(() => {
@@ -251,6 +269,19 @@ function EducationTree({
   async function removeModule(module: LearningModule) {
     if (!confirm(`Удалить модуль «${module.title}»? Все главы и уроки будут удалены.`)) return;
     await onMutate(`/admin/content/education/modules/${module.id}`, "DELETE");
+  }
+
+  async function handleModuleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    const from = modules.findIndex((module) => module.id === activeId);
+    const to = modules.findIndex((module) => module.id === overId);
+    if (from === -1 || to === -1 || from === to) return;
+    await onMutate(`/admin/content/education/modules/${activeId}`, "PATCH", {
+      position: to,
+    });
   }
 
   async function addChapter(module: LearningModule) {
@@ -326,8 +357,10 @@ function EducationTree({
       {modules.length === 0 ? (
         <p className="education-tree-empty">Модулей пока нет.</p>
       ) : null}
-      <ul className="tree" role="tree">
-        {modules.map((module) => {
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleModuleDragEnd}>
+        <SortableContext items={modules.map((module) => module.id)} strategy={verticalListSortingStrategy}>
+          <ul className="tree" role="tree">
+            {modules.map((module) => {
           const isExpanded = expandedModules.has(module.id);
           const moduleActions: ActionItem[] = [
             {
@@ -344,20 +377,27 @@ function EducationTree({
             { label: "Удалить модуль", onClick: () => removeModule(module), danger: true },
           ];
           return (
-            <li key={module.id} role="treeitem" aria-expanded={isExpanded}>
-              <TreeRow
-                depth={0}
-                expandable={module.chapters.length > 0}
-                expanded={isExpanded}
-                onToggle={() => toggleModule(module.id)}
-                onSelect={() => onSelect({ kind: "module", id: module.id })}
-                active={selection.kind === "module" && selection.id === module.id}
-                icon={<FolderOpen size={16} />}
-                status={module.status}
-                title={module.title}
-                meta={`${module.accessLevel} · ${module.chapters.length} ${pluralize(module.chapters.length, "глава", "главы", "глав")}`}
-                actions={moduleActions}
-              />
+            <SortableModuleTreeItem
+              key={module.id}
+              id={module.id}
+              isExpanded={isExpanded}
+              renderRow={(dragHandleProps) => (
+                <TreeRow
+                  depth={0}
+                  expandable={module.chapters.length > 0}
+                  expanded={isExpanded}
+                  onToggle={() => toggleModule(module.id)}
+                  onSelect={() => onSelect({ kind: "module", id: module.id })}
+                  active={selection.kind === "module" && selection.id === module.id}
+                  icon={<FolderOpen size={16} />}
+                  status={module.status}
+                  title={module.title}
+                  meta={`${module.isInDevelopment ? "В разработке · " : ""}${module.accessLevel} · ${module.chapters.length} ${pluralize(module.chapters.length, "глава", "главы", "глав")}`}
+                  actions={moduleActions}
+                  dragHandleProps={dragHandleProps}
+                />
+              )}
+            >
               {isExpanded ? (
                 <ul className="tree-children" role="group">
                   {module.chapters.map((chapter, chapterIndex) => {
@@ -452,11 +492,45 @@ function EducationTree({
                   </li>
                 </ul>
               ) : null}
-            </li>
+            </SortableModuleTreeItem>
           );
-        })}
-      </ul>
+            })}
+          </ul>
+        </SortableContext>
+      </DndContext>
     </>
+  );
+}
+
+function SortableModuleTreeItem({
+  id,
+  isExpanded,
+  renderRow,
+  children,
+}: {
+  id: string;
+  isExpanded: boolean;
+  renderRow: (dragHandleProps: React.ButtonHTMLAttributes<HTMLButtonElement>) => React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.55 : 1,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={isDragging ? "is-dragging" : undefined}
+      role="treeitem"
+      aria-expanded={isExpanded}
+    >
+      {renderRow({ ...attributes, ...listeners })}
+      {children}
+    </li>
   );
 }
 
@@ -473,6 +547,7 @@ function ModuleCreateForm({
     description: "",
     coverImageId: "",
     accessLevel: "basic" as LearningModule["accessLevel"],
+    isInDevelopment: false,
   });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -483,6 +558,7 @@ function ModuleCreateForm({
       description: draft.description,
       coverImageId: draft.coverImageId.trim() || undefined,
       accessLevel: draft.accessLevel,
+      isInDevelopment: draft.isInDevelopment,
       preview: { promotionalDescription: draft.summary, whatYouWillLearn: [] },
       chapters: [],
     });
@@ -523,6 +599,7 @@ function ModuleCreateForm({
       <FileUploadField
         accept="image/*"
         buttonLabel="Загрузить обложку"
+        imagePreset="cover"
         label="Обложка модуля"
         value={draft.coverImageId}
         onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
@@ -544,6 +621,15 @@ function ModuleCreateForm({
           <option value="one_time">one_time — разовая покупка</option>
         </select>
       </label>
+      <label className="module-development-toggle">
+        <input
+          checked={draft.isInDevelopment}
+          onChange={(event) => setDraft((prev) => ({ ...prev, isInDevelopment: event.target.checked }))}
+          type="checkbox"
+        />
+        <span className="module-development-toggle-track" aria-hidden="true" />
+        <span>В разработке</span>
+      </label>
       <button className="button" type="submit">
         Создать модуль
       </button>
@@ -563,6 +649,7 @@ function TreeRow({
   title,
   meta,
   actions,
+  dragHandleProps,
 }: {
   depth: number;
   expandable?: boolean;
@@ -575,9 +662,20 @@ function TreeRow({
   title: string;
   meta?: string;
   actions: ActionItem[];
+  dragHandleProps?: React.ButtonHTMLAttributes<HTMLButtonElement>;
 }) {
   return (
-    <div className={`tree-row depth-${depth}${active ? " is-active" : ""}`}>
+    <div className={`tree-row depth-${depth}${active ? " is-active" : ""}${dragHandleProps ? " is-sortable" : ""}`}>
+      {dragHandleProps ? (
+        <button
+          type="button"
+          className="tree-row-drag"
+          aria-label="Изменить порядок"
+          {...dragHandleProps}
+        >
+          <GripVertical size={14} />
+        </button>
+      ) : null}
       <button
         type="button"
         className="tree-row-chevron"
@@ -661,6 +759,7 @@ function ModuleForm({
     coverImageId: module.coverImageId ?? "",
     accessLevel: module.accessLevel,
     oneTimePrice: module.oneTimePrice ?? 0,
+    isInDevelopment: module.isInDevelopment,
     promotionalDescription: module.preview?.promotionalDescription ?? "",
     whatYouWillLearn: module.preview?.whatYouWillLearn ?? [],
   });
@@ -675,10 +774,11 @@ function ModuleForm({
       coverImageId: module.coverImageId ?? "",
       accessLevel: module.accessLevel,
       oneTimePrice: module.oneTimePrice ?? 0,
+      isInDevelopment: module.isInDevelopment,
       promotionalDescription: module.preview?.promotionalDescription ?? "",
       whatYouWillLearn: module.preview?.whatYouWillLearn ?? [],
     });
-  }, [module.id, module.title, module.summary, module.description, module.coverImageId, module.accessLevel, module.oneTimePrice, module.preview]);
+  }, [module.id, module.title, module.summary, module.description, module.coverImageId, module.accessLevel, module.oneTimePrice, module.isInDevelopment, module.preview]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -691,6 +791,7 @@ function ModuleForm({
       accessLevel: draft.accessLevel,
       oneTimePrice:
         draft.accessLevel === "one_time" && draft.oneTimePrice > 0 ? draft.oneTimePrice : null,
+      isInDevelopment: draft.isInDevelopment,
       preview: {
         promotionalDescription: draft.promotionalDescription,
         whatYouWillLearn: draft.whatYouWillLearn,
@@ -701,7 +802,18 @@ function ModuleForm({
 
   return (
     <form className="form" onSubmit={submit}>
-      <h2>Модуль</h2>
+      <header className="module-form-header">
+        <h2>Модуль</h2>
+        <label className="module-development-toggle">
+          <input
+            checked={draft.isInDevelopment}
+            onChange={(event) => setDraft((prev) => ({ ...prev, isInDevelopment: event.target.checked }))}
+            type="checkbox"
+          />
+          <span className="module-development-toggle-track" aria-hidden="true" />
+          <span>В разработке</span>
+        </label>
+      </header>
       <label className="form-field">
         <span>Название</span>
         <input
@@ -733,6 +845,7 @@ function ModuleForm({
       <FileUploadField
         accept="image/*"
         buttonLabel="Загрузить обложку"
+        imagePreset="cover"
         label="Обложка модуля"
         value={draft.coverImageId}
         onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}

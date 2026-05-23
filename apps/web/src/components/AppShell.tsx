@@ -5,29 +5,29 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Bell,
   BookOpen,
-  Boxes,
   Calculator,
   ChevronsLeft,
   ChevronsRight,
   FileText,
   GraduationCap,
   HelpCircle,
+  LayoutDashboard,
   LineChart,
   Map,
   Menu,
   MessageCircle,
   Newspaper,
   Settings,
-  Shield,
+  ShieldCheck,
   ShoppingBag,
-  Users,
+  Store,
   X,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../lib/auth";
 import { NotificationBell } from "./NotificationBell";
+import { UserSupportDrawer } from "./UserSupportDrawer";
 
 type NavItem = {
   href?: string;
@@ -45,14 +45,18 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
       { href: "/news", label: "Новости", icon: Newspaper },
       { href: "/indices", label: "Индексы цен", icon: LineChart },
       { href: "/education", label: "Обучение", icon: GraduationCap },
+      { label: "Торговая площадка", icon: ShoppingBag, disabled: true },
     ],
   },
   {
     title: "Сообщество",
     items: [
       { label: "Форум", icon: MessageCircle, disabled: true },
-      { label: "Торговая площадка", icon: ShoppingBag, disabled: true },
     ],
+  },
+  {
+    title: "Автоматизация",
+    items: [{ label: "Магазин", icon: Store, disabled: true }],
   },
   {
     title: "Базы знаний",
@@ -73,12 +77,10 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
     items: [
       // Личный кабинет и уведомления уже доступны через иконки в топбаре —
       // здесь дублировать не нужно. Секция показывается только админам.
-      { href: "/admin/content/news", label: "Админ / CMS", icon: Shield, roles: ["admin", "content_manager"] },
-      { href: "/admin/moderation", label: "Модерация", icon: Shield, roles: ["admin", "moderator"] },
-      { href: "/admin/users", label: "Пользователи", icon: Users, roles: ["admin"] },
-      { href: "/admin/companies", label: "Компании", icon: Boxes, roles: ["admin"] },
-      { href: "/admin/staff", label: "Сотрудники", icon: Shield, roles: ["admin"] },
-      { href: "/admin/journals", label: "Журнал действий", icon: FileText, roles: ["admin"] },
+      // Раньше «Компании» и «Сотрудники» были отдельными пунктами; теперь
+      // это табы внутри «Пользователи» — так навигация чище.
+      { href: "/admin/content/news", label: "Панель управления", icon: LayoutDashboard, roles: ["admin", "content_manager"] },
+      { href: "/admin/moderation", label: "Модерация", icon: ShieldCheck, roles: ["admin", "moderator"] },
       { href: "/admin/settings", label: "Настройки", icon: Settings, roles: ["admin"] },
       { href: "/admin/support", label: "Поддержка", icon: HelpCircle, roles: ["admin"] },
     ],
@@ -91,6 +93,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, token, ready } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
+  // У админов своя полноценная страница /admin/support — drawer им
+  // показывать не нужно, иначе двойная сущность.
+  const isAdminUser = (user?.platformRoles?.length ?? 0) > 0;
 
   // Любой защищённый раздел оборачивается в AppShell. Если AuthProvider уже
   // проверил localStorage и токена нет — отправляем на /login. До ready
@@ -107,6 +113,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const handler = () => setSupportOpen(true);
+    window.addEventListener("support:open", handler);
+    return () => window.removeEventListener("support:open", handler);
+  }, []);
 
   // Запоминаем свёртку сайдбара между сессиями (только desktop-режим).
   useEffect(() => {
@@ -195,9 +207,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Breadcrumb nav={visibleNav} pathname={pathname} />
           <div className="topbar-spacer" />
           <NotificationBell />
-          <Link className="icon-button" href="/admin/support" title="Помощь">
-            <HelpCircle size={20} />
-          </Link>
+          {isAdminUser ? null : (
+            <button
+              className="icon-button"
+              type="button"
+              onClick={() => setSupportOpen(true)}
+              title="Поддержка"
+              aria-label="Открыть поддержку"
+            >
+              <HelpCircle size={20} />
+            </button>
+          )}
           <Link className="icon-button" href="/account" title="Настройки">
             <Settings size={20} />
           </Link>
@@ -211,6 +231,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <div className="page-surface">{children}</div>
       </main>
+      {/* Drawer поддержки рендерим один раз на уровне AppShell — компонент
+          сам проверяет проп `open` и ничего не рисует, пока он false. */}
+      {isAdminUser ? null : (
+        <UserSupportDrawer open={supportOpen} onClose={() => setSupportOpen(false)} />
+      )}
     </div>
   );
 }

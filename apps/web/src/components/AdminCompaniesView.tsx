@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -179,6 +180,7 @@ export function AdminCompaniesView() {
           <h1 className="page-title">Компании</h1>
           <p className="page-subtitle">Управление компаниями и их подписками.</p>
         </header>
+        <AdminPeopleTabs />
 
         <form
           className="form"

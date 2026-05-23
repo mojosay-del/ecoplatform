@@ -17,6 +17,7 @@ import { AdminActionLogService } from "../common/admin-action-log.service";
 import { ModuleAccessService } from "../common/module-access.service";
 import { sanitizeParagraphHtml } from "../common/sanitize-html";
 import type { RequestUser } from "../common/request-user";
+import { FilesService } from "../files/files.service";
 import type {
   categoryInputSchema,
   categoryUpdateInputSchema,
@@ -82,6 +83,7 @@ export class ContentService {
     private readonly auditLog: AdminActionLogService,
     private readonly moduleAccess: ModuleAccessService,
     private readonly settings: PlatformSettingsService,
+    private readonly files: FilesService,
   ) {}
 
   private assertFunctionalAccess(user: RequestUser) {
@@ -104,12 +106,80 @@ export class ContentService {
     return user.company ? canAccessLearningLevel(user.company, accessLevel) : false;
   }
 
+  private canAccessPublishedLearningModule(
+    user: RequestUser,
+    module: { accessLevel: LearningAccessLevel; isInDevelopment: boolean },
+  ) {
+    return !module.isInDevelopment && this.hasLearningAccess(user, module.accessLevel);
+  }
+
+  private assertLearningModulePublishable(
+    module: {
+      chapters: Array<{
+        title: string;
+        lessons: Array<{ title: string; _count: { blocks: number } }>;
+      }>;
+    },
+  ) {
+    if (module.chapters.length === 0) {
+      throw new ForbiddenException("Нельзя открыть доступ к модулю без глав.");
+    }
+    for (const chapter of module.chapters) {
+      if (chapter.lessons.length === 0) {
+        throw new ForbiddenException(`В главе «${chapter.title}» нет уроков.`);
+      }
+      for (const lesson of chapter.lessons) {
+        if (lesson._count.blocks === 0) {
+          throw new ForbiddenException(`Урок «${lesson.title}» не содержит блоков.`);
+        }
+      }
+    }
+  }
+
   private payload(block: BaseContentBlock): Prisma.InputJsonValue {
     if (block.type === "paragraph") {
       const { html } = block.payload as { html: string };
       return { html: sanitizeParagraphHtml(html) } as Prisma.InputJsonValue;
     }
     return block.payload as Prisma.InputJsonValue;
+  }
+
+  private collectFileIdsFromPayload(payload: unknown, fileIds = new Set<string>()) {
+    if (!payload || typeof payload !== "object") {
+      return fileIds;
+    }
+
+    if (Array.isArray(payload)) {
+      payload.forEach((value) => this.collectFileIdsFromPayload(value, fileIds));
+      return fileIds;
+    }
+
+    const record = payload as Record<string, unknown>;
+    if (typeof record.fileId === "string" && record.fileId) {
+      fileIds.add(record.fileId);
+    }
+
+    Object.values(record).forEach((value) => this.collectFileIdsFromPayload(value, fileIds));
+    return fileIds;
+  }
+
+  private collectFileIdsFromBlocks(blocks: Array<{ payload: unknown }>) {
+    const fileIds = new Set<string>();
+    blocks.forEach((block) => this.collectFileIdsFromPayload(block.payload, fileIds));
+    return Array.from(fileIds);
+  }
+
+  private compactFileIds(ids: Array<string | null | undefined>) {
+    return Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
+  }
+
+  private async cleanupDetachedFiles(ids: Array<string | null | undefined>) {
+    const fileIds = this.compactFileIds(ids);
+    if (fileIds.length === 0) {
+      return;
+    }
+
+    await this.files.deleteIfUnreferenced(fileIds);
   }
 
   private async uniqueSlug(base: string, exists: (slug: string) => Promise<boolean>) {
@@ -259,12 +329,16 @@ export class ContentService {
 
     const before = await this.prisma.newsPost.findUnique({
       where: { id },
-      include: { tags: true },
+      include: { tags: true, blocks: true },
     });
     if (!before) {
       throw new NotFoundException("Новость не найдена.");
     }
     const previousTagIds = before.tags.map((tag) => tag.newsTagId);
+    const previousFileIds = this.compactFileIds([
+      before.coverImageId,
+      ...this.collectFileIdsFromBlocks(before.blocks),
+    ]);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.newsContentBlock.deleteMany({ where: { newsPostId: id } });
@@ -288,6 +362,7 @@ export class ContentService {
 
     await this.replaceNewsTags(id, input.tags, user.id);
     await this.refreshTagUsage(previousTagIds);
+    await this.cleanupDetachedFiles(previousFileIds);
 
     await this.auditLog.record({
       actorId: user.id,
@@ -354,13 +429,22 @@ export class ContentService {
   async deleteNews(id: string, user: RequestUser, reason?: string) {
     const existing = await this.prisma.newsPost.findUnique({
       where: { id },
-      include: { tags: true },
+      include: {
+        tags: true,
+        blocks: true,
+        comments: { include: { attachments: true } },
+      },
     });
     if (!existing) {
       throw new NotFoundException("Новость не найдена.");
     }
 
     const affectedTagIds = existing.tags.map((tag) => tag.newsTagId);
+    const deletedFileIds = this.compactFileIds([
+      existing.coverImageId,
+      ...this.collectFileIdsFromBlocks(existing.blocks),
+      ...existing.comments.flatMap((comment) => comment.attachments.map((attachment) => attachment.fileId)),
+    ]);
 
     // Комментарии физически удаляются каскадом Comment.newsPost (onDelete: Cascade
     // в schema.prisma). Раньше мы пытались помечать им CommentStatus.removed_with_news
@@ -370,6 +454,7 @@ export class ContentService {
     await this.prisma.newsPost.delete({ where: { id } });
 
     await this.refreshTagUsage(affectedTagIds);
+    await this.cleanupDetachedFiles(deletedFileIds);
 
     await this.auditLog.record({
       actorId: user.id,
@@ -387,6 +472,13 @@ export class ContentService {
     return this.prisma.newsPost.findMany({
       orderBy: { updatedAt: "desc" },
       include: { tags: { include: { newsTag: true } }, blocks: { orderBy: { position: "asc" } } },
+    });
+  }
+
+  async adminListNewsTags() {
+    return this.prisma.newsTag.findMany({
+      orderBy: [{ usageCount: "desc" }, { name: "asc" }],
+      select: { id: true, name: true, usageCount: true },
     });
   }
 
@@ -539,10 +631,13 @@ export class ContentService {
                 priceIndex: item.priceIndex,
                 summary,
                 chart: {
+                  "2W": filterPriceIndexPoints(values, 14),
                   "1M": filterPriceIndexPoints(values, 30),
                   "3M": filterPriceIndexPoints(values, 90),
                   "6M": filterPriceIndexPoints(values, 180),
                   "1Y": filterPriceIndexPoints(values, 365),
+                  "2Y": filterPriceIndexPoints(values, 730),
+                  "3Y": filterPriceIndexPoints(values, 1095),
                 },
               }
             : null;
@@ -663,13 +758,10 @@ export class ContentService {
   async deleteNomenclature(id: string, user: RequestUser, reason?: string) {
     const existing = await this.prisma.nomenclature.findUnique({
       where: { id },
-      include: { priceIndex: true },
+      include: { priceIndex: { include: { _count: { select: { values: true } } } } },
     });
     if (!existing) {
       throw new NotFoundException("Номенклатура не найдена.");
-    }
-    if (existing.priceIndex) {
-      throw new ForbiddenException("Сначала удалите индекс цены, связанный с этой номенклатурой.");
     }
 
     await this.prisma.nomenclature.delete({ where: { id } });
@@ -680,7 +772,12 @@ export class ContentService {
       entityType: "Nomenclature",
       entityId: id,
       comment: reason,
-      payload: { code: existing.code, name: existing.name },
+      payload: {
+        code: existing.code,
+        name: existing.name,
+        priceIndexId: existing.priceIndex?.id ?? null,
+        priceValuesDeleted: existing.priceIndex?._count.values ?? 0,
+      },
     });
 
     return { ok: true };
@@ -802,7 +899,7 @@ export class ContentService {
     this.assertFunctionalAccess(user);
     const modules = await this.prisma.learningModule.findMany({
       where: { status: ContentStatus.published },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ position: "asc" }, { createdAt: "desc" }],
       include: {
         chapters: {
           include: {
@@ -815,7 +912,7 @@ export class ContentService {
 
     return modules.map((module) => ({
       ...module,
-      hasAccess: this.hasLearningAccess(user, module.accessLevel),
+      hasAccess: this.canAccessPublishedLearningModule(user, module),
     }));
   }
 
@@ -845,13 +942,20 @@ export class ContentService {
       throw new NotFoundException("Модуль не найден.");
     }
 
-    const hasAccess = this.hasLearningAccess(user, module.accessLevel);
-    return { ...module, hasAccess };
+    const hasAccess = this.canAccessPublishedLearningModule(user, module);
+    const chapters = hasAccess
+      ? module.chapters
+      : module.chapters.map((chapter) => ({
+          ...chapter,
+          lessons: chapter.lessons.map(({ blocks: _blocks, attachments: _attachments, ...lesson }) => lesson),
+        }));
+
+    return { ...module, chapters, hasAccess };
   }
 
   async adminListLearningModules() {
     return this.prisma.learningModule.findMany({
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ position: "asc" }, { updatedAt: "desc" }],
       include: { preview: true, chapters: { include: { lessons: { include: { blocks: true, attachments: true } } } } },
     });
   }
@@ -867,6 +971,10 @@ export class ContentService {
       }
     }
 
+    const lastPosition = await this.prisma.learningModule.aggregate({
+      _max: { position: true },
+    });
+
     const module = await this.prisma.learningModule.create({
       data: {
         title: input.title,
@@ -875,6 +983,8 @@ export class ContentService {
         coverImageId: input.coverImageId,
         accessLevel: input.accessLevel,
         oneTimePrice: input.oneTimePrice,
+        isInDevelopment: input.isInDevelopment,
+        position: (lastPosition._max.position ?? -1) + 1,
         createdById: user.id,
         preview: {
           create: {
@@ -931,18 +1041,8 @@ export class ContentService {
     if (!existing) {
       throw new NotFoundException("Модуль не найден.");
     }
-    if (existing.chapters.length === 0) {
-      throw new ForbiddenException("Нельзя опубликовать модуль без глав.");
-    }
-    for (const chapter of existing.chapters) {
-      if (chapter.lessons.length === 0) {
-        throw new ForbiddenException(`В главе «${chapter.title}» нет уроков.`);
-      }
-      for (const lesson of chapter.lessons) {
-        if (lesson._count.blocks === 0) {
-          throw new ForbiddenException(`Урок «${lesson.title}» не содержит блоков.`);
-        }
-      }
+    if (!existing.isInDevelopment) {
+      this.assertLearningModulePublishable(existing);
     }
 
     const now = new Date();
@@ -956,9 +1056,11 @@ export class ContentService {
         include: { chapters: { include: { lessons: true } } },
       });
 
-      const lessonIds = module.chapters.flatMap((chapter) =>
-        chapter.lessons.filter((lesson) => lesson.status === ContentStatus.draft).map((lesson) => lesson.id),
-      );
+      const lessonIds = module.isInDevelopment
+        ? []
+        : module.chapters.flatMap((chapter) =>
+            chapter.lessons.filter((lesson) => lesson.status === ContentStatus.draft).map((lesson) => lesson.id),
+          );
 
       if (lessonIds.length > 0) {
         await tx.lesson.updateMany({
@@ -1018,6 +1120,23 @@ export class ContentService {
     if (input.coverImageId !== undefined) data.coverImageId = input.coverImageId;
     if (input.accessLevel !== undefined) data.accessLevel = input.accessLevel;
     if (input.oneTimePrice !== undefined) data.oneTimePrice = input.oneTimePrice;
+    if (input.isInDevelopment !== undefined) data.isInDevelopment = input.isInDevelopment;
+    const positionChanged = input.position !== undefined && input.position !== existing.position;
+
+    let draftLessonIdsToPublish: string[] = [];
+    if (existing.status === ContentStatus.published && input.isInDevelopment === false) {
+      const publishable = await this.prisma.learningModule.findUnique({
+        where: { id },
+        include: { chapters: { include: { lessons: { include: { _count: { select: { blocks: true } } } } } } },
+      });
+      if (!publishable) {
+        throw new NotFoundException("Модуль не найден.");
+      }
+      this.assertLearningModulePublishable(publishable);
+      draftLessonIdsToPublish = publishable.chapters.flatMap((chapter) =>
+        chapter.lessons.filter((lesson) => lesson.status === ContentStatus.draft).map((lesson) => lesson.id),
+      );
+    }
 
     if (input.preview) {
       data.preview = {
@@ -1034,11 +1153,32 @@ export class ContentService {
       };
     }
 
-    const module = await this.prisma.learningModule.update({
-      where: { id },
-      data,
-      include: { preview: true },
+    const module = await this.prisma.$transaction(async (tx) => {
+      if (positionChanged) {
+        await this.repositionLearningModule(tx, id, input.position!);
+      }
+      if (Object.keys(data).length === 0 && !input.preview) {
+        return tx.learningModule.findUniqueOrThrow({ where: { id }, include: { preview: true } });
+      }
+      const updated = await tx.learningModule.update({
+        where: { id },
+        data,
+        include: { preview: true },
+      });
+
+      if (draftLessonIdsToPublish.length > 0) {
+        await tx.lesson.updateMany({
+          where: { id: { in: draftLessonIdsToPublish } },
+          data: { status: ContentStatus.published, firstPublishedAt: new Date() },
+        });
+      }
+
+      return updated;
     });
+
+    if (input.coverImageId !== undefined && input.coverImageId !== existing.coverImageId) {
+      await this.cleanupDetachedFiles([existing.coverImageId]);
+    }
 
     await this.auditLog.record({
       actorId: user.id,
@@ -1052,12 +1192,37 @@ export class ContentService {
   }
 
   async deleteLearningModule(id: string, user: RequestUser, reason?: string) {
-    const existing = await this.prisma.learningModule.findUnique({ where: { id } });
+    const existing = await this.prisma.learningModule.findUnique({
+      where: { id },
+      include: {
+        chapters: {
+          include: {
+            lessons: {
+              include: {
+                blocks: true,
+                attachments: true,
+              },
+            },
+          },
+        },
+      },
+    });
     if (!existing) {
       throw new NotFoundException("Модуль не найден.");
     }
 
+    const deletedFileIds = this.compactFileIds([
+      existing.coverImageId,
+      ...existing.chapters.flatMap((chapter) =>
+        chapter.lessons.flatMap((lesson) => [
+          ...this.collectFileIdsFromBlocks(lesson.blocks),
+          ...lesson.attachments.map((attachment) => attachment.fileId),
+        ]),
+      ),
+    ]);
+
     await this.prisma.learningModule.delete({ where: { id } });
+    await this.cleanupDetachedFiles(deletedFileIds);
 
     await this.auditLog.record({
       actorId: user.id,
@@ -1200,7 +1365,10 @@ export class ContentService {
   }
 
   async updateLesson(id: string, input: LessonUpdateInput, user: RequestUser) {
-    const existing = await this.prisma.lesson.findUnique({ where: { id } });
+    const existing = await this.prisma.lesson.findUnique({
+      where: { id },
+      include: { blocks: true, attachments: true },
+    });
     if (!existing) {
       throw new NotFoundException("Урок не найден.");
     }
@@ -1213,6 +1381,10 @@ export class ContentService {
     }
 
     const positionChanged = input.position !== undefined && input.position !== existing.position;
+    const previousFileIds = this.compactFileIds([
+      ...(input.blocks ? this.collectFileIdsFromBlocks(existing.blocks) : []),
+      ...(input.attachments ? existing.attachments.map((attachment) => attachment.fileId) : []),
+    ]);
 
     const lesson = await this.prisma.$transaction(async (tx) => {
       if (positionChanged) {
@@ -1254,16 +1426,27 @@ export class ContentService {
       entityId: id,
     });
 
+    await this.cleanupDetachedFiles(previousFileIds);
+
     return lesson;
   }
 
   async deleteLesson(id: string, user: RequestUser, reason?: string) {
-    const existing = await this.prisma.lesson.findUnique({ where: { id } });
+    const existing = await this.prisma.lesson.findUnique({
+      where: { id },
+      include: { blocks: true, attachments: true },
+    });
     if (!existing) {
       throw new NotFoundException("Урок не найден.");
     }
 
+    const deletedFileIds = this.compactFileIds([
+      ...this.collectFileIdsFromBlocks(existing.blocks),
+      ...existing.attachments.map((attachment) => attachment.fileId),
+    ]);
+
     await this.prisma.lesson.delete({ where: { id } });
+    await this.cleanupDetachedFiles(deletedFileIds);
 
     await this.auditLog.record({
       actorId: user.id,
@@ -1331,6 +1514,21 @@ export class ContentService {
 
   async completeLesson(lessonId: string, user: RequestUser) {
     this.assertFunctionalAccess(user);
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { chapter: { include: { module: true } } },
+    });
+    if (
+      !lesson ||
+      lesson.status !== ContentStatus.published ||
+      lesson.chapter.module.status !== ContentStatus.published
+    ) {
+      throw new NotFoundException("Урок не найден.");
+    }
+    if (!this.canAccessPublishedLearningModule(user, lesson.chapter.module)) {
+      throw new ForbiddenException("Доступ к модулю закрыт.");
+    }
+
     return this.prisma.lessonProgress.upsert({
       where: { userId_lessonId: { userId: user.id, lessonId } },
       update: {},
@@ -1395,7 +1593,8 @@ export class ContentService {
   }
 
   async createKnowledgeArticle(input: KnowledgeArticleInput, user: RequestUser) {
-    const check = validateContentBlocks(input.blocks);
+    const isCategory = this.isKnowledgeCategory(input.iconType);
+    const check = isCategory ? { ok: true as const } : validateContentBlocks(input.blocks);
 
     if (!check.ok) {
       throw new ForbiddenException(check.message);
@@ -1436,16 +1635,24 @@ export class ContentService {
   }
 
   async updateKnowledgeArticle(id: string, input: KnowledgeArticleInput, user: RequestUser) {
-    const check = validateContentBlocks(input.blocks);
+    const isCategory = this.isKnowledgeCategory(input.iconType);
+    const check = isCategory ? { ok: true as const } : validateContentBlocks(input.blocks);
 
     if (!check.ok) {
       throw new ForbiddenException(check.message);
     }
 
-    const existing = await this.prisma.knowledgeBaseArticle.findUnique({ where: { id } });
+    const existing = await this.prisma.knowledgeBaseArticle.findUnique({
+      where: { id },
+      include: { blocks: true },
+    });
     if (!existing) {
       throw new NotFoundException("Статья не найдена.");
     }
+    const previousFileIds = this.compactFileIds([
+      existing.coverImageId,
+      ...this.collectFileIdsFromBlocks(existing.blocks),
+    ]);
 
     const article = await this.prisma.$transaction(async (tx) => {
       await tx.knowledgeBaseBlock.deleteMany({ where: { articleId: id } });
@@ -1478,6 +1685,8 @@ export class ContentService {
       entityId: id,
     });
 
+    await this.cleanupDetachedFiles(previousFileIds);
+
     return article;
   }
 
@@ -1489,7 +1698,7 @@ export class ContentService {
     if (!existing) {
       throw new NotFoundException("Статья не найдена.");
     }
-    if (existing._count.blocks === 0) {
+    if (!this.isKnowledgeCategory(existing.iconType) && existing._count.blocks === 0) {
       throw new ForbiddenException("Нельзя опубликовать статью без блоков.");
     }
 
@@ -1592,7 +1801,7 @@ export class ContentService {
   async deleteKnowledgeArticle(id: string, user: RequestUser, reason?: string) {
     const existing = await this.prisma.knowledgeBaseArticle.findUnique({
       where: { id },
-      include: { _count: { select: { children: true } } },
+      include: { blocks: true, _count: { select: { children: true } } },
     });
     if (!existing) {
       throw new NotFoundException("Статья не найдена.");
@@ -1600,8 +1809,13 @@ export class ContentService {
     if (existing._count.children > 0) {
       throw new ForbiddenException("Нельзя удалить статью с дочерними узлами. Сначала переместите или удалите их.");
     }
+    const deletedFileIds = this.compactFileIds([
+      existing.coverImageId,
+      ...this.collectFileIdsFromBlocks(existing.blocks),
+    ]);
 
     await this.prisma.knowledgeBaseArticle.delete({ where: { id } });
+    await this.cleanupDetachedFiles(deletedFileIds);
 
     await this.auditLog.record({
       actorId: user.id,
@@ -1632,6 +1846,10 @@ export class ContentService {
         throw new ForbiddenException("Перемещение нарушит ограничение в три уровня.");
       }
     }
+  }
+
+  private isKnowledgeCategory(iconType?: string | null) {
+    return iconType === "category";
   }
 
   private async knowledgeDepth(nodeId: string): Promise<number> {
@@ -1701,6 +1919,26 @@ export class ContentService {
 
     for (let i = 0; i < ordered.length; i++) {
       await tx.chapter.update({ where: { id: ordered[i]! }, data: { position: i } });
+    }
+  }
+
+  private async repositionLearningModule(
+    tx: Prisma.TransactionClient,
+    itemId: string,
+    newPosition: number,
+  ) {
+    const siblings = await tx.learningModule.findMany({
+      where: { id: { not: itemId } },
+      orderBy: [{ position: "asc" }, { createdAt: "desc" }],
+      select: { id: true },
+    });
+
+    const ordered = siblings.map((s) => s.id);
+    const clamped = Math.max(0, Math.min(newPosition, ordered.length));
+    ordered.splice(clamped, 0, itemId);
+
+    for (let i = 0; i < ordered.length; i++) {
+      await tx.learningModule.update({ where: { id: ordered[i]! }, data: { position: i } });
     }
   }
 
