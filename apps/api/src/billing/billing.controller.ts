@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Headers, Post, Query, UseGuards } from "@nestjs/common";
 import { manualSubscriptionDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
@@ -36,8 +36,12 @@ export class BillingController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/billing/manual-subscriptions")
-  async activate(@Body() body: unknown, @CurrentUser() user: RequestUser) {
+  async activate(
+    @Body() body: unknown,
+    @CurrentUser() user: RequestUser,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+  ) {
     const input = parseBody(manualSubscriptionDtoSchema, body);
-    return this.billing.activateManually(input, user.id);
+    return this.billing.activateManually(input, user.id, idempotencyKey);
   }
 }

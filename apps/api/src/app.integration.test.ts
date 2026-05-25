@@ -287,6 +287,7 @@ describe("Demo gating", () => {
     const act = await ctx.http
       .post("/api/admin/billing/manual-subscriptions")
       .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", `manual-activate-${companyId}`)
       .send({ companyId, plan: "basic", endsAt, reason: "integration-test" });
     expect(act.status).toBe(201);
     expect(act.body.company.status).toBe("active");
@@ -295,6 +296,57 @@ describe("Demo gating", () => {
     // 3. Доступ восстановлен
     const news = await ctx.http.get("/api/news").set("Authorization", `Bearer ${token}`);
     expect(news.status).toBe(200);
+  });
+
+  it("ручная активация подписки идемпотентна по Idempotency-Key", async () => {
+    const { companyId, userId } = await registerCompany("0000013");
+    const adminToken = await loginAdmin();
+    const endsAt = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString();
+    const payload = { companyId, plan: "extended", endsAt, reason: "double-click-test" };
+    const key = `manual-idempotency-${companyId}`;
+
+    const first = await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", key)
+      .send(payload);
+    expect(first.status).toBe(201);
+
+    const second = await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", key)
+      .send(payload);
+    expect(second.status).toBe(201);
+    expect(second.body).toEqual(first.body);
+
+    const conflict = await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", key)
+      .send({ ...payload, reason: "different-payload" });
+    expect(conflict.status).toBe(409);
+
+    const [subscriptions, logs, notifications, deliveries] = await Promise.all([
+      ctx.prisma.subscription.findMany({ where: { companyId } }),
+      ctx.prisma.adminActionLog.findMany({
+        where: { action: "manual_subscription_activation", entityId: companyId },
+      }),
+      ctx.prisma.inAppNotification.findMany({
+        where: { userId, eventType: "billing.subscription.activated" },
+      }),
+      ctx.prisma.notificationDelivery.findMany({
+        where: {
+          recipientUserId: userId,
+          eventType: "billing.subscription.activated",
+        },
+      }),
+    ]);
+
+    expect(subscriptions).toHaveLength(1);
+    expect(logs).toHaveLength(1);
+    expect(notifications).toHaveLength(1);
+    expect(deliveries).toHaveLength(2);
   });
 });
 
@@ -1028,12 +1080,16 @@ describe("Billing notifications (cron)", () => {
 
     // Активируем подписку, оканчивающуюся через 5 дней.
     const fiveDaysLater = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-    await ctx.http.post("/api/admin/billing/manual-subscriptions").set("Authorization", `Bearer ${adminToken}`).send({
-      companyId: company.companyId,
-      plan: "basic",
-      endsAt: fiveDaysLater.toISOString(),
-      reason: "тест",
-    });
+    await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", `billing-expiring-${company.companyId}`)
+      .send({
+        companyId: company.companyId,
+        plan: "basic",
+        endsAt: fiveDaysLater.toISOString(),
+        reason: "тест",
+      });
 
     await ctx.app.get(BillingNotificationsService).runHourlyCheck();
 
@@ -1049,12 +1105,16 @@ describe("Billing notifications (cron)", () => {
     const company = await registerCompany("0600004");
 
     const futureEndsAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
-    await ctx.http.post("/api/admin/billing/manual-subscriptions").set("Authorization", `Bearer ${adminToken}`).send({
-      companyId: company.companyId,
-      plan: "extended",
-      endsAt: futureEndsAt.toISOString(),
-      reason: "тест",
-    });
+    await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", `billing-expired-${company.companyId}`)
+      .send({
+        companyId: company.companyId,
+        plan: "extended",
+        endsAt: futureEndsAt.toISOString(),
+        reason: "тест",
+      });
 
     // Сдвинем end даты в прошлое (имитация истечения).
     const pastEndsAt = new Date(Date.now() - 60 * 60 * 1000);

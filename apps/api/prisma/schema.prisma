@@ -265,6 +265,25 @@ model AdminActionLog {
   @@index([actorId, createdAt])
 }
 
+model IdempotencyKey {
+  id            String   @id @default(cuid())
+  key           String
+  endpoint      String
+  action        String
+  actorId       String
+  requestHash   String
+  response      Json?
+  referenceType String?
+  referenceId   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([key, endpoint, actorId])
+  @@index([endpoint, createdAt])
+  @@index([actorId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
 model PlatformSetting {
   key           String   @id
   value         Json

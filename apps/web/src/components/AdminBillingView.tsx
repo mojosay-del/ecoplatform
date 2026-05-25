@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, type SetStateAction } from "react";
 import { AppShell } from "./AppShell";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -43,6 +43,13 @@ export function AdminBillingView() {
     reason: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
+  const idempotencyKey = useRef(createIdempotencyKey());
+
+  function updateForm(next: SetStateAction<typeof form>) {
+    idempotencyKey.current = createIdempotencyKey();
+    setForm(next);
+  }
 
   async function loadCompanies() {
     if (!token) {
@@ -70,7 +77,8 @@ export function AdminBillingView() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token) return;
+    if (!token || submitInFlight.current) return;
+    submitInFlight.current = true;
     setSubmitting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -78,6 +86,7 @@ export function AdminBillingView() {
       await apiFetch("/admin/billing/manual-subscriptions", {
         method: "POST",
         token,
+        headers: { "Idempotency-Key": idempotencyKey.current },
         body: {
           companyId: form.companyId,
           plan: form.plan,
@@ -86,11 +95,13 @@ export function AdminBillingView() {
         },
       });
       setSuccessMessage("Подписка активирована.");
+      idempotencyKey.current = createIdempotencyKey();
       setForm((prev) => ({ ...prev, reason: "" }));
       await loadCompanies();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось активировать подписку");
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   }
@@ -141,7 +152,7 @@ export function AdminBillingView() {
             <select
               className="select"
               value={form.companyId}
-              onChange={(event) => setForm((prev) => ({ ...prev, companyId: event.target.value }))}
+              onChange={(event) => updateForm((prev) => ({ ...prev, companyId: event.target.value }))}
               required
             >
               <option value="">Выберите компанию…</option>
@@ -158,7 +169,9 @@ export function AdminBillingView() {
             <select
               className="select"
               value={form.plan}
-              onChange={(event) => setForm((prev) => ({ ...prev, plan: event.target.value as "basic" | "extended" }))}
+              onChange={(event) =>
+                updateForm((prev) => ({ ...prev, plan: event.target.value as "basic" | "extended" }))
+              }
             >
               {plans.map((plan) => (
                 <option key={plan.value} value={plan.value}>
@@ -174,7 +187,7 @@ export function AdminBillingView() {
               className="input"
               type="date"
               value={form.endsAt}
-              onChange={(event) => setForm((prev) => ({ ...prev, endsAt: event.target.value }))}
+              onChange={(event) => updateForm((prev) => ({ ...prev, endsAt: event.target.value }))}
               required
             />
           </label>
@@ -185,7 +198,7 @@ export function AdminBillingView() {
               className="textarea small"
               placeholder="Например: оплачено по счёту № 123 от 2026-05-19."
               value={form.reason}
-              onChange={(event) => setForm((prev) => ({ ...prev, reason: event.target.value }))}
+              onChange={(event) => updateForm((prev) => ({ ...prev, reason: event.target.value }))}
               minLength={3}
               required
             />
@@ -226,4 +239,10 @@ function defaultEndsAt(): string {
   const date = new Date();
   date.setMonth(date.getMonth() + 1);
   return date.toISOString().slice(0, 10);
+}
+
+function createIdempotencyKey(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `manual-subscription-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
 }

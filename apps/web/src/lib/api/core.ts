@@ -4,6 +4,7 @@ export type ApiOptions = {
   token?: string | null;
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
+  headers?: Record<string, string>;
 };
 
 export type FileAsset = {
@@ -170,6 +171,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
       method: options.method ?? "GET",
       headers: {
         "Content-Type": "application/json",
+        ...(options.headers ?? {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
     },
