@@ -4,13 +4,6 @@
 
 ## Открытые
 
-### S-1. Локальный тип `User` в `auth.tsx` и `AuthMeUser` в shared расходятся
-
-- **Где**: `apps/web/src/lib/auth.tsx:6-23` (локальный `type User`) vs `packages/shared/src/api-response.ts:274-289` (`AuthMeUser`).
-- **Симптом**: каждый раз, когда API возвращает поле, которого нет в локальном типе, TS падает. Сегодня починили `phone?: string` — но рассинхрон останется до унификации.
-- **Что сделать**: заменить локальный `User` на импорт `AuthMeUser` из shared. Сверить shape (локальный имеет `avatarUrl`, `company { organizationName, demoEndsAt, subscriptionPlan, subscriptionEndsAt }`; AuthMeUser имеет `phone`, `status`, `company { id, name }`). Привести `/api/auth/me` к единому shape, обновить все потребителей.
-- **Когда**: после Волны 6 (юр-фундамент тоже потребует расширения `AuthMeUser`, лучше за один раз).
-
 ### S-4. PROGRESS.md содержит «галлюцинации»
 
 - **Что**: в журнал писались записи о работе, которая фактически не была доведена (Волны 3.1, 3.2, 4.1 в части пагинации, 4.7 в части unit-тестов, 5.7 в части обновления паролей в тестах). Часть исправлена 2026-05-25 при ревизии.
@@ -18,6 +11,12 @@
 - **Что сделать**: ничего отдельного — следить за дисциплиной в следующих волнах.
 
 ## Закрытые
+
+### S-1. Локальный тип `User` в `auth.tsx` и `AuthMeUser` в shared расходились
+
+- **Закрыто 2026-05-25**: `/api/auth/me` теперь возвращает явный shared-контракт `AuthMeUser`: `avatarUrl`, `companyId`, `platformRoles`, `status`, ограниченный `company`-снимок (`id`, `organizationName`, `type`, `status`, `demoEndsAt`, `subscriptionPlan`, `subscriptionEndsAt`) и задел `requiresReConsent: false`.
+- **Web**: `apps/web/src/lib/auth.tsx` больше не держит локальный рассинхронизированный shape, а использует `AuthMeUser` из `@ecoplatform/shared`.
+- **Проверки**: `pnpm lint`, `pnpm test`, полный `apps/api/src/app.integration.test.ts` — 79/79. Два первых root-прогона `pnpm test:integration` падали на плавающих `ECONNRESET`/407 вне auth-контракта, повторный полный API integration прошёл.
 
 ### S-2. Нет корневого `pnpm test:integration` через turbo
 

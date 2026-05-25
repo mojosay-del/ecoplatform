@@ -14,6 +14,10 @@ export const userGenders = ["male", "female"] as const;
 
 export type UserGender = (typeof userGenders)[number];
 
+export const userStatuses = ["active", "blocked"] as const;
+
+export type UserStatus = (typeof userStatuses)[number];
+
 export const platformRoles = ["admin", "moderator", "content_manager"] as const;
 
 export type PlatformRole = (typeof platformRoles)[number];

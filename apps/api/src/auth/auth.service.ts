@@ -10,7 +10,7 @@ import { JwtService } from "@nestjs/jwt";
 import { CompanyStatus, NotificationCategory, UserStatus } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { randomBytes } from "crypto";
-import type { LoginDto, RegisterDto } from "@ecoplatform/shared";
+import type { AuthMeUser, LoginDto, RegisterDto } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -338,16 +338,26 @@ export class AuthService {
     return { ok: true, revoked: result.count };
   }
 
-  async me(userId: string) {
+  async me(userId: string): Promise<AuthMeUser> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       include: {
-        company: true,
+        company: {
+          select: {
+            id: true,
+            organizationName: true,
+            type: true,
+            status: true,
+            demoEndsAt: true,
+            subscriptionPlan: true,
+            subscriptionEndsAt: true,
+          },
+        },
         platformStaff: true,
       },
     });
 
-    const platformRoles = user.platformStaff?.roles ?? [];
+    const platformRoles = user.platformStaff?.isActive ? user.platformStaff.roles : [];
 
     return {
       id: user.id,
@@ -356,10 +366,22 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       gender: user.gender,
+      status: user.status,
       avatarUrl: resolveProfileAvatarUrl(platformRoles, user.company?.type ?? null, user.gender),
       companyId: user.companyId,
-      company: user.company,
+      company: user.company
+        ? {
+            id: user.company.id,
+            organizationName: user.company.organizationName,
+            type: user.company.type,
+            status: user.company.status,
+            demoEndsAt: user.company.demoEndsAt?.toISOString() ?? null,
+            subscriptionPlan: user.company.subscriptionPlan,
+            subscriptionEndsAt: user.company.subscriptionEndsAt?.toISOString() ?? null,
+          }
+        : null,
       platformRoles,
+      requiresReConsent: false,
     };
   }
 

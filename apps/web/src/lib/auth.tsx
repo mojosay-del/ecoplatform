@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type { AuthMeUser } from "@ecoplatform/shared";
 import {
   apiFetch,
   clearAccessToken,
@@ -10,25 +11,7 @@ import {
   tryRestoreSession,
 } from "./api";
 
-type User = {
-  id: string;
-  email: string;
-  phone?: string;
-  firstName: string;
-  lastName: string;
-  gender: string;
-  avatarUrl: string | null;
-  companyId?: string | null;
-  company?: {
-    organizationName: string;
-    type: string;
-    status: string;
-    demoEndsAt?: string;
-    subscriptionPlan?: string;
-    subscriptionEndsAt?: string;
-  };
-  platformRoles: string[];
-};
+export type User = AuthMeUser;
 
 type AuthContextValue = {
   token: string | null;

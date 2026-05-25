@@ -7,6 +7,9 @@
 // в API некоторые поля приходят с decorator-обёрткой (likedByMe, hasAccess,
 // progress и т.п.). Дата приходит строкой (JSON.stringify Date → string).
 
+import type { CompanyStatus, CompanyType, PlatformRole, SubscriptionPlan, UserGender, UserStatus } from "./domain";
+import type { PriceIndexSummary } from "./price-index";
+
 // ── Common ────────────────────────────────────────────────────────────────
 export type IsoDateString = string;
 
@@ -97,10 +100,6 @@ export type PriceChartPoint = {
 export type IndexPeriodKey = "2W" | "1M" | "3M" | "6M" | "1Y" | "2Y" | "3Y";
 
 export type PriceIndexChart = Partial<Record<IndexPeriodKey, PriceChartPoint[]>>;
-
-// PriceIndexSummary живёт в ./price-index.ts (используется одновременно
-// и расчётной функцией `summarizePriceIndex`, и API-ответом).
-import type { PriceIndexSummary } from "./price-index";
 
 export type NomenclatureListItem = {
   id: string;
@@ -236,10 +235,6 @@ export type KnowledgeArticleDetail = KnowledgeNode & {
 };
 
 // ── Account / billing / notifications ─────────────────────────────────────
-// Эти shape живут в Codex-стороне (auth/me, billing/status, etc.). Сейчас в
-// AccountView они частично типизированы через локальные types — здесь только
-// общий минимум, чтобы не дублировать.
-
 export type BillingSubscription = {
   id: string;
   companyId: string;
@@ -273,17 +268,25 @@ export type BillingStatus = {
 
 export type AuthMeUser = {
   id: string;
-  firstName: string;
-  lastName: string;
   email: string;
   phone: string;
-  gender: string;
-  platformRoles: string[];
-  status: string;
-  company: {
-    id: string;
-    type: string;
-    status: string;
-    name: string;
-  } | null;
+  firstName: string;
+  lastName: string;
+  gender: UserGender;
+  status: UserStatus;
+  avatarUrl: string | null;
+  companyId: string | null;
+  company: AuthMeCompany | null;
+  platformRoles: PlatformRole[];
+  requiresReConsent: boolean;
+};
+
+export type AuthMeCompany = {
+  id: string;
+  organizationName: string;
+  type: CompanyType;
+  status: CompanyStatus;
+  demoEndsAt: IsoDateString | null;
+  subscriptionPlan: SubscriptionPlan | null;
+  subscriptionEndsAt: IsoDateString | null;
 };

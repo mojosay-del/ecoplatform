@@ -64,6 +64,10 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
   const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
   expect(me.status).toBe(200);
   expect(me.body.avatarUrl).toBe("/avatars/company/zman.png");
+  expect(me.body.companyId).toBe(me.body.company.id);
+  expect(me.body.company.organizationName).toBe(`ООО Тест ${suffix}`);
+  expect(me.body.company.billingInn).toBeUndefined();
+  expect(me.body.requiresReConsent).toBe(false);
   return { token, companyId: me.body.company.id, userId: me.body.id };
 }
 
@@ -189,6 +193,9 @@ describe("Auth", () => {
     expect(me.status).toBe(200);
     expect(me.body.gender).toBe("male");
     expect(me.body.avatarUrl).toBe("/avatars/platform/aman.png");
+    expect(me.body.company).toBeNull();
+    expect(me.body.companyId).toBeNull();
+    expect(me.body.requiresReConsent).toBe(false);
   });
 
   it("регистрация сохраняет тип компании и пол для аватара профиля", async () => {
@@ -208,6 +215,7 @@ describe("Auth", () => {
     expect(me.status).toBe(200);
     expect(me.body.gender).toBe("female");
     expect(me.body.company.type).toBe("trader");
+    expect(me.body.company.organizationName).toBe("ООО Трейд Жен");
     expect(me.body.avatarUrl).toBe("/avatars/company/twoman.png");
   });
 
