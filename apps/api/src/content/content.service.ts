@@ -136,7 +136,7 @@ export class ContentService {
     }
   }
 
-  private payload(block: BaseContentBlock): Prisma.InputJsonValue {
+  private payload(block: { type: string; payload: unknown }): Prisma.InputJsonValue {
     if (block.type === "paragraph") {
       const { html } = block.payload as { html: string };
       return { html: sanitizeParagraphHtml(html) } as Prisma.InputJsonValue;
@@ -631,13 +631,10 @@ export class ContentService {
                 priceIndex: item.priceIndex,
                 summary,
                 chart: {
-                  "2W": filterPriceIndexPoints(values, 14),
                   "1M": filterPriceIndexPoints(values, 30),
                   "3M": filterPriceIndexPoints(values, 90),
                   "6M": filterPriceIndexPoints(values, 180),
                   "1Y": filterPriceIndexPoints(values, 365),
-                  "2Y": filterPriceIndexPoints(values, 730),
-                  "3Y": filterPriceIndexPoints(values, 1095),
                 },
               }
             : null;
@@ -899,7 +896,7 @@ export class ContentService {
     this.assertFunctionalAccess(user);
     const modules = await this.prisma.learningModule.findMany({
       where: { status: ContentStatus.published },
-      orderBy: [{ position: "asc" }, { createdAt: "desc" }],
+      orderBy: { createdAt: "desc" },
       include: {
         chapters: {
           include: {
@@ -955,7 +952,7 @@ export class ContentService {
 
   async adminListLearningModules() {
     return this.prisma.learningModule.findMany({
-      orderBy: [{ position: "asc" }, { updatedAt: "desc" }],
+      orderBy: { updatedAt: "desc" },
       include: { preview: true, chapters: { include: { lessons: { include: { blocks: true, attachments: true } } } } },
     });
   }
@@ -971,10 +968,6 @@ export class ContentService {
       }
     }
 
-    const lastPosition = await this.prisma.learningModule.aggregate({
-      _max: { position: true },
-    });
-
     const module = await this.prisma.learningModule.create({
       data: {
         title: input.title,
@@ -984,7 +977,6 @@ export class ContentService {
         accessLevel: input.accessLevel,
         oneTimePrice: input.oneTimePrice,
         isInDevelopment: input.isInDevelopment,
-        position: (lastPosition._max.position ?? -1) + 1,
         createdById: user.id,
         preview: {
           create: {
@@ -1121,7 +1113,6 @@ export class ContentService {
     if (input.accessLevel !== undefined) data.accessLevel = input.accessLevel;
     if (input.oneTimePrice !== undefined) data.oneTimePrice = input.oneTimePrice;
     if (input.isInDevelopment !== undefined) data.isInDevelopment = input.isInDevelopment;
-    const positionChanged = input.position !== undefined && input.position !== existing.position;
 
     let draftLessonIdsToPublish: string[] = [];
     if (existing.status === ContentStatus.published && input.isInDevelopment === false) {
@@ -1154,12 +1145,6 @@ export class ContentService {
     }
 
     const module = await this.prisma.$transaction(async (tx) => {
-      if (positionChanged) {
-        await this.repositionLearningModule(tx, id, input.position!);
-      }
-      if (Object.keys(data).length === 0 && !input.preview) {
-        return tx.learningModule.findUniqueOrThrow({ where: { id }, include: { preview: true } });
-      }
       const updated = await tx.learningModule.update({
         where: { id },
         data,
@@ -1593,8 +1578,7 @@ export class ContentService {
   }
 
   async createKnowledgeArticle(input: KnowledgeArticleInput, user: RequestUser) {
-    const isCategory = this.isKnowledgeCategory(input.iconType);
-    const check = isCategory ? { ok: true as const } : validateContentBlocks(input.blocks);
+    const check = validateContentBlocks(input.blocks);
 
     if (!check.ok) {
       throw new ForbiddenException(check.message);
@@ -1635,8 +1619,7 @@ export class ContentService {
   }
 
   async updateKnowledgeArticle(id: string, input: KnowledgeArticleInput, user: RequestUser) {
-    const isCategory = this.isKnowledgeCategory(input.iconType);
-    const check = isCategory ? { ok: true as const } : validateContentBlocks(input.blocks);
+    const check = validateContentBlocks(input.blocks);
 
     if (!check.ok) {
       throw new ForbiddenException(check.message);
@@ -1698,7 +1681,7 @@ export class ContentService {
     if (!existing) {
       throw new NotFoundException("Статья не найдена.");
     }
-    if (!this.isKnowledgeCategory(existing.iconType) && existing._count.blocks === 0) {
+    if (existing._count.blocks === 0) {
       throw new ForbiddenException("Нельзя опубликовать статью без блоков.");
     }
 
@@ -1848,10 +1831,6 @@ export class ContentService {
     }
   }
 
-  private isKnowledgeCategory(iconType?: string | null) {
-    return iconType === "category";
-  }
-
   private async knowledgeDepth(nodeId: string): Promise<number> {
     let current: string | null = nodeId;
     let depth = 0;
@@ -1919,26 +1898,6 @@ export class ContentService {
 
     for (let i = 0; i < ordered.length; i++) {
       await tx.chapter.update({ where: { id: ordered[i]! }, data: { position: i } });
-    }
-  }
-
-  private async repositionLearningModule(
-    tx: Prisma.TransactionClient,
-    itemId: string,
-    newPosition: number,
-  ) {
-    const siblings = await tx.learningModule.findMany({
-      where: { id: { not: itemId } },
-      orderBy: [{ position: "asc" }, { createdAt: "desc" }],
-      select: { id: true },
-    });
-
-    const ordered = siblings.map((s) => s.id);
-    const clamped = Math.max(0, Math.min(newPosition, ordered.length));
-    ordered.splice(clamped, 0, itemId);
-
-    for (let i = 0; i < ordered.length; i++) {
-      await tx.learningModule.update({ where: { id: ordered[i]! }, data: { position: i } });
     }
   }
 

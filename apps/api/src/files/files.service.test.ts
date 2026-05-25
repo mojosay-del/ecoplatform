@@ -15,6 +15,7 @@ function referencePrisma(overrides: Record<string, unknown> = {}) {
     newsContentBlock: { findMany: vi.fn().mockResolvedValue([]) },
     lessonContentBlock: { findMany: vi.fn().mockResolvedValue([]) },
     knowledgeBaseBlock: { findMany: vi.fn().mockResolvedValue([]) },
+    fileReference: { count: vi.fn().mockResolvedValue(0) },
     fileAsset: {
       findUnique: vi.fn().mockResolvedValue({
         id: "file-1",
@@ -27,7 +28,7 @@ function referencePrisma(overrides: Record<string, unknown> = {}) {
 }
 
 describe("FilesService cleanup", () => {
-  it("deletes file metadata when an asset is no longer referenced", async () => {
+  it("удаляет метаданные файла, если на него нигде не ссылаются", async () => {
     const prisma = referencePrisma();
     const service = serviceWithPrisma(prisma);
 
@@ -36,7 +37,29 @@ describe("FilesService cleanup", () => {
     expect(prisma.fileAsset.delete).toHaveBeenCalledWith({ where: { id: "file-1" } });
   });
 
-  it("keeps an asset referenced from content block payloads", async () => {
+  it("сохраняет файл, если на него есть запись в FileReference", async () => {
+    const prisma = referencePrisma({
+      fileReference: { count: vi.fn().mockResolvedValue(1) },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await service.deleteIfUnreferenced(["file-1"]);
+
+    expect(prisma.fileAsset.delete).not.toHaveBeenCalled();
+  });
+
+  it("сохраняет файл, если он указан как cover в структурированном поле", async () => {
+    const prisma = referencePrisma({
+      newsPost: { count: vi.fn().mockResolvedValue(1) },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await service.deleteIfUnreferenced(["file-1"]);
+
+    expect(prisma.fileAsset.delete).not.toHaveBeenCalled();
+  });
+
+  it("сохраняет файл, если он встречается в payload блока контента", async () => {
     const prisma = referencePrisma({
       lessonContentBlock: {
         findMany: vi.fn().mockResolvedValue([{ payload: { images: [{ fileId: "file-1" }] } }]),
