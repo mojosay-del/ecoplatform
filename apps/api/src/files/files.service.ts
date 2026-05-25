@@ -285,11 +285,7 @@ export class FilesService {
   }
 
   private isAllowedDetectedMime(mimeType: string): boolean {
-    return (
-      ALLOWED_DETECTED_MIME_TYPES.has(mimeType) ||
-      mimeType.startsWith("audio/") ||
-      mimeType.startsWith("video/")
-    );
+    return ALLOWED_DETECTED_MIME_TYPES.has(mimeType) || mimeType.startsWith("audio/") || mimeType.startsWith("video/");
   }
 
   private isDeclaredMimeCompatible(declaredMime: string, detectedMime: string): boolean {
@@ -453,14 +449,13 @@ export class FilesService {
   }
 
   private async hasStructuredReference(fileId: string) {
-    const [newsCovers, learningCovers, knowledgeCovers, lessonAttachments, commentAttachments] =
-      await Promise.all([
-        this.prisma.newsPost.count({ where: { coverImageId: fileId } }),
-        this.prisma.learningModule.count({ where: { coverImageId: fileId } }),
-        this.prisma.knowledgeBaseArticle.count({ where: { coverImageId: fileId } }),
-        this.prisma.lessonAttachment.count({ where: { fileId } }),
-        this.prisma.commentAttachment.count({ where: { fileId } }),
-      ]);
+    const [newsCovers, learningCovers, knowledgeCovers, lessonAttachments, commentAttachments] = await Promise.all([
+      this.prisma.newsPost.count({ where: { coverImageId: fileId } }),
+      this.prisma.learningModule.count({ where: { coverImageId: fileId } }),
+      this.prisma.knowledgeBaseArticle.count({ where: { coverImageId: fileId } }),
+      this.prisma.lessonAttachment.count({ where: { fileId } }),
+      this.prisma.commentAttachment.count({ where: { fileId } }),
+    ]);
 
     return newsCovers + learningCovers + knowledgeCovers + lessonAttachments + commentAttachments > 0;
   }

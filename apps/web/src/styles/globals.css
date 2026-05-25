@@ -38,7 +38,14 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 a {
@@ -158,7 +165,9 @@ select {
   color: #4b5363;
   font-weight: 500;
   font-size: 14px;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .nav-link svg {
@@ -237,7 +246,9 @@ select {
   border: 1px solid var(--line);
   color: #495264;
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
 .icon-button:hover {
@@ -469,9 +480,7 @@ select {
   place-items: center;
   border-radius: var(--radius-card);
   overflow: hidden;
-  background:
-    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.08), transparent 28%),
-    rgba(15, 23, 42, 0.24);
+  background: radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.08), transparent 28%), rgba(15, 23, 42, 0.24);
   backdrop-filter: blur(3px) saturate(0.9);
   -webkit-backdrop-filter: blur(3px) saturate(0.9);
   box-shadow:
@@ -541,15 +550,21 @@ select {
 }
 
 @media (max-width: 1360px) {
-  .news-masonry { column-count: 3; }
+  .news-masonry {
+    column-count: 3;
+  }
 }
 
 @media (max-width: 1024px) {
-  .news-masonry { column-count: 2; }
+  .news-masonry {
+    column-count: 2;
+  }
 }
 
 @media (max-width: 640px) {
-  .news-masonry { column-count: 1; }
+  .news-masonry {
+    column-count: 1;
+  }
 }
 
 .news-tile {
@@ -561,7 +576,10 @@ select {
   overflow: hidden;
   break-inside: avoid;
   border: 1px solid var(--line);
-  transition: box-shadow 160ms ease, transform 160ms ease, border-color 160ms ease;
+  transition:
+    box-shadow 160ms ease,
+    transform 160ms ease,
+    border-color 160ms ease;
   cursor: pointer;
   color: inherit;
 }
@@ -675,7 +693,9 @@ select {
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .cms-tab:hover {
@@ -713,7 +733,10 @@ select {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
 
 .indices-category-tab:hover {
@@ -771,7 +794,9 @@ select {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .index-period-tab:hover {
@@ -1118,8 +1143,12 @@ body.news-modal-open .app-shell {
 }
 
 @keyframes news-modal-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .news-modal {
@@ -1133,8 +1162,14 @@ body.news-modal-open .app-shell {
 }
 
 @keyframes news-modal-rise {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .news-modal-close {
@@ -1152,7 +1187,9 @@ body.news-modal-open .app-shell {
   color: var(--text);
   z-index: 2;
   backdrop-filter: blur(4px);
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 .news-modal-close:hover {
@@ -1233,7 +1270,11 @@ body.news-modal-open .app-shell {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 80ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 80ms ease;
 }
 
 .news-like-button:hover:not(:disabled) {
@@ -1304,7 +1345,9 @@ body.news-modal-open .app-shell {
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  transition: background 120ms ease, transform 80ms ease;
+  transition:
+    background 120ms ease,
+    transform 80ms ease;
 }
 
 .button:hover:not(:disabled) {
@@ -1360,7 +1403,9 @@ body.news-modal-open .app-shell {
   padding: 11px 14px;
   font-size: 14px;
   color: var(--text);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .input:focus,
@@ -1527,7 +1572,8 @@ body.news-modal-open .app-shell {
 }
 
 @keyframes auth-icon-float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -2022,7 +2068,10 @@ body.news-modal-open .app-shell {
   color: #4b5363;
   font-size: 15px;
   font-weight: 650;
-  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .knowledge-nav-link:hover {
@@ -2085,8 +2134,7 @@ body.news-modal-open .app-shell {
   flex: 0 0 auto;
   border-radius: 10px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.72), transparent 42%),
-    linear-gradient(135deg, #f6c89e, #b9743b);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), transparent 42%), linear-gradient(135deg, #f6c89e, #b9743b);
   box-shadow: var(--shadow-card);
 }
 
@@ -2169,7 +2217,10 @@ body.news-modal-open .app-shell {
   background: var(--panel);
   padding: 16px;
   box-shadow: var(--shadow-card);
-  transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .knowledge-child-card:hover {
@@ -2418,7 +2469,10 @@ body.news-modal-open .app-shell {
   padding: 11px 12px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .indices-nomenclature-tab:hover {
@@ -2678,7 +2732,10 @@ body.news-modal-open .app-shell {
   line-height: 1.25;
   text-align: center;
   cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .file-upload-tile-empty:hover {
@@ -2741,7 +2798,10 @@ body.news-modal-open .app-shell {
   color: var(--text);
   box-shadow: var(--shadow-soft);
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
 }
 
 .file-upload-tile-actions button:hover {
@@ -3020,13 +3080,17 @@ body.news-modal-open .app-shell {
   resize: vertical;
   font-size: 14px;
   line-height: 1.5;
-  transition: box-shadow 120ms ease, background 120ms ease;
+  transition:
+    box-shadow 120ms ease,
+    background 120ms ease;
 }
 
 .comment-textarea:focus {
   outline: none;
   background: #fff;
-  box-shadow: 0 0 0 3px var(--primary-soft), inset 0 0 0 1px var(--primary);
+  box-shadow:
+    0 0 0 3px var(--primary-soft),
+    inset 0 0 0 1px var(--primary);
 }
 
 .comment-composer-footer {
@@ -3158,7 +3222,9 @@ body.news-modal-open .app-shell {
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .comment-like-button {
@@ -3417,7 +3483,10 @@ body.news-modal-open .app-shell {
   border-radius: 8px;
   cursor: pointer;
   flex-shrink: 0;
-  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 .sidebar-collapse:hover {
@@ -4044,7 +4113,10 @@ a.topbar-breadcrumb-current:hover {
   color: var(--muted);
   font-size: 12px;
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease,
+    background-color 120ms ease;
 }
 
 .tag-suggestion:hover {
@@ -4184,7 +4256,9 @@ a.topbar-breadcrumb-current:hover {
   color: var(--muted);
   border-radius: 6px;
   cursor: pointer;
-  transition: color 120ms ease, background-color 120ms ease;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
 }
 
 .indices-value-delete:hover {
@@ -4410,7 +4484,9 @@ a.topbar-breadcrumb-current:hover {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .chapter-card:hover {
@@ -4481,7 +4557,9 @@ a.topbar-breadcrumb-current:hover {
   border-radius: 10px;
   color: var(--text);
   font-size: 14px;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .lesson-item-link:hover {
@@ -4506,7 +4584,9 @@ a.topbar-breadcrumb-current:hover {
 .lesson-item-arrow {
   color: var(--muted);
   font-size: 16px;
-  transition: transform 120ms ease, color 120ms ease;
+  transition:
+    transform 120ms ease,
+    color 120ms ease;
   text-align: right;
 }
 
@@ -4562,7 +4642,10 @@ a.topbar-breadcrumb-current:hover {
   color: var(--muted);
   border-radius: 6px;
   cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 .education-tree-add:hover {
@@ -4802,7 +4885,9 @@ a.topbar-breadcrumb-current:hover {
   border-radius: 6px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease, background-color 120ms ease;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease;
 }
 
 .tree-row:hover .tree-row-kebab-button,
@@ -4882,7 +4967,10 @@ li.tree-add-row + li.tree-add-row,
   font-size: 12px;
   color: var(--muted);
   cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 .tree-add-button:hover {
@@ -4947,7 +5035,9 @@ li.tree-add-row + li.tree-add-row,
   border-radius: 6px;
   cursor: grab;
   opacity: 0;
-  transition: opacity 120ms ease, background-color 120ms ease;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease;
 }
 
 .block-row:hover .block-row-handle,
@@ -5003,7 +5093,10 @@ li.tree-add-row + li.tree-add-row,
   border-radius: 6px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    background-color 120ms ease;
 }
 
 .block-row:hover .block-row-delete {
@@ -5041,7 +5134,11 @@ li.tree-add-row + li.tree-add-row,
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 .block-insert-slot:hover .block-insert-button,
@@ -5155,7 +5252,9 @@ li.tree-add-row + li.tree-add-row,
   line-height: 1.3;
   padding: 8px 10px;
   outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .gallery-editor-input:focus {
@@ -5179,7 +5278,10 @@ li.tree-add-row + li.tree-add-row,
   box-shadow: var(--shadow-soft);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    background-color 120ms ease;
 }
 
 .gallery-editor-tile:hover .gallery-editor-remove,
@@ -5206,7 +5308,10 @@ li.tree-add-row + li.tree-add-row,
   background: var(--panel);
   color: var(--muted);
   cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .gallery-editor-add:hover {
@@ -5445,7 +5550,10 @@ li.tree-add-row + li.tree-add-row,
   border-radius: 6px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    background-color 120ms ease;
 }
 
 .attachment-row:hover .attachment-delete {
@@ -5469,7 +5577,10 @@ li.tree-add-row + li.tree-add-row,
   font-size: 13px;
   color: var(--muted);
   cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 .attachments-add:hover {
@@ -5574,7 +5685,10 @@ li.tree-add-row + li.tree-add-row,
   background: transparent;
   color: var(--text);
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
 .rich-text-button:hover:not(:disabled) {
@@ -5623,7 +5737,9 @@ li.tree-add-row + li.tree-add-row,
   padding: 0;
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--line);
-  transition: transform 120ms ease, border-color 120ms ease;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease;
 }
 
 .rich-text-color-swatch:hover {
@@ -5854,7 +5970,9 @@ li.tree-add-row + li.tree-add-row,
   color: var(--muted);
   cursor: pointer;
   text-align: left;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .settings-nav-item:hover {
@@ -6153,7 +6271,9 @@ li.tree-add-row + li.tree-add-row,
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition: border-color 120ms ease, transform 120ms ease;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease;
 }
 
 .support-drawer-ticket:hover {
@@ -6644,7 +6764,9 @@ li.tree-add-row + li.tree-add-row,
   display: flex;
   flex-direction: column;
   gap: 4px;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 .support-inbox-item:hover {

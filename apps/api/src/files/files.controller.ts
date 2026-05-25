@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import { FileAccessLevel } from "@prisma/client";
@@ -44,7 +55,11 @@ export class FilesController {
   @Roles("admin", "content_manager")
   @Post("upload")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 100 * 1024 * 1024 } }))
-  async upload(@UploadedFile() file: UploadedMemoryFile | undefined, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+  async upload(
+    @UploadedFile() file: UploadedMemoryFile | undefined,
+    @Body() body: unknown,
+    @CurrentUser() user: RequestUser,
+  ) {
     const input = parseBody(
       z.object({
         accessLevel: z.nativeEnum(FileAccessLevel).optional(),

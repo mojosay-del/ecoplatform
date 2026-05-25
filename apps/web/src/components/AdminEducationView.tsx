@@ -1,15 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import {
-  BookOpen,
-  ChevronRight,
-  FileText,
-  FolderOpen,
-  Paperclip,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { BookOpen, ChevronRight, FileText, FolderOpen, Paperclip, Plus, Trash2 } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { Block, BlocksEditor, LESSON_BLOCK_KINDS, type BlockInsertExtraOption } from "./BlocksEditor";
@@ -121,13 +113,13 @@ export function AdminEducationView() {
     if (selection.kind === "module") return modules.find((m) => m.id === selection.id) ?? null;
     if (selection.kind === "chapter") {
       const chapter = findChapter(modules, selection.id);
-      return chapter ? modules.find((m) => m.id === chapter.moduleId) ?? null : null;
+      return chapter ? (modules.find((m) => m.id === chapter.moduleId) ?? null) : null;
     }
     if (selection.kind === "lesson") {
       const lesson = findLesson(modules, selection.id);
       if (!lesson) return null;
       const chapter = findChapter(modules, lesson.chapterId);
-      return chapter ? modules.find((m) => m.id === chapter.moduleId) ?? null : null;
+      return chapter ? (modules.find((m) => m.id === chapter.moduleId) ?? null) : null;
     }
     return null;
   }, [modules, selection]);
@@ -166,20 +158,10 @@ export function AdminEducationView() {
 
         <div className="moderation-layout cms-vertical-layout">
           <div className="education-tree">
-            <EducationTree
-              modules={modules}
-              selection={selection}
-              onSelect={setSelection}
-              onMutate={mutate}
-            />
+            <EducationTree modules={modules} selection={selection} onSelect={setSelection} onMutate={mutate} />
           </div>
           <div className="moderation-detail">
-            <DetailPanel
-              selection={selection}
-              modules={modules}
-              onSelect={setSelection}
-              onMutate={mutate}
-            />
+            <DetailPanel selection={selection} modules={modules} onSelect={setSelection} onMutate={mutate} />
           </div>
         </div>
         {selectedModule ? <p className="page-subtitle">Контекст: {selectedModule.title}</p> : null}
@@ -213,9 +195,7 @@ function EducationTree({
     if (selection.kind === "chapter") {
       const chapter = findChapter(modules, selection.id);
       if (!chapter) return;
-      setExpandedModules((prev) =>
-        prev.has(chapter.moduleId) ? prev : new Set(prev).add(chapter.moduleId),
-      );
+      setExpandedModules((prev) => (prev.has(chapter.moduleId) ? prev : new Set(prev).add(chapter.moduleId)));
       setExpandedChapters((prev) => (prev.has(chapter.id) ? prev : new Set(prev).add(chapter.id)));
       return;
     }
@@ -224,12 +204,8 @@ function EducationTree({
       if (!lesson) return;
       const chapter = findChapter(modules, lesson.chapterId);
       if (!chapter) return;
-      setExpandedModules((prev) =>
-        prev.has(chapter.moduleId) ? prev : new Set(prev).add(chapter.moduleId),
-      );
-      setExpandedChapters((prev) =>
-        prev.has(chapter.id) ? prev : new Set(prev).add(chapter.id),
-      );
+      setExpandedModules((prev) => (prev.has(chapter.moduleId) ? prev : new Set(prev).add(chapter.moduleId)));
+      setExpandedChapters((prev) => (prev.has(chapter.id) ? prev : new Set(prev).add(chapter.id)));
     }
   }, [selection, modules]);
 
@@ -327,15 +303,8 @@ function EducationTree({
           <Plus size={14} />
         </button>
       </div>
-      {createOpen ? (
-        <ModuleCreateForm
-          onMutate={onMutate}
-          onClose={() => setCreateOpen(false)}
-        />
-      ) : null}
-      {modules.length === 0 ? (
-        <p className="education-tree-empty">Модулей пока нет.</p>
-      ) : null}
+      {createOpen ? <ModuleCreateForm onMutate={onMutate} onClose={() => setCreateOpen(false)} /> : null}
+      {modules.length === 0 ? <p className="education-tree-empty">Модулей пока нет.</p> : null}
       <ul className="tree" role="tree">
         {modules.map((module) => {
           const isExpanded = expandedModules.has(module.id);
@@ -442,11 +411,7 @@ function EducationTree({
                               );
                             })}
                             <li className="tree-add-row">
-                              <button
-                                type="button"
-                                className="tree-add-button"
-                                onClick={() => addLesson(chapter)}
-                              >
+                              <button type="button" className="tree-add-button" onClick={() => addLesson(chapter)}>
                                 <Plus size={14} /> Урок
                               </button>
                             </li>
@@ -610,9 +575,7 @@ function TreeRow({
         aria-label={expanded ? "Свернуть" : "Развернуть"}
         disabled={!expandable}
       >
-        {expandable ? (
-          <ChevronRight size={14} className={expanded ? "is-expanded" : ""} />
-        ) : null}
+        {expandable ? <ChevronRight size={14} className={expanded ? "is-expanded" : ""} /> : null}
       </button>
       <button type="button" className="tree-row-main" onClick={onSelect}>
         <span className="tree-row-icon">{icon}</span>
@@ -702,7 +665,17 @@ function ModuleForm({
       promotionalDescription: module.preview?.promotionalDescription ?? "",
       whatYouWillLearn: module.preview?.whatYouWillLearn ?? [],
     });
-  }, [module.id, module.title, module.summary, module.description, module.coverImageId, module.accessLevel, module.oneTimePrice, module.isInDevelopment, module.preview]);
+  }, [
+    module.id,
+    module.title,
+    module.summary,
+    module.description,
+    module.coverImageId,
+    module.accessLevel,
+    module.oneTimePrice,
+    module.isInDevelopment,
+    module.preview,
+  ]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -713,8 +686,7 @@ function ModuleForm({
       description: draft.description,
       coverImageId: draft.coverImageId.trim() || null,
       accessLevel: draft.accessLevel,
-      oneTimePrice:
-        draft.accessLevel === "one_time" && draft.oneTimePrice > 0 ? draft.oneTimePrice : null,
+      oneTimePrice: draft.accessLevel === "one_time" && draft.oneTimePrice > 0 ? draft.oneTimePrice : null,
       isInDevelopment: draft.isInDevelopment,
       preview: {
         promotionalDescription: draft.promotionalDescription,
@@ -900,12 +872,7 @@ function ChapterForm({
       <h2>Глава</h2>
       <label className="form-field">
         <span>Название</span>
-        <input
-          className="input"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          required
-        />
+        <input className="input" value={title} onChange={(event) => setTitle(event.target.value)} required />
       </label>
       <p className="page-subtitle">Порядок глав меняется стрелками ↑↓ в списке слева.</p>
       <button className="button" type="submit" disabled={saving}>
@@ -1007,7 +974,10 @@ function LessonForm({
   // Сравниваем draft с lesson, чтобы показать индикатор «есть изменения».
   const hasChanges = useMemo(() => {
     if (draft.title !== lesson.title) return true;
-    if (JSON.stringify(draft.blocks) !== JSON.stringify(lesson.blocks.map((b) => ({ type: b.type, payload: b.payload })))) return true;
+    if (
+      JSON.stringify(draft.blocks) !== JSON.stringify(lesson.blocks.map((b) => ({ type: b.type, payload: b.payload })))
+    )
+      return true;
     if (JSON.stringify(normalizedDraftAttachments) !== JSON.stringify(lesson.attachments)) return true;
     return false;
   }, [draft, lesson, normalizedDraftAttachments]);
@@ -1015,9 +985,7 @@ function LessonForm({
   return (
     <form className="form lesson-form" onSubmit={submit}>
       <header className="lesson-header">
-        <span
-          className={`lesson-header-status${lesson.status === "published" ? " is-published" : ""}`}
-        >
+        <span className={`lesson-header-status${lesson.status === "published" ? " is-published" : ""}`}>
           {lesson.status === "published" ? "Опубликован" : "Черновик"}
         </span>
         <input

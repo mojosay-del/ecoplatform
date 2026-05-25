@@ -4,7 +4,15 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hash } from "bcryptjs";
-import { CommentStatus, CompanyStatus, ContentStatus, PlatformRole, SanctionType, SubscriptionStatus, UserStatus } from "@prisma/client";
+import {
+  CommentStatus,
+  CompanyStatus,
+  ContentStatus,
+  PlatformRole,
+  SanctionType,
+  SubscriptionStatus,
+  UserStatus,
+} from "@prisma/client";
 import { BillingNotificationsService } from "./billing/billing-notifications.service";
 import { createTestApp, resetDb, TestApp } from "./test/test-app";
 
@@ -34,9 +42,7 @@ beforeEach(async () => {
 });
 
 async function loginAdmin(): Promise<string> {
-  const res = await ctx.http
-    .post("/api/auth/login")
-    .send({ email: "admin@test.local", password: "Admin12345" });
+  const res = await ctx.http.post("/api/auth/login").send({ email: "admin@test.local", password: "Admin12345" });
   expect(res.status).toBe(201);
   return res.body.accessToken as string;
 }
@@ -349,9 +355,7 @@ describe("Content publish", () => {
       expect(draft.status).toBe(201);
     }
 
-    const res = await ctx.http
-      .get("/api/admin/content/news/tags")
-      .set("Authorization", `Bearer ${adminToken}`);
+    const res = await ctx.http.get("/api/admin/content/news/tags").set("Authorization", `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
     expect(res.body.map((tag: { name: string }) => tag.name)).toEqual(
       expect.arrayContaining(["рынок", "переработка", "экология"]),
@@ -426,7 +430,11 @@ describe("Support ownership", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ text: "Ответ админа" });
     expect(adminReply.status).toBe(201);
-    expect(adminReply.body.messages.some((m: { authorRole: string; text: string }) => m.authorRole === "admin" && m.text === "Ответ админа")).toBe(true);
+    expect(
+      adminReply.body.messages.some(
+        (m: { authorRole: string; text: string }) => m.authorRole === "admin" && m.text === "Ответ админа",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -459,7 +467,9 @@ describe("Moderation", () => {
     expect(second.status).toBe(201);
     expect(second.body.duplicate).toBe(false);
 
-    expect(await ctx.prisma.moderationCase.count({ where: { entityType: "news_comment", entityId: comment.id } })).toBe(1);
+    expect(await ctx.prisma.moderationCase.count({ where: { entityType: "news_comment", entityId: comment.id } })).toBe(
+      1,
+    );
     expect(await ctx.prisma.complaint.count({ where: { entityType: "news_comment", entityId: comment.id } })).toBe(2);
   });
 
@@ -475,7 +485,9 @@ describe("Moderation", () => {
       .set("Authorization", `Bearer ${reporter.token}`)
       .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "offensive_content" });
 
-    const forbidden = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${reporter.token}`);
+    const forbidden = await ctx.http
+      .get("/api/admin/moderation/cases")
+      .set("Authorization", `Bearer ${reporter.token}`);
     expect(forbidden.status).toBe(403);
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
@@ -483,12 +495,16 @@ describe("Moderation", () => {
     expect(list.body).toHaveLength(1);
     const caseId = list.body[0].id as string;
 
-    const lock = await ctx.http.post(`/api/admin/moderation/cases/${caseId}/lock`).set("Authorization", `Bearer ${moderatorToken}`);
+    const lock = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/lock`)
+      .set("Authorization", `Bearer ${moderatorToken}`);
     expect(lock.status).toBe(201);
     expect(lock.body.status).toBe("in_review");
     expect(lock.body.lockedBy.email).toBe("moderator@test.local");
 
-    const release = await ctx.http.post(`/api/admin/moderation/cases/${caseId}/release`).set("Authorization", `Bearer ${moderatorToken}`);
+    const release = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/release`)
+      .set("Authorization", `Bearer ${moderatorToken}`);
     expect(release.status).toBe(201);
     expect(release.body.status).toBe("open");
     expect(release.body.lockedById).toBeNull();
@@ -734,9 +750,7 @@ describe("Admin users panel", () => {
     const adminToken = await loginAdmin();
     const target = await registerCompany("0100003");
 
-    const card = await ctx.http
-      .get(`/api/admin/users/${target.userId}`)
-      .set("Authorization", `Bearer ${adminToken}`);
+    const card = await ctx.http.get(`/api/admin/users/${target.userId}`).set("Authorization", `Bearer ${adminToken}`);
     expect(card.status).toBe(200);
     expect(card.body.company.id).toBe(target.companyId);
     expect(card.body.activeRestrictions).toEqual([]);
@@ -1006,15 +1020,12 @@ describe("Billing notifications (cron)", () => {
 
     // Активируем подписку, оканчивающуюся через 5 дней.
     const fiveDaysLater = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-    await ctx.http
-      .post("/api/admin/billing/manual-subscriptions")
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({
-        companyId: company.companyId,
-        plan: "basic",
-        endsAt: fiveDaysLater.toISOString(),
-        reason: "тест",
-      });
+    await ctx.http.post("/api/admin/billing/manual-subscriptions").set("Authorization", `Bearer ${adminToken}`).send({
+      companyId: company.companyId,
+      plan: "basic",
+      endsAt: fiveDaysLater.toISOString(),
+      reason: "тест",
+    });
 
     await ctx.app.get(BillingNotificationsService).runHourlyCheck();
 
@@ -1030,15 +1041,12 @@ describe("Billing notifications (cron)", () => {
     const company = await registerCompany("0600004");
 
     const futureEndsAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
-    await ctx.http
-      .post("/api/admin/billing/manual-subscriptions")
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({
-        companyId: company.companyId,
-        plan: "extended",
-        endsAt: futureEndsAt.toISOString(),
-        reason: "тест",
-      });
+    await ctx.http.post("/api/admin/billing/manual-subscriptions").set("Authorization", `Bearer ${adminToken}`).send({
+      companyId: company.companyId,
+      plan: "extended",
+      endsAt: futureEndsAt.toISOString(),
+      reason: "тест",
+    });
 
     // Сдвинем end даты в прошлое (имитация истечения).
     const pastEndsAt = new Date(Date.now() - 60 * 60 * 1000);
@@ -1186,9 +1194,7 @@ describe("Admin journals", () => {
     const forbidden = await ctx.http.get("/api/admin/journals").set("Authorization", `Bearer ${moderatorToken}`);
     expect(forbidden.status).toBe(403);
 
-    const all = await ctx.http
-      .get("/api/admin/journals?take=100")
-      .set("Authorization", `Bearer ${adminToken}`);
+    const all = await ctx.http.get("/api/admin/journals?take=100").set("Authorization", `Bearer ${adminToken}`);
     expect(all.status).toBe(200);
     expect(all.body.total).toBeGreaterThanOrEqual(2);
 
@@ -1200,7 +1206,9 @@ describe("Admin journals", () => {
     const byEntity = await ctx.http
       .get("/api/admin/journals?entityType=PlatformSetting")
       .set("Authorization", `Bearer ${adminToken}`);
-    expect(byEntity.body.items.every((item: { entityType: string }) => item.entityType === "PlatformSetting")).toBe(true);
+    expect(byEntity.body.items.every((item: { entityType: string }) => item.entityType === "PlatformSetting")).toBe(
+      true,
+    );
 
     const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
     const byActor = await ctx.http
@@ -1219,9 +1227,7 @@ describe("Admin journals", () => {
       .send({ value: 20 });
 
     const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    const res = await ctx.http
-      .get(`/api/admin/journals?from=${future}`)
-      .set("Authorization", `Bearer ${adminToken}`);
+    const res = await ctx.http.get(`/api/admin/journals?from=${future}`).set("Authorization", `Bearer ${adminToken}`);
     expect(res.body.total).toBe(0);
     expect(res.body.items).toEqual([]);
   });
@@ -1684,9 +1690,7 @@ describe("Content lifecycle: news", () => {
     const reader = await registerCompany("0800001");
     const { news, comment } = await createPublishedNewsWithComment(adminToken, reader.token);
 
-    const likePost = await ctx.http
-      .post(`/api/news/${news.id}/like`)
-      .set("Authorization", `Bearer ${reader.token}`);
+    const likePost = await ctx.http.post(`/api/news/${news.id}/like`).set("Authorization", `Bearer ${reader.token}`);
     expect(likePost.status).toBe(201);
 
     const likeComment = await ctx.http
@@ -1709,15 +1713,14 @@ describe("Content lifecycle: news", () => {
     const direct = await ctx.http.get(`/api/news/${news.slug}`).set("Authorization", `Bearer ${reader.token}`);
     expect(direct.status).toBe(404);
 
-    const [post, blockCount, postTagCount, postLikeCount, commentCount, commentLikeCount] =
-      await Promise.all([
-        ctx.prisma.newsPost.findUnique({ where: { id: news.id } }),
-        ctx.prisma.newsContentBlock.count({ where: { newsPostId: news.id } }),
-        ctx.prisma.newsPostTag.count({ where: { newsPostId: news.id } }),
-        ctx.prisma.newsLike.count({ where: { newsPostId: news.id } }),
-        ctx.prisma.comment.count({ where: { newsPostId: news.id } }),
-        ctx.prisma.commentLike.count({ where: { commentId: comment.id } }),
-      ]);
+    const [post, blockCount, postTagCount, postLikeCount, commentCount, commentLikeCount] = await Promise.all([
+      ctx.prisma.newsPost.findUnique({ where: { id: news.id } }),
+      ctx.prisma.newsContentBlock.count({ where: { newsPostId: news.id } }),
+      ctx.prisma.newsPostTag.count({ where: { newsPostId: news.id } }),
+      ctx.prisma.newsLike.count({ where: { newsPostId: news.id } }),
+      ctx.prisma.comment.count({ where: { newsPostId: news.id } }),
+      ctx.prisma.commentLike.count({ where: { commentId: comment.id } }),
+    ]);
     expect(post).toBeNull();
     expect(blockCount).toBe(0);
     expect(postTagCount).toBe(0);
@@ -1832,9 +1835,7 @@ describe("Content lifecycle: learning modules", () => {
     const reader = await registerCompany("0800010");
     const { moduleId } = await createLearningModuleWithLesson(adminToken, "lifecycle");
 
-    const beforePublish = await ctx.http
-      .get("/api/education/modules")
-      .set("Authorization", `Bearer ${reader.token}`);
+    const beforePublish = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
     expect(beforePublish.body.find((item: { id: string }) => item.id === moduleId)).toBeUndefined();
 
     const publish = await ctx.http
@@ -1842,9 +1843,7 @@ describe("Content lifecycle: learning modules", () => {
       .set("Authorization", `Bearer ${adminToken}`);
     expect(publish.status).toBe(201);
 
-    const afterPublish = await ctx.http
-      .get("/api/education/modules")
-      .set("Authorization", `Bearer ${reader.token}`);
+    const afterPublish = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
     expect(afterPublish.body.find((item: { id: string }) => item.id === moduleId)).toBeTruthy();
 
     const unpublish = await ctx.http
@@ -1853,9 +1852,7 @@ describe("Content lifecycle: learning modules", () => {
       .send({ reason: "тест" });
     expect(unpublish.status).toBe(201);
 
-    const afterUnpublish = await ctx.http
-      .get("/api/education/modules")
-      .set("Authorization", `Bearer ${reader.token}`);
+    const afterUnpublish = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
     expect(afterUnpublish.body.find((item: { id: string }) => item.id === moduleId)).toBeUndefined();
 
     const del = await ctx.http
@@ -1885,9 +1882,7 @@ describe("Content lifecycle: learning modules", () => {
     expect(markDevelopment.status).toBe(200);
     expect(markDevelopment.body.isInDevelopment).toBe(true);
 
-    const list = await ctx.http
-      .get("/api/education/modules")
-      .set("Authorization", `Bearer ${reader.token}`);
+    const list = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
     const item = list.body.find((module: { id: string }) => module.id === moduleId);
     expect(item).toMatchObject({ isInDevelopment: true, hasAccess: false });
 

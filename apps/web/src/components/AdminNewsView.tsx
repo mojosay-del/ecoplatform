@@ -96,15 +96,13 @@ export function AdminNewsView() {
   const filteredSuggestions = useMemo(() => {
     if (!tagDraft.trim()) return [];
     const query = tagDraft.trim().toLowerCase();
-    return knownTags
-      .filter((tag) => tag.toLowerCase().includes(query) && !draft.tags.includes(tag))
-      .slice(0, 8);
+    return knownTags.filter((tag) => tag.toLowerCase().includes(query) && !draft.tags.includes(tag)).slice(0, 8);
   }, [tagDraft, knownTags, draft.tags]);
 
   // Запоминаем «оригинал» текущей открытой новости — нужен для индикатора
   // «есть несохранённые изменения» внизу формы.
   const original = useMemo(
-    () => (draft.id ? items.find((item) => item.id === draft.id) ?? null : null),
+    () => (draft.id ? (items.find((item) => item.id === draft.id) ?? null) : null),
     [draft.id, items],
   );
 
@@ -117,7 +115,10 @@ export function AdminNewsView() {
     if (draft.title !== original.title) return true;
     if (draft.lead !== original.lead) return true;
     if ((draft.coverImageId || "") !== (original.coverImageId ?? "")) return true;
-    const origTags = original.tags.map((t) => t.newsTag.name).sort().join("|");
+    const origTags = original.tags
+      .map((t) => t.newsTag.name)
+      .sort()
+      .join("|");
     const draftTags = [...draft.tags].sort().join("|");
     if (origTags !== draftTags) return true;
     if (
@@ -267,11 +268,8 @@ export function AdminNewsView() {
   }
 
   const isEditingNew = draft.id === null;
-  const draftCoverUrl = draft.coverImageId
-    ? covers.get(draft.coverImageId)?.publicUrl ?? null
-    : null;
-  const canPreview =
-    draft.title.trim().length > 0 || draft.lead.trim().length > 0 || draft.blocks.length > 0;
+  const draftCoverUrl = draft.coverImageId ? (covers.get(draft.coverImageId)?.publicUrl ?? null) : null;
+  const canPreview = draft.title.trim().length > 0 || draft.lead.trim().length > 0 || draft.blocks.length > 0;
 
   return (
     <AppShell>
@@ -297,9 +295,7 @@ export function AdminNewsView() {
                 <Plus size={14} />
               </button>
             </div>
-            {items.length === 0 ? (
-              <p className="education-tree-empty">Новостей пока нет.</p>
-            ) : null}
+            {items.length === 0 ? <p className="education-tree-empty">Новостей пока нет.</p> : null}
             <div className="news-list">
               {visibleItems.map((item) => {
                 const coverUrl = item.coverImageId ? covers.get(item.coverImageId)?.publicUrl : null;
@@ -312,15 +308,8 @@ export function AdminNewsView() {
                 ];
                 const isActive = draft.id === item.id;
                 return (
-                  <article
-                    key={item.id}
-                    className={`news-row${isActive ? " is-active" : ""}`}
-                  >
-                    <button
-                      type="button"
-                      className="news-row-main"
-                      onClick={() => startEdit(item)}
-                    >
+                  <article key={item.id} className={`news-row${isActive ? " is-active" : ""}`}>
+                    <button type="button" className="news-row-main" onClick={() => startEdit(item)}>
                       <div className="news-row-thumb">
                         {coverUrl ? (
                           <img alt="" src={coverUrl} />
@@ -347,9 +336,7 @@ export function AdminNewsView() {
                               </span>
                             ))}
                             {item.tags.length > 4 ? (
-                              <span className="news-row-tags-more">
-                                +{item.tags.length - 4}
-                              </span>
+                              <span className="news-row-tags-more">+{item.tags.length - 4}</span>
                             ) : null}
                           </div>
                         ) : null}
@@ -374,9 +361,7 @@ export function AdminNewsView() {
           <div className="moderation-detail">
             <form className="form news-form" onSubmit={submit}>
               <div className="news-form-head">
-                <span className="news-form-mode">
-                  {isEditingNew ? "Новая новость" : "Редактирование"}
-                </span>
+                <span className="news-form-mode">{isEditingNew ? "Новая новость" : "Редактирование"}</span>
               </div>
 
               <FileUploadField
@@ -435,11 +420,7 @@ export function AdminNewsView() {
                   ))}
                   <input
                     className="tag-input-field"
-                    placeholder={
-                      draft.tags.length === 0
-                        ? "Добавьте теги — Enter или пробел"
-                        : "Ещё тег…"
-                    }
+                    placeholder={draft.tags.length === 0 ? "Добавьте теги — Enter или пробел" : "Ещё тег…"}
                     value={tagDraft}
                     onChange={(event) => setTagDraft(event.target.value)}
                     onKeyDown={(event) => {
@@ -448,11 +429,7 @@ export function AdminNewsView() {
                         addTag(tagDraft);
                         return;
                       }
-                      if (
-                        event.key === "Backspace" &&
-                        tagDraft.length === 0 &&
-                        draft.tags.length > 0
-                      ) {
+                      if (event.key === "Backspace" && tagDraft.length === 0 && draft.tags.length > 0) {
                         event.preventDefault();
                         removeTag(draft.tags[draft.tags.length - 1]!);
                       }
@@ -492,20 +469,12 @@ export function AdminNewsView() {
                     </button>
                   ) : null}
                   {!isEditingNew && original ? (
-                    <button
-                      className="button secondary"
-                      type="button"
-                      onClick={() => publishToggle(original)}
-                    >
+                    <button className="button secondary" type="button" onClick={() => publishToggle(original)}>
                       {original.status === "published" ? "Снять с публикации" : "Опубликовать"}
                     </button>
                   ) : null}
                   {!isEditingNew && original ? (
-                    <button
-                      className="button secondary danger"
-                      type="button"
-                      onClick={() => remove(original)}
-                    >
+                    <button className="button secondary danger" type="button" onClick={() => remove(original)}>
                       Удалить полностью
                     </button>
                   ) : null}
@@ -518,16 +487,8 @@ export function AdminNewsView() {
                     <Eye size={14} />
                     Предпросмотр
                   </button>
-                  <button
-                    className="button"
-                    type="submit"
-                    disabled={submitting || !hasChanges}
-                  >
-                    {submitting
-                      ? "Сохраняю…"
-                      : isEditingNew
-                        ? "Создать черновик"
-                        : "Сохранить"}
+                  <button className="button" type="submit" disabled={submitting || !hasChanges}>
+                    {submitting ? "Сохраняю…" : isEditingNew ? "Создать черновик" : "Сохранить"}
                   </button>
                 </div>
               </div>
@@ -594,12 +555,7 @@ function NewsPreviewModal({
       }}
     >
       <div className="news-modal">
-        <button
-          className="news-modal-close"
-          onClick={onClose}
-          type="button"
-          aria-label="Закрыть предпросмотр"
-        >
+        <button className="news-modal-close" onClick={onClose} type="button" aria-label="Закрыть предпросмотр">
           <X size={20} />
         </button>
         <div className="news-article">

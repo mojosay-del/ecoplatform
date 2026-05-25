@@ -35,10 +35,7 @@ type PriceIndex = {
   values: { id: string; date: string; price: string | number }[];
 };
 
-type Selection =
-  | { kind: "none" }
-  | { kind: "category"; id: string }
-  | { kind: "nomenclature"; id: string };
+type Selection = { kind: "none" } | { kind: "category"; id: string } | { kind: "nomenclature"; id: string };
 
 export function AdminIndicesView() {
   const { token } = useAuth();
@@ -46,9 +43,7 @@ export function AdminIndicesView() {
   const [message, setMessage] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>({ kind: "none" });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [createOpen, setCreateOpen] = useState<null | "category" | { type: "nomenclature"; categoryId: string }>(
-    null,
-  );
+  const [createOpen, setCreateOpen] = useState<null | "category" | { type: "nomenclature"; categoryId: string }>(null);
 
   useEffect(() => {
     void loadAll();
@@ -163,15 +158,9 @@ export function AdminIndicesView() {
               </button>
             </div>
             {createOpen === "category" ? (
-              <CategoryCreateForm
-                position={categories.length}
-                onMutate={mutate}
-                onClose={() => setCreateOpen(null)}
-              />
+              <CategoryCreateForm position={categories.length} onMutate={mutate} onClose={() => setCreateOpen(null)} />
             ) : null}
-            {categories.length === 0 ? (
-              <p className="education-tree-empty">Категорий пока нет.</p>
-            ) : null}
+            {categories.length === 0 ? <p className="education-tree-empty">Категорий пока нет.</p> : null}
             <ul className="tree" role="tree">
               {categories.map((category) => {
                 const isExpanded = expanded.has(category.id);
@@ -188,25 +177,16 @@ export function AdminIndicesView() {
                     danger: true,
                     onClick: () => {
                       if (confirm(`Удалить категорию «${category.name}»?`)) {
-                        void mutate(
-                          `/admin/content/indices/categories/${category.id}`,
-                          "DELETE",
-                        );
+                        void mutate(`/admin/content/indices/categories/${category.id}`, "DELETE");
                       }
                     },
                   },
                 ];
                 return (
-                  <li
-                    key={category.id}
-                    role="treeitem"
-                    aria-expanded={isExpanded}
-                  >
+                  <li key={category.id} role="treeitem" aria-expanded={isExpanded}>
                     <div
                       className={`tree-row depth-0${
-                        selection.kind === "category" && selection.id === category.id
-                          ? " is-active"
-                          : ""
+                        selection.kind === "category" && selection.id === category.id ? " is-active" : ""
                       }`}
                     >
                       <button
@@ -232,9 +212,7 @@ export function AdminIndicesView() {
                           <FolderOpen size={16} />
                         </span>
                         <span className="tree-row-title">{category.name}</span>
-                        <span className="tree-row-meta">
-                          {category.nomenclatures.length} позиций
-                        </span>
+                        <span className="tree-row-meta">{category.nomenclatures.length} позиций</span>
                       </button>
                       <RowKebab actions={categoryActions} />
                     </div>
@@ -259,27 +237,18 @@ export function AdminIndicesView() {
                                     : ""
                                 }`}
                               >
-                                <button
-                                  type="button"
-                                  className="tree-row-chevron"
-                                  disabled
-                                  aria-hidden
-                                />
+                                <button type="button" className="tree-row-chevron" disabled aria-hidden />
                                 <button
                                   type="button"
                                   className="tree-row-main"
-                                  onClick={() =>
-                                    setSelection({ kind: "nomenclature", id: nomenclature.id })
-                                  }
+                                  onClick={() => setSelection({ kind: "nomenclature", id: nomenclature.id })}
                                 >
                                   <span className="tree-row-icon">
                                     <Package size={16} />
                                   </span>
                                   {hasIndex ? (
                                     <span
-                                      className={`tree-row-dot${
-                                        isPublished ? " is-published" : ""
-                                      }`}
+                                      className={`tree-row-dot${isPublished ? " is-published" : ""}`}
                                       title={isPublished ? "Опубликован" : "Черновик"}
                                       aria-hidden
                                     />
@@ -287,9 +256,7 @@ export function AdminIndicesView() {
                                     <span className="tree-row-dot is-muted" aria-hidden />
                                   )}
                                   <span className="tree-row-title">{nomenclature.name}</span>
-                                  <span className="tree-row-meta">
-                                    {nomenclature.code}
-                                  </span>
+                                  <span className="tree-row-meta">{nomenclature.code}</span>
                                 </button>
                                 <RowKebab actions={nomActions} />
                               </div>
@@ -312,9 +279,7 @@ export function AdminIndicesView() {
                             <button
                               type="button"
                               className="tree-add-button"
-                              onClick={() =>
-                                setCreateOpen({ type: "nomenclature", categoryId: category.id })
-                              }
+                              onClick={() => setCreateOpen({ type: "nomenclature", categoryId: category.id })}
                             >
                               <Plus size={14} /> Номенклатура
                             </button>
@@ -339,18 +304,13 @@ export function AdminIndicesView() {
                 categories={categories}
               />
             ) : activeCategory ? (
-              <CategoryEditor
-                key={activeCategory.id}
-                category={activeCategory}
-                onMutate={mutate}
-              />
+              <CategoryEditor key={activeCategory.id} category={activeCategory} onMutate={mutate} />
             ) : (
               <div className="indices-empty-detail">
                 <FolderOpen size={28} />
                 <h2>Выберите категорию или номенклатуру слева</h2>
                 <p>
-                  Категория — для переименования и удаления. Номенклатура — для редактирования и
-                  ведения истории цен.
+                  Категория — для переименования и удаления. Номенклатура — для редактирования и ведения истории цен.
                 </p>
               </div>
             )}
@@ -409,13 +369,7 @@ function CategoryCreateForm({
     <form className="card form indices-inline-form" onSubmit={submit}>
       <label className="form-field">
         <span>Название категории</span>
-        <input
-          className="input"
-          autoFocus
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          required
-        />
+        <input className="input" autoFocus value={name} onChange={(event) => setName(event.target.value)} required />
       </label>
       <div className="auth-actions">
         <button className="button" type="submit">
@@ -553,9 +507,7 @@ function CategoryEditor({
           onChange={(event) => setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))}
         />
       </label>
-      <p className="page-subtitle">
-        Номенклатур в этой категории: {category.nomenclatures.length}
-      </p>
+      <p className="page-subtitle">Номенклатур в этой категории: {category.nomenclatures.length}</p>
       <div className="lesson-save-bar">
         <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>
           {saving ? "Сохраняю…" : hasChanges ? "Есть несохранённые изменения" : "Всё сохранено"}
@@ -704,9 +656,7 @@ function PriceIndexCard({
           <select
             className="select"
             value={draft.categoryId}
-            onChange={(event) =>
-              setDraft((prev) => ({ ...prev, categoryId: event.target.value }))
-            }
+            onChange={(event) => setDraft((prev) => ({ ...prev, categoryId: event.target.value }))}
           >
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
@@ -758,9 +708,7 @@ function PriceIndexCard({
               rows={2}
               placeholder="Служебное описание (необязательно)"
               value={draft.indexDescription}
-              onChange={(event) =>
-                setDraft((prev) => ({ ...prev, indexDescription: event.target.value }))
-              }
+              onChange={(event) => setDraft((prev) => ({ ...prev, indexDescription: event.target.value }))}
             />
             <button className="button" type="button" onClick={createIndex}>
               Создать индекс
@@ -779,11 +727,7 @@ function PriceIndexCard({
               </div>
               <div>
                 <span>Последнее</span>
-                <strong>
-                  {latestValue
-                    ? `${formatIndexPrice(latestValue.price)} ${nomenclature.unit}`
-                    : "—"}
-                </strong>
+                <strong>{latestValue ? `${formatIndexPrice(latestValue.price)} ${nomenclature.unit}` : "—"}</strong>
               </div>
             </div>
 
@@ -795,9 +739,7 @@ function PriceIndexCard({
                 <div className="indices-values-list">
                   {values.map((value) => (
                     <div className="indices-value-row" key={value.id}>
-                      <span className="indices-value-date">
-                        {new Date(value.date).toLocaleDateString("ru-RU")}
-                      </span>
+                      <span className="indices-value-date">{new Date(value.date).toLocaleDateString("ru-RU")}</span>
                       <strong className="indices-value-price">
                         {formatIndexPrice(value.price)} {nomenclature.unit}
                       </strong>
@@ -821,9 +763,7 @@ function PriceIndexCard({
                 className="input"
                 type="date"
                 value={valueDraft.date}
-                onChange={(event) =>
-                  setValueDraft((prev) => ({ ...prev, date: event.target.value }))
-                }
+                onChange={(event) => setValueDraft((prev) => ({ ...prev, date: event.target.value }))}
                 required
               />
               <input
@@ -834,9 +774,7 @@ function PriceIndexCard({
                 step="0.1"
                 placeholder="Цена"
                 value={valueDraft.price}
-                onChange={(event) =>
-                  setValueDraft((prev) => ({ ...prev, price: event.target.value }))
-                }
+                onChange={(event) => setValueDraft((prev) => ({ ...prev, price: event.target.value }))}
                 required
               />
               <button className="button secondary" type="submit">
@@ -869,12 +807,7 @@ function PriceIndexCard({
               </button>
             </>
           ) : null}
-          <button
-            className="button"
-            type="button"
-            disabled={!hasChanges || saving}
-            onClick={saveNomenclature}
-          >
+          <button className="button" type="button" disabled={!hasChanges || saving} onClick={saveNomenclature}>
             {saving ? "Сохраняю…" : "Сохранить"}
           </button>
         </div>

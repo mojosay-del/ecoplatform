@@ -103,7 +103,7 @@ export function AdminKnowledgeView() {
   }, [items, draft.id]);
 
   const original = useMemo(
-    () => (draft.id ? items.find((item) => item.id === draft.id) ?? null : null),
+    () => (draft.id ? (items.find((item) => item.id === draft.id) ?? null) : null),
     [draft.id, items],
   );
 
@@ -235,11 +235,7 @@ export function AdminKnowledgeView() {
 
   async function remove(article: Article) {
     if (!token) return;
-    if (
-      !confirm(
-        `Удалить статью «${article.title}»? Если есть дочерние статьи — сначала переместите или удалите их.`,
-      )
-    )
+    if (!confirm(`Удалить статью «${article.title}»? Если есть дочерние статьи — сначала переместите или удалите их.`))
       return;
     try {
       await apiFetch(`/admin/content/knowledge-base/${article.id}`, { method: "DELETE", token });
@@ -304,9 +300,7 @@ export function AdminKnowledgeView() {
                 <Plus size={14} />
               </button>
             </div>
-            {tree.length === 0 ? (
-              <p className="education-tree-empty">Статей пока нет.</p>
-            ) : null}
+            {tree.length === 0 ? <p className="education-tree-empty">Статей пока нет.</p> : null}
             <ul className="tree" role="tree">
               {tree.map((node) => (
                 <KnowledgeNode
@@ -328,17 +322,13 @@ export function AdminKnowledgeView() {
           <div className="moderation-detail">
             <form className="form news-form" onSubmit={submit}>
               <div className="news-form-head">
-                <span className="news-form-mode">
-                  {isEditingNew ? "Новая статья" : "Редактирование"}
-                </span>
+                <span className="news-form-mode">{isEditingNew ? "Новая статья" : "Редактирование"}</span>
               </div>
 
               {/* Секция 1 — основное содержимое статьи: то, что видит читатель. */}
               <fieldset className="form-fieldset">
                 <legend className="form-legend">Основное</legend>
-                <p className="form-legend-hint">
-                  То, что увидит читатель в карточке статьи и на странице.
-                </p>
+                <p className="form-legend-hint">То, что увидит читатель в карточке статьи и на странице.</p>
 
                 <FileUploadField
                   accept="image/*"
@@ -383,9 +373,7 @@ export function AdminKnowledgeView() {
                   <select
                     className="select"
                     value={draft.parentId ?? ""}
-                    onChange={(event) =>
-                      setDraft((prev) => ({ ...prev, parentId: event.target.value || null }))
-                    }
+                    onChange={(event) => setDraft((prev) => ({ ...prev, parentId: event.target.value || null }))}
                   >
                     <option value="">— верхний уровень —</option>
                     {parentOptions.map((parent) => (
@@ -394,9 +382,7 @@ export function AdminKnowledgeView() {
                       </option>
                     ))}
                   </select>
-                  <small className="form-field-hint">
-                    «Верхний уровень» — статья появится в корне базы знаний.
-                  </small>
+                  <small className="form-field-hint">«Верхний уровень» — статья появится в корне базы знаний.</small>
                 </label>
 
                 <div className="form-grid-2">
@@ -407,13 +393,9 @@ export function AdminKnowledgeView() {
                       type="number"
                       min={0}
                       value={draft.position}
-                      onChange={(event) =>
-                        setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))
-                      }
+                      onChange={(event) => setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))}
                     />
-                    <small className="form-field-hint">
-                      Меньше — выше в списке. 0 — самая первая.
-                    </small>
+                    <small className="form-field-hint">Меньше — выше в списке. 0 — самая первая.</small>
                   </label>
                   <label className="form-field">
                     <span>Тип материала</span>
@@ -434,9 +416,7 @@ export function AdminKnowledgeView() {
                       <option value="textile" />
                       <option value="organic" />
                     </datalist>
-                    <small className="form-field-hint">
-                      Подсказка для каталога. Можно оставить пустым.
-                    </small>
+                    <small className="form-field-hint">Подсказка для каталога. Можно оставить пустым.</small>
                   </label>
                 </div>
               </fieldset>
@@ -444,9 +424,7 @@ export function AdminKnowledgeView() {
               {/* Секция 3 — само содержание (блоки). */}
               <fieldset className="form-fieldset">
                 <legend className="form-legend">Содержание</legend>
-                <p className="form-legend-hint">
-                  Текст, изображения, видео — собирается из блоков.
-                </p>
+                <p className="form-legend-hint">Текст, изображения, видео — собирается из блоков.</p>
                 <BlocksEditor
                   blocks={draft.blocks}
                   onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks }))}
@@ -471,24 +449,12 @@ export function AdminKnowledgeView() {
                     </button>
                   ) : null}
                   {!isEditingNew && original ? (
-                    <button
-                      className="button secondary"
-                      type="button"
-                      onClick={() => publishToggle(original)}
-                    >
+                    <button className="button secondary" type="button" onClick={() => publishToggle(original)}>
                       {original.status === "published" ? "Снять с публикации" : "Опубликовать"}
                     </button>
                   ) : null}
-                  <button
-                    className="button"
-                    type="submit"
-                    disabled={submitting || !hasChanges}
-                  >
-                    {submitting
-                      ? "Сохраняю…"
-                      : isEditingNew
-                        ? "Создать черновик"
-                        : "Сохранить"}
+                  <button className="button" type="submit" disabled={submitting || !hasChanges}>
+                    {submitting ? "Сохраняю…" : isEditingNew ? "Создать черновик" : "Сохранить"}
                   </button>
                 </div>
               </div>
@@ -587,18 +553,13 @@ function KnowledgeNode({
           disabled={!hasChildren}
           aria-label={isExpanded ? "Свернуть" : "Развернуть"}
         >
-          {hasChildren ? (
-            <ChevronRight size={14} className={isExpanded ? "is-expanded" : ""} />
-          ) : null}
+          {hasChildren ? <ChevronRight size={14} className={isExpanded ? "is-expanded" : ""} /> : null}
         </button>
         <button type="button" className="tree-row-main" onClick={() => onSelect(node)}>
           <span className="tree-row-icon">
             <Icon size={16} />
           </span>
-          <span
-            className={`tree-row-dot${node.status === "published" ? " is-published" : ""}`}
-            aria-hidden
-          />
+          <span className={`tree-row-dot${node.status === "published" ? " is-published" : ""}`} aria-hidden />
           <span className="tree-row-title">{node.title}</span>
           {node.subtitle ? <span className="tree-row-meta">{node.subtitle}</span> : null}
         </button>

@@ -678,12 +678,7 @@ function GalleryEditor({
         })}
         {rows[rows.length - 1]?.length === 3 ? (
           <div className="gallery-editor-row">
-            <button
-              className="gallery-editor-add is-square"
-              type="button"
-              onClick={add}
-              title="Добавить изображение"
-            >
+            <button className="gallery-editor-add is-square" type="button" onClick={add} title="Добавить изображение">
               <Plus size={18} />
               <span>Добавить изображение</span>
             </button>

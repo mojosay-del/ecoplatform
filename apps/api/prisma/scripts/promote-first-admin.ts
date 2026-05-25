@@ -84,23 +84,74 @@ async function main() {
   // String без FK, поэтому updateMany делает то, что нужно. CASCADE-relations
   // не трогаем — их разрулит DELETE на следующем шаге.
   const reassignOps = [
-    prisma.adminActionLog.updateMany({ where: { actorId: { in: otherUsers.map((u) => u.id) } }, data: { actorId: owner.id } }),
-    prisma.fileAsset.updateMany({ where: { uploadedById: { in: otherUsers.map((u) => u.id) } }, data: { uploadedById: owner.id } }),
-    prisma.newsPost.updateMany({ where: { createdById: { in: otherUsers.map((u) => u.id) } }, data: { createdById: owner.id } }),
-    prisma.newsTag.updateMany({ where: { createdById: { in: otherUsers.map((u) => u.id) } }, data: { createdById: owner.id } }),
-    prisma.priceIndex.updateMany({ where: { createdById: { in: otherUsers.map((u) => u.id) } }, data: { createdById: owner.id } }),
-    prisma.priceIndexValue.updateMany({ where: { createdById: { in: otherUsers.map((u) => u.id) } }, data: { createdById: owner.id } }),
-    prisma.learningModule.updateMany({ where: { createdById: { in: otherUsers.map((u) => u.id) } }, data: { createdById: owner.id } }),
-    prisma.chapter.updateMany({ where: { createdById: { in: otherUsers.map((u) => u.id) } }, data: { createdById: owner.id } }),
-    prisma.lesson.updateMany({ where: { createdById: { in: otherUsers.map((u) => u.id) } }, data: { createdById: owner.id } }),
-    prisma.knowledgeBaseArticle.updateMany({ where: { createdById: { in: otherUsers.map((u) => u.id) } }, data: { createdById: owner.id } }),
-    prisma.moderationCase.updateMany({ where: { entityAuthorId: { in: otherUsers.map((u) => u.id) } }, data: { entityAuthorId: owner.id } }),
-    prisma.moderationCase.updateMany({ where: { lockedById: { in: otherUsers.map((u) => u.id) } }, data: { lockedById: owner.id } }),
-    prisma.complaint.updateMany({ where: { authorId: { in: otherUsers.map((u) => u.id) } }, data: { authorId: owner.id } }),
-    prisma.moderationDecision.updateMany({ where: { actorId: { in: otherUsers.map((u) => u.id) } }, data: { actorId: owner.id } }),
-    prisma.sanction.updateMany({ where: { appliedById: { in: otherUsers.map((u) => u.id) } }, data: { appliedById: owner.id } }),
-    prisma.sanction.updateMany({ where: { liftedById: { in: otherUsers.map((u) => u.id) } }, data: { liftedById: owner.id } }),
-    prisma.supportTicketMessage.updateMany({ where: { authorId: { in: otherUsers.map((u) => u.id) } }, data: { authorId: owner.id } }),
+    prisma.adminActionLog.updateMany({
+      where: { actorId: { in: otherUsers.map((u) => u.id) } },
+      data: { actorId: owner.id },
+    }),
+    prisma.fileAsset.updateMany({
+      where: { uploadedById: { in: otherUsers.map((u) => u.id) } },
+      data: { uploadedById: owner.id },
+    }),
+    prisma.newsPost.updateMany({
+      where: { createdById: { in: otherUsers.map((u) => u.id) } },
+      data: { createdById: owner.id },
+    }),
+    prisma.newsTag.updateMany({
+      where: { createdById: { in: otherUsers.map((u) => u.id) } },
+      data: { createdById: owner.id },
+    }),
+    prisma.priceIndex.updateMany({
+      where: { createdById: { in: otherUsers.map((u) => u.id) } },
+      data: { createdById: owner.id },
+    }),
+    prisma.priceIndexValue.updateMany({
+      where: { createdById: { in: otherUsers.map((u) => u.id) } },
+      data: { createdById: owner.id },
+    }),
+    prisma.learningModule.updateMany({
+      where: { createdById: { in: otherUsers.map((u) => u.id) } },
+      data: { createdById: owner.id },
+    }),
+    prisma.chapter.updateMany({
+      where: { createdById: { in: otherUsers.map((u) => u.id) } },
+      data: { createdById: owner.id },
+    }),
+    prisma.lesson.updateMany({
+      where: { createdById: { in: otherUsers.map((u) => u.id) } },
+      data: { createdById: owner.id },
+    }),
+    prisma.knowledgeBaseArticle.updateMany({
+      where: { createdById: { in: otherUsers.map((u) => u.id) } },
+      data: { createdById: owner.id },
+    }),
+    prisma.moderationCase.updateMany({
+      where: { entityAuthorId: { in: otherUsers.map((u) => u.id) } },
+      data: { entityAuthorId: owner.id },
+    }),
+    prisma.moderationCase.updateMany({
+      where: { lockedById: { in: otherUsers.map((u) => u.id) } },
+      data: { lockedById: owner.id },
+    }),
+    prisma.complaint.updateMany({
+      where: { authorId: { in: otherUsers.map((u) => u.id) } },
+      data: { authorId: owner.id },
+    }),
+    prisma.moderationDecision.updateMany({
+      where: { actorId: { in: otherUsers.map((u) => u.id) } },
+      data: { actorId: owner.id },
+    }),
+    prisma.sanction.updateMany({
+      where: { appliedById: { in: otherUsers.map((u) => u.id) } },
+      data: { appliedById: owner.id },
+    }),
+    prisma.sanction.updateMany({
+      where: { liftedById: { in: otherUsers.map((u) => u.id) } },
+      data: { liftedById: owner.id },
+    }),
+    prisma.supportTicketMessage.updateMany({
+      where: { authorId: { in: otherUsers.map((u) => u.id) } },
+      data: { authorId: owner.id },
+    }),
   ];
   await prisma.$transaction(reassignOps);
   console.log("✓ Контент переназначен на владельца");

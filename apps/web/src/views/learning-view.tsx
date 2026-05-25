@@ -487,18 +487,18 @@ export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId:
 
             {lessonTasks.length > 0 ? (
               <div className="lesson-side-card">
-              <div className="lesson-side-card-header">Задания урока</div>
-              <ul className="lesson-task-list">
-                {lessonTasks.map((task, index) => (
-                  <li className={lessonAlreadyCompleted ? "done" : ""} key={`${task.title}-${index}`}>
-                    <span className="lesson-task-icon">{lessonAlreadyCompleted ? "✓" : index + 1}</span>
-                    <div>
-                      <strong>{task.title}</strong>
-                      {task.description ? <span>{task.description}</span> : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                <div className="lesson-side-card-header">Задания урока</div>
+                <ul className="lesson-task-list">
+                  {lessonTasks.map((task, index) => (
+                    <li className={lessonAlreadyCompleted ? "done" : ""} key={`${task.title}-${index}`}>
+                      <span className="lesson-task-icon">{lessonAlreadyCompleted ? "✓" : index + 1}</span>
+                      <div>
+                        <strong>{task.title}</strong>
+                        {task.description ? <span>{task.description}</span> : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ) : null}
 
@@ -600,18 +600,10 @@ function resolveLessonMaterialIcon(asset: FileAsset | undefined, displayName: st
   if (mimeType.startsWith("image/") || /\.(avif|gif|jpe?g|png|webp)$/.test(fileName)) return FileImage;
   if (mimeType.startsWith("video/") || /\.(mp4|webm)$/.test(fileName)) return FileVideoCamera;
   if (mimeType.startsWith("audio/") || /\.(mp3|ogg|wav|weba)$/.test(fileName)) return FileMusic;
-  if (
-    mimeType.includes("spreadsheet") ||
-    mimeType.includes("ms-excel") ||
-    /\.(xls|xlsx)$/.test(fileName)
-  ) {
+  if (mimeType.includes("spreadsheet") || mimeType.includes("ms-excel") || /\.(xls|xlsx)$/.test(fileName)) {
     return FileSpreadsheet;
   }
-  if (
-    mimeType.includes("presentation") ||
-    mimeType.includes("ms-powerpoint") ||
-    /\.(ppt|pptx)$/.test(fileName)
-  ) {
+  if (mimeType.includes("presentation") || mimeType.includes("ms-powerpoint") || /\.(ppt|pptx)$/.test(fileName)) {
     return Presentation;
   }
   if (mimeType.includes("zip") || /\.zip$/.test(fileName)) return FileArchive;

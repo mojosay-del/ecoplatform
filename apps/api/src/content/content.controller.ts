@@ -266,11 +266,7 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Delete("admin/content/indices/:id/values/:valueId")
-  async deletePriceValue(
-    @Param("id") id: string,
-    @Param("valueId") valueId: string,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async deletePriceValue(@Param("id") id: string, @Param("valueId") valueId: string, @CurrentUser() user: RequestUser) {
     return this.indices.deletePriceValue(id, valueId, user);
   }
 
@@ -358,11 +354,7 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/education/modules/:moduleId/chapters")
-  async createChapter(
-    @Param("moduleId") moduleId: string,
-    @Body() body: unknown,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async createChapter(@Param("moduleId") moduleId: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     return this.learning.createChapter(moduleId, parseBody(chapterInputSchema, body), user);
   }
 
@@ -387,11 +379,7 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/education/chapters/:chapterId/lessons")
-  async createLesson(
-    @Param("chapterId") chapterId: string,
-    @Body() body: unknown,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async createLesson(@Param("chapterId") chapterId: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     return this.learning.createLesson(chapterId, parseBody(lessonInputSchema, body), user);
   }
 
@@ -450,11 +438,7 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Patch("admin/content/knowledge-base/:id")
-  async updateKnowledgeArticle(
-    @Param("id") id: string,
-    @Body() body: unknown,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async updateKnowledgeArticle(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     return this.knowledgeBase.updateKnowledgeArticle(id, parseBody(knowledgeArticleInputSchema, body), user);
   }
 
@@ -479,11 +463,7 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Patch("admin/content/knowledge-base/:id/move")
-  async moveKnowledgeArticle(
-    @Param("id") id: string,
-    @Body() body: unknown,
-    @CurrentUser() user: RequestUser,
-  ) {
+  async moveKnowledgeArticle(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     return this.knowledgeBase.moveKnowledgeArticle(id, parseBody(knowledgeMoveInputSchema, body), user);
   }
 
