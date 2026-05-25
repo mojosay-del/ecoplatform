@@ -157,6 +157,23 @@ enum UserStatus {
   blocked
 }
 
+enum LegalDocumentType {
+  privacy_policy
+  terms_of_service
+  personal_data_consent
+  cookie_policy
+  marketing_consent
+  offer_agreement
+}
+
+enum ConsentSource {
+  registration
+  login_reconfirm
+  cookie_banner
+  settings
+  admin_action
+}
+
 model User {
   id                      String                       @id @default(cuid())
   email                   String                       @unique
@@ -179,6 +196,7 @@ model User {
   notificationDeliveries  NotificationDelivery[]       @relation("NotificationRecipient")
   notificationPreferences UserNotificationPreferences?
   moduleRestrictions      UserModuleRestriction[]
+  consents                ConsentRecord[]
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt
 
@@ -803,4 +821,39 @@ model SupportTicketMessage {
 
   // Загрузка переписки тикета (chronological order).
   @@index([ticketId, createdAt])
+}
+
+model LegalDocument {
+  id          String            @id @default(cuid())
+  type        LegalDocumentType
+  version     String
+  title       String
+  body        String
+  summary     String?
+  isRequired  Boolean           @default(true)
+  isActive    Boolean           @default(false)
+  publishedAt DateTime?
+  consents    ConsentRecord[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([type, version])
+  @@index([type, isActive])
+  @@index([type, publishedAt(sort: Desc)])
+}
+
+model ConsentRecord {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId String
+  document   LegalDocument @relation(fields: [documentId], references: [id])
+  acceptedAt DateTime      @default(now())
+  ipAddress  String?
+  userAgent  String?
+  source     ConsentSource @default(registration)
+
+  @@unique([userId, documentId])
+  @@index([userId, acceptedAt(sort: Desc)])
+  @@index([documentId, acceptedAt(sort: Desc)])
 }

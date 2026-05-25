@@ -34,6 +34,21 @@ export const supportTicketStatuses = ["new", "in_progress", "awaiting_user", "re
 
 export type SupportTicketStatus = (typeof supportTicketStatuses)[number];
 
+export const legalDocumentTypes = [
+  "privacy_policy",
+  "terms_of_service",
+  "personal_data_consent",
+  "cookie_policy",
+  "marketing_consent",
+  "offer_agreement",
+] as const;
+
+export type LegalDocumentType = (typeof legalDocumentTypes)[number];
+
+export const consentSources = ["registration", "login_reconfirm", "cookie_banner", "settings", "admin_action"] as const;
+
+export type ConsentSource = (typeof consentSources)[number];
+
 export const supportTicketCategories = [
   "billing",
   "moderation_review",

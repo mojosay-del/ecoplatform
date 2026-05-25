@@ -234,6 +234,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </header>
         <div className="page-surface">{children}</div>
+        <AppShellFooter />
       </main>
       {/* Drawer поддержки рендерим один раз на уровне AppShell — компонент
           сам проверяет проп `open` и ничего не рисует, пока он false. */}
@@ -327,4 +328,29 @@ function filterVisibleItems(items: NavItem[], roles: string[]): NavItem[] {
       ...item,
       children: item.children ? filterVisibleItems(item.children, roles) : undefined,
     }));
+}
+
+// Footer внутри кабинета — даёт постоянный доступ к юридическим документам.
+function AppShellFooter() {
+  return (
+    <footer className="app-shell-footer">
+      <div className="app-shell-footer-column">
+        <strong>ЭкоПлатформа</strong>
+        <span>SaaS для рынка вторсырья</span>
+      </div>
+      <div className="app-shell-footer-column">
+        <span className="app-shell-footer-title">Правовое</span>
+        <Link href="/legal/privacy">Политика конфиденциальности</Link>
+        <Link href="/legal/terms">Пользовательское соглашение</Link>
+        <Link href="/legal/personal-data">152-ФЗ: согласие на обработку ПДн</Link>
+        <Link href="/legal/cookies">Политика cookies</Link>
+        <Link href="/legal/offer">Публичная оферта</Link>
+      </div>
+      <div className="app-shell-footer-column">
+        <span className="app-shell-footer-title">Контакты</span>
+        <a href="mailto:support@ecoplatform.local">support@ecoplatform.local</a>
+        <span className="app-shell-footer-copyright">© 2026 ЭкоПлатформа</span>
+      </div>
+    </footer>
+  );
 }

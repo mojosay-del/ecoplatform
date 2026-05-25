@@ -9,6 +9,7 @@ import {
   CompanyType,
   ContentStatus,
   LearningAccessLevel,
+  LegalDocumentType,
   PlatformRole,
   PrismaClient,
   UserGender,
@@ -390,10 +391,82 @@ async function main() {
     },
   });
 
+  await seedLegalDocuments();
+
   console.log("Seed completed");
   console.log("Admin: admin@ecoplatform.local / Admin12345");
   console.log("Demo user: demo@ecoplatform.local / Demo12345");
   console.log(`Learning module seeded: ${module.title}`);
+}
+
+// Placeholder-версии всех обязательных юр-документов на dev-стенде, чтобы
+// регистрация и страницы /legal/* работали сразу после миграции. Реальный
+// текст контент-менеджер опубликует через админский CMS позже.
+type LegalDocSeed = {
+  type: LegalDocumentType;
+  title: string;
+  summary: string;
+  body: string;
+  isRequired: boolean;
+};
+
+const LEGAL_DOCUMENT_SEEDS: LegalDocSeed[] = [
+  {
+    type: LegalDocumentType.privacy_policy,
+    title: "Политика конфиденциальности",
+    summary: "Какие персональные данные мы собираем, как храним и зачем используем.",
+    body: "<p>Текст Политики конфиденциальности находится в подготовке. Финальная редакция будет опубликована до запуска платных тарифов.</p>",
+    isRequired: true,
+  },
+  {
+    type: LegalDocumentType.terms_of_service,
+    title: "Пользовательское соглашение",
+    summary: "Правила использования платформы и взаимные обязательства сторон.",
+    body: "<p>Текст Пользовательского соглашения находится в подготовке.</p>",
+    isRequired: true,
+  },
+  {
+    type: LegalDocumentType.personal_data_consent,
+    title: "Согласие на обработку персональных данных (152-ФЗ)",
+    summary: "Согласие на обработку персональных данных в соответствии с 152-ФЗ.",
+    body: "<p>Текст Согласия на обработку персональных данных находится в подготовке.</p>",
+    isRequired: true,
+  },
+  {
+    type: LegalDocumentType.cookie_policy,
+    title: "Политика использования cookies",
+    summary: "Какие cookies мы используем и как ими управлять.",
+    body: "<p>Текст Политики использования cookies находится в подготовке.</p>",
+    isRequired: false,
+  },
+  {
+    type: LegalDocumentType.offer_agreement,
+    title: "Публичная оферта",
+    summary: "Условия покупки подписки и предоставления услуг.",
+    body: "<p>Текст Публичной оферты находится в подготовке.</p>",
+    isRequired: false,
+  },
+];
+
+async function seedLegalDocuments() {
+  const initialVersion = "1.0.0";
+  for (const seed of LEGAL_DOCUMENT_SEEDS) {
+    await prisma.legalDocument.upsert({
+      where: { type_version: { type: seed.type, version: initialVersion } },
+      update: {},
+      create: {
+        type: seed.type,
+        version: initialVersion,
+        title: seed.title,
+        summary: seed.summary,
+        body: seed.body,
+        isRequired: seed.isRequired,
+        isActive: true,
+        publishedAt: new Date(),
+      },
+    });
+  }
+  console.log(`Legal documents seeded (${LEGAL_DOCUMENT_SEEDS.length} active v${initialVersion})`);
 }
 
 main()

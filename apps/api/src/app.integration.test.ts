@@ -8,6 +8,7 @@ import {
   CommentStatus,
   CompanyStatus,
   ContentStatus,
+  LegalDocumentType,
   PlatformRole,
   SanctionType,
   SubscriptionStatus,
@@ -29,7 +30,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await resetDb(ctx.prisma);
   // Сидим админа — он нужен почти в каждом тесте для ручной активации/CMS.
-  await ctx.prisma.user.create({
+  const adminUser = await ctx.prisma.user.create({
     data: {
       email: "admin@test.local",
       firstName: "Админ",
@@ -39,7 +40,59 @@ beforeEach(async () => {
       platformStaff: { create: { roles: [PlatformRole.admin], isActive: true } },
     },
   });
+
+  // Сидим минимальный набор активных обязательных юр-документов — чтобы
+  // регистрация в тестах проходила через ту же проверку acceptedDocumentIds,
+  // что и на проде. Если документов нет, register разрешает регистрацию
+  // без consent (см. auth.service.register), но это deviation от прод-поведения.
+  await ctx.prisma.legalDocument.createMany({
+    data: [
+      {
+        id: "test-doc-privacy",
+        type: LegalDocumentType.privacy_policy,
+        version: "1.0.0",
+        title: "Политика конфиденциальности",
+        body: "<p>тест</p>",
+        isRequired: true,
+        isActive: true,
+        publishedAt: new Date(),
+      },
+      {
+        id: "test-doc-terms",
+        type: LegalDocumentType.terms_of_service,
+        version: "1.0.0",
+        title: "Пользовательское соглашение",
+        body: "<p>тест</p>",
+        isRequired: true,
+        isActive: true,
+        publishedAt: new Date(),
+      },
+      {
+        id: "test-doc-pd",
+        type: LegalDocumentType.personal_data_consent,
+        version: "1.0.0",
+        title: "Согласие на обработку ПДн",
+        body: "<p>тест</p>",
+        isRequired: true,
+        isActive: true,
+        publishedAt: new Date(),
+      },
+    ],
+  });
+
+  // Админ тоже должен иметь записи consent (иначе requiresReConsent=true).
+  // На проде админ либо регистрируется через ту же форму, либо для него
+  // выставляются consent миграцией.
+  await ctx.prisma.consentRecord.createMany({
+    data: ["test-doc-privacy", "test-doc-terms", "test-doc-pd"].map((documentId) => ({
+      userId: adminUser.id,
+      documentId,
+      source: "admin_action" as const,
+    })),
+  });
 });
+
+const REQUIRED_DOC_IDS_FOR_TESTS = ["test-doc-privacy", "test-doc-terms", "test-doc-pd"];
 
 async function loginAdmin(): Promise<string> {
   const res = await ctx.http.post("/api/auth/login").send({ email: "admin@test.local", password: "Admin12345" });
@@ -57,6 +110,7 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
     phone: `+7900${suffix}`,
     email: `user${suffix}@test.local`,
     password: "User123456",
+    acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
   });
   expect(res.status).toBe(201);
   const token = res.body.accessToken as string;
@@ -208,6 +262,7 @@ describe("Auth", () => {
       phone: "+71111111112",
       email: "trader-female@test.local",
       password: "User123456",
+      acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
     });
     expect(res.status).toBe(201);
 
@@ -2246,5 +2301,270 @@ describe("Content lifecycle: price indices", () => {
       where: { entityId: nomenclatureId, action: "indices.nomenclature.delete" },
     });
     expect(log?.payload).toMatchObject({ priceIndexId: indexId, priceValuesDeleted: 1 });
+  });
+});
+
+// Юридические документы и согласия (Волна 6.2). Документы создаются вручную
+// в каждом тесте, потому что resetDb чистит ВСЕ таблицы (включая LegalDocument);
+// глобального seed для тестов нет.
+describe("Legal documents & consents", () => {
+  // Используем версии 9.x.x чтобы не пересечься с seed-документами из beforeEach
+  // (test-doc-privacy/terms/pd с версией 1.0.0).
+  async function createActiveDoc(type: LegalDocumentType, version: string, isRequired = true) {
+    return ctx.prisma.legalDocument.create({
+      data: {
+        type,
+        version,
+        title: `Документ ${type} ${version}`,
+        body: `<p>Тело ${type} ${version}</p>`,
+        isRequired,
+        isActive: true,
+        publishedAt: new Date(),
+      },
+    });
+  }
+
+  it("публичная выдача активных документов: фильтр по типам и без фильтра", async () => {
+    // beforeEach создал 3 обязательных документа. Добавим одну cookie-версию.
+    const cookieDoc = await createActiveDoc(LegalDocumentType.cookie_policy, "9.0.0", false);
+
+    const all = await ctx.http.get("/api/legal/documents");
+    expect(all.status).toBe(200);
+    expect(all.body).toHaveLength(4);
+    const types = all.body.map((d: { type: string }) => d.type).sort();
+    expect(types).toEqual(["cookie_policy", "personal_data_consent", "privacy_policy", "terms_of_service"]);
+    // body НЕ должно отдаваться в summary-выдаче — это легче для каталога
+    expect(all.body[0].body).toBeUndefined();
+
+    const filtered = await ctx.http.get("/api/legal/documents?types=privacy_policy,cookie_policy");
+    expect(filtered.status).toBe(200);
+    expect(filtered.body).toHaveLength(2);
+    const filteredIds = filtered.body.map((d: { id: string }) => d.id).sort();
+    expect(filteredIds.some((id: string) => id === cookieDoc.id)).toBe(true);
+  });
+
+  it("получение конкретной версии документа", async () => {
+    const res = await ctx.http.get("/api/legal/documents/privacy_policy/1.0.0");
+    expect(res.status).toBe(200);
+    expect(res.body.isActive).toBe(true);
+    expect(res.body.body).toBeTruthy();
+
+    const missing = await ctx.http.get("/api/legal/documents/privacy_policy/9.9.9");
+    expect(missing.status).toBe(404);
+  });
+
+  it("POST /consents записывает согласие в БД с IP и user-agent", async () => {
+    const doc = await createActiveDoc(LegalDocumentType.cookie_policy, "9.0.0", false);
+    const { token, userId } = await registerCompany("0000200");
+
+    const res = await ctx.http
+      .post("/api/legal/consents")
+      .set("Authorization", `Bearer ${token}`)
+      .set("User-Agent", "vitest-agent")
+      .send({ documentIds: [doc.id], source: "cookie_banner" });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ ok: true });
+
+    const records = await ctx.prisma.consentRecord.findMany({ where: { userId, documentId: doc.id } });
+    expect(records).toHaveLength(1);
+    expect(records[0].source).toBe("cookie_banner");
+    expect(records[0].userAgent).toBe("vitest-agent");
+  });
+
+  it("POST /consents отклоняет неактивную версию", async () => {
+    const { token } = await registerCompany("0000201");
+    const draft = await ctx.prisma.legalDocument.create({
+      data: {
+        type: LegalDocumentType.cookie_policy,
+        version: "0.9.0",
+        title: "Черновик",
+        body: "<p>x</p>",
+        isRequired: false,
+        isActive: false,
+      },
+    });
+    const res = await ctx.http
+      .post("/api/legal/consents")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ documentIds: [draft.id] });
+    expect(res.status).toBe(400);
+  });
+
+  it("GET /me/consents возвращает только согласия текущего пользователя", async () => {
+    // На регистрации пользователь подтверждает 3 обязательных документа,
+    // поэтому на a уже минимум 3 записи. Добавим ещё одну на cookie.
+    const cookieDoc = await createActiveDoc(LegalDocumentType.cookie_policy, "9.0.0", false);
+    const a = await registerCompany("0000202");
+    const b = await registerCompany("0000203");
+    await ctx.http
+      .post("/api/legal/consents")
+      .set("Authorization", `Bearer ${a.token}`)
+      .send({ documentIds: [cookieDoc.id], source: "settings" });
+
+    const aMe = await ctx.http.get("/api/legal/me/consents").set("Authorization", `Bearer ${a.token}`);
+    expect(aMe.status).toBe(200);
+    expect(aMe.body).toHaveLength(4);
+    const aDocIds = aMe.body.map((r: { documentId: string }) => r.documentId).sort();
+    expect(aDocIds).toEqual([...REQUIRED_DOC_IDS_FOR_TESTS, cookieDoc.id].sort());
+
+    const bMe = await ctx.http.get("/api/legal/me/consents").set("Authorization", `Bearer ${b.token}`);
+    expect(bMe.status).toBe(200);
+    // b подтвердил только 3 обязательных при регистрации
+    expect(bMe.body).toHaveLength(3);
+  });
+
+  it("повторный POST /consents идемпотентен (skipDuplicates)", async () => {
+    const cookieDoc = await createActiveDoc(LegalDocumentType.cookie_policy, "9.0.0", false);
+    const { token, userId } = await registerCompany("0000204");
+
+    const first = await ctx.http
+      .post("/api/legal/consents")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ documentIds: [cookieDoc.id], source: "settings" });
+    expect(first.status).toBe(201);
+    const second = await ctx.http
+      .post("/api/legal/consents")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ documentIds: [cookieDoc.id], source: "settings" });
+    expect(second.status).toBe(201);
+    const count = await ctx.prisma.consentRecord.count({ where: { userId, documentId: cookieDoc.id } });
+    expect(count).toBe(1);
+  });
+
+  it("admin создаёт новую версию документа и активирует её, предыдущая деактивируется", async () => {
+    // Берём seed-документ test-doc-privacy как v1, создадим новую v2 через API.
+    const v1Id = "test-doc-privacy";
+    const adminToken = await loginAdmin();
+
+    const create = await ctx.http.post("/api/admin/legal/documents").set("Authorization", `Bearer ${adminToken}`).send({
+      type: "privacy_policy",
+      version: "1.1.0",
+      title: "Политика v1.1",
+      summary: "Расширили раздел про cookies",
+      body: "<p>Обновлённый текст</p>",
+      isRequired: true,
+    });
+    expect(create.status).toBe(201);
+    expect(create.body.isActive).toBe(false);
+    const v2Id = create.body.id as string;
+
+    const publish = await ctx.http
+      .post(`/api/admin/legal/documents/${v2Id}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({});
+    expect(publish.status).toBe(201);
+    expect(publish.body.isActive).toBe(true);
+    expect(publish.body.publishedAt).toBeTruthy();
+
+    const prev = await ctx.prisma.legalDocument.findUnique({ where: { id: v1Id } });
+    expect(prev?.isActive).toBe(false);
+    const active = await ctx.prisma.legalDocument.findMany({
+      where: { type: LegalDocumentType.privacy_policy, isActive: true },
+    });
+    expect(active).toHaveLength(1);
+    expect(active[0].id).toBe(v2Id);
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: v2Id, action: "admin.legal.document.publish" },
+    });
+    expect(log).toBeTruthy();
+  });
+
+  it("admin не может создать дубль (type, version)", async () => {
+    // privacy_policy 1.0.0 уже создан в beforeEach (test-doc-privacy).
+    const adminToken = await loginAdmin();
+
+    const res = await ctx.http.post("/api/admin/legal/documents").set("Authorization", `Bearer ${adminToken}`).send({
+      type: "privacy_policy",
+      version: "1.0.0",
+      title: "Дубль",
+      body: "<p>x</p>",
+      isRequired: true,
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("обычный пользователь не имеет доступа к admin/legal/*", async () => {
+    const { token } = await registerCompany("0000205");
+    const res = await ctx.http.get("/api/admin/legal/documents").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("регистрация записывает 3 ConsentRecord c source=registration и ipAddress", async () => {
+    const { userId } = await registerCompany("0000206");
+    const records = await ctx.prisma.consentRecord.findMany({
+      where: { userId },
+      orderBy: { documentId: "asc" },
+    });
+    expect(records).toHaveLength(3);
+    for (const record of records) {
+      expect(record.source).toBe("registration");
+      // ipAddress в integration-supertest может быть пустым — главное, что поле
+      // присутствует (NULL допустим). На проде trust proxy=1 заполнит его.
+      expect(record).toHaveProperty("ipAddress");
+    }
+    expect(records.map((r) => r.documentId).sort()).toEqual([...REQUIRED_DOC_IDS_FOR_TESTS].sort());
+  });
+
+  it("регистрация без обязательного документа — 400", async () => {
+    const res = await ctx.http.post("/api/auth/register").send({
+      organizationName: "ООО Без согласий",
+      companyType: "collector",
+      firstName: "Иван",
+      lastName: "Тестов",
+      gender: "male",
+      phone: "+79000000300",
+      email: "noconsents@test.local",
+      password: "User123456",
+      acceptedDocumentIds: ["test-doc-privacy", "test-doc-terms"], // не хватает personal_data_consent
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("Согласие на обработку ПДн");
+    // пользователь не должен быть создан
+    const u = await ctx.prisma.user.findUnique({ where: { email: "noconsents@test.local" } });
+    expect(u).toBeNull();
+  });
+
+  it("auth/me.requiresReConsent=true после публикации новой обязательной версии", async () => {
+    const { token, userId } = await registerCompany("0000207");
+
+    const me1 = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(me1.body.requiresReConsent).toBe(false);
+
+    // Контент-менеджер публикует новую версию privacy_policy.
+    const adminToken = await loginAdmin();
+    const created = await ctx.http
+      .post("/api/admin/legal/documents")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        type: "privacy_policy",
+        version: "2.0.0",
+        title: "Политика v2",
+        body: "<p>обновили</p>",
+        isRequired: true,
+      });
+    expect(created.status).toBe(201);
+    await ctx.http
+      .post(`/api/admin/legal/documents/${created.body.id}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({});
+
+    // У пользователя ещё нет ConsentRecord на новую активную версию.
+    const me2 = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(me2.body.requiresReConsent).toBe(true);
+
+    // Пользователь подтверждает новую версию.
+    const accept = await ctx.http
+      .post("/api/legal/consents")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ documentIds: [created.body.id], source: "login_reconfirm" });
+    expect(accept.status).toBe(201);
+
+    const me3 = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(me3.body.requiresReConsent).toBe(false);
+
+    // sanity: всего 4 записи — 3 при регистрации + 1 на v2
+    const count = await ctx.prisma.consentRecord.count({ where: { userId } });
+    expect(count).toBe(4);
   });
 });

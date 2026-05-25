@@ -18,7 +18,7 @@ type AuthContextValue = {
   user: User | null;
   ready: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  register: (input: Record<string, string>) => Promise<void>;
+  register: (input: Record<string, string | string[]>) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
 };
@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadMe(result.accessToken);
   }
 
-  async function register(input: Record<string, string>) {
+  async function register(input: Record<string, string | string[]>) {
     const result = await apiFetch<{ accessToken: string }>("/auth/register", {
       method: "POST",
       body: input,

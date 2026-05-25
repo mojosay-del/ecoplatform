@@ -42,6 +42,33 @@ export class AuthService {
       throw new ConflictException("Пользователь с такой почтой или телефоном уже зарегистрирован.");
     }
 
+    // Проверка обязательных юр-документов до создания компании/юзера, чтобы
+    // не оставлять «мусорный» аккаунт без consent'а, если массив неполный.
+    // Если в системе вообще нет активных обязательных документов (свежий
+    // dev-стенд до сидера), регистрация всё равно проходит — пустой
+    // requiredActive не блокирует. На проде сидер запускается до запуска.
+    const requiredActive = await this.prisma.legalDocument.findMany({
+      where: { isActive: true, isRequired: true },
+      select: { id: true, title: true },
+    });
+    const proposed = new Set(input.acceptedDocumentIds);
+    const missingRequired = requiredActive.filter((d) => !proposed.has(d.id));
+    if (missingRequired.length) {
+      throw new BadRequestException(
+        "Не подтверждены обязательные документы: " + missingRequired.map((d) => d.title).join(", "),
+      );
+    }
+    // Опциональные документы (cookies, marketing): берём только активные из
+    // присланных, остальные молча игнорируем — устаревшие версии или
+    // несуществующие ID не должны валить регистрацию.
+    const optionalAcceptedActive = input.acceptedDocumentIds.length
+      ? await this.prisma.legalDocument.findMany({
+          where: { isActive: true, id: { in: input.acceptedDocumentIds } },
+          select: { id: true },
+        })
+      : [];
+    const consentDocumentIds = Array.from(new Set(optionalAcceptedActive.map((d) => d.id)));
+
     const passwordHash = await hash(input.password, 12);
     const demoHours = await this.settings.getValue("demo.duration_hours");
     const company = await this.prisma.company.create({
@@ -64,6 +91,19 @@ export class AuthService {
         companyId: company.id,
       },
     });
+
+    if (consentDocumentIds.length) {
+      await this.prisma.consentRecord.createMany({
+        data: consentDocumentIds.map((documentId) => ({
+          userId: user.id,
+          documentId,
+          source: "registration" as const,
+          ipAddress: meta.ipAddress ?? null,
+          userAgent: meta.userAgent ?? null,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     return this.createSession(user.id, meta, false);
   }
@@ -381,8 +421,26 @@ export class AuthService {
           }
         : null,
       platformRoles,
-      requiresReConsent: false,
+      requiresReConsent: await this.hasPendingRequiredConsent(userId),
     };
+  }
+
+  // requiresReConsent=true означает, что после последнего входа была
+  // опубликована новая версия обязательного документа, и пользователь её
+  // ещё не подтвердил. UI показывает модалку «Условия использования
+  // обновлены» при следующем визите. ConsentRecord имеет уникальный
+  // (userId, documentId) — каждая новая версия = новая строка LegalDocument,
+  // поэтому отсутствие записи на конкретную активную версию = pending.
+  private async hasPendingRequiredConsent(userId: string): Promise<boolean> {
+    const requiredActive = await this.prisma.legalDocument.findMany({
+      where: { isActive: true, isRequired: true },
+      select: { id: true },
+    });
+    if (requiredActive.length === 0) return false;
+    const acceptedCount = await this.prisma.consentRecord.count({
+      where: { userId, documentId: { in: requiredActive.map((d) => d.id) } },
+    });
+    return acceptedCount < requiredActive.length;
   }
 
   private async createSession(

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { companyTypes, userGenders } from "./domain";
+import { companyTypes, consentSources, legalDocumentTypes, userGenders } from "./domain";
 
 // Единое правило сложности пароля. До этого было три разных:
 // register=8, changePassword=10, admin-staff=10. 10 — компромисс между
@@ -24,9 +24,34 @@ export const registerDtoSchema = z.object({
     .regex(/^\+7\d{10}$/, "Телефон должен быть в формате +7XXXXXXXXXX"),
   email: z.string().trim().email(),
   password: passwordSchema,
+  // ID документов, на которые пользователь явно поставил галочку при
+  // регистрации. Бэк проверит, что среди них есть все актуальные обязательные
+  // документы; маркетинг — опционально.
+  acceptedDocumentIds: z.array(z.string().min(1)).default([]),
 });
 
 export type RegisterDto = z.infer<typeof registerDtoSchema>;
+
+export const consentSubmitDtoSchema = z.object({
+  documentIds: z.array(z.string().min(1)).min(1, "Не указан ни один документ"),
+  source: z.enum(consentSources).default("settings"),
+});
+
+export type ConsentSubmitDto = z.infer<typeof consentSubmitDtoSchema>;
+
+export const legalDocumentCreateDtoSchema = z.object({
+  type: z.enum(legalDocumentTypes),
+  version: z
+    .string()
+    .trim()
+    .regex(/^\d+\.\d+\.\d+$/, "Версия должна быть в формате semver, например 1.0.0"),
+  title: z.string().trim().min(2),
+  summary: z.string().trim().max(500).optional(),
+  body: z.string().min(1),
+  isRequired: z.boolean().default(true),
+});
+
+export type LegalDocumentCreateDto = z.infer<typeof legalDocumentCreateDtoSchema>;
 
 export const loginDtoSchema = z.object({
   email: z.string().email(),

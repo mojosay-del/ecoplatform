@@ -9,10 +9,15 @@
 
 import type {
   BillingStatus,
+  ConsentRecordItem,
+  ConsentSource,
   KnowledgeArticleDetail,
   KnowledgeNode,
   LearningModuleDetail,
   LearningModuleListItem,
+  LegalDocumentDetail,
+  LegalDocumentSummary,
+  LegalDocumentType,
   NewsListItem,
   NewsPostDetail,
   NomenclatureCategoryListItem,
@@ -200,6 +205,19 @@ export const api = {
   // ── Файлы ──────────────────────────────────────────────────────────────
   files: {
     listByIds: (ids: string[]) => apiFetch<FileAsset[]>(`/files?ids=${enc(ids.join(","))}`),
+  },
+
+  // ── Юридические документы и согласия ──────────────────────────────────
+  legal: {
+    list: (types?: LegalDocumentType[]) => {
+      const suffix = types && types.length ? `?types=${enc(types.join(","))}` : "";
+      return apiFetch<LegalDocumentSummary[]>(`/legal/documents${suffix}`);
+    },
+    get: (type: LegalDocumentType, version: string) =>
+      apiFetch<LegalDocumentDetail>(`/legal/documents/${enc(type)}/${enc(version)}`),
+    submitConsents: (documentIds: string[], source: ConsentSource = "settings") =>
+      apiFetch<{ ok: true }>("/legal/consents", { method: "POST", body: { documentIds, source } }),
+    listMyConsents: () => apiFetch<ConsentRecordItem[]>("/legal/me/consents"),
   },
 };
 

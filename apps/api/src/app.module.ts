@@ -11,6 +11,7 @@ import { BillingModule } from "./billing/billing.module";
 import { ContentModule } from "./content/content.module";
 import { FilesModule } from "./files/files.module";
 import { HealthModule } from "./health/health.module";
+import { LegalModule } from "./legal/legal.module";
 import { ModerationModule } from "./moderation/moderation.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -56,6 +57,7 @@ function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
     ContentModule,
     FilesModule,
     HealthModule,
+    LegalModule,
     ModerationModule,
     NotificationsModule,
     SchedulerModule,

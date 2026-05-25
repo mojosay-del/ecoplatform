@@ -7,7 +7,16 @@
 // в API некоторые поля приходят с decorator-обёрткой (likedByMe, hasAccess,
 // progress и т.п.). Дата приходит строкой (JSON.stringify Date → string).
 
-import type { CompanyStatus, CompanyType, PlatformRole, SubscriptionPlan, UserGender, UserStatus } from "./domain";
+import type {
+  CompanyStatus,
+  CompanyType,
+  ConsentSource,
+  LegalDocumentType,
+  PlatformRole,
+  SubscriptionPlan,
+  UserGender,
+  UserStatus,
+} from "./domain";
 import type { PriceIndexSummary } from "./price-index";
 
 // ── Common ────────────────────────────────────────────────────────────────
@@ -289,4 +298,42 @@ export type AuthMeCompany = {
   demoEndsAt: IsoDateString | null;
   subscriptionPlan: SubscriptionPlan | null;
   subscriptionEndsAt: IsoDateString | null;
+};
+
+// ── Legal documents & consents ────────────────────────────────────────────
+// Публичная карточка юр-документа: id текущей активной версии, заголовок,
+// summary краткого описания изменений, рендеримый HTML и флаг обязательности.
+// `body` отдаётся уже после серверной санитизации (DOMPurify в shared),
+// фронт ещё раз прогоняет через тот же sanitize-html — двойная защита.
+export type LegalDocumentSummary = {
+  id: string;
+  type: LegalDocumentType;
+  version: string;
+  title: string;
+  summary: string | null;
+  isRequired: boolean;
+  publishedAt: IsoDateString | null;
+};
+
+export type LegalDocumentDetail = LegalDocumentSummary & {
+  body: string;
+  isActive: boolean;
+  createdAt: IsoDateString;
+  updatedAt: IsoDateString;
+};
+
+export type ConsentRecordItem = {
+  id: string;
+  documentId: string;
+  acceptedAt: IsoDateString;
+  source: ConsentSource;
+  document: LegalDocumentSummary;
+};
+
+// Снимок «надо ли пользователю переподтвердить условия» — используется в
+// /auth/me, чтобы web показал модалку re-consent при возврате после
+// публикации новой версии обязательного документа.
+export type PendingConsentInfo = {
+  requiresReConsent: boolean;
+  documents: LegalDocumentSummary[];
 };

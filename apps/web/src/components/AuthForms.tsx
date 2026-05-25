@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Eye, EyeOff, Factory, Forklift, Package, RussianRuble, Truck } from "lucide-react";
-import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
-import { ApiError } from "../lib/api";
+import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
+import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 const companyTypeOptions = [
@@ -162,7 +162,16 @@ function AuthShell({ children, mode }: { children: ReactNode; mode: AuthMode }) 
     <main className="auth-page">
       <div className="auth-layout">
         <AuthVisual mode={mode} />
-        <div className="auth-form-panel">{children}</div>
+        <div className="auth-form-panel">
+          {children}
+          <footer className="auth-footer">
+            <Link href="/legal/privacy">Конфиденциальность</Link>
+            <Link href="/legal/terms">Соглашение</Link>
+            <Link href="/legal/personal-data">152-ФЗ</Link>
+            <Link href="/legal/cookies">Cookies</Link>
+            <Link href="/legal/offer">Оферта</Link>
+          </footer>
+        </div>
       </div>
     </main>
   );
@@ -418,6 +427,47 @@ export function RegisterForm() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Активные документы — приходят с API, чекбоксы рендерятся динамически по
+  // списку. Это даёт гибкость: контент-менеджер опубликовал новую обязательную
+  // версию — на форме она появилась без правки кода.
+  const [legalDocs, setLegalDocs] = useState<LegalDocumentSummary[]>([]);
+  const [legalLoadError, setLegalLoadError] = useState(false);
+  const [acceptedIds, setAcceptedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    api.legal
+      .list()
+      .then((docs) => {
+        if (cancelled) return;
+        setLegalDocs(docs);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLegalLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const requiredDocs = useMemo(() => legalDocs.filter((d) => d.isRequired), [legalDocs]);
+  const optionalDocs = useMemo(() => legalDocs.filter((d) => !d.isRequired), [legalDocs]);
+  const requiredAccepted = requiredDocs.length > 0 && requiredDocs.every((d) => acceptedIds.has(d.id));
+  // Кнопка submit заблокирована, пока документы не загружены или не отмечены
+  // все обязательные. Так пользователь не сможет «прокликать» регистрацию,
+  // а бэк имеет двойную защиту (см. auth.service.register).
+  const canSubmit = legalDocs.length > 0 && requiredAccepted;
+
+  function toggleAccepted(id: string) {
+    setAcceptedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -433,6 +483,7 @@ export function RegisterForm() {
         phone: String(form.get("phone")),
         email: normalizeEmailValue(String(form.get("email"))),
         password: String(form.get("password")),
+        acceptedDocumentIds: Array.from(acceptedIds),
       });
       router.push("/news");
     } catch (err) {
@@ -516,12 +567,86 @@ export function RegisterForm() {
           </div>
         </fieldset>
 
+        <fieldset className="auth-section">
+          <legend className="auth-section-title">Согласия</legend>
+          {legalLoadError ? (
+            <p className="auth-error">Не удалось загрузить юридические документы. Обновите страницу.</p>
+          ) : legalDocs.length === 0 ? (
+            <p className="auth-card-sub">Загружаем актуальные документы…</p>
+          ) : (
+            <div className="consent-list">
+              {requiredDocs.map((doc) => (
+                <ConsentRow
+                  key={doc.id}
+                  document={doc}
+                  checked={acceptedIds.has(doc.id)}
+                  onChange={() => toggleAccepted(doc.id)}
+                  required
+                />
+              ))}
+              {optionalDocs.map((doc) => (
+                <ConsentRow
+                  key={doc.id}
+                  document={doc}
+                  checked={acceptedIds.has(doc.id)}
+                  onChange={() => toggleAccepted(doc.id)}
+                />
+              ))}
+            </div>
+          )}
+        </fieldset>
+
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <button className="button auth-submit" type="submit" disabled={submitting}>
+        <button className="button auth-submit" type="submit" disabled={submitting || !canSubmit}>
           {submitting ? "Создаём аккаунт…" : "Создать аккаунт"}
         </button>
       </form>
     </AuthShell>
+  );
+}
+
+// Маппинг типа документа на ссылку публичной страницы. Если для какого-то
+// типа страницы нет (например, marketing_consent), показываем title без линка.
+const LEGAL_PUBLIC_ROUTES: Record<string, string> = {
+  privacy_policy: "/legal/privacy",
+  terms_of_service: "/legal/terms",
+  personal_data_consent: "/legal/personal-data",
+  cookie_policy: "/legal/cookies",
+  offer_agreement: "/legal/offer",
+};
+
+function ConsentRow({
+  document,
+  checked,
+  onChange,
+  required,
+}: {
+  document: LegalDocumentSummary;
+  checked: boolean;
+  onChange: () => void;
+  required?: boolean;
+}) {
+  const route = LEGAL_PUBLIC_ROUTES[document.type];
+  return (
+    <label className="consent-row">
+      <input type="checkbox" checked={checked} onChange={onChange} required={required} />
+      <span>
+        Я ознакомлен(а) и согласен(на) с{" "}
+        {route ? (
+          <Link href={route} target="_blank" rel="noopener noreferrer">
+            {document.title}
+          </Link>
+        ) : (
+          <strong>{document.title}</strong>
+        )}
+        {required ? (
+          <span className="consent-required" aria-label="обязательно">
+            {" "}
+            *
+          </span>
+        ) : null}
+      </span>
+    </label>
   );
 }
