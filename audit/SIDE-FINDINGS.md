@@ -11,13 +11,6 @@
 - **Что сделать**: заменить локальный `User` на импорт `AuthMeUser` из shared. Сверить shape (локальный имеет `avatarUrl`, `company { organizationName, demoEndsAt, subscriptionPlan, subscriptionEndsAt }`; AuthMeUser имеет `phone`, `status`, `company { id, name }`). Привести `/api/auth/me` к единому shape, обновить все потребителей.
 - **Когда**: после Волны 6 (юр-фундамент тоже потребует расширения `AuthMeUser`, лучше за один раз).
 
-### S-2. Нет корневого `pnpm test:integration` через turbo
-
-- **Где**: `package.json` (корневой) — только `dev/build/lint/test/typecheck`. `apps/api/package.json` имеет `test:integration`.
-- **Симптом**: команда из инструкций пользователя `pnpm test:integration` падает с `Command "test:integration" not found`. Сейчас работает только `pnpm --filter @ecoplatform/api test:integration`.
-- **Что сделать**: добавить в корневой `package.json` скрипт `"test:integration": "turbo run test:integration"` и в `turbo.json` — task с конфигом (`dependsOn: ["^build"]`, `inputs`, `outputs`).
-- **Когда**: вместе с обновлением CI/runbook (Волна 10).
-
 ### S-4. PROGRESS.md содержит «галлюцинации»
 
 - **Что**: в журнал писались записи о работе, которая фактически не была доведена (Волны 3.1, 3.2, 4.1 в части пагинации, 4.7 в части unit-тестов, 5.7 в части обновления паролей в тестах). Часть исправлена 2026-05-25 при ревизии.
@@ -25,6 +18,10 @@
 - **Что сделать**: ничего отдельного — следить за дисциплиной в следующих волнах.
 
 ## Закрытые
+
+### S-2. Нет корневого `pnpm test:integration` через turbo
+
+- **Закрыто 2026-05-25**: в корневой `package.json` добавлен скрипт `"test:integration": "turbo run test:integration"`. `turbo.json` уже содержал task `test:integration` (`dependsOn: ["^build"]`, `cache: false`), поэтому отдельная настройка turbo не потребовалась. Проверка: `pnpm test:integration` проходит через root-алиас и запускает integration-тесты API.
 
 ### S-3. Старый `content.service.ts` и старый `DataViews.tsx` параллельно с новыми сплитами
 
