@@ -103,9 +103,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isAdminUser = (user?.platformRoles?.length ?? 0) > 0;
 
   // Любой защищённый раздел оборачивается в AppShell. Если AuthProvider уже
-  // проверил localStorage и токена нет — отправляем на /login. До ready
-  // ничего не делаем, чтобы не сорвать сессию у залогиненного пользователя
-  // в момент гидратации страницы.
+  // попробовал восстановить refresh-cookie и токена нет — отправляем на /login.
+  // До ready ничего не делаем, чтобы не сорвать сессию у залогиненного
+  // пользователя в момент гидратации страницы.
   useEffect(() => {
     if (ready && !token) {
       router.replace("/login");

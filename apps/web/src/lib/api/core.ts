@@ -76,7 +76,7 @@ export function subscribeAccessToken(listener: AccessTokenListener) {
 }
 
 // 401 = токен протух или сессия отозвана. Чтобы не дублировать обработку
-// в каждом view, централизованно очищаем localStorage и редиректим
+// в каждом view, централизованно очищаем in-memory token и редиректим
 // пользователя на /login. Один раз — повторные 401 не должны спамить.
 let didRedirectOn401 = false;
 

@@ -37,3 +37,7 @@
 ### S-5. Волна 1.5 MIME-валидация file-type не была доведена
 
 - **Закрыто 2026-05-25**: `apps/api/src/files/files.service.ts` теперь валидирует обычный upload через `file-type/fromBuffer`, блокирует HTML/SVG/executable-типы и опасные расширения, сравнивает заявленный MIME с реальным, а non-media файлы кладёт в S3 с `Content-Disposition: attachment`. `apps/api/src/files/files.service.test.ts` покрывает HTML-as-image, SVG и PDF attachment. Проверки: targeted `pnpm --filter @ecoplatform/api test -- files.service.test.ts` — 20/20; полный цикл `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm --filter @ecoplatform/api test:integration` — зелёный, integration 79/79.
+
+### S-7. AuthProvider не вызывал refresh-cookie restore
+
+- **Закрыто 2026-05-25**: `apps/web/src/lib/auth.tsx` больше не ищет access-token через `getAccessToken()` на холодном mount, а вызывает `tryRestoreSession()` и затем `/auth/me`. Это приводит фактическое поведение к модели Волны 1.3: access-token только в памяти, reload восстанавливается через HttpOnly refresh-cookie. `apps/web/src/lib/api/core.test.ts` покрывает восстановление токена через `/auth/refresh`.

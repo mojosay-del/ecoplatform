@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiFetch } from "./core";
+import { apiFetch, clearAccessToken, getAccessToken, tryRestoreSession } from "./core";
 
 describe("apiFetch", () => {
   afterEach(() => {
+    clearAccessToken();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -64,6 +65,24 @@ describe("apiFetch", () => {
         headers: expect.objectContaining({
           Authorization: "Bearer new-access-token",
         }),
+      }),
+    );
+  });
+
+  it("restores access token through refresh cookie after page reload", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ accessToken: "restored-token" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(tryRestoreSession()).resolves.toBe(true);
+
+    expect(getAccessToken()).toBe("restored-token");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:4000/api/auth/refresh",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
       }),
     );
   });

@@ -1,7 +1,14 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { apiFetch, clearAccessToken, getAccessToken, setAccessToken, subscribeAccessToken } from "./api";
+import {
+  apiFetch,
+  clearAccessToken,
+  getAccessToken,
+  setAccessToken,
+  subscribeAccessToken,
+  tryRestoreSession,
+} from "./api";
 
 type User = {
   id: string;
@@ -38,8 +45,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  // ready=false до первой проверки localStorage — иначе guards увидят token=null
-  // в момент монтирования и отправят даже залогиненного пользователя на /login.
+  // ready=false до попытки восстановить сессию через HttpOnly refresh-cookie —
+  // иначе guards увидят token=null в момент монтирования и отправят даже
+  // залогиненного пользователя на /login.
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -52,17 +60,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const saved = getAccessToken();
-    if (!saved) {
-      setReady(true);
-      return;
-    }
-    setToken(saved);
-    loadMe(saved)
-      .catch(() => {
+    let cancelled = false;
+
+    async function restoreSession() {
+      const restored = await tryRestoreSession();
+      const restoredToken = getAccessToken();
+
+      if (!restored || !restoredToken) {
+        if (!cancelled) setReady(true);
+        return;
+      }
+
+      try {
+        const me = await apiFetch<User>("/auth/me", { token: restoredToken });
+        if (!cancelled) {
+          setUser(me);
+        }
+      } catch {
         clearAccessToken();
-      })
-      .finally(() => setReady(true));
+      } finally {
+        if (!cancelled) {
+          setReady(true);
+        }
+      }
+    }
+
+    void restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function loadMe(nextToken: string) {
@@ -106,10 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const value = useMemo(
-    () => ({ token, user, ready, login, register, logout, refreshMe }),
-    [token, user, ready],
-  );
+  const value = useMemo(() => ({ token, user, ready, login, register, logout, refreshMe }), [token, user, ready]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
