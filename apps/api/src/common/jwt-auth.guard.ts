@@ -25,7 +25,8 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const payload = await this.jwt.verifyAsync<{ sub: string; sessionId: string }>(token, {
-        secret: process.env.JWT_ACCESS_SECRET ?? "dev-access-secret",
+        // Секрет проверяется в bootstrap() — без него процесс не стартует.
+        secret: process.env.JWT_ACCESS_SECRET as string,
       });
 
       const user = await this.prisma.user.findUnique({

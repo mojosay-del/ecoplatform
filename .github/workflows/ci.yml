@@ -1,0 +1,96 @@
+# CI для PR/push в main. Запускает lint + prettier-check + unit-тесты + сборку.
+# Integration-тесты выполняются отдельным job с поднятым Postgres.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-checks:
+    name: lint + format-check + unit-tests + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate (нужен для tsc)
+        run: pnpm --filter @ecoplatform/api prisma:generate
+
+      - name: Prettier check
+        run: pnpm format:check
+
+      - name: TypeScript (tsc --noEmit) lint
+        run: pnpm lint
+
+      - name: Unit tests (vitest)
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+  integration-tests:
+    name: integration tests (Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ecoplatform
+          POSTGRES_PASSWORD: ecoplatform
+          POSTGRES_DB: ecoplatform
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U ecoplatform"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Тестовая БД создаётся в integration-global-setup.ts из этого URL
+      # (она добавляет суффикс _test).
+      DATABASE_URL: postgresql://ecoplatform:ecoplatform@localhost:5433/ecoplatform?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-long-enough-for-bootstrap-check-32+
+      JWT_REFRESH_SECRET: ci-refresh-secret-long-enough-for-bootstrap-check-32+
+      S3_ENDPOINT: https://s3.example.test
+      S3_REGION: ru-1
+      S3_BUCKET: ci-test
+      S3_ACCESS_KEY_ID: ci-key
+      S3_SECRET_ACCESS_KEY: ci-secret
+      S3_PUBLIC_BASE_URL: https://s3.example.test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm --filter @ecoplatform/api prisma:generate
+
+      - name: Integration tests
+        run: pnpm --filter @ecoplatform/api test:integration

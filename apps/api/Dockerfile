@@ -1,0 +1,75 @@
+# syntax=docker/dockerfile:1
+# Multi-stage Docker-сборка NestJS API внутри pnpm + Turborepo монорепы.
+# Сборка идёт из КОРНЯ репозитория: `docker build -f apps/api/Dockerfile .`
+
+ARG NODE_VERSION=24
+
+# ────────────────── Stage 1: deps ──────────────────
+# Ставим зависимости один раз и кешируем слой. Дальше остальные стадии
+# берут готовый node_modules без повторной установки.
+FROM node:${NODE_VERSION}-alpine AS deps
+RUN apk add --no-cache libc6-compat openssl
+# pnpm берём через corepack — версию задаём такую же, как в корневом package.json.
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+WORKDIR /repo
+
+# Сначала только манифесты — это позволит Docker переиспользовать кеш слоя,
+# пока package.json'ы не меняются.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY packages/shared/package.json ./packages/shared/
+
+# `--frozen-lockfile` гарантирует, что версии не «разъедутся» против lock.
+RUN pnpm install --frozen-lockfile
+
+# ────────────────── Stage 2: build ──────────────────
+FROM node:${NODE_VERSION}-alpine AS build
+RUN apk add --no-cache libc6-compat openssl
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+WORKDIR /repo
+
+# Тянем готовые node_modules и реальные исходники.
+COPY --from=deps /repo/node_modules ./node_modules
+COPY . .
+
+# Prisma engine генерируется под linux-musl-* (см. binaryTargets в schema.prisma).
+RUN pnpm --filter @ecoplatform/api prisma generate
+
+# shared собирается первым через turbo dependsOn `^build`.
+RUN pnpm --filter @ecoplatform/api... build
+
+# ────────────────── Stage 3: runtime ──────────────────
+FROM node:${NODE_VERSION}-alpine AS runtime
+RUN apk add --no-cache libc6-compat openssl tini
+# pnpm нужен только для `pnpm prisma migrate deploy` при старте.
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    TZ=UTC \
+    API_PORT=4000
+
+# Не-root пользователь — стандартная защита.
+RUN addgroup -S nodeapp && adduser -S nodeapp -G nodeapp
+
+# Только то, что нужно для запуска:
+COPY --from=build --chown=nodeapp:nodeapp /repo/apps/api/dist ./dist
+COPY --from=build --chown=nodeapp:nodeapp /repo/apps/api/package.json ./package.json
+COPY --from=build --chown=nodeapp:nodeapp /repo/apps/api/prisma ./prisma
+COPY --from=build --chown=nodeapp:nodeapp /repo/packages/shared/dist ./node_modules/@ecoplatform/shared/dist
+COPY --from=build --chown=nodeapp:nodeapp /repo/packages/shared/package.json ./node_modules/@ecoplatform/shared/package.json
+COPY --from=build --chown=nodeapp:nodeapp /repo/node_modules ./node_modules
+COPY --from=build --chown=nodeapp:nodeapp /repo/pnpm-workspace.yaml ./pnpm-workspace.yaml
+
+USER nodeapp
+EXPOSE 4000
+
+# tini корректно обрабатывает SIGTERM и форвардит сигналы Node-процессу —
+# без него graceful shutdown в Nest может не сработать.
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# При старте контейнера сначала прокатываем миграции (idempotent),
+# потом запускаем сервер. Можно поставить `prisma migrate deploy` в init-job
+# и тут запускать только `node dist/main.js` — выбираем как удобнее в Timeweb.
+CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/main.js"]

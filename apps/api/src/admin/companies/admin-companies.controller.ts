@@ -5,10 +5,7 @@ import { Roles } from "../../common/roles.decorator";
 import { RolesGuard } from "../../common/roles.guard";
 import type { RequestUser } from "../../common/request-user";
 import { parseBody } from "../../common/zod";
-import {
-  adminCompanyListQuerySchema,
-  adminCompanyStatusInputSchema,
-} from "./admin-companies.schemas";
+import { adminCompanyListQuerySchema, adminCompanyStatusInputSchema } from "./admin-companies.schemas";
 import { AdminCompaniesService } from "./admin-companies.service";
 
 @UseGuards(JwtAuthGuard, RolesGuard)

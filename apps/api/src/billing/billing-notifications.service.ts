@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { CompanyStatus, NotificationCategory, SubscriptionStatus } from "@prisma/client";
+import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -78,7 +79,7 @@ export class BillingNotificationsService {
             link: "/account",
             payload: { companyId: company.id, demoEndsAt: endsAt.toISOString() },
           })
-          .catch(() => undefined);
+          .catch(swallowAndLog("billing.notifications.dispatch"));
       }
       count += 1;
     }
@@ -113,7 +114,7 @@ export class BillingNotificationsService {
             link: "/account",
             payload: { companyId: company.id },
           })
-          .catch(() => undefined);
+          .catch(swallowAndLog("billing.notifications.dispatch"));
       }
     }
     return companies.length;
@@ -152,7 +153,7 @@ export class BillingNotificationsService {
               plan: company.subscriptionPlan,
             },
           })
-          .catch(() => undefined);
+          .catch(swallowAndLog("billing.notifications.dispatch"));
       }
       count += 1;
     }
@@ -193,7 +194,7 @@ export class BillingNotificationsService {
             link: "/account",
             payload: { companyId: company.id },
           })
-          .catch(() => undefined);
+          .catch(swallowAndLog("billing.notifications.dispatch"));
       }
     }
     return companies.length;

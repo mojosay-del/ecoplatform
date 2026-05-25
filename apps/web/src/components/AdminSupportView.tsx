@@ -72,8 +72,10 @@ export function AdminSupportView() {
   const loadTickets = useCallback(async () => {
     if (!token) return;
     try {
-      const data = await apiFetch<Ticket[]>("/admin/support/tickets", { token });
-      setTickets(data);
+      const page = await apiFetch<{ items: Ticket[]; total: number; hasMore: boolean }>("/admin/support/tickets", {
+        token,
+      });
+      setTickets(page.items);
     } catch {
       setTickets([]);
     }
@@ -93,8 +95,7 @@ export function AdminSupportView() {
       if (filter === "open" && ticket.status !== "open") return false;
       if (filter === "in_progress" && ticket.status !== "in_progress" && ticket.status !== "awaiting_user")
         return false;
-      if (filter === "resolved" && ticket.status !== "resolved" && ticket.status !== "closed")
-        return false;
+      if (filter === "resolved" && ticket.status !== "resolved" && ticket.status !== "closed") return false;
 
       if (q) {
         const haystack = [
@@ -113,10 +114,7 @@ export function AdminSupportView() {
     });
   }, [tickets, filter, query]);
 
-  const selectedTicket = useMemo(
-    () => tickets.find((t) => t.id === selectedId) ?? null,
-    [tickets, selectedId],
-  );
+  const selectedTicket = useMemo(() => tickets.find((t) => t.id === selectedId) ?? null, [tickets, selectedId]);
 
   function selectTicket(id: string | null) {
     const params = new URLSearchParams(searchParams?.toString() ?? "");
@@ -190,9 +188,7 @@ export function AdminSupportView() {
               />
             </div>
             <ul className="support-inbox-items">
-              {filteredTickets.length === 0 ? (
-                <li className="support-inbox-empty">Ничего не найдено.</li>
-              ) : null}
+              {filteredTickets.length === 0 ? <li className="support-inbox-empty">Ничего не найдено.</li> : null}
               {filteredTickets.map((ticket) => {
                 const last = ticket.messages?.[ticket.messages.length - 1];
                 const preview = last?.text ?? "";
@@ -209,12 +205,8 @@ export function AdminSupportView() {
                           {STATUS_LABELS[ticket.status] ?? ticket.status}
                         </span>
                       </div>
-                      <span className="support-inbox-item-company">
-                        {ticket.company?.organizationName ?? "—"}
-                      </span>
-                      {preview ? (
-                        <span className="support-inbox-item-preview">{preview}</span>
-                      ) : null}
+                      <span className="support-inbox-item-company">{ticket.company?.organizationName ?? "—"}</span>
+                      {preview ? <span className="support-inbox-item-preview">{preview}</span> : null}
                       <span className="support-inbox-item-time">
                         {new Date(ticket.updatedAt).toLocaleString("ru-RU")}
                       </span>
@@ -258,10 +250,7 @@ export function AdminSupportView() {
                     <p className="page-subtitle">Сообщений пока нет.</p>
                   ) : null}
                   {(selectedTicket.messages ?? []).map((m) => (
-                    <div
-                      key={m.id}
-                      className={`support-inbox-message${m.authorRole === "admin" ? " from-admin" : ""}`}
-                    >
+                    <div key={m.id} className={`support-inbox-message${m.authorRole === "admin" ? " from-admin" : ""}`}>
                       <span className="support-inbox-message-author">
                         {m.authorRole === "admin" ? "Поддержка" : "Клиент"}
                       </span>
@@ -271,17 +260,8 @@ export function AdminSupportView() {
                   ))}
                 </div>
 
-                <form
-                  className="support-inbox-reply"
-                  onSubmit={(event) => onReply(event, selectedTicket.id)}
-                >
-                  <textarea
-                    className="textarea"
-                    name="text"
-                    placeholder="Ответ клиенту"
-                    required
-                    rows={3}
-                  />
+                <form className="support-inbox-reply" onSubmit={(event) => onReply(event, selectedTicket.id)}>
+                  <textarea className="textarea" name="text" placeholder="Ответ клиенту" required rows={3} />
                   <button className="button" type="submit" disabled={sending}>
                     {sending ? "Отправляю…" : "Ответить"}
                   </button>

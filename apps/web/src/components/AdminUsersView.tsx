@@ -227,7 +227,11 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
             type="search"
             value={search}
           />
-          <select className="select" onChange={(event) => setStatusFilter(event.target.value as "active" | "blocked" | "")} value={statusFilter}>
+          <select
+            className="select"
+            onChange={(event) => setStatusFilter(event.target.value as "active" | "blocked" | "")}
+            value={statusFilter}
+          >
             <option value="">Все статусы</option>
             <option value="active">Активен</option>
             <option value="blocked">Заблокирован</option>
@@ -379,8 +383,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                       <article className="checklist-block" key={session.id}>
                         <strong>{session.userAgent ?? "Без UA"}</strong>
                         <p>
-                          {session.ipAddress ?? "—"} ·{" "}
-                          {new Date(session.createdAt).toLocaleString("ru-RU")}
+                          {session.ipAddress ?? "—"} · {new Date(session.createdAt).toLocaleString("ru-RU")}
                         </p>
                         <small>
                           {session.revokedAt

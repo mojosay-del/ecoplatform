@@ -187,9 +187,7 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
                 {entry.actor ? ` · ${entry.actor.firstName} ${entry.actor.lastName} (${entry.actor.email})` : ""}
               </p>
               {entry.comment ? <p>«{entry.comment}»</p> : null}
-              {entry.payload ? (
-                <pre className="json-preview">{JSON.stringify(entry.payload, null, 2)}</pre>
-              ) : null}
+              {entry.payload ? <pre className="json-preview">{JSON.stringify(entry.payload, null, 2)}</pre> : null}
             </article>
           ))}
 

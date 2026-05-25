@@ -80,4 +80,15 @@ describe("content block validation", () => {
 
     expect(result.ok).toBe(false);
   });
+
+  it("accepts lesson task blocks in lessons", () => {
+    const result = validateLessonBlocks([
+      {
+        type: "lesson_tasks",
+        payload: { tasks: [{ title: "Посмотреть урок", description: "Дочитайте до конца" }] },
+      },
+    ]);
+
+    expect(result.ok).toBe(true);
+  });
 });

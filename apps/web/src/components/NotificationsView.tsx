@@ -2,15 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import {
-  CreditCard,
-  HelpCircle,
-  type LucideIcon,
-  MessageSquare,
-  Settings,
-  Shield,
-  ShoppingBag,
-} from "lucide-react";
+import { CreditCard, HelpCircle, type LucideIcon, MessageSquare, Settings, Shield, ShoppingBag } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -180,7 +172,9 @@ export function NotificationsView() {
             <p className="page-subtitle">Войдите, чтобы видеть свои уведомления.</p>
           </header>
           <div className="auth-actions">
-            <Link className="button" href="/login">Войти</Link>
+            <Link className="button" href="/login">
+              Войти
+            </Link>
           </div>
         </section>
       </AppShell>
@@ -210,32 +204,32 @@ export function NotificationsView() {
                 {items.map((item) => {
                   const Icon = categoryIcons[item.category] ?? Settings;
                   return (
-                  <article className={`notification-card ${item.readAt ? "" : "unread"}`} key={item.id}>
-                    <div className="notification-head">
-                      <span className="status-pill">
-                        <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                        {categoryLabels[item.category] ?? item.category}
-                      </span>
-                      <time>{new Date(item.createdAt).toLocaleString("ru-RU")}</time>
-                    </div>
-                    <h2>{item.title}</h2>
-                    <p>{item.body}</p>
-                    <div className="notification-actions">
-                      {item.link ? (
-                        <Link className="button" href={item.link} onClick={() => markRead(item.id)}>
-                          Перейти
-                        </Link>
-                      ) : null}
-                      {!item.readAt ? (
-                        <button className="button secondary" onClick={() => markRead(item.id)}>
-                          Прочитано
+                    <article className={`notification-card ${item.readAt ? "" : "unread"}`} key={item.id}>
+                      <div className="notification-head">
+                        <span className="status-pill">
+                          <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+                          {categoryLabels[item.category] ?? item.category}
+                        </span>
+                        <time>{new Date(item.createdAt).toLocaleString("ru-RU")}</time>
+                      </div>
+                      <h2>{item.title}</h2>
+                      <p>{item.body}</p>
+                      <div className="notification-actions">
+                        {item.link ? (
+                          <Link className="button" href={item.link} onClick={() => markRead(item.id)}>
+                            Перейти
+                          </Link>
+                        ) : null}
+                        {!item.readAt ? (
+                          <button className="button secondary" onClick={() => markRead(item.id)}>
+                            Прочитано
+                          </button>
+                        ) : null}
+                        <button className="button secondary" onClick={() => archive(item.id)}>
+                          В архив
                         </button>
-                      ) : null}
-                      <button className="button secondary" onClick={() => archive(item.id)}>
-                        В архив
-                      </button>
-                    </div>
-                  </article>
+                      </div>
+                    </article>
                   );
                 })}
               </div>
@@ -243,8 +237,8 @@ export function NotificationsView() {
             <section className="notification-preferences">
               <h2>Настройки</h2>
               <p className="page-subtitle">
-                Управляйте каналами доставки. Email-канал пока в режиме задела:
-                уведомления ставятся в очередь и отправятся, когда подключим почту.
+                Управляйте каналами доставки. Email-канал пока в режиме задела: уведомления ставятся в очередь и
+                отправятся, когда подключим почту.
               </p>
               <div className="preference-list">
                 {preferenceCategories.map((category) => {

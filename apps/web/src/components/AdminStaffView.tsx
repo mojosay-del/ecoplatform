@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
@@ -187,7 +188,9 @@ export function AdminStaffView() {
                 value={createForm.gender}
               >
                 {genderOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
               </select>
             </label>
@@ -228,7 +231,13 @@ export function AdminStaffView() {
           {items.map((staff) => (
             <article className="checklist-block" key={staff.id}>
               <div className="staff-profile">
-                <img className="staff-avatar" alt="" src={resolvePlatformAvatarUrl(staff.roles, staff.user.gender)} />
+                <Image
+                  className="staff-avatar"
+                  alt=""
+                  src={resolvePlatformAvatarUrl(staff.roles, staff.user.gender)}
+                  width={58}
+                  height={58}
+                />
                 <div>
                   <strong>
                     {staff.user.firstName} {staff.user.lastName}
@@ -236,14 +245,12 @@ export function AdminStaffView() {
                   <p>
                     {staff.user.email} · {staff.user.phone}
                   </p>
-                  <p className="page-subtitle">
-                    Пол: {staff.user.gender === "female" ? "Женский" : "Мужской"}
-                  </p>
+                  <p className="page-subtitle">Пол: {staff.user.gender === "female" ? "Женский" : "Мужской"}</p>
                 </div>
               </div>
               <p>
-                <span className="status-pill">{staff.isActive ? "Активен" : "Деактивирован"}</span>{" "}
-                Роли: {staff.roles.join(", ") || "—"}
+                <span className="status-pill">{staff.isActive ? "Активен" : "Деактивирован"}</span> Роли:{" "}
+                {staff.roles.join(", ") || "—"}
               </p>
               <div className="auth-actions">
                 {allRoles.map((role) => {
@@ -254,9 +261,7 @@ export function AdminStaffView() {
                       key={role}
                       onClick={() =>
                         updateStaff(staff.userId, {
-                          roles: has
-                            ? staff.roles.filter((item) => item !== role)
-                            : [...staff.roles, role],
+                          roles: has ? staff.roles.filter((item) => item !== role) : [...staff.roles, role],
                         })
                       }
                       type="button"

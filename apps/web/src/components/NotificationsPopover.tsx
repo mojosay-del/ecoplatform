@@ -117,9 +117,7 @@ export function NotificationsPopover({ open, onClose, items, loading, onChanged 
 
       <div className="notif-popover-body">
         {loading ? <p className="notif-popover-empty">Загружаем…</p> : null}
-        {!loading && recent.length === 0 ? (
-          <p className="notif-popover-empty">Новых уведомлений нет.</p>
-        ) : null}
+        {!loading && recent.length === 0 ? <p className="notif-popover-empty">Новых уведомлений нет.</p> : null}
         <ul className="notif-popover-list">
           {recent.map((item) => (
             <li key={item.id} className={`notif-popover-item${item.readAt ? "" : " unread"}`}>
@@ -137,14 +135,10 @@ export function NotificationsPopover({ open, onClose, items, loading, onChanged 
               >
                 <div className="notif-popover-item-head">
                   <strong className="notif-popover-item-title">{item.title}</strong>
-                  <span className="notif-popover-item-cat">
-                    {CATEGORY_LABELS[item.category] ?? item.category}
-                  </span>
+                  <span className="notif-popover-item-cat">{CATEGORY_LABELS[item.category] ?? item.category}</span>
                 </div>
                 <p className="notif-popover-item-body">{item.body}</p>
-                <span className="notif-popover-item-time">
-                  {formatRelative(item.createdAt)}
-                </span>
+                <span className="notif-popover-item-time">{formatRelative(item.createdAt)}</span>
               </button>
               {item.link ? (
                 <Link

@@ -21,11 +21,7 @@ export function AdminPeopleTabs() {
       {PEOPLE_TABS.map((tab) => {
         const active = pathname.startsWith(tab.href);
         return (
-          <Link
-            className={`cms-tab ${active ? "active" : ""}`}
-            href={tab.href}
-            key={tab.href}
-          >
+          <Link className={`cms-tab ${active ? "active" : ""}`} href={tab.href} key={tab.href}>
             {tab.label}
           </Link>
         );

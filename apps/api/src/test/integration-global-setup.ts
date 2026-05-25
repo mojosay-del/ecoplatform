@@ -8,7 +8,13 @@ import { execSync } from "child_process";
 
 loadEnv({ path: resolve(__dirname, "../../../../.env") });
 
-function parseDatabaseUrl(url: string): { host: string; port: number; user: string; password: string; database: string } {
+function parseDatabaseUrl(url: string): {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+} {
   const u = new URL(url);
   return {
     host: u.hostname,

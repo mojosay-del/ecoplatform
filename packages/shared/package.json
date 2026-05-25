@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "isomorphic-dompurify": "^3.14.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {

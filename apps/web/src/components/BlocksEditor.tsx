@@ -1,23 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   CheckSquare,
+  ClipboardList,
   FileAudio,
   FileText,
   GripVertical,
@@ -30,14 +19,15 @@ import {
   Plus,
   Trash2,
   Video as VideoIcon,
+  X,
 } from "lucide-react";
 import { FileUploadField } from "./FileUploadField";
 import { RichTextEditor } from "./RichTextEditor";
 
 // Универсальный композитор контентных блоков.
-// Поддерживает все 10 типов, описанных в shared/content-blocks.
+// Поддерживает типы, описанные в shared/content-blocks.
 // Через allowedKinds родитель ограничивает выбор (новости — без чек-листов,
-// уроки — ещё без audio/file).
+// уроки — со своим блоком заданий, но без audio/file).
 
 export type BlockKind =
   | "heading"
@@ -49,9 +39,11 @@ export type BlockKind =
   | "audio"
   | "file"
   | "checklist"
-  | "image_checklist";
+  | "image_checklist"
+  | "lesson_tasks";
 
 export type Block = { type: BlockKind; payload: Record<string, unknown> };
+export type BlockInsertExtraOption = { id: string; label: string; icon: React.ReactNode; onPick: () => void };
 
 export const ALL_BLOCK_KINDS: BlockKind[] = [
   "heading",
@@ -83,6 +75,7 @@ export const LESSON_BLOCK_KINDS: BlockKind[] = [
   "image",
   "gallery",
   "video",
+  "lesson_tasks",
 ];
 
 const KIND_LABELS: Record<BlockKind, string> = {
@@ -96,6 +89,7 @@ const KIND_LABELS: Record<BlockKind, string> = {
   file: "Файл",
   checklist: "Чек-лист",
   image_checklist: "Чек-лист с картинкой",
+  lesson_tasks: "Задания урока",
 };
 
 const KIND_ICONS: Record<BlockKind, React.ReactNode> = {
@@ -109,6 +103,7 @@ const KIND_ICONS: Record<BlockKind, React.ReactNode> = {
   file: <Paperclip size={16} />,
   checklist: <CheckSquare size={16} />,
   image_checklist: <ListChecks size={16} />,
+  lesson_tasks: <ClipboardList size={16} />,
 };
 
 const CHECKLIST_STYLES = [
@@ -128,7 +123,7 @@ function defaultPayload(kind: BlockKind): Record<string, unknown> {
     case "image":
       return { fileId: "", caption: "", altText: "" };
     case "gallery":
-      return { images: [{ fileId: "", caption: "", altText: "" }] };
+      return { images: [] };
     case "video":
       return { fileId: "", rutubeUrl: "", caption: "" };
     case "audio":
@@ -144,6 +139,8 @@ function defaultPayload(kind: BlockKind): Record<string, unknown> {
         image: { fileId: "", caption: "", altText: "" },
         items: [""],
       };
+    case "lesson_tasks":
+      return { tasks: [{ title: "", description: "" }] };
   }
 }
 
@@ -157,10 +154,12 @@ export function BlocksEditor({
   blocks,
   onChange,
   allowedKinds = ALL_BLOCK_KINDS,
+  extraInsertOptions = [],
 }: {
   blocks: Block[];
   onChange: (next: Block[]) => void;
   allowedKinds?: BlockKind[];
+  extraInsertOptions?: BlockInsertExtraOption[];
 }) {
   // Поддерживаем параллельный массив стабильных id для dnd-kit. При внешней
   // замене blocks (например, после сохранения) длину синхронизируем.
@@ -169,7 +168,12 @@ export function BlocksEditor({
     if (ids.length !== blocks.length) {
       setIds((prev) => {
         if (blocks.length > prev.length) {
-          return [...prev, ...Array(blocks.length - prev.length).fill(0).map(() => makeBlockId())];
+          return [
+            ...prev,
+            ...Array(blocks.length - prev.length)
+              .fill(0)
+              .map(() => makeBlockId()),
+          ];
         }
         return prev.slice(0, blocks.length);
       });
@@ -218,6 +222,7 @@ export function BlocksEditor({
               <InsertButton
                 allowedKinds={addOptions}
                 onPick={(kind) => insertAt(0, kind)}
+                extraOptions={extraInsertOptions}
                 label="Добавить блок"
                 size="lg"
               />
@@ -229,6 +234,7 @@ export function BlocksEditor({
             <>
               <BlockInsertSlot
                 allowedKinds={addOptions}
+                extraOptions={extraInsertOptions}
                 onPick={(kind) => insertAt(0, kind)}
               />
               {blocks.map((block, index) => (
@@ -241,6 +247,7 @@ export function BlocksEditor({
                   />
                   <BlockInsertSlot
                     allowedKinds={addOptions}
+                    extraOptions={extraInsertOptions}
                     onPick={(kind) => insertAt(index + 1, kind)}
                   />
                 </div>
@@ -274,13 +281,7 @@ function SortableBlock({
 
   return (
     <div ref={setNodeRef} style={style} className={`block-row${isDragging ? " is-dragging" : ""}`}>
-      <button
-        type="button"
-        className="block-row-handle"
-        aria-label="Перетащить"
-        {...attributes}
-        {...listeners}
-      >
+      <button type="button" className="block-row-handle" aria-label="Перетащить" {...attributes} {...listeners}>
         <GripVertical size={16} />
       </button>
       <div className="block-row-body">
@@ -306,25 +307,29 @@ function SortableBlock({
 
 function BlockInsertSlot({
   allowedKinds,
+  extraOptions,
   onPick,
 }: {
   allowedKinds: BlockKind[];
+  extraOptions: BlockInsertExtraOption[];
   onPick: (kind: BlockKind) => void;
 }) {
   return (
     <div className="block-insert-slot">
-      <InsertButton allowedKinds={allowedKinds} onPick={onPick} />
+      <InsertButton allowedKinds={allowedKinds} extraOptions={extraOptions} onPick={onPick} />
     </div>
   );
 }
 
 function InsertButton({
   allowedKinds,
+  extraOptions,
   onPick,
   label = "Добавить",
   size = "sm",
 }: {
   allowedKinds: BlockKind[];
+  extraOptions: BlockInsertExtraOption[];
   onPick: (kind: BlockKind) => void;
   label?: string;
   size?: "sm" | "lg";
@@ -378,6 +383,21 @@ function InsertButton({
               {KIND_LABELS[kind]}
             </button>
           ))}
+          {extraOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="menuitem"
+              className="block-insert-menu-item"
+              onClick={() => {
+                setOpen(false);
+                option.onPick();
+              }}
+            >
+              <span className="block-insert-menu-icon">{option.icon}</span>
+              {option.label}
+            </button>
+          ))}
         </div>
       ) : null}
     </div>
@@ -412,7 +432,9 @@ function BlockBody({ block, onUpdate }: { block: Block; onUpdate: (patch: Record
             buttonLabel="Загрузить картинку"
             label="ID изображения"
             value={(block.payload.fileId as string) ?? ""}
-            onChange={(fileId, asset) => onUpdate({ fileId, altText: (block.payload.altText as string) || asset?.originalName || "" })}
+            onChange={(fileId, asset) =>
+              onUpdate({ fileId, altText: (block.payload.altText as string) || asset?.originalName || "" })
+            }
           />
           <input
             className="input"
@@ -446,8 +468,8 @@ function BlockBody({ block, onUpdate }: { block: Block; onUpdate: (patch: Record
             onChange={(fileId) => onUpdate({ fileId })}
           />
           <p className="page-subtitle" style={{ fontSize: 13 }}>
-            Можно вместо загрузки указать ссылку на Rutube (если видео уже размещено там).
-            Загруженный файл имеет приоритет.
+            Можно вместо загрузки указать ссылку на Rutube (если видео уже размещено там). Загруженный файл имеет
+            приоритет.
           </p>
           <input
             className="input"
@@ -471,7 +493,9 @@ function BlockBody({ block, onUpdate }: { block: Block; onUpdate: (patch: Record
             buttonLabel="Загрузить аудио"
             label="ID аудиофайла"
             value={(block.payload.fileId as string) ?? ""}
-            onChange={(fileId, asset) => onUpdate({ fileId, episodeTitle: (block.payload.episodeTitle as string) || asset?.originalName || "" })}
+            onChange={(fileId, asset) =>
+              onUpdate({ fileId, episodeTitle: (block.payload.episodeTitle as string) || asset?.originalName || "" })
+            }
           />
           <input
             className="input"
@@ -494,7 +518,9 @@ function BlockBody({ block, onUpdate }: { block: Block; onUpdate: (patch: Record
             buttonLabel="Загрузить файл"
             label="ID файла"
             value={(block.payload.fileId as string) ?? ""}
-            onChange={(fileId, asset) => onUpdate({ fileId, displayName: (block.payload.displayName as string) || asset?.originalName || "" })}
+            onChange={(fileId, asset) =>
+              onUpdate({ fileId, displayName: (block.payload.displayName as string) || asset?.originalName || "" })
+            }
           />
           <input
             className="input"
@@ -529,6 +555,13 @@ function BlockBody({ block, onUpdate }: { block: Block; onUpdate: (patch: Record
           onChange={(patch) => onUpdate(patch)}
         />
       );
+    case "lesson_tasks":
+      return (
+        <LessonTasksEditor
+          tasks={(block.payload.tasks as Array<Record<string, unknown>>) ?? []}
+          onChange={(tasks) => onUpdate({ tasks })}
+        />
+      );
   }
 }
 
@@ -539,49 +572,124 @@ function GalleryEditor({
   images: Array<Record<string, unknown>>;
   onChange: (next: Array<Record<string, unknown>>) => void;
 }) {
+  const [extraSlots, setExtraSlots] = useState(0);
+  const filledImages = images.filter((image) => typeof image.fileId === "string" && image.fileId);
+  const basePlaceholderCount = Math.max(2 - filledImages.length, 0);
+  const placeholderCount = basePlaceholderCount + extraSlots;
+  const slots = [
+    ...filledImages,
+    ...Array.from({ length: placeholderCount }, () => ({ fileId: "", caption: "", altText: "" })),
+  ];
+  const rows: Array<Array<{ image: Record<string, unknown>; index: number }>> = [];
+  slots.forEach((image, index) => {
+    const rowIndex = Math.floor(index / 3);
+    rows[rowIndex] ??= [];
+    rows[rowIndex]!.push({ image, index });
+  });
+
   function updateAt(index: number, patch: Record<string, unknown>) {
-    onChange(images.map((image, idx) => (idx === index ? { ...image, ...patch } : image)));
+    if (index < filledImages.length) {
+      const nextImages = filledImages.map((image, idx) => (idx === index ? { ...image, ...patch } : image));
+      onChange(nextImages.filter((image) => typeof image.fileId === "string" && image.fileId));
+      return;
+    }
+    if (typeof patch.fileId === "string" && patch.fileId) {
+      onChange([...filledImages, { fileId: "", caption: "", altText: "", ...patch }]);
+      setExtraSlots((value) => Math.max(0, value - 1));
+    }
   }
   function add() {
-    onChange([...images, { fileId: "", caption: "", altText: "" }]);
+    setExtraSlots((value) => value + 1);
   }
   function remove(index: number) {
-    onChange(images.filter((_, idx) => idx !== index));
+    if (index >= filledImages.length) {
+      setExtraSlots((value) => Math.max(0, value - 1));
+      return;
+    }
+    onChange(filledImages.filter((_, idx) => idx !== index));
   }
   return (
-    <div className="stack-list">
-      {images.map((image, index) => (
-        <div className="form" key={index} style={{ gap: 4 }}>
-          <div className="list-row">
-            <strong>Картинка {index + 1}</strong>
-            <button className="button secondary" type="button" onClick={() => remove(index)} disabled={images.length === 1}>
-              ✕ Убрать картинку
+    <div className="gallery-editor">
+      <div className="gallery-editor-rows">
+        {rows.map((row, rowIndex) => {
+          const isLastRow = rowIndex === rows.length - 1;
+          const showRailAdd = isLastRow && row.length < 3;
+          return (
+            <div className={`gallery-editor-row${showRailAdd ? " has-add-rail" : ""}`} key={rowIndex}>
+              {row.map(({ image, index }) => {
+                const isPersisted = index < filledImages.length;
+                const isExtraPlaceholder = !isPersisted && index >= filledImages.length + basePlaceholderCount;
+                const canShowRemove = isExtraPlaceholder;
+                return (
+                  <div className="gallery-editor-tile" key={index}>
+                    <FileUploadField
+                      accept="image/*"
+                      buttonLabel="Добавить изображение"
+                      hideLabel
+                      tile
+                      value={(image.fileId as string) ?? ""}
+                      onChange={(fileId, asset) =>
+                        updateAt(index, { fileId, altText: (image.altText as string) || asset?.originalName || "" })
+                      }
+                    />
+                    {isPersisted ? (
+                      <>
+                        <input
+                          className="gallery-editor-input"
+                          placeholder="Подпись"
+                          value={(image.caption as string) ?? ""}
+                          onChange={(event) => updateAt(index, { caption: event.target.value })}
+                        />
+                        <input
+                          className="gallery-editor-input"
+                          placeholder="Alt-текст"
+                          value={(image.altText as string) ?? ""}
+                          onChange={(event) => updateAt(index, { altText: event.target.value })}
+                        />
+                      </>
+                    ) : null}
+                    {canShowRemove ? (
+                      <button
+                        className={`gallery-editor-remove${isExtraPlaceholder ? " is-placeholder" : ""}`}
+                        type="button"
+                        onClick={() => remove(index)}
+                        title="Убрать пустой слот"
+                        aria-label="Убрать пустой слот"
+                      >
+                        <X size={13} />
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {showRailAdd ? (
+                <button
+                  className="gallery-editor-add is-rail"
+                  type="button"
+                  onClick={add}
+                  title="Добавить изображение"
+                  aria-label="Добавить изображение"
+                >
+                  <Plus size={18} />
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
+        {rows[rows.length - 1]?.length === 3 ? (
+          <div className="gallery-editor-row">
+            <button
+              className="gallery-editor-add is-square"
+              type="button"
+              onClick={add}
+              title="Добавить изображение"
+            >
+              <Plus size={18} />
+              <span>Добавить изображение</span>
             </button>
           </div>
-          <FileUploadField
-            accept="image/*"
-            buttonLabel="Загрузить картинку"
-            label="ID изображения"
-            value={(image.fileId as string) ?? ""}
-            onChange={(fileId, asset) => updateAt(index, { fileId, altText: (image.altText as string) || asset?.originalName || "" })}
-          />
-          <input
-            className="input"
-            placeholder="Подпись"
-            value={(image.caption as string) ?? ""}
-            onChange={(event) => updateAt(index, { caption: event.target.value })}
-          />
-          <input
-            className="input"
-            placeholder="Alt-текст"
-            value={(image.altText as string) ?? ""}
-            onChange={(event) => updateAt(index, { altText: event.target.value })}
-          />
-        </div>
-      ))}
-      <button className="button secondary" type="button" onClick={add}>
-        + Добавить картинку
-      </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -661,12 +769,7 @@ function ImageChecklistEditor({
   style: string;
   image: Record<string, unknown>;
   items: string[];
-  onChange: (patch: {
-    title?: string;
-    style?: string;
-    image?: Record<string, unknown>;
-    items?: string[];
-  }) => void;
+  onChange: (patch: { title?: string; style?: string; image?: Record<string, unknown>; items?: string[] }) => void;
 }) {
   function updateItem(index: number, value: string) {
     const next = items.map((item, idx) => (idx === index ? value : item));
@@ -699,7 +802,9 @@ function ImageChecklistEditor({
         buttonLabel="Загрузить картинку"
         label="ID картинки"
         value={(image.fileId as string) ?? ""}
-        onChange={(fileId, asset) => onChange({ image: { ...image, fileId, altText: (image.altText as string) || asset?.originalName || "" } })}
+        onChange={(fileId, asset) =>
+          onChange({ image: { ...image, fileId, altText: (image.altText as string) || asset?.originalName || "" } })
+        }
       />
       <input
         className="input"
@@ -737,6 +842,64 @@ function ImageChecklistEditor({
       </div>
       <button className="button secondary" type="button" onClick={addItem}>
         + Добавить пункт
+      </button>
+    </div>
+  );
+}
+
+function LessonTasksEditor({
+  tasks,
+  onChange,
+}: {
+  tasks: Array<Record<string, unknown>>;
+  onChange: (next: Array<Record<string, unknown>>) => void;
+}) {
+  const normalizedTasks = tasks.length > 0 ? tasks : [{ title: "", description: "" }];
+
+  function updateTask(index: number, patch: Record<string, unknown>) {
+    onChange(normalizedTasks.map((task, idx) => (idx === index ? { ...task, ...patch } : task)));
+  }
+  function addTask() {
+    onChange([...normalizedTasks, { title: "", description: "" }]);
+  }
+  function removeTask(index: number) {
+    if (normalizedTasks.length === 1) return;
+    onChange(normalizedTasks.filter((_, idx) => idx !== index));
+  }
+
+  return (
+    <div className="lesson-tasks-editor">
+      {normalizedTasks.map((task, index) => (
+        <div className="lesson-task-editor-row" key={index}>
+          <span className="lesson-task-editor-index">{index + 1}</span>
+          <div className="lesson-task-editor-fields">
+            <input
+              className="input"
+              placeholder={`Задача ${index + 1}`}
+              value={(task.title as string) ?? ""}
+              onChange={(event) => updateTask(index, { title: event.target.value })}
+            />
+            <input
+              className="input"
+              placeholder="Подсказка под задачей (необязательно)"
+              value={(task.description as string) ?? ""}
+              onChange={(event) => updateTask(index, { description: event.target.value })}
+            />
+          </div>
+          <button
+            className="icon-button lesson-task-editor-remove"
+            type="button"
+            onClick={() => removeTask(index)}
+            disabled={normalizedTasks.length === 1}
+            title="Удалить задачу"
+            aria-label="Удалить задачу"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ))}
+      <button className="attachments-add" type="button" onClick={addTask}>
+        <Plus size={14} /> Добавить задачу
       </button>
     </div>
   );

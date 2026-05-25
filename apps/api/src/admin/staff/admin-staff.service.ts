@@ -3,10 +3,7 @@ import { hash } from "bcryptjs";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import type { RequestUser } from "../../common/request-user";
 import { PrismaService } from "../../prisma/prisma.service";
-import type {
-  adminStaffCreateInputSchema,
-  adminStaffUpdateInputSchema,
-} from "./admin-staff.schemas";
+import type { adminStaffCreateInputSchema, adminStaffUpdateInputSchema } from "./admin-staff.schemas";
 import type { z } from "zod";
 
 type CreateInput = z.infer<typeof adminStaffCreateInputSchema>;
@@ -101,6 +98,13 @@ export class AdminStaffService {
     if (losesAdmin) {
       if (staff.userId === actor.id) {
         throw new BadRequestException("Нельзя снять с себя роль admin или деактивировать себя.");
+      }
+      // «Первый админ» (env PLATFORM_OWNER_EMAIL, по умолчанию — основатель)
+      // — защищён от деактивации/снятия admin даже другими админами.
+      const ownerEmail = (process.env.PLATFORM_OWNER_EMAIL ?? "mojosay@icloud.com").toLowerCase();
+      const targetUser = await this.prisma.user.findUnique({ where: { id }, select: { email: true } });
+      if (targetUser?.email.toLowerCase() === ownerEmail) {
+        throw new BadRequestException("Этот аккаунт защищён как первый администратор платформы.");
       }
       const otherAdmins = await this.prisma.platformStaff.count({
         where: {

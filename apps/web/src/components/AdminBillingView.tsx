@@ -52,8 +52,11 @@ export function AdminBillingView() {
     setState("loading");
     setErrorMessage(null);
     try {
-      const data = await apiFetch<CompanyItem[]>("/admin/billing/companies", { token });
-      setCompanies(data);
+      const page = await apiFetch<{ items: CompanyItem[]; total: number; hasMore: boolean }>(
+        "/admin/billing/companies",
+        { token },
+      );
+      setCompanies(page.items);
       setState("ready");
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
@@ -200,16 +203,15 @@ export function AdminBillingView() {
             <article className="checklist-block" key={company.id}>
               <strong>{company.organizationName}</strong>
               <p>
-                <span className="status-pill">{company.status}</span> ·{" "}
-                Тариф: {company.subscriptionPlan ?? "—"}
+                <span className="status-pill">{company.status}</span> · Тариф: {company.subscriptionPlan ?? "—"}
                 {company.subscriptionEndsAt
                   ? ` (до ${new Date(company.subscriptionEndsAt).toLocaleDateString("ru-RU")})`
                   : ""}
               </p>
               {company.subscriptions[0] ? (
                 <p className="page-subtitle">
-                  Последняя подписка: {company.subscriptions[0].plan} · {company.subscriptions[0].status} ·{" "}
-                  до {new Date(company.subscriptions[0].endsAt).toLocaleDateString("ru-RU")}
+                  Последняя подписка: {company.subscriptions[0].plan} · {company.subscriptions[0].status} · до{" "}
+                  {new Date(company.subscriptions[0].endsAt).toLocaleDateString("ru-RU")}
                 </p>
               ) : null}
             </article>

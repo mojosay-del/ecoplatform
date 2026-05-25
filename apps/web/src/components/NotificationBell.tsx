@@ -86,9 +86,7 @@ export function NotificationBell() {
         onClick={() => setOpen((value) => !value)}
       >
         <BellRing className="notification-bell-icon" size={21} strokeWidth={2.15} />
-        {count > 0 ? (
-          <span className={`notification-badge ${count > 9 ? "wide" : ""}`}>{badgeLabel}</span>
-        ) : null}
+        {count > 0 ? <span className={`notification-badge ${count > 9 ? "wide" : ""}`}>{badgeLabel}</span> : null}
       </button>
       <NotificationsPopover
         open={open}

@@ -37,7 +37,10 @@ export function canOpenFunctionalSections(company: CompanyAccessSnapshot, now = 
   return isDemoActive(company, now) || isSubscriptionActive(company, now);
 }
 
-export function effectivePlan(company: CompanyAccessSnapshot, now = new Date()): "demo_basic" | "basic" | "extended" | null {
+export function effectivePlan(
+  company: CompanyAccessSnapshot,
+  now = new Date(),
+): "demo_basic" | "basic" | "extended" | null {
   // Demo считается базовой подпиской, но мы возвращаем отдельное значение,
   // чтобы интерфейс мог честно показать пользователю, что доступ временный.
   if (isDemoActive(company, now)) {

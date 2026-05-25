@@ -1,15 +1,29 @@
 import { z } from "zod";
 import { companyTypes, userGenders } from "./domain";
 
+// Единое правило сложности пароля. До этого было три разных:
+// register=8, changePassword=10, admin-staff=10. 10 — компромисс между
+// безопасностью и обратной совместимостью с существующими паролями.
+// Регулярка покрывает кириллицу + латиницу, требует минимум одну букву и одну цифру.
+export const MIN_PASSWORD_LENGTH = 10;
+export const passwordSchema = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, `Пароль должен быть не короче ${MIN_PASSWORD_LENGTH} символов.`)
+  .regex(/[A-Za-zА-Яа-яЁё]/, "Пароль должен содержать хотя бы одну букву.")
+  .regex(/[0-9]/, "Пароль должен содержать хотя бы одну цифру.");
+
 export const registerDtoSchema = z.object({
   organizationName: z.string().trim().min(2),
   companyType: z.enum(companyTypes),
   firstName: z.string().trim().min(1),
   lastName: z.string().trim().min(1),
   gender: z.enum(userGenders),
-  phone: z.string().trim().regex(/^\+7\d{10}$/, "Телефон должен быть в формате +7XXXXXXXXXX"),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+7\d{10}$/, "Телефон должен быть в формате +7XXXXXXXXXX"),
   email: z.string().trim().email(),
-  password: z.string().min(8).regex(/[A-Za-zА-Яа-яЁё]/).regex(/[0-9]/),
+  password: passwordSchema,
 });
 
 export type RegisterDto = z.infer<typeof registerDtoSchema>;
@@ -24,7 +38,7 @@ export type LoginDto = z.infer<typeof loginDtoSchema>;
 
 export const changePasswordDtoSchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(10).regex(/[A-Za-zА-Яа-яЁё]/).regex(/[0-9]/),
+  newPassword: passwordSchema,
 });
 
 export type ChangePasswordDto = z.infer<typeof changePasswordDtoSchema>;

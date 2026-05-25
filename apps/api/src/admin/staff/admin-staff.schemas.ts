@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { userGenders } from "@ecoplatform/shared";
+import { MIN_PASSWORD_LENGTH, passwordSchema, userGenders } from "@ecoplatform/shared";
 
 export const platformRoleSchema = z.enum(["admin", "moderator", "content_manager"]);
 
@@ -14,9 +14,13 @@ export const adminStaffCreateInputSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
   gender: z.enum(userGenders),
-  password: z.string().min(10).max(120),
+  // Делегируем общей passwordSchema, чтобы политика не разошлась.
+  // Дополнительно max(120) против DoS на bcrypt (он линейно растёт).
+  password: passwordSchema.max(120, `Пароль должен быть короче 120 символов.`),
   roles: z.array(platformRoleSchema).min(1),
 });
+// Re-export для admin-UI: чтобы фронт показывал тот же минимум.
+export { MIN_PASSWORD_LENGTH };
 
 export const adminStaffUpdateInputSchema = z
   .object({

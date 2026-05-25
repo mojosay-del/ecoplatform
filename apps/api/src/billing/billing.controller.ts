@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Post, Query, UseGuards } from "@nestjs/common";
 import { manualSubscriptionDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
@@ -26,8 +26,11 @@ export class BillingController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Get("admin/billing/companies")
-  async companies() {
-    return this.billing.listCompanies();
+  async companies(@Query("limit") limit?: string, @Query("offset") offset?: string) {
+    return this.billing.listCompanies({
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+      offset: offset ? Number.parseInt(offset, 10) : undefined,
+    });
   }
 
   @UseGuards(RolesGuard)

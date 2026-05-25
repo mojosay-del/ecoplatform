@@ -25,9 +25,7 @@ export function summarizePriceIndex(
   stagnationThreshold = 1,
 ): PriceIndexSummary | null {
   const today = toDateOnly(now).getTime();
-  const actualPoints = points
-    .filter((point) => toDateOnly(point.date).getTime() <= today)
-    .sort(byDateAsc);
+  const actualPoints = points.filter((point) => toDateOnly(point.date).getTime() <= today).sort(byDateAsc);
 
   if (actualPoints.length === 0) {
     return null;
@@ -45,12 +43,10 @@ export function summarizePriceIndex(
 
   // Если точного значения неделю назад нет, берём ближайшую более раннюю точку
   // в 14-дневном окне. Это отражает продуктовую договорённость по индексам.
-  const previous = [...actualPoints]
-    .reverse()
-    .find((point) => {
-      const time = toDateOnly(point.date).getTime();
-      return time <= weekAgo && time >= twoWeeksAgo;
-    });
+  const previous = [...actualPoints].reverse().find((point) => {
+    const time = toDateOnly(point.date).getTime();
+    return time <= weekAgo && time >= twoWeeksAgo;
+  });
 
   if (!previous) {
     return {
@@ -62,7 +58,8 @@ export function summarizePriceIndex(
   }
 
   const weeklyChange = Number((((current.price - previous.price) / previous.price) * 100).toFixed(1));
-  const trend = weeklyChange > stagnationThreshold ? "growth" : weeklyChange < -stagnationThreshold ? "fall" : "stagnation";
+  const trend =
+    weeklyChange > stagnationThreshold ? "growth" : weeklyChange < -stagnationThreshold ? "fall" : "stagnation";
 
   return {
     currentPrice: current.price,
@@ -72,7 +69,11 @@ export function summarizePriceIndex(
   };
 }
 
-export function filterPriceIndexPoints(points: PriceIndexPoint[], periodDays: number, now = new Date()): PriceIndexPoint[] {
+export function filterPriceIndexPoints(
+  points: PriceIndexPoint[],
+  periodDays: number,
+  now = new Date(),
+): PriceIndexPoint[] {
   const today = toDateOnly(now).getTime();
   const since = today - periodDays * 24 * 60 * 60 * 1000;
 

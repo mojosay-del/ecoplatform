@@ -1,5 +1,4 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
-const ACCESS_TOKEN_STORAGE_KEY = "ecoplatform.accessToken";
 
 export type ApiOptions = {
   token?: string | null;
@@ -28,41 +27,44 @@ export class ApiError extends Error {
   }
 }
 
+// NestJS отдаёт ошибки JSON-объектом `{ message, error, statusCode }`. Когда
+// `message` массив (валидация zod) — склеиваем. Любой не-JSON — возвращаем как есть.
+function extractApiErrorMessage(raw: string): string {
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw) as { message?: string | string[] };
+    if (Array.isArray(parsed.message)) return parsed.message.join("; ");
+    if (typeof parsed.message === "string") return parsed.message;
+    return raw;
+  } catch {
+    return raw;
+  }
+}
+
 type AccessTokenListener = (token: string | null) => void;
 type ApiRequestInit = Omit<RequestInit, "headers"> & { headers?: Record<string, string> };
 
 const accessTokenListeners = new Set<AccessTokenListener>();
 let refreshPromise: Promise<string> | null = null;
 
+// Access-токен живёт ТОЛЬКО в памяти модуля — никогда не пишется в localStorage.
+// Это закрывает классическую stored-XSS-атаку «утянули token из localStorage».
+// При перезагрузке страницы токен восстанавливается через `/auth/refresh` по
+// HttpOnly refresh-cookie (см. AuthProvider).
+let currentAccessToken: string | null = null;
+
 export function getAccessToken() {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-  } catch {
-    return null;
-  }
+  return currentAccessToken;
 }
 
 export function setAccessToken(token: string) {
   didRedirectOn401 = false;
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
-    } catch {
-      /* приватный режим / отсутствие localStorage — игнорируем */
-    }
-  }
+  currentAccessToken = token;
   accessTokenListeners.forEach((listener) => listener(token));
 }
 
 export function clearAccessToken() {
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-    } catch {
-      /* приватный режим / отсутствие localStorage — игнорируем */
-    }
-  }
+  currentAccessToken = null;
   accessTokenListeners.forEach((listener) => listener(null));
 }
 
@@ -104,7 +106,7 @@ async function refreshAccessToken() {
     });
 
     if (!response.ok) {
-      const message = await response.text();
+      const message = extractApiErrorMessage(await response.text());
       clearAccessToken();
       throw new ApiError(message || "Не удалось обновить сессию.", response.status);
     }
@@ -117,6 +119,18 @@ async function refreshAccessToken() {
   });
 
   return refreshPromise;
+}
+
+// Восстановление сессии после reload страницы: токен в памяти потерян,
+// но HttpOnly refresh-cookie на месте — пробуем поменять его на свежий
+// access-token. Возвращает true, если успешно (юзер залогинен).
+export async function tryRestoreSession(): Promise<boolean> {
+  try {
+    await refreshAccessToken();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function withAuthorization(headers: Record<string, string> | undefined, token: string | null) {
@@ -150,19 +164,23 @@ async function fetchWithAuthRetry(path: string, init: ApiRequestInit, token?: st
 }
 
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const response = await fetchWithAuthRetry(path, {
-    method: options.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await fetchWithAuthRetry(
+    path,
+    {
+      method: options.method ?? "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
     },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  }, options.token);
+    options.token,
+  );
 
   if (!response.ok) {
     if (response.status === 401 && !isAuthEntryPath(path)) {
       handleUnauthorized();
     }
-    const message = await response.text();
+    const message = extractApiErrorMessage(await response.text());
     throw new ApiError(message || "API request failed", response.status);
   }
 
@@ -180,35 +198,40 @@ export async function apiUploadFile(
     formData.append("imagePreset", options.imagePreset);
   }
 
-  const response = await fetchWithAuthRetry("/files/upload", {
-    method: "POST",
-    body: formData,
-  }, options.token);
+  const response = await fetchWithAuthRetry(
+    "/files/upload",
+    {
+      method: "POST",
+      body: formData,
+    },
+    options.token,
+  );
 
   if (!response.ok) {
     if (response.status === 401) {
       handleUnauthorized();
     }
-    const message = await response.text();
+    const message = extractApiErrorMessage(await response.text());
     throw new ApiError(message || "File upload failed", response.status);
   }
 
   return response.json() as Promise<FileAsset>;
 }
 
-export async function apiDeleteFile(
-  fileId: string,
-  options: { token?: string | null } = {},
-): Promise<{ ok: boolean }> {
-  const response = await fetchWithAuthRetry(`/files/${encodeURIComponent(fileId)}`, {
-    method: "DELETE",
-  }, options.token);
+export async function apiDeleteFile(fileId: string, options: { token?: string | null } = {}): Promise<{ ok: boolean }> {
+  const response = await fetchWithAuthRetry(
+    `/files/${encodeURIComponent(fileId)}`,
+    {
+      method: "DELETE",
+    },
+    options.token,
+  );
 
   if (!response.ok) {
     if (response.status === 401) {
       handleUnauthorized();
     }
-    const message = await response.text();
+    const message = extractApiErrorMessage(await response.text());
     throw new ApiError(message || "File delete failed", response.status);
   }
 

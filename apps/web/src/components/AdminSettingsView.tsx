@@ -253,9 +253,7 @@ export function AdminSettingsView() {
               </header>
 
               <div className="settings-list">
-                {groupItems.length === 0 ? (
-                  <p className="page-subtitle">В этой группе пока нет настроек.</p>
-                ) : null}
+                {groupItems.length === 0 ? <p className="page-subtitle">В этой группе пока нет настроек.</p> : null}
                 {groupItems.map((item) => {
                   const unit = groupDef.unit(item.key);
                   const isDirty = drafts[item.key] !== String(item.value);
@@ -274,9 +272,7 @@ export function AdminSettingsView() {
                         <div className="setting-row-input">
                           <input
                             className="input"
-                            onChange={(event) =>
-                              setDrafts((prev) => ({ ...prev, [item.key]: event.target.value }))
-                            }
+                            onChange={(event) => setDrafts((prev) => ({ ...prev, [item.key]: event.target.value }))}
                             type="number"
                             value={drafts[item.key] ?? ""}
                           />

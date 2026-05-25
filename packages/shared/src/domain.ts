@@ -1,11 +1,4 @@
-export const companyStatuses = [
-  "demo",
-  "active",
-  "past_due",
-  "suspended",
-  "blocked",
-  "archived",
-] as const;
+export const companyStatuses = ["demo", "active", "past_due", "suspended", "blocked", "archived"] as const;
 
 export type CompanyStatus = (typeof companyStatuses)[number];
 
@@ -33,13 +26,7 @@ export const learningAccessLevels = ["basic", "extended", "one_time"] as const;
 
 export type LearningAccessLevel = (typeof learningAccessLevels)[number];
 
-export const supportTicketStatuses = [
-  "new",
-  "in_progress",
-  "awaiting_user",
-  "resolved",
-  "closed",
-] as const;
+export const supportTicketStatuses = ["new", "in_progress", "awaiting_user", "resolved", "closed"] as const;
 
 export type SupportTicketStatus = (typeof supportTicketStatuses)[number];
 

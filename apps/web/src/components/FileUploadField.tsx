@@ -23,6 +23,7 @@ export function FileUploadField({
   onChange,
   hideLabel,
   compact,
+  tile,
 }: {
   value: string;
   accept?: string;
@@ -33,6 +34,7 @@ export function FileUploadField({
   onChange: (fileId: string, asset?: FileAsset) => void;
   hideLabel?: boolean;
   compact?: boolean;
+  tile?: boolean;
 }) {
   const { token } = useAuth();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -103,6 +105,54 @@ export function FileUploadField({
 
   const imageMode = isImageAsset(uploaded);
   const hasFile = Boolean(uploaded);
+
+  if (tile) {
+    return (
+      <div className="file-upload-field is-tile">
+        {hideLabel ? null : <span className="file-upload-label">{label}</span>}
+        <input
+          accept={accept}
+          hidden
+          onChange={(event) => void upload(event.target.files?.[0])}
+          ref={inputRef}
+          type="file"
+        />
+        {hasFile ? (
+          imageMode && uploaded?.publicUrl ? (
+            <div className="file-upload-tile-preview">
+              <img alt={uploaded.originalName} src={uploaded.publicUrl} />
+              <div className="file-upload-tile-actions">
+                <button onClick={() => inputRef.current?.click()} type="button" aria-label="Заменить файл">
+                  <Upload size={15} />
+                </button>
+                <button onClick={() => void clear()} type="button" aria-label="Убрать файл">
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="file-upload-tile-file">
+              <strong>{uploaded?.originalName ?? "Файл прикреплён"}</strong>
+              <div className="file-upload-tile-actions">
+                <button onClick={() => inputRef.current?.click()} type="button" aria-label="Заменить файл">
+                  <Upload size={15} />
+                </button>
+                <button onClick={() => void clear()} type="button" aria-label="Убрать файл">
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+          )
+        ) : (
+          <button className="file-upload-tile-empty" onClick={() => inputRef.current?.click()} type="button">
+            <Upload size={18} />
+            <span>{buttonLabel}</span>
+          </button>
+        )}
+        {status ? <p className="page-subtitle">{status}</p> : null}
+      </div>
+    );
+  }
 
   return (
     <div className={`file-upload-field${compact ? " is-compact" : ""}`}>

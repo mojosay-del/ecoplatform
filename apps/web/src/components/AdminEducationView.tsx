@@ -2,32 +2,17 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
   BookOpen,
   ChevronRight,
   FileText,
   FolderOpen,
-  GripVertical,
   Paperclip,
   Plus,
   Trash2,
 } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
-import { Block, BlocksEditor, LESSON_BLOCK_KINDS } from "./BlocksEditor";
+import { Block, BlocksEditor, LESSON_BLOCK_KINDS, type BlockInsertExtraOption } from "./BlocksEditor";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, apiFetch } from "../lib/api";
@@ -64,7 +49,6 @@ type LearningModule = {
   accessLevel: "basic" | "extended" | "one_time";
   oneTimePrice: number | null;
   isInDevelopment: boolean;
-  position: number;
   status: "draft" | "published";
   preview: Preview | null;
   chapters: Chapter[];
@@ -77,6 +61,15 @@ type Selection =
   | { kind: "module"; id: string }
   | { kind: "chapter"; id: string }
   | { kind: "lesson"; id: string };
+
+function normalizeAttachments(attachments: Attachment[]) {
+  return attachments
+    .map((attachment) => ({
+      fileId: attachment.fileId.trim(),
+      displayName: attachment.displayName.trim(),
+    }))
+    .filter((attachment) => attachment.fileId && attachment.displayName);
+}
 
 export function AdminEducationView() {
   const { token } = useAuth();
@@ -209,7 +202,6 @@ function EducationTree({
   const [createOpen, setCreateOpen] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   // Авто-раскрытие ветки, в которой находится текущий выбор.
   useEffect(() => {
@@ -269,19 +261,6 @@ function EducationTree({
   async function removeModule(module: LearningModule) {
     if (!confirm(`Удалить модуль «${module.title}»? Все главы и уроки будут удалены.`)) return;
     await onMutate(`/admin/content/education/modules/${module.id}`, "DELETE");
-  }
-
-  async function handleModuleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const activeId = String(active.id);
-    const overId = String(over.id);
-    const from = modules.findIndex((module) => module.id === activeId);
-    const to = modules.findIndex((module) => module.id === overId);
-    if (from === -1 || to === -1 || from === to) return;
-    await onMutate(`/admin/content/education/modules/${activeId}`, "PATCH", {
-      position: to,
-    });
   }
 
   async function addChapter(module: LearningModule) {
@@ -357,10 +336,8 @@ function EducationTree({
       {modules.length === 0 ? (
         <p className="education-tree-empty">Модулей пока нет.</p>
       ) : null}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleModuleDragEnd}>
-        <SortableContext items={modules.map((module) => module.id)} strategy={verticalListSortingStrategy}>
-          <ul className="tree" role="tree">
-            {modules.map((module) => {
+      <ul className="tree" role="tree">
+        {modules.map((module) => {
           const isExpanded = expandedModules.has(module.id);
           const moduleActions: ActionItem[] = [
             {
@@ -377,27 +354,20 @@ function EducationTree({
             { label: "Удалить модуль", onClick: () => removeModule(module), danger: true },
           ];
           return (
-            <SortableModuleTreeItem
-              key={module.id}
-              id={module.id}
-              isExpanded={isExpanded}
-              renderRow={(dragHandleProps) => (
-                <TreeRow
-                  depth={0}
-                  expandable={module.chapters.length > 0}
-                  expanded={isExpanded}
-                  onToggle={() => toggleModule(module.id)}
-                  onSelect={() => onSelect({ kind: "module", id: module.id })}
-                  active={selection.kind === "module" && selection.id === module.id}
-                  icon={<FolderOpen size={16} />}
-                  status={module.status}
-                  title={module.title}
-                  meta={`${module.isInDevelopment ? "В разработке · " : ""}${module.accessLevel} · ${module.chapters.length} ${pluralize(module.chapters.length, "глава", "главы", "глав")}`}
-                  actions={moduleActions}
-                  dragHandleProps={dragHandleProps}
-                />
-              )}
-            >
+            <li key={module.id} role="treeitem" aria-expanded={isExpanded}>
+              <TreeRow
+                depth={0}
+                expandable={module.chapters.length > 0}
+                expanded={isExpanded}
+                onToggle={() => toggleModule(module.id)}
+                onSelect={() => onSelect({ kind: "module", id: module.id })}
+                active={selection.kind === "module" && selection.id === module.id}
+                icon={<FolderOpen size={16} />}
+                status={module.status}
+                title={module.title}
+                meta={`${module.isInDevelopment ? "В разработке · " : ""}${module.accessLevel} · ${module.chapters.length} ${pluralize(module.chapters.length, "глава", "главы", "глав")}`}
+                actions={moduleActions}
+              />
               {isExpanded ? (
                 <ul className="tree-children" role="group">
                   {module.chapters.map((chapter, chapterIndex) => {
@@ -492,45 +462,11 @@ function EducationTree({
                   </li>
                 </ul>
               ) : null}
-            </SortableModuleTreeItem>
+            </li>
           );
-            })}
-          </ul>
-        </SortableContext>
-      </DndContext>
+        })}
+      </ul>
     </>
-  );
-}
-
-function SortableModuleTreeItem({
-  id,
-  isExpanded,
-  renderRow,
-  children,
-}: {
-  id: string;
-  isExpanded: boolean;
-  renderRow: (dragHandleProps: React.ButtonHTMLAttributes<HTMLButtonElement>) => React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.55 : 1,
-  };
-
-  return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className={isDragging ? "is-dragging" : undefined}
-      role="treeitem"
-      aria-expanded={isExpanded}
-    >
-      {renderRow({ ...attributes, ...listeners })}
-      {children}
-    </li>
   );
 }
 
@@ -649,7 +585,6 @@ function TreeRow({
   title,
   meta,
   actions,
-  dragHandleProps,
 }: {
   depth: number;
   expandable?: boolean;
@@ -662,20 +597,9 @@ function TreeRow({
   title: string;
   meta?: string;
   actions: ActionItem[];
-  dragHandleProps?: React.ButtonHTMLAttributes<HTMLButtonElement>;
 }) {
   return (
-    <div className={`tree-row depth-${depth}${active ? " is-active" : ""}${dragHandleProps ? " is-sortable" : ""}`}>
-      {dragHandleProps ? (
-        <button
-          type="button"
-          className="tree-row-drag"
-          aria-label="Изменить порядок"
-          {...dragHandleProps}
-        >
-          <GripVertical size={14} />
-        </button>
-      ) : null}
+    <div className={`tree-row depth-${depth}${active ? " is-active" : ""}`}>
       <button
         type="button"
         className="tree-row-chevron"
@@ -1005,7 +929,24 @@ function LessonForm({
     blocks: lesson.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
     attachments: lesson.attachments.map((a) => ({ ...a })),
   });
+  const [attachmentsBlockVisible, setAttachmentsBlockVisible] = useState(lesson.attachments.length > 0);
   const [saving, setSaving] = useState(false);
+  const normalizedDraftAttachments = useMemo(() => normalizeAttachments(draft.attachments), [draft.attachments]);
+  const extraInsertOptions = useMemo<BlockInsertExtraOption[]>(
+    () =>
+      attachmentsBlockVisible
+        ? []
+        : [
+            {
+              id: "lesson_attachments",
+              label: "Прикреплённые файлы",
+              icon: <Paperclip size={16} />,
+              onPick: addAttachmentsBlock,
+            },
+          ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [attachmentsBlockVisible, draft.attachments.length],
+  );
 
   useEffect(() => {
     setDraft({
@@ -1013,6 +954,7 @@ function LessonForm({
       blocks: lesson.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
       attachments: lesson.attachments.map((a) => ({ ...a })),
     });
+    setAttachmentsBlockVisible(lesson.attachments.length > 0);
   }, [lesson.id, lesson.title, lesson.blocks, lesson.attachments]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -1021,7 +963,7 @@ function LessonForm({
     await onMutate(`/admin/content/education/lessons/${lesson.id}`, "PATCH", {
       title: draft.title,
       blocks: draft.blocks,
-      attachments: draft.attachments,
+      attachments: normalizedDraftAttachments,
     });
     setSaving(false);
   }
@@ -1031,6 +973,12 @@ function LessonForm({
       ...prev,
       attachments: [...prev.attachments, { fileId: "", displayName: "" }],
     }));
+  }
+  function addAttachmentsBlock() {
+    setAttachmentsBlockVisible(true);
+    if (draft.attachments.length === 0) {
+      addAttachment();
+    }
   }
   function updateAttachment(index: number, patch: Partial<Attachment>) {
     setDraft((prev) => ({
@@ -1043,6 +991,9 @@ function LessonForm({
       ...prev,
       attachments: prev.attachments.filter((_, idx) => idx !== index),
     }));
+    if (draft.attachments.length <= 1) {
+      setAttachmentsBlockVisible(false);
+    }
   }
 
   async function publishToggle() {
@@ -1057,9 +1008,9 @@ function LessonForm({
   const hasChanges = useMemo(() => {
     if (draft.title !== lesson.title) return true;
     if (JSON.stringify(draft.blocks) !== JSON.stringify(lesson.blocks.map((b) => ({ type: b.type, payload: b.payload })))) return true;
-    if (JSON.stringify(draft.attachments) !== JSON.stringify(lesson.attachments)) return true;
+    if (JSON.stringify(normalizedDraftAttachments) !== JSON.stringify(lesson.attachments)) return true;
     return false;
-  }, [draft, lesson]);
+  }, [draft, lesson, normalizedDraftAttachments]);
 
   return (
     <form className="form lesson-form" onSubmit={submit}>
@@ -1084,15 +1035,14 @@ function LessonForm({
           blocks={draft.blocks}
           onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks }))}
           allowedKinds={LESSON_BLOCK_KINDS}
+          extraInsertOptions={extraInsertOptions}
         />
       </section>
 
-      <section className="lesson-section">
-        <h3 className="lesson-section-title">Прикреплённые файлы</h3>
-        <div className="attachments">
-          {draft.attachments.length === 0 ? (
-            <p className="attachments-empty">Файлов пока нет.</p>
-          ) : (
+      {attachmentsBlockVisible ? (
+        <section className="lesson-section">
+          <h3 className="lesson-section-title">Прикреплённые файлы</h3>
+          <div className="attachments">
             <ul className="attachments-list">
               {draft.attachments.map((attachment, index) => (
                 <li className="attachment-row" key={index}>
@@ -1129,12 +1079,12 @@ function LessonForm({
                 </li>
               ))}
             </ul>
-          )}
-          <button type="button" className="attachments-add" onClick={addAttachment}>
-            <Plus size={14} /> Добавить файл
-          </button>
-        </div>
-      </section>
+            <button type="button" className="attachments-add" onClick={addAttachment}>
+              <Plus size={14} /> Добавить файл
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <div className="lesson-save-bar">
         <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>

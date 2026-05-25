@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { CompanyStatus, NotificationCategory, SubscriptionStatus } from "@prisma/client";
 import type { ManualSubscriptionDto } from "@ecoplatform/shared";
+import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -24,11 +25,36 @@ export class BillingService {
     return company;
   }
 
-  async listCompanies() {
-    return this.prisma.company.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { users: true, subscriptions: { orderBy: { createdAt: "desc" }, take: 1 } },
-    });
+  async listCompanies(pagination: { limit?: number; offset?: number } = {}) {
+    const limit = Math.min(Math.max(pagination.limit ?? 50, 1), 200);
+    const offset = Math.max(pagination.offset ?? 0, 0);
+
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.company.count(),
+      this.prisma.company.findMany({
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+        include: {
+          // `include: { users: true }` тянул бы passwordHash в админ-ответ —
+          // явный select оставляет только то, что нужно списку.
+          users: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+          subscriptions: { orderBy: { createdAt: "desc" }, take: 1 },
+        },
+      }),
+    ]);
+
+    return { items, total, hasMore: offset + items.length < total };
   }
 
   async activateManually(input: ManualSubscriptionDto, actorId: string) {
@@ -93,7 +119,12 @@ export class BillingService {
             link: "/account",
             payload: { plan: input.plan, endsAt: endsAtIso },
           })
-          .catch(() => undefined),
+          .catch(
+            swallowAndLog("billing.manual_activation.notify", {
+              userId: user.id,
+              subscriptionId: result.subscription.id,
+            }),
+          ),
       ),
     );
 

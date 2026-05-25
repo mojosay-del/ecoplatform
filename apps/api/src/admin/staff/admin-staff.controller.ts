@@ -5,10 +5,7 @@ import { Roles } from "../../common/roles.decorator";
 import { RolesGuard } from "../../common/roles.guard";
 import type { RequestUser } from "../../common/request-user";
 import { parseBody } from "../../common/zod";
-import {
-  adminStaffCreateInputSchema,
-  adminStaffUpdateInputSchema,
-} from "./admin-staff.schemas";
+import { adminStaffCreateInputSchema, adminStaffUpdateInputSchema } from "./admin-staff.schemas";
 import { AdminStaffService } from "./admin-staff.service";
 
 @UseGuards(JwtAuthGuard, RolesGuard)

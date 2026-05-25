@@ -3,10 +3,7 @@ import { CompanyStatus, Prisma, SubscriptionPlan } from "@prisma/client";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import type { RequestUser } from "../../common/request-user";
 import { PrismaService } from "../../prisma/prisma.service";
-import type {
-  adminCompanyListQuerySchema,
-  adminCompanyStatusInputSchema,
-} from "./admin-companies.schemas";
+import type { adminCompanyListQuerySchema, adminCompanyStatusInputSchema } from "./admin-companies.schemas";
 import type { z } from "zod";
 
 type ListQuery = z.infer<typeof adminCompanyListQuerySchema>;
@@ -29,10 +26,7 @@ export class AdminCompaniesService {
     }
     if (query.search) {
       const term = query.search;
-      where.OR = [
-        { organizationName: { contains: term, mode: "insensitive" } },
-        { billingInn: { contains: term } },
-      ];
+      where.OR = [{ organizationName: { contains: term, mode: "insensitive" } }, { billingInn: { contains: term } }];
     }
 
     const [total, items] = await Promise.all([

@@ -351,14 +351,22 @@ export function AdminCompaniesView() {
 
                   <form className="form" onSubmit={submitStatus}>
                     <h3>Сменить статус</h3>
-                    <select className="select" onChange={(event) => setNextStatus(event.target.value)} value={nextStatus}>
+                    <select
+                      className="select"
+                      onChange={(event) => setNextStatus(event.target.value)}
+                      value={nextStatus}
+                    >
                       {companyStatuses.map((status) => (
                         <option key={status} value={status}>
                           {status}
                         </option>
                       ))}
                     </select>
-                    <select className="select" onChange={(event) => setStatusReason(event.target.value)} value={statusReason}>
+                    <select
+                      className="select"
+                      onChange={(event) => setStatusReason(event.target.value)}
+                      value={statusReason}
+                    >
                       {statusReasons.map(([value, label]) => (
                         <option key={value} value={value}>
                           {label}

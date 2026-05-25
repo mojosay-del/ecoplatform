@@ -83,6 +83,118 @@ export class FilesService {
     };
   }
 
+  private compactFileIds(ids: Array<string | null | undefined>): string[] {
+    return Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
+  }
+
+  private collectFileIdsFromPayload(payload: unknown, fileIds = new Set<string>()): Set<string> {
+    if (!payload || typeof payload !== "object") {
+      return fileIds;
+    }
+    if (Array.isArray(payload)) {
+      payload.forEach((value) => this.collectFileIdsFromPayload(value, fileIds));
+      return fileIds;
+    }
+    const record = payload as Record<string, unknown>;
+    if (typeof record.fileId === "string" && record.fileId) {
+      fileIds.add(record.fileId);
+    }
+    Object.values(record).forEach((value) => this.collectFileIdsFromPayload(value, fileIds));
+    return fileIds;
+  }
+
+  async replaceFileReferences(
+    entityType: string,
+    entityId: string,
+    fileIds: Array<string | null | undefined>,
+  ): Promise<void> {
+    const uniqueIds = this.compactFileIds(fileIds);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.fileReference.deleteMany({ where: { entityType, entityId } });
+      if (uniqueIds.length === 0) {
+        return;
+      }
+      await tx.fileReference.createMany({
+        data: uniqueIds.map((fileId) => ({ fileId, entityType, entityId })),
+        skipDuplicates: true,
+      });
+    });
+  }
+
+  async clearFileReferences(entityType: string, entityId: string): Promise<void> {
+    await this.prisma.fileReference.deleteMany({ where: { entityType, entityId } });
+  }
+
+  async backfillFileReferencesIfNeeded(): Promise<{ scanned: number }> {
+    const existing = await this.prisma.fileReference.count();
+    if (existing > 0) {
+      return { scanned: 0 };
+    }
+
+    let scanned = 0;
+
+    const newsPosts = await this.prisma.newsPost.findMany({ include: { blocks: true } });
+    for (const post of newsPosts) {
+      const fileIds = this.compactFileIds([
+        post.coverImageId,
+        ...post.blocks.flatMap((block) => Array.from(this.collectFileIdsFromPayload(block.payload))),
+      ]);
+      if (fileIds.length === 0) {
+        continue;
+      }
+      await this.replaceFileReferences("news_post", post.id, fileIds);
+      scanned += 1;
+    }
+
+    const articles = await this.prisma.knowledgeBaseArticle.findMany({ include: { blocks: true } });
+    for (const article of articles) {
+      const fileIds = this.compactFileIds([
+        article.coverImageId,
+        ...article.blocks.flatMap((block) => Array.from(this.collectFileIdsFromPayload(block.payload))),
+      ]);
+      if (fileIds.length === 0) {
+        continue;
+      }
+      await this.replaceFileReferences("knowledge_base_article", article.id, fileIds);
+      scanned += 1;
+    }
+
+    const modules = await this.prisma.learningModule.findMany({
+      include: {
+        chapters: {
+          include: {
+            lessons: {
+              include: { blocks: true, attachments: true },
+            },
+          },
+        },
+      },
+    });
+    for (const module of modules) {
+      const fileIds = this.compactFileIds([
+        module.coverImageId,
+        ...module.chapters.flatMap((chapter) =>
+          chapter.lessons.flatMap((lesson) => [
+            ...Array.from(
+              lesson.blocks.reduce(
+                (ids, block) => this.collectFileIdsFromPayload(block.payload, ids),
+                new Set<string>(),
+              ),
+            ),
+            ...lesson.attachments.map((attachment) => attachment.fileId),
+          ]),
+        ),
+      ]);
+      if (fileIds.length === 0) {
+        continue;
+      }
+      await this.replaceFileReferences("learning_module", module.id, fileIds);
+      scanned += 1;
+    }
+
+    return { scanned };
+  }
+
   private payloadContainsFileId(payload: unknown, fileId: string): boolean {
     if (!payload || typeof payload !== "object") {
       return false;
@@ -228,13 +340,14 @@ export class FilesService {
     const uniqueIds = Array.from(new Set(fileIds.filter(Boolean)));
 
     for (const fileId of uniqueIds) {
-      const [asset, hasStructuredReference, hasBlockReference] = await Promise.all([
+      const [asset, referenceCount, hasStructuredReference, hasBlockReference] = await Promise.all([
         this.prisma.fileAsset.findUnique({ where: { id: fileId } }),
+        this.prisma.fileReference.count({ where: { fileId } }),
         this.hasStructuredReference(fileId),
         this.hasBlockReference(fileId),
       ]);
 
-      if (!asset || hasStructuredReference || hasBlockReference) {
+      if (!asset || referenceCount > 0 || hasStructuredReference || hasBlockReference) {
         continue;
       }
 

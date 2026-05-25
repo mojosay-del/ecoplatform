@@ -1,0 +1,289 @@
+// Типы ОТВЕТОВ публичного API. Расширение dto.ts (там — входные zod-схемы).
+// Замена `any[]` в apps/web/src/views — компилятор ловит опечатки в полях
+// и автодополнение в IDE начинает работать.
+//
+// Поля сознательно укладываются под фактическую выдачу сервисов
+// (apps/api/src/content/services/*), а НЕ под чистую Prisma-модель —
+// в API некоторые поля приходят с decorator-обёрткой (likedByMe, hasAccess,
+// progress и т.п.). Дата приходит строкой (JSON.stringify Date → string).
+
+// ── Common ────────────────────────────────────────────────────────────────
+export type IsoDateString = string;
+
+// Стандартный envelope пагинации. Используется на всех публичных списочных
+// эндпоинтах (`/news`, `/admin/content/news`, `/notifications`, тикеты, ...).
+// `hasMore` фронт использует для infinite-scroll: если true — догружает
+// `offset += limit`.
+export type PaginatedResponse<T> = {
+  items: T[];
+  total: number;
+  hasMore: boolean;
+};
+
+export type PaginationQuery = {
+  limit?: number;
+  offset?: number;
+};
+
+export type CommentLikeCount = {
+  likes: number;
+};
+
+// ── News ──────────────────────────────────────────────────────────────────
+export type NewsTag = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+export type NewsTagLink = {
+  newsTag: NewsTag;
+};
+
+export type NewsListItem = {
+  id: string;
+  slug: string;
+  title: string;
+  lead: string;
+  coverImageId: string | null;
+  firstPublishedAt: IsoDateString | null;
+  status: string;
+  tags: NewsTagLink[];
+  likedByMe: boolean;
+  _count: {
+    likes: number;
+    comments: number;
+  };
+};
+
+export type NewsCommentAuthorPublic = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  gender: string;
+  avatarUrl: string | null;
+};
+
+export type NewsCommentDecorated = {
+  id: string;
+  text: string;
+  createdAt: IsoDateString;
+  status: string;
+  parentCommentId: string | null;
+  user: NewsCommentAuthorPublic;
+  likedByMe: boolean;
+  _count: CommentLikeCount;
+  replies?: NewsCommentDecorated[];
+};
+
+export type NewsContentBlock = {
+  id: string;
+  position: number;
+  type: string;
+  payload: Record<string, unknown>;
+};
+
+export type NewsPostDetail = NewsListItem & {
+  blocks: NewsContentBlock[];
+  comments: NewsCommentDecorated[];
+};
+
+// ── Indices ───────────────────────────────────────────────────────────────
+export type PriceChartPoint = {
+  date: IsoDateString;
+  price: number;
+};
+
+export type IndexPeriodKey = "2W" | "1M" | "3M" | "6M" | "1Y" | "2Y" | "3Y";
+
+export type PriceIndexChart = Partial<Record<IndexPeriodKey, PriceChartPoint[]>>;
+
+// PriceIndexSummary живёт в ./price-index.ts (используется одновременно
+// и расчётной функцией `summarizePriceIndex`, и API-ответом).
+import type { PriceIndexSummary } from "./price-index";
+
+export type NomenclatureListItem = {
+  id: string;
+  name: string;
+  code: string;
+  unit: string | null;
+  priceIndex: {
+    id: string;
+    status: string;
+  } | null;
+  summary: PriceIndexSummary;
+  chart: PriceIndexChart;
+};
+
+export type NomenclatureCategoryListItem = {
+  id: string;
+  slug: string;
+  name: string;
+  position: number;
+  isActive: boolean;
+  nomenclatures: NomenclatureListItem[];
+};
+
+// ── Learning ──────────────────────────────────────────────────────────────
+export type LearningLessonSummary = {
+  id: string;
+  title: string;
+  position: number;
+  status: string;
+};
+
+export type LearningChapterSummary = {
+  id: string;
+  title: string;
+  position: number;
+  lessons: LearningLessonSummary[];
+};
+
+export type LearningModuleListItem = {
+  id: string;
+  title: string;
+  summary: string | null;
+  description: string | null;
+  coverImageId: string | null;
+  accessLevel: string;
+  oneTimePrice: number | null;
+  isInDevelopment: boolean;
+  position: number;
+  status: string;
+  hasAccess: boolean;
+  chapters: LearningChapterSummary[];
+};
+
+export type LessonAttachment = {
+  id: string;
+  fileId: string;
+  displayName: string;
+  position: number;
+};
+
+export type LessonBlock = {
+  id: string;
+  position: number;
+  type: string;
+  payload: Record<string, unknown>;
+};
+
+export type LessonDetail = LearningLessonSummary & {
+  blocks?: LessonBlock[];
+  attachments?: LessonAttachment[];
+  completedAt?: IsoDateString | null;
+};
+
+export type LearningChapterDetail = Omit<LearningChapterSummary, "lessons"> & {
+  lessons: LessonDetail[];
+};
+
+export type LearningModulePreview = {
+  promotionalDescription: string | null;
+  whatYouWillLearn: string[];
+};
+
+export type LearningModuleProgress = {
+  completedLessons: number;
+  totalLessons: number;
+  percent: number;
+};
+
+export type LearningModuleDetail = LearningModuleListItem & {
+  preview: LearningModulePreview | null;
+  chapters: LearningChapterDetail[];
+  progress: LearningModuleProgress | null;
+};
+
+// ── Knowledge Base ────────────────────────────────────────────────────────
+export type KnowledgeNode = {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  iconType: string | null;
+  coverImageId: string | null;
+  parentId: string | null;
+  position: number;
+  status: string;
+  // У tree-выдачи children приходят как nested-массив, у detail-выдачи —
+  // как массив того же типа KnowledgeNode (без блоков, только метаданные).
+  // `blocks` приходит только в KnowledgeArticleDetail, поэтому опционально.
+  children?: KnowledgeNode[];
+  blocks?: Array<{
+    id: string;
+    position: number;
+    type: string;
+    payload: Record<string, unknown>;
+  }>;
+};
+
+export type KnowledgeBreadcrumb = {
+  id: string;
+  slug: string;
+  title: string;
+};
+
+export type KnowledgeArticleDetail = KnowledgeNode & {
+  description: string | null;
+  blocks: Array<{
+    id: string;
+    position: number;
+    type: string;
+    payload: Record<string, unknown>;
+  }>;
+  breadcrumbs: KnowledgeBreadcrumb[];
+};
+
+// ── Account / billing / notifications ─────────────────────────────────────
+// Эти shape живут в Codex-стороне (auth/me, billing/status, etc.). Сейчас в
+// AccountView они частично типизированы через локальные types — здесь только
+// общий минимум, чтобы не дублировать.
+
+export type BillingSubscription = {
+  id: string;
+  companyId: string;
+  plan: string;
+  status: string;
+  startsAt: IsoDateString;
+  endsAt: IsoDateString;
+  reason: string | null;
+  createdAt: IsoDateString;
+};
+
+// `/billing/status` отдаёт полный Company (с реквизитами) + список подписок.
+// Не вырезаем поля, потому что AccountView отображает и реквизиты, и историю.
+export type BillingStatus = {
+  id: string;
+  organizationName: string;
+  type: string;
+  status: string;
+  subscriptionPlan: string | null;
+  subscriptionEndsAt: IsoDateString | null;
+  demoEndsAt: IsoDateString | null;
+  billingInn: string | null;
+  billingKpp: string | null;
+  legalAddress: string | null;
+  bankName: string | null;
+  bankBik: string | null;
+  bankAccount: string | null;
+  correspondentAccount: string | null;
+  subscriptions: BillingSubscription[];
+};
+
+export type AuthMeUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  gender: string;
+  platformRoles: string[];
+  status: string;
+  company: {
+    id: string;
+    type: string;
+    status: string;
+    name: string;
+  } | null;
+};

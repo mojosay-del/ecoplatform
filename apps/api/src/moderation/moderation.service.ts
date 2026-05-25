@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   CommentStatus,
   CompanyStatus,
@@ -15,6 +21,7 @@ import { canOpenFunctionalSections } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { AdminActionLogService } from "../common/admin-action-log.service";
 import type { RequestUser } from "../common/request-user";
+import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type {
@@ -27,7 +34,11 @@ import type {
 import { moderatedEntityTypes } from "./moderation.schemas";
 import type { z } from "zod";
 
-const ACTIVE_CASE_STATUSES = [ModerationCaseStatus.open, ModerationCaseStatus.in_review, ModerationCaseStatus.escalated];
+const ACTIVE_CASE_STATUSES = [
+  ModerationCaseStatus.open,
+  ModerationCaseStatus.in_review,
+  ModerationCaseStatus.escalated,
+];
 
 function isModeratedEntityType(value: string): value is ModeratedEntityType {
   return (moderatedEntityTypes as readonly string[]).includes(value);
@@ -314,7 +325,9 @@ export class ModerationService {
 
       await tx.complaint.updateMany({
         where: { caseId: found.id },
-        data: { status: nextStatus === ModerationCaseStatus.resolved ? ComplaintStatus.resolved : ComplaintStatus.pending },
+        data: {
+          status: nextStatus === ModerationCaseStatus.resolved ? ComplaintStatus.resolved : ComplaintStatus.pending,
+        },
       });
 
       const updatedCase = await tx.moderationCase.update({
@@ -340,7 +353,9 @@ export class ModerationService {
       payload: { reasonCode: input.reasonCode, entityType: found.entityType, entityId: found.entityId },
     });
 
-    await this.notifyDecision(result.updatedCase, result.decision).catch(() => undefined);
+    await this.notifyDecision(result.updatedCase, result.decision).catch(
+      swallowAndLog("moderation.decision.notify", { caseId: result.updatedCase.id }),
+    );
 
     return (await this.enrichCases([result.updatedCase]))[0];
   }
@@ -435,7 +450,12 @@ export class ModerationService {
 
       const updatedCase = await tx.moderationCase.update({
         where: { id: found.id },
-        data: { status: ModerationCaseStatus.closed_by_admin, closedAt: new Date(), lockedById: null, lockedUntil: null },
+        data: {
+          status: ModerationCaseStatus.closed_by_admin,
+          closedAt: new Date(),
+          lockedById: null,
+          lockedUntil: null,
+        },
         include: moderationCaseInclude,
       });
 
@@ -457,7 +477,9 @@ export class ModerationService {
       },
     });
 
-    await this.notifyAdminSanction(found, result.sanction, input).catch(() => undefined);
+    await this.notifyAdminSanction(found, result.sanction, input).catch(
+      swallowAndLog("moderation.sanction.notify", { sanctionId: result.sanction.id }),
+    );
 
     return (await this.enrichCases([result.updatedCase]))[0];
   }
@@ -505,7 +527,9 @@ export class ModerationService {
       payload: { reasonCode: input.reasonCode },
     });
 
-    await this.notifySanctionLift(sanction).catch(() => undefined);
+    await this.notifySanctionLift(sanction).catch(
+      swallowAndLog("moderation.sanction.lift.notify", { sanctionId: sanction.id }),
+    );
 
     return this.prisma.sanction.findUniqueOrThrow({ where: { id } });
   }
@@ -570,7 +594,9 @@ export class ModerationService {
     if (recipients.length === 0) return;
 
     const category =
-      sanction.type === SanctionType.module_restriction ? NotificationCategory.moderation : NotificationCategory.security;
+      sanction.type === SanctionType.module_restriction
+        ? NotificationCategory.moderation
+        : NotificationCategory.security;
 
     const titles = this.sanctionLiftCopy(sanction.type);
 
@@ -854,10 +880,10 @@ export class ModerationService {
       const entity = this.buildEntitySummary(item, commentMap, newsPostMap, articleMap);
       return {
         ...item,
-        lockedBy: item.lockedById ? userMap.get(item.lockedById) ?? null : null,
+        lockedBy: item.lockedById ? (userMap.get(item.lockedById) ?? null) : null,
         entity:
           entity && entity.type === "news_comment"
-            ? { ...entity, author: item.entityAuthorId ? userMap.get(item.entityAuthorId) ?? null : null }
+            ? { ...entity, author: item.entityAuthorId ? (userMap.get(item.entityAuthorId) ?? null) : null }
             : entity,
         complaints: item.complaints.map((complaint) => ({
           ...complaint,
@@ -873,7 +899,16 @@ export class ModerationService {
 
   private buildEntitySummary(
     item: ModerationCaseWithRelations,
-    commentMap: Map<string, { id: string; text: string; status: CommentStatus; createdAt: Date; newsPost: { id: string; title: string; slug: string } }>,
+    commentMap: Map<
+      string,
+      {
+        id: string;
+        text: string;
+        status: CommentStatus;
+        createdAt: Date;
+        newsPost: { id: string; title: string; slug: string };
+      }
+    >,
     newsPostMap: Map<string, { id: string; title: string; slug: string; status: ContentStatus }>,
     articleMap: Map<string, { id: string; title: string; slug: string; status: ContentStatus }>,
   ): ResolvedEntitySummary | null {

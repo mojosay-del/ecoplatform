@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { NotificationCategory, SupportTicketStatus } from "@prisma/client";
 import type { SupportTicketDto } from "@ecoplatform/shared";
+import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -33,28 +34,51 @@ export class SupportService {
       },
     });
 
-    await this.notifyTicketCreated(ticket).catch(() => undefined);
+    await this.notifyTicketCreated(ticket).catch(swallowAndLog("support.ticket.created", { ticketId: ticket.id }));
 
     return ticket;
   }
 
-  async listOwn(companyId: string) {
-    return this.prisma.supportTicket.findMany({
-      where: { companyId },
-      orderBy: { updatedAt: "desc" },
-      include: { messages: { orderBy: { createdAt: "asc" } } },
-    });
+  async listOwn(companyId: string, pagination: { limit?: number; offset?: number } = {}) {
+    const limit = Math.min(Math.max(pagination.limit ?? 50, 1), 200);
+    const offset = Math.max(pagination.offset ?? 0, 0);
+    const where = { companyId };
+
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.supportTicket.count({ where }),
+      this.prisma.supportTicket.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        take: limit,
+        skip: offset,
+        // Сообщения остаются в выдаче — UI рендерит thread прямо из listing,
+        // отдельной /tickets/:id-ручки пока нет (см. PROGRESS.md, 4.1).
+        include: { messages: { orderBy: { createdAt: "asc" } } },
+      }),
+    ]);
+
+    return { items, total, hasMore: offset + items.length < total };
   }
 
-  async listAdmin() {
-    return this.prisma.supportTicket.findMany({
-      orderBy: { updatedAt: "desc" },
-      include: {
-        company: { select: { id: true, organizationName: true, status: true } },
-        author: { select: { id: true, firstName: true, lastName: true, email: true } },
-        messages: { orderBy: { createdAt: "asc" } },
-      },
-    });
+  async listAdmin(pagination: { limit?: number; offset?: number } = {}) {
+    const limit = Math.min(Math.max(pagination.limit ?? 50, 1), 200);
+    const offset = Math.max(pagination.offset ?? 0, 0);
+
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.supportTicket.count(),
+      this.prisma.supportTicket.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: limit,
+        skip: offset,
+        include: {
+          company: { select: { id: true, organizationName: true, status: true } },
+          author: { select: { id: true, firstName: true, lastName: true, email: true } },
+          messages: { orderBy: { createdAt: "asc" } },
+        },
+      }),
+    ]);
+
+    return { items, total, hasMore: offset + items.length < total };
   }
 
   async replyAsCompanyUser(ticketId: string, actorId: string, companyId: string, text: string) {
@@ -73,7 +97,9 @@ export class SupportService {
     }
 
     const result = await this.addReply(ticket.id, actorId, "company_user", text);
-    await this.notifyUserReply(ticket, result.message.id).catch(() => undefined);
+    await this.notifyUserReply(ticket, result.message.id).catch(
+      swallowAndLog("support.user.reply", { ticketId: ticket.id }),
+    );
 
     return result.ticket;
   }
@@ -92,7 +118,9 @@ export class SupportService {
     }
 
     const result = await this.addReply(ticket.id, actorId, "admin", text);
-    await this.notifyAdminReply(ticket, result.message.id).catch(() => undefined);
+    await this.notifyAdminReply(ticket, result.message.id).catch(
+      swallowAndLog("support.admin.reply", { ticketId: ticket.id }),
+    );
 
     return result.ticket;
   }

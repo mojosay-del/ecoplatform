@@ -13,7 +13,9 @@ describe("SupportService", () => {
       },
     } as any);
 
-    await expect(service.replyAsCompanyUser("ticket-1", "user-1", "company-1", "Ответ")).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.replyAsCompanyUser("ticket-1", "user-1", "company-1", "Ответ")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
     expect(findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "ticket-1", companyId: "company-1" },

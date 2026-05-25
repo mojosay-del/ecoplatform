@@ -1,5 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { NotificationCategory, NotificationChannel, NotificationDeliveryStatus, PlatformRole, Prisma } from "@prisma/client";
+import {
+  NotificationCategory,
+  NotificationChannel,
+  NotificationDeliveryStatus,
+  PlatformRole,
+  Prisma,
+} from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import type { RequestUser } from "../common/request-user";
 
@@ -39,7 +45,8 @@ export class NotificationsService {
       return null;
     }
 
-    const domainEventId = input.domainEventId ?? this.buildDomainEventId(input.eventType, input.sourceId ?? input.userId);
+    const domainEventId =
+      input.domainEventId ?? this.buildDomainEventId(input.eventType, input.sourceId ?? input.userId);
     const now = new Date();
 
     // Email-канал: задел на будущее. Email-провайдера пока нет, поэтому

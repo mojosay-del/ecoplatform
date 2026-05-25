@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import { changePasswordDtoSchema, loginDtoSchema, registerDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
@@ -7,10 +8,15 @@ import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
 import { AuthService } from "./auth.service";
 
+// Жёсткое окно «10 запросов в минуту на IP» именно для login/register/refresh —
+// чтобы перебор паролей и массовая регистрация ботов сразу натыкались на 429.
+const AUTH_THROTTLE = { auth: { limit: 10, ttl: 60_000 } };
+
 @Controller("auth")
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Throttle(AUTH_THROTTLE)
   @Post("register")
   async register(@Body() body: unknown, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const input = parseBody(registerDtoSchema, body);
@@ -19,6 +25,7 @@ export class AuthController {
     return { accessToken: tokens.accessToken };
   }
 
+  @Throttle(AUTH_THROTTLE)
   @Post("login")
   async login(@Body() body: unknown, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const input = parseBody(loginDtoSchema, body);
@@ -27,6 +34,7 @@ export class AuthController {
     return { accessToken: tokens.accessToken };
   }
 
+  @Throttle(AUTH_THROTTLE)
   @Post("refresh")
   async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const tokens = await this.auth.refresh(request.cookies?.refreshToken as string | undefined);

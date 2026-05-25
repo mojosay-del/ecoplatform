@@ -11,10 +11,7 @@ export function useCoverAssets(items: Array<{ coverImageId?: string | null }>) {
   const { token } = useAuth();
   const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
   const ids = useMemo(
-    () =>
-      Array.from(
-        new Set(items.map((item) => item.coverImageId).filter((id): id is string => Boolean(id))),
-      ).sort(),
+    () => Array.from(new Set(items.map((item) => item.coverImageId).filter((id): id is string => Boolean(id)))).sort(),
     [items],
   );
   const idsKey = ids.join(",");

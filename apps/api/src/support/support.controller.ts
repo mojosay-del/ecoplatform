@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { supportTicketDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
@@ -26,8 +26,11 @@ export class SupportController {
   constructor(private readonly support: SupportService) {}
 
   @Get("support/tickets")
-  async ownTickets(@CurrentUser() user: RequestUser) {
-    return this.support.listOwn(requireCompany(user));
+  async ownTickets(@CurrentUser() user: RequestUser, @Query("limit") limit?: string, @Query("offset") offset?: string) {
+    return this.support.listOwn(requireCompany(user), {
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+      offset: offset ? Number.parseInt(offset, 10) : undefined,
+    });
   }
 
   @Post("support/tickets")
@@ -45,8 +48,11 @@ export class SupportController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Get("admin/support/tickets")
-  async adminTickets() {
-    return this.support.listAdmin();
+  async adminTickets(@Query("limit") limit?: string, @Query("offset") offset?: string) {
+    return this.support.listAdmin({
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+      offset: offset ? Number.parseInt(offset, 10) : undefined,
+    });
   }
 
   @UseGuards(RolesGuard)

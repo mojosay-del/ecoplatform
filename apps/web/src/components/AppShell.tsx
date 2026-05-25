@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -50,9 +51,7 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
   },
   {
     title: "Сообщество",
-    items: [
-      { label: "Форум", icon: MessageCircle, disabled: true },
-    ],
+    items: [{ label: "Форум", icon: MessageCircle, disabled: true }],
   },
   {
     title: "Автоматизация",
@@ -79,7 +78,12 @@ const nav: Array<{ title: string; items: NavItem[] }> = [
       // здесь дублировать не нужно. Секция показывается только админам.
       // Раньше «Компании» и «Сотрудники» были отдельными пунктами; теперь
       // это табы внутри «Пользователи» — так навигация чище.
-      { href: "/admin/content/news", label: "Панель управления", icon: LayoutDashboard, roles: ["admin", "content_manager"] },
+      {
+        href: "/admin/content/news",
+        label: "Панель управления",
+        icon: LayoutDashboard,
+        roles: ["admin", "content_manager"],
+      },
       { href: "/admin/moderation", label: "Модерация", icon: ShieldCheck, roles: ["admin", "moderator"] },
       { href: "/admin/settings", label: "Настройки", icon: Settings, roles: ["admin"] },
       { href: "/admin/support", label: "Поддержка", icon: HelpCircle, roles: ["admin"] },
@@ -160,7 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="sidebar-head">
           <Link className="brand" href="/news">
             <span className="brand-mark">
-              <img alt="" decoding="async" height={32} src="/brand/logo.webp" width={32} />
+              <Image alt="" height={32} src="/brand/logo.webp" width={32} priority />
             </span>
             <span className="brand-text">ЭкоПлатформа</span>
           </Link>
@@ -226,16 +230,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             title={user ? `${user.firstName} ${user.lastName}` : "Войти"}
             href={user ? "/account" : "/login"}
           >
-            {user?.avatarUrl ? <img alt="" src={user.avatarUrl} /> : null}
+            {user?.avatarUrl ? <Image alt="" src={user.avatarUrl} width={40} height={40} /> : null}
           </Link>
         </header>
         <div className="page-surface">{children}</div>
       </main>
       {/* Drawer поддержки рендерим один раз на уровне AppShell — компонент
           сам проверяет проп `open` и ничего не рисует, пока он false. */}
-      {isAdminUser ? null : (
-        <UserSupportDrawer open={supportOpen} onClose={() => setSupportOpen(false)} />
-      )}
+      {isAdminUser ? null : <UserSupportDrawer open={supportOpen} onClose={() => setSupportOpen(false)} />}
     </div>
   );
 }
@@ -278,13 +280,7 @@ function isActiveNavItem(item: NavItem, pathname: string): boolean {
 // Хлебные крошки в топбаре: ищем в навигации активный пункт и показываем
 // «Категория / Пункт» (например, «Главная / Обучение»). Если ничего не нашли —
 // прячем (на /login и подобных страницах AppShell всё равно не отрисуется).
-function Breadcrumb({
-  nav,
-  pathname,
-}: {
-  nav: Array<{ title: string; items: NavItem[] }>;
-  pathname: string;
-}) {
+function Breadcrumb({ nav, pathname }: { nav: Array<{ title: string; items: NavItem[] }>; pathname: string }) {
   let sectionTitle: string | null = null;
   let activeItem: NavItem | null = null;
   let activeHref: string | null = null;

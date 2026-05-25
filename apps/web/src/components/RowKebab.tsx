@@ -13,13 +13,7 @@ export type ActionItem = {
 // Универсальное kebab-меню «⋯» для строк списков. Открывается по клику,
 // закрывается по клику снаружи и Escape. Используется в дереве уроков,
 // в списках новостей и базе знаний.
-export function RowKebab({
-  actions,
-  className,
-}: {
-  actions: ActionItem[];
-  className?: string;
-}) {
+export function RowKebab({ actions, className }: { actions: ActionItem[]; className?: string }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 

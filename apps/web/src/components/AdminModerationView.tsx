@@ -163,10 +163,16 @@ export function AdminModerationView() {
                       <h2>{selectedCase.entity?.newsPost?.title ?? "Кейс модерации"}</h2>
                     </div>
                     <div className="auth-actions">
-                      <button className="button secondary" onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/lock`)}>
+                      <button
+                        className="button secondary"
+                        onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/lock`)}
+                      >
                         Взять
                       </button>
-                      <button className="button secondary" onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/release`)}>
+                      <button
+                        className="button secondary"
+                        onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/release`)}
+                      >
                         Освободить
                       </button>
                     </div>
@@ -214,14 +220,22 @@ export function AdminModerationView() {
                   </section>
                   {selectedCase.status !== "resolved" && selectedCase.status !== "closed_by_admin" ? (
                     <form className="form moderation-decision-form" onSubmit={submitDecision}>
-                      <select className="select" onChange={(event) => setDecisionType(event.target.value)} value={decisionType}>
+                      <select
+                        className="select"
+                        onChange={(event) => setDecisionType(event.target.value)}
+                        value={decisionType}
+                      >
                         {decisionLabels.map(([value, label]) => (
                           <option key={value} value={value}>
                             {label}
                           </option>
                         ))}
                       </select>
-                      <select className="select" onChange={(event) => setReasonCode(event.target.value)} value={reasonCode}>
+                      <select
+                        className="select"
+                        onChange={(event) => setReasonCode(event.target.value)}
+                        value={reasonCode}
+                      >
                         {reasonLabels.map(([value, label]) => (
                           <option key={value} value={value}>
                             {label}

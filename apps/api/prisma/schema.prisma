@@ -1,5 +1,10 @@
 generator client {
   provider = "prisma-client-js"
+  // native       — локальная разработка (macOS arm64 / linux x64).
+  // linux-musl-* — alpine-образы в Docker (наш прод-вариант).
+  // debian-*     — запасной вариант, если перейдём на bookworm-slim.
+  // Без этого `prisma generate` в Docker не подтянет нужный query engine.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -213,6 +218,12 @@ model Subscription {
   reason    String?
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
+
+  // Биллинг-cron каждый час смотрит истёкшие подписки + у компании показывает
+  // самую свежую («take: 1, orderBy createdAt desc»). Оба запроса попадают
+  // под этот индекс.
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([status, endsAt])
 }
 
 model Session {
@@ -271,6 +282,30 @@ model FileAsset {
   accessLevel  FileAccessLevel @default(authenticated)
   uploadedById String?
   createdAt    DateTime        @default(now())
+  references   FileReference[]
+}
+
+// Полиморфная таблица «кто на какой файл ссылается». Заменяет старый
+// scan всех NewsContentBlock/LessonContentBlock/KnowledgeBaseBlock в
+// `deleteIfUnreferenced` — теперь это `count({ where: { fileId } })`.
+//
+// Поддерживается сервисами явно через `FilesService.replaceFileReferences()`.
+// На прод-стенде заполняется backfill'ом при первом запуске (если таблица
+// пустая, но есть существующий контент).
+model FileReference {
+  id         String   @id @default(cuid())
+  fileId     String
+  file       FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  // 'news_post' | 'learning_module' | 'lesson' | 'knowledge_base_article' | 'comment'
+  entityType String
+  entityId   String
+  createdAt  DateTime @default(now())
+
+  // Один файл может быть упомянут только один раз в рамках одной сущности;
+  // повторные ссылки внутри блоков схлопываются в одну строку.
+  @@unique([fileId, entityType, entityId])
+  @@index([fileId])
+  @@index([entityType, entityId])
 }
 
 model NewsPost {
@@ -288,6 +323,12 @@ model NewsPost {
   comments         Comment[]
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
+
+  // Главный публичный запрос — лента: `where status=published, orderBy firstPublishedAt desc`.
+  // Без этого индекса Postgres сканирует всю таблицу новостей.
+  @@index([status, firstPublishedAt(sort: Desc)])
+  // Админка использует `orderBy updatedAt desc` — отдельный составной индекс.
+  @@index([updatedAt(sort: Desc)])
 }
 
 model NewsContentBlock {
@@ -347,6 +388,12 @@ model Comment {
   likes           CommentLike[]
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+
+  // Главный запрос — дерево комментариев к новости: фильтрация по
+  // (newsPostId, parentCommentId=null, status=published), затем reply'ы.
+  // Без индекса всё дерево перебирается seq-scan'ом на каждую открытую новость.
+  @@index([newsPostId, parentCommentId, status, createdAt(sort: Desc)])
+  @@index([parentCommentId, status, createdAt])
 }
 
 model CommentAttachment {
@@ -406,6 +453,9 @@ model PriceIndex {
   values           PriceIndexValue[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+
+  // /indices фильтрует по `status=published` через `nomenclatures.where`.
+  @@index([status])
 }
 
 model PriceIndexValue {
@@ -438,6 +488,9 @@ model LearningModule {
   chapters         Chapter[]
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
+
+  // /education/modules: `where status=published, orderBy [position, createdAt]`.
+  @@index([status, position])
 }
 
 model LearningModulePreview {
@@ -531,6 +584,10 @@ model KnowledgeBaseArticle {
   blocks           KnowledgeBaseBlock[]
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
+
+  // Tree-выдача: парентом сортируем по position, фильтруем по status.
+  @@index([parentId, status, position])
+  @@index([status, position])
 
   @@unique([parentId, position])
 }
@@ -708,6 +765,11 @@ model SupportTicket {
   messages  SupportTicketMessage[]
   createdAt DateTime               @default(now())
   updatedAt DateTime               @updatedAt
+
+  // Списки: для компании — `where companyId, orderBy updatedAt desc`,
+  // для админ-консоли модерации — `where status, orderBy updatedAt`.
+  @@index([companyId, updatedAt(sort: Desc)])
+  @@index([status, updatedAt(sort: Desc)])
 }
 
 model SupportTicketMessage {
@@ -719,4 +781,7 @@ model SupportTicketMessage {
   text       String
   isInternal Boolean       @default(false)
   createdAt  DateTime      @default(now())
+
+  // Загрузка переписки тикета (chronological order).
+  @@index([ticketId, createdAt])
 }

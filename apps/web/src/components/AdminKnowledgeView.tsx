@@ -1,21 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import {
-  DndContext,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { BookOpen, ChevronRight, FileText, FolderOpen, GripVertical, Plus } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, FolderOpen, Plus } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { ALL_BLOCK_KINDS, Block, BlocksEditor } from "./BlocksEditor";
@@ -71,14 +57,9 @@ export function AdminKnowledgeView() {
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [categoryCreateOpen, setCategoryCreateOpen] = useState(false);
-  const [categoryTitle, setCategoryTitle] = useState("");
-  const [categorySubmitting, setCategorySubmitting] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const tree = useMemo(() => buildTree(items), [items]);
-  const visibleNodes = useMemo(() => flattenVisibleTree(tree, expanded), [tree, expanded]);
 
   // Авто-раскрытие предков выбранной статьи.
   useEffect(() => {
@@ -194,41 +175,6 @@ export function AdminKnowledgeView() {
     });
   }
 
-  async function createRootCategory(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token || categorySubmitting) return;
-    const title = categoryTitle.trim();
-    if (!title) {
-      setMessage("Введите название категории.");
-      return;
-    }
-
-    setCategorySubmitting(true);
-    setMessage(null);
-    try {
-      const rootCount = items.filter((item) => item.parentId === null).length;
-      await apiFetch("/admin/content/knowledge-base", {
-        method: "POST",
-        token,
-        body: {
-          parentId: null,
-          title,
-          position: rootCount,
-          iconType: "category",
-          blocks: [],
-        },
-      });
-      setCategoryTitle("");
-      setCategoryCreateOpen(false);
-      setMessage("Категория создана. Теперь можно перетащить в неё статьи.");
-      await loadList();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось создать категорию.");
-    } finally {
-      setCategorySubmitting(false);
-    }
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
@@ -305,72 +251,6 @@ export function AdminKnowledgeView() {
     }
   }
 
-  async function moveArticle(articleId: string, parentId: string | null, position: number) {
-    if (!token) return;
-    const article = items.find((item) => item.id === articleId);
-    if (!article) return;
-    if (article.parentId === parentId && article.position === position) return;
-
-    try {
-      await apiFetch(`/admin/content/knowledge-base/${articleId}/move`, {
-        method: "PATCH",
-        token,
-        body: { parentId, position },
-      });
-      setMessage("Положение статьи обновлено.");
-      await loadList();
-      setDraft((prev) =>
-        prev.id === articleId ? { ...prev, parentId, position } : prev,
-      );
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось переместить статью.");
-    }
-  }
-
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over, delta } = event;
-    if (!over || active.id === over.id) return;
-
-    const activeId = String(active.id);
-    const overId = String(over.id);
-    const activeNode = findTreeNode(tree, activeId);
-    const overNode = findTreeNode(tree, overId);
-    if (!activeNode || !overNode || isDescendant(activeNode, overId)) return;
-
-    const activeSubtreeDepth = getTreeNodeSubtreeDepth(activeNode);
-    const overDepth = getTreeNodeDepth(tree, overId);
-    const canNestIntoOver = overDepth < 2 && overDepth + 1 + activeSubtreeDepth <= 2;
-    const shouldNest = canNestIntoOver && (isKnowledgeCategory(overNode) || delta.x > 24);
-
-    if (shouldNest) {
-      const position = overNode.children.filter((child) => child.id !== activeId).length;
-      setExpanded((prev) => new Set(prev).add(overId));
-      await moveArticle(activeId, overId, position);
-      return;
-    }
-
-    const targetParentId = overNode.parentId;
-    const targetSiblings = items
-      .filter((item) => item.parentId === targetParentId && item.id !== activeId)
-      .sort((a, b) => a.position - b.position);
-    const overIndex = targetSiblings.findIndex((item) => item.id === overId);
-    if (overIndex === -1) return;
-    const targetPosition =
-      activeNode.parentId === targetParentId && activeNode.position < overNode.position
-        ? overIndex + 1
-        : overIndex;
-
-    const activeWouldFit =
-      targetParentId === activeNode.parentId ||
-      getTargetDepth(tree, targetParentId) + activeSubtreeDepth <= 2;
-    if (!activeWouldFit) {
-      setMessage("Перемещение нарушит ограничение в три уровня.");
-      return;
-    }
-
-    await moveArticle(activeId, targetParentId, targetPosition);
-  }
-
   useEffect(() => {
     void loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -399,7 +279,6 @@ export function AdminKnowledgeView() {
   }
 
   const isEditingNew = draft.id === null;
-  const isEditingCategory = !isEditingNew && original ? isKnowledgeCategory(original) : false;
 
   return (
     <AppShell>
@@ -418,193 +297,162 @@ export function AdminKnowledgeView() {
               <button
                 className="education-tree-add"
                 type="button"
-                onClick={() => setCategoryCreateOpen((value) => !value)}
-                title={categoryCreateOpen ? "Скрыть форму" : "Новая категория"}
-                aria-label={categoryCreateOpen ? "Скрыть форму" : "Новая категория"}
+                onClick={() => startNew(null)}
+                title="Новая статья"
+                aria-label="Новая статья"
               >
                 <Plus size={14} />
               </button>
             </div>
-            {categoryCreateOpen ? (
-              <form className="knowledge-category-create" onSubmit={createRootCategory}>
-                <input
-                  className="input"
-                  value={categoryTitle}
-                  onChange={(event) => setCategoryTitle(event.target.value)}
-                  placeholder="Название категории"
-                  autoFocus
-                />
-                <button className="button" type="submit" disabled={categorySubmitting}>
-                  {categorySubmitting ? "Создаю…" : "Создать"}
-                </button>
-              </form>
-            ) : null}
             {tree.length === 0 ? (
               <p className="education-tree-empty">Статей пока нет.</p>
             ) : null}
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext
-                items={visibleNodes.map((node) => node.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <ul className="tree" role="tree">
-                  {tree.map((node) => (
-                    <KnowledgeNode
-                      key={node.id}
-                      node={node}
-                      level={0}
-                      draftId={draft.id}
-                      expanded={expanded}
-                      onToggle={toggleExpand}
-                      onSelect={startEdit}
-                      onPublishToggle={publishToggle}
-                      onAddChild={(parentId) => startNew(parentId)}
-                      onRemove={remove}
-                    />
-                  ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
+            <ul className="tree" role="tree">
+              {tree.map((node) => (
+                <KnowledgeNode
+                  key={node.id}
+                  node={node}
+                  level={0}
+                  draftId={draft.id}
+                  expanded={expanded}
+                  onToggle={toggleExpand}
+                  onSelect={startEdit}
+                  onPublishToggle={publishToggle}
+                  onAddChild={(parentId) => startNew(parentId)}
+                  onRemove={remove}
+                />
+              ))}
+            </ul>
           </div>
 
           <div className="moderation-detail">
             <form className="form news-form" onSubmit={submit}>
               <div className="news-form-head">
                 <span className="news-form-mode">
-                  {isEditingNew ? "Новая статья" : isEditingCategory ? "Категория" : "Редактирование"}
+                  {isEditingNew ? "Новая статья" : "Редактирование"}
                 </span>
               </div>
 
-              {isEditingCategory ? (
-                <fieldset className="form-fieldset">
-                  <legend className="form-legend">Категория</legend>
-                  <p className="form-legend-hint">
-                    Это папка в дереве. В неё можно перетаскивать статьи и подкатегории.
-                  </p>
+              {/* Секция 1 — основное содержимое статьи: то, что видит читатель. */}
+              <fieldset className="form-fieldset">
+                <legend className="form-legend">Основное</legend>
+                <p className="form-legend-hint">
+                  То, что увидит читатель в карточке статьи и на странице.
+                </p>
+
+                <FileUploadField
+                  accept="image/*"
+                  buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+                  imagePreset="cover"
+                  label="Обложка статьи"
+                  value={draft.coverImageId}
+                  onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+                />
+
+                <label className="form-field">
+                  <span>Заголовок</span>
+                  <input
+                    className="news-form-title"
+                    placeholder="Например: «Как сортировать стекло»"
+                    value={draft.title}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+                    required
+                  />
+                </label>
+
+                <label className="form-field">
+                  <span>Подзаголовок</span>
+                  <input
+                    className="input"
+                    placeholder="Короткое уточнение (необязательно)"
+                    value={draft.subtitle}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
+                  />
+                </label>
+              </fieldset>
+
+              {/* Секция 2 — куда положить статью в иерархии и как её показывать в каталоге. */}
+              <fieldset className="form-fieldset">
+                <legend className="form-legend">Размещение</legend>
+                <p className="form-legend-hint">
+                  Где статья будет жить в иерархии базы знаний и в каком порядке показываться.
+                </p>
+
+                <label className="form-field">
+                  <span>Раздел</span>
+                  <select
+                    className="select"
+                    value={draft.parentId ?? ""}
+                    onChange={(event) =>
+                      setDraft((prev) => ({ ...prev, parentId: event.target.value || null }))
+                    }
+                  >
+                    <option value="">— верхний уровень —</option>
+                    {parentOptions.map((parent) => (
+                      <option key={parent.id} value={parent.id}>
+                        {indentTitle(items, parent)}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="form-field-hint">
+                    «Верхний уровень» — статья появится в корне базы знаний.
+                  </small>
+                </label>
+
+                <div className="form-grid-2">
                   <label className="form-field">
-                    <span>Название</span>
+                    <span>Порядок в разделе</span>
                     <input
-                      className="news-form-title"
-                      placeholder="Например: «Макулатура»"
-                      value={draft.title}
-                      onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-                      required
+                      className="input"
+                      type="number"
+                      min={0}
+                      value={draft.position}
+                      onChange={(event) =>
+                        setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))
+                      }
                     />
+                    <small className="form-field-hint">
+                      Меньше — выше в списке. 0 — самая первая.
+                    </small>
                   </label>
-                </fieldset>
-              ) : (
-                <>
-                  {/* Секция 1 — основное содержимое статьи: то, что видит читатель. */}
-                  <fieldset className="form-fieldset">
-                    <legend className="form-legend">Основное</legend>
-                    <p className="form-legend-hint">
-                      То, что увидит читатель в карточке статьи и на странице.
-                    </p>
-
-                    <FileUploadField
-                      accept="image/*"
-                      buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
-                      imagePreset="cover"
-                      label="Обложка статьи"
-                      value={draft.coverImageId}
-                      onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+                  <label className="form-field">
+                    <span>Тип материала</span>
+                    <input
+                      className="input"
+                      list="knowledge-icon-types"
+                      placeholder="Например: paper"
+                      value={draft.iconType}
+                      onChange={(event) => setDraft((prev) => ({ ...prev, iconType: event.target.value }))}
                     />
+                    <datalist id="knowledge-icon-types">
+                      <option value="paper" />
+                      <option value="plastic" />
+                      <option value="glass" />
+                      <option value="metal" />
+                      <option value="rubber" />
+                      <option value="electronics" />
+                      <option value="textile" />
+                      <option value="organic" />
+                    </datalist>
+                    <small className="form-field-hint">
+                      Подсказка для каталога. Можно оставить пустым.
+                    </small>
+                  </label>
+                </div>
+              </fieldset>
 
-                    <label className="form-field">
-                      <span>Заголовок</span>
-                      <input
-                        className="news-form-title"
-                        placeholder="Например: «Как сортировать стекло»"
-                        value={draft.title}
-                        onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-                        required
-                      />
-                    </label>
-
-                    <label className="form-field">
-                      <span>Подзаголовок</span>
-                      <input
-                        className="input"
-                        placeholder="Короткое уточнение (необязательно)"
-                        value={draft.subtitle}
-                        onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
-                      />
-                    </label>
-                  </fieldset>
-
-                  {/* Секция 2 — куда положить статью в иерархии и как её показывать в каталоге. */}
-                  <fieldset className="form-fieldset">
-                    <legend className="form-legend">Размещение</legend>
-                    <p className="form-legend-hint">
-                      Для существующих статей меняется перетаскиванием в дереве слева.
-                    </p>
-
-                    {isEditingNew ? (
-                      <label className="form-field">
-                        <span>Раздел</span>
-                        <select
-                          className="select"
-                          value={draft.parentId ?? ""}
-                          onChange={(event) =>
-                            setDraft((prev) => {
-                              const parentId = event.target.value || null;
-                              const siblings = items.filter((item) => item.parentId === parentId);
-                              return { ...prev, parentId, position: siblings.length };
-                            })
-                          }
-                        >
-                          <option value="">— верхний уровень —</option>
-                          {parentOptions.map((parent) => (
-                            <option key={parent.id} value={parent.id}>
-                              {indentTitle(items, parent)}
-                            </option>
-                          ))}
-                        </select>
-                        <small className="form-field-hint">
-                          Новая статья попадёт в конец выбранного раздела.
-                        </small>
-                      </label>
-                    ) : null}
-
-                    <label className="form-field">
-                      <span>Тип материала</span>
-                      <input
-                        className="input"
-                        list="knowledge-icon-types"
-                        placeholder="Например: paper"
-                        value={draft.iconType}
-                        onChange={(event) => setDraft((prev) => ({ ...prev, iconType: event.target.value }))}
-                      />
-                      <datalist id="knowledge-icon-types">
-                        <option value="paper" />
-                        <option value="plastic" />
-                        <option value="glass" />
-                        <option value="metal" />
-                        <option value="rubber" />
-                        <option value="electronics" />
-                        <option value="textile" />
-                        <option value="organic" />
-                      </datalist>
-                      <small className="form-field-hint">
-                        Подсказка для каталога. Можно оставить пустым.
-                      </small>
-                    </label>
-                  </fieldset>
-
-                  {/* Секция 3 — само содержание (блоки). */}
-                  <fieldset className="form-fieldset">
-                    <legend className="form-legend">Содержание</legend>
-                    <p className="form-legend-hint">
-                      Текст, изображения, видео — собирается из блоков.
-                    </p>
-                    <BlocksEditor
-                      blocks={draft.blocks}
-                      onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks }))}
-                      allowedKinds={ALL_BLOCK_KINDS}
-                    />
-                  </fieldset>
-                </>
-              )}
+              {/* Секция 3 — само содержание (блоки). */}
+              <fieldset className="form-fieldset">
+                <legend className="form-legend">Содержание</legend>
+                <p className="form-legend-hint">
+                  Текст, изображения, видео — собирается из блоков.
+                </p>
+                <BlocksEditor
+                  blocks={draft.blocks}
+                  onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks }))}
+                  allowedKinds={ALL_BLOCK_KINDS}
+                />
+              </fieldset>
 
               <div className="lesson-save-bar">
                 <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>
@@ -673,54 +521,6 @@ function buildTree(items: Article[]): TreeNode[] {
   return roots;
 }
 
-function flattenVisibleTree(nodes: TreeNode[], expanded: Set<string>): TreeNode[] {
-  const result: TreeNode[] = [];
-  for (const node of nodes) {
-    result.push(node);
-    if (expanded.has(node.id)) {
-      result.push(...flattenVisibleTree(node.children, expanded));
-    }
-  }
-  return result;
-}
-
-function findTreeNode(nodes: TreeNode[], id: string): TreeNode | null {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    const child = findTreeNode(node.children, id);
-    if (child) return child;
-  }
-  return null;
-}
-
-function getTreeNodeDepth(nodes: TreeNode[], id: string, depth = 0): number {
-  for (const node of nodes) {
-    if (node.id === id) return depth;
-    const childDepth = getTreeNodeDepth(node.children, id, depth + 1);
-    if (childDepth !== -1) return childDepth;
-  }
-  return -1;
-}
-
-function getTargetDepth(nodes: TreeNode[], parentId: string | null): number {
-  if (!parentId) return 0;
-  const parentDepth = getTreeNodeDepth(nodes, parentId);
-  return parentDepth === -1 ? 0 : parentDepth + 1;
-}
-
-function getTreeNodeSubtreeDepth(node: TreeNode): number {
-  if (node.children.length === 0) return 0;
-  return 1 + Math.max(...node.children.map(getTreeNodeSubtreeDepth));
-}
-
-function isDescendant(node: TreeNode, targetId: string): boolean {
-  return node.children.some((child) => child.id === targetId || isDescendant(child, targetId));
-}
-
-function isKnowledgeCategory(article: Pick<Article, "iconType">): boolean {
-  return article.iconType === "category";
-}
-
 function indentTitle(items: Article[], target: Article): string {
   let depth = 0;
   let current: Article | undefined = target;
@@ -753,17 +553,9 @@ function KnowledgeNode({
   onAddChild: (parentId: string) => void;
   onRemove: (article: Article) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: node.id,
-  });
   const isExpanded = expanded.has(node.id);
   const hasChildren = node.children.length > 0;
   const Icon = level === 0 ? FolderOpen : level === 1 ? BookOpen : FileText;
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.55 : 1,
-  };
 
   const actions: ActionItem[] = [
     {
@@ -783,24 +575,8 @@ function KnowledgeNode({
   actions.push({ label: "Удалить", onClick: () => onRemove(node), danger: true });
 
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      className={isDragging ? "is-dragging" : undefined}
-      role="treeitem"
-      aria-expanded={hasChildren ? isExpanded : undefined}
-    >
-      <div className={`tree-row depth-${level}${draftId === node.id ? " is-active" : ""} is-sortable`}>
-        <button
-          type="button"
-          className="tree-row-drag"
-          aria-label="Переместить статью"
-          title="Переместить статью"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical size={14} />
-        </button>
+    <li role="treeitem" aria-expanded={hasChildren ? isExpanded : undefined}>
+      <div className={`tree-row depth-${level}${draftId === node.id ? " is-active" : ""}`}>
         <button
           type="button"
           className="tree-row-chevron"

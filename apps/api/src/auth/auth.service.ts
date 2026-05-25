@@ -1,10 +1,18 @@
-import { BadRequestException, ConflictException, forwardRef, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  forwardRef,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { CompanyStatus, NotificationCategory, UserStatus } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 import type { LoginDto, RegisterDto } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
+import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -80,7 +88,7 @@ export class AuthService {
 
     const newDevice = await this.detectNewDevice(user.id, meta);
     const tokens = await this.createSession(user.id, meta, Boolean(input.rememberMe));
-    await this.notifyLogin(user.id, meta, newDevice).catch(() => undefined);
+    await this.notifyLogin(user.id, meta, newDevice).catch(swallowAndLog("auth.login.notify", { userId: user.id }));
 
     return tokens;
   }
@@ -127,7 +135,7 @@ export class AuthService {
         body: "Пароль вашей учётной записи был изменён. Все остальные сессии отозваны.",
         link: "/account",
       })
-      .catch(() => undefined);
+      .catch(swallowAndLog("auth.password.changed.notify", { userId }));
 
     return { ok: true };
   }
@@ -163,10 +171,7 @@ export class AuthService {
     return `${browser}/${os}`;
   }
 
-  private async detectNewDevice(
-    userId: string,
-    meta: { userAgent?: string; ipAddress?: string },
-  ): Promise<boolean> {
+  private async detectNewDevice(userId: string, meta: { userAgent?: string; ipAddress?: string }): Promise<boolean> {
     const currentFp = this.fingerprintUserAgent(meta.userAgent);
     // Сравниваем с сессиями за последние 30 дней. IP сознательно не учитываем —
     // мобильные операторы и Wi-Fi-роуминг постоянно меняют IP при том же
@@ -385,7 +390,8 @@ export class AuthService {
     const accessToken = await this.jwt.signAsync(
       { sub: userId, sessionId: session.id },
       {
-        secret: process.env.JWT_ACCESS_SECRET ?? "dev-access-secret",
+        // Секрет проверяется в bootstrap() — здесь полагаемся, что он валиден.
+        secret: process.env.JWT_ACCESS_SECRET as string,
         expiresIn: "15m",
       },
     );

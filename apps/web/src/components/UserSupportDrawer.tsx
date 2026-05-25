@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ChevronLeft, MessageSquare, Plus, X } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { api, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 // Drawer (правая выезжающая панель), открываемый по иконке «?» в шапке.
@@ -62,8 +62,8 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await apiFetch<Ticket[]>("/support/tickets", { token });
-      setTickets(data);
+      const page = await api.support.listMyTickets({ limit: 100 });
+      setTickets(page.items as Ticket[]);
     } catch (error) {
       // Тихо игнорируем — пользователь может быть платформенным стаффом
       // без companyId (API в этом случае вернёт 403). Drawer всё равно
@@ -157,12 +157,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
               <>Поддержка</>
             )}
           </h2>
-          <button
-            type="button"
-            className="support-drawer-close"
-            onClick={onClose}
-            aria-label="Закрыть"
-          >
+          <button type="button" className="support-drawer-close" onClick={onClose} aria-label="Закрыть">
             <X size={20} />
           </button>
         </header>
@@ -199,11 +194,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                 {!loading && tickets.length === 0 ? (
                   <div className="support-drawer-empty">
                     <p>У вас пока нет обращений в поддержку.</p>
-                    <button
-                      type="button"
-                      className="button"
-                      onClick={() => setTab("new")}
-                    >
+                    <button type="button" className="button" onClick={() => setTab("new")}>
                       Создать первое
                     </button>
                   </div>
@@ -245,13 +236,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                 </label>
                 <label className="form-field">
                   <span>Тема</span>
-                  <input
-                    className="input"
-                    name="subject"
-                    placeholder="Коротко опишите вопрос"
-                    required
-                    minLength={3}
-                  />
+                  <input className="input" name="subject" placeholder="Коротко опишите вопрос" required minLength={3} />
                 </label>
                 <label className="form-field">
                   <span>Сообщение</span>
@@ -309,20 +294,13 @@ function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => 
         <strong>{ticket.subject}</strong>
         <span className="page-subtitle">
           {CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
-          <span className={`status-pill status-${ticket.status}`}>
-            {STATUS_LABELS[ticket.status] ?? ticket.status}
-          </span>
+          <span className={`status-pill status-${ticket.status}`}>{STATUS_LABELS[ticket.status] ?? ticket.status}</span>
         </span>
       </header>
       <div className="support-drawer-messages">
-        {messages.length === 0 ? (
-          <p className="page-subtitle">Пока нет сообщений.</p>
-        ) : null}
+        {messages.length === 0 ? <p className="page-subtitle">Пока нет сообщений.</p> : null}
         {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`support-drawer-message${m.authorRole === "admin" ? " from-admin" : ""}`}
-          >
+          <div key={m.id} className={`support-drawer-message${m.authorRole === "admin" ? " from-admin" : ""}`}>
             <p>{m.text}</p>
             <small>{new Date(m.createdAt).toLocaleString("ru-RU")}</small>
           </div>

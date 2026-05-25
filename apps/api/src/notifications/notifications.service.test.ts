@@ -178,17 +178,14 @@ describe("NotificationsService", () => {
     const { prisma } = buildPrismaMock({});
     const service = new NotificationsService(prisma);
 
-    await service.updatePreferences(
-      { id: "user-1", platformRoles: [], companyId: null, sessionId: "" } as any,
-      {
-        inAppMutedCategories: [
-          NotificationCategory.security,
-          NotificationCategory.billing,
-          NotificationCategory.moderation,
-        ],
-        emailMutedCategories: [NotificationCategory.billing, NotificationCategory.support],
-      },
-    );
+    await service.updatePreferences({ id: "user-1", platformRoles: [], companyId: null, sessionId: "" } as any, {
+      inAppMutedCategories: [
+        NotificationCategory.security,
+        NotificationCategory.billing,
+        NotificationCategory.moderation,
+      ],
+      emailMutedCategories: [NotificationCategory.billing, NotificationCategory.support],
+    });
 
     const args = prisma.userNotificationPreferences.upsert.mock.calls[0]?.[0];
     expect(args.create.inAppMutedCategories).toEqual([NotificationCategory.moderation]);

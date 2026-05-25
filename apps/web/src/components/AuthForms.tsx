@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Check, Eye, EyeOff, Factory, Forklift, Package, RussianRuble, Truck } from "lucide-react";
+import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
+import { ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 const companyTypeOptions = [
@@ -82,9 +84,7 @@ const ORGANIZATION_EMPTY_DELAY = 600;
 function normalizeRussianPhoneDigits(value: string) {
   const digits = value.replace(/\D/g, "");
   const withoutCountryCode =
-    digits.length > PHONE_MAX_DIGITS && (digits.startsWith("7") || digits.startsWith("8"))
-      ? digits.slice(1)
-      : digits;
+    digits.length > PHONE_MAX_DIGITS && (digits.startsWith("7") || digits.startsWith("8")) ? digits.slice(1) : digits;
 
   return withoutCountryCode.slice(0, PHONE_MAX_DIGITS);
 }
@@ -120,10 +120,7 @@ function AuthVisual({ mode }: { mode: AuthMode }) {
   // иконки. setTimeout пересоздаётся при каждом изменении index — это
   // даёт точный тайминг без рассинхрона, который был бы у одного setInterval.
   useEffect(() => {
-    const id = window.setTimeout(
-      () => setIndex((prev) => (prev + 1) % AUTH_ICONS.length),
-      current.hold,
-    );
+    const id = window.setTimeout(() => setIndex((prev) => (prev + 1) % AUTH_ICONS.length), current.hold);
     return () => window.clearTimeout(id);
   }, [current.key, current.hold]);
 
@@ -134,10 +131,7 @@ function AuthVisual({ mode }: { mode: AuthMode }) {
       <div className="auth-visual-wordmark">ЭкоПлатформа</div>
 
       <div className="auth-visual-stage">
-        <div
-          className={`auth-visual-icon${current.key === "logo" ? " is-logo" : ""}`}
-          key={current.key}
-        >
+        <div className={`auth-visual-icon${current.key === "logo" ? " is-logo" : ""}`} key={current.key}>
           {current.node}
         </div>
       </div>
@@ -176,28 +170,17 @@ function AuthShell({ children, mode }: { children: ReactNode; mode: AuthMode }) 
 
 // Унифицированное поле: label сверху, контрол снизу. Раньше часть полей
 // шла с placeholder вместо label, что нарушало WCAG и сбивало пользователя.
-function AuthField({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function AuthField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <label className="auth-field">
       <span className="auth-field-label">{label}</span>
       {children}
+      {hint ? <span className="auth-field-hint">{hint}</span> : null}
     </label>
   );
 }
 
-function EmailInput({
-  name,
-  autoComplete,
-}: {
-  name: string;
-  autoComplete: "email" | "username";
-}) {
+function EmailInput({ name, autoComplete }: { name: string; autoComplete: "email" | "username" }) {
   return (
     <input
       className="input"
@@ -275,13 +258,7 @@ function OrganizationNameInput() {
   }, [charIndex, exampleIndex, phase]);
 
   return (
-    <input
-      className="input"
-      name="organizationName"
-      placeholder={placeholder}
-      autoComplete="organization"
-      required
-    />
+    <input className="input" name="organizationName" placeholder={placeholder} autoComplete="organization" required />
   );
 }
 
@@ -386,8 +363,11 @@ export function LoginForm() {
         form.get("rememberMe") === "on",
       );
       router.push("/news");
-    } catch {
-      setError("Не удалось войти. Проверьте email и пароль.");
+    } catch (err) {
+      // Сервер возвращает осмысленные тексты («Учётная запись заблокирована»,
+      // «Доступ к кабинету компании закрыт»). Раньше пустой catch их съедал —
+      // пользователь видел только общий «Не удалось войти».
+      setError(err instanceof ApiError && err.message ? err.message : "Не удалось войти. Проверьте email и пароль.");
     } finally {
       setSubmitting(false);
     }
@@ -455,8 +435,12 @@ export function RegisterForm() {
         password: String(form.get("password")),
       });
       router.push("/news");
-    } catch {
-      setError("Не удалось зарегистрироваться. Возможно, email или телефон уже используются.");
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.message
+          ? err.message
+          : "Не удалось зарегистрироваться. Возможно, email или телефон уже используются.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -523,8 +507,11 @@ export function RegisterForm() {
             <AuthField label="Email">
               <EmailInput name="email" autoComplete="email" />
             </AuthField>
-            <AuthField label="Пароль">
-              <PasswordInput name="password" autoComplete="new-password" minLength={8} />
+            <AuthField
+              label="Пароль"
+              hint={`Не короче ${MIN_PASSWORD_LENGTH} символов, минимум одна буква и одна цифра.`}
+            >
+              <PasswordInput name="password" autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} />
             </AuthField>
           </div>
         </fieldset>

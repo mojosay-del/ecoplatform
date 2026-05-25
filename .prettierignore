@@ -1,0 +1,18 @@
+node_modules
+dist
+.next
+.turbo
+coverage
+pnpm-lock.yaml
+
+# Документация — пишется людьми, ручной формат важнее единообразия.
+# Если когда-то унифицируем — уберём отсюда.
+docs/
+audit/
+*.md
+
+# Сгенерированный код Prisma client.
+**/prisma/migrations/**
+
+# Standalone-сборка Next.js.
+apps/web/.next/

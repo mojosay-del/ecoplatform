@@ -3,26 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
-import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  Bell,
-  Building2,
-  CreditCard,
-  Flag,
-  KeyRound,
-  LifeBuoy,
-  LogOut,
-  MessageCircle,
-  Send,
-  ShieldCheck,
-  Smartphone,
-  ThumbsUp,
-  UserRound,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Flag, MessageCircle, Send, ThumbsUp, X, type LucideIcon } from "lucide-react";
 import { AppShell } from "./AppShell";
-import { ApiError, apiFetch, clearAccessToken, type FileAsset } from "../lib/api";
+import { ApiError, apiFetch, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { sanitizeParagraphHtml } from "../lib/sanitize-html";
 import { useCoverAssets } from "../lib/use-cover-assets";
@@ -992,16 +976,12 @@ export function NewsPostView({ slug }: { slug: string }) {
   );
 }
 
-type IndexPeriod = "2W" | "1M" | "3M" | "6M" | "1Y" | "2Y" | "3Y";
+type IndexPeriod = "1M" | "3M" | "1Y";
 
 const INDEX_PERIOD_LABELS: Record<IndexPeriod, string> = {
-  "2W": "2 нед.",
   "1M": "1 мес.",
   "3M": "3 мес.",
-  "6M": "6 мес.",
   "1Y": "1 год",
-  "2Y": "2 года",
-  "3Y": "3 года",
 };
 
 export function IndicesView() {
@@ -1073,19 +1053,11 @@ function IndexCard({ item }: { item: any }) {
   const points: Array<{ date: string | Date; price: number }> =
     chart[period]?.length > 0
       ? chart[period]
-      : chart["3Y"]?.length > 0
-        ? chart["3Y"]
-        : chart["2Y"]?.length > 0
-          ? chart["2Y"]
-          : chart["1Y"]?.length > 0
-            ? chart["1Y"]
-            : chart["6M"]?.length > 0
-              ? chart["6M"]
-              : chart["3M"]?.length > 0
-                ? chart["3M"]
-                : chart["1M"]?.length > 0
-                  ? chart["1M"]
-                  : chart["2W"] ?? [];
+      : chart["1Y"]?.length > 0
+        ? chart["1Y"]
+        : chart["3M"]?.length > 0
+          ? chart["3M"]
+          : chart["1M"] ?? [];
 
   const currentPrice = Number(item.summary?.currentPrice ?? points[points.length - 1]?.price ?? 0);
   const weeklyChange = Number(item.summary?.weeklyChange ?? 0);
@@ -1093,20 +1065,17 @@ function IndexCard({ item }: { item: any }) {
   return (
     <article className="index-card">
       <div className="index-card-head">
-        <div className="index-card-body">
-          <h2 className="index-card-title">{item.name}</h2>
-          <p className="index-card-subtitle">
-            {item.code}
-            {weeklyChange !== 0 ? (
-              <>
-                {" · "}
-                <span className={weeklyChange >= 0 ? "index-change-positive" : "index-change-negative"}>
-                  {weeklyChange > 0 ? "+" : ""}
-                  {weeklyChange}% за неделю
-                </span>
-              </>
-            ) : null}
-          </p>
+        <div className="index-period-tabs">
+          {(Object.keys(INDEX_PERIOD_LABELS) as IndexPeriod[]).map((value) => (
+            <button
+              className={`index-period-tab ${period === value ? "active" : ""}`}
+              key={value}
+              onClick={() => setPeriod(value)}
+              type="button"
+            >
+              {INDEX_PERIOD_LABELS[value]}
+            </button>
+          ))}
         </div>
         <div className="index-current-price">
           <strong>{formatIndexPrice(currentPrice)}</strong>
@@ -1114,20 +1083,23 @@ function IndexCard({ item }: { item: any }) {
         </div>
       </div>
 
-      <IndexChart points={points} period={period} />
-
-      <div className="index-period-tabs" aria-label="Период графика">
-        {(Object.keys(INDEX_PERIOD_LABELS) as IndexPeriod[]).map((value) => (
-          <button
-            className={`index-period-tab ${period === value ? "active" : ""}`}
-            key={value}
-            onClick={() => setPeriod(value)}
-            type="button"
-          >
-            {INDEX_PERIOD_LABELS[value]}
-          </button>
-        ))}
+      <div className="index-card-body">
+        <h2 className="index-card-title">{item.name}</h2>
+        <p className="index-card-subtitle">
+          {item.code}
+          {weeklyChange !== 0 ? (
+            <>
+              {" · "}
+              <span className={weeklyChange >= 0 ? "index-change-positive" : "index-change-negative"}>
+                {weeklyChange > 0 ? "+" : ""}
+                {weeklyChange}% за неделю
+              </span>
+            </>
+          ) : null}
+        </p>
       </div>
+
+      <IndexChart points={points} period={period} />
     </article>
   );
 }
@@ -1142,9 +1114,7 @@ function formatIndexPrice(value: number) {
 
 function formatIndexDateLabel(date: Date, period: IndexPeriod) {
   const month = MONTH_LABELS[date.getMonth()];
-  return ["1Y", "2Y", "3Y"].includes(period)
-    ? `${month} ${date.getFullYear()}`
-    : `${date.getDate()} ${month} ${date.getFullYear()}`;
+  return period === "1Y" ? `${month} ${date.getFullYear()}` : `${date.getDate()} ${month} ${date.getFullYear()}`;
 }
 
 function formatIndexTooltipDate(date: Date) {
@@ -1195,12 +1165,11 @@ function buildSmoothChartPath(xs: number[], ys: number[]) {
 }
 
 function smoothPricesForScale(prices: number[], period: IndexPeriod, innerWidth: number) {
-  if (prices.length < 5 || period === "2W" || period === "1M") return prices;
+  if (prices.length < 5 || period === "1M") return prices;
 
   const pointGap = innerWidth / Math.max(1, prices.length - 1);
-  const isLongPeriod = period === "1Y" || period === "2Y" || period === "3Y";
-  const targetGap = isLongPeriod ? 28 : 14;
-  const maxRadius = isLongPeriod ? 18 : 6;
+  const targetGap = period === "1Y" ? 28 : 14;
+  const maxRadius = period === "1Y" ? 18 : 6;
   const radius = Math.min(
     maxRadius,
     Math.max(1, Math.round(targetGap / Math.max(1, pointGap))),
@@ -1301,9 +1270,8 @@ function IndexChart({
   const startColor = isGrowth ? "#f5773e" : "#4d73d8";
   const endColor = isGrowth ? "#4d73d8" : "#f5773e";
 
-  // Подписи на оси X: короткие периоды чаще, длинные — реже, чтобы даты не наезжали.
-  const labelDivisor = period === "2W" || period === "1M" || period === "3M" ? 4 : 6;
-  const labelStep = Math.max(1, Math.floor(points.length / labelDivisor));
+  // Подписи на оси X: для 1M примерно по неделям, для 3M раз в месяц, для 1Y раз в 2 месяца.
+  const labelStep = period === "1M" ? Math.max(1, Math.floor(points.length / 4)) : period === "3M" ? Math.max(1, Math.floor(points.length / 4)) : Math.max(1, Math.floor(points.length / 6));
   const labels: Array<{ x: number; text: string }> = [];
   const minLabelGap = 112;
   points.forEach((p, i) => {
@@ -1457,7 +1425,7 @@ export function EducationView() {
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="Обучение" />
+        <PageHeader title="Обучение" subtitle="MVP-модули: закупка сырья и склад." />
         <div className="education-grid">
           {data.map((module: any) => {
             const lessonsCount = module.chapters?.reduce(
@@ -2170,225 +2138,10 @@ function describeSubscription(billing: { status?: string; subscriptionPlan?: str
   return { tariff: "не активирован", note: "Подписка не активна" };
 }
 
-type AccountTab = "profile" | "company" | "billing" | "security" | "notifications" | "support";
-
-type AccountSession = {
-  id: string;
-  userAgent: string | null;
-  ipAddress: string | null;
-  rememberMe: boolean;
-  expiresAt: string;
-  createdAt: string;
-  updatedAt: string;
-  current: boolean;
-};
-
-type NotificationPreferences = {
-  inAppMutedCategories: string[];
-  emailMutedCategories: string[];
-};
-
-type AccountSupportTicket = {
-  id: string;
-  category: string;
-  subject: string;
-  status: string;
-  updatedAt: string;
-};
-
-const ACCOUNT_TABS: Array<{ id: AccountTab; label: string; icon: LucideIcon; companyOnly?: boolean }> = [
-  { id: "profile", label: "Профиль", icon: UserRound },
-  { id: "company", label: "Компания", icon: Building2, companyOnly: true },
-  { id: "billing", label: "Подписка", icon: CreditCard, companyOnly: true },
-  { id: "security", label: "Безопасность", icon: ShieldCheck },
-  { id: "notifications", label: "Уведомления", icon: Bell },
-  { id: "support", label: "Поддержка", icon: LifeBuoy, companyOnly: true },
-];
-
-const NOTIFICATION_ROWS: Array<{
-  category: string;
-  label: string;
-  description: string;
-  locked?: boolean;
-  companyOnly?: boolean;
-}> = [
-  {
-    category: "security",
-    label: "Безопасность",
-    description: "Входы, смена пароля и отзыв сессий.",
-    locked: true,
-  },
-  {
-    category: "billing",
-    label: "Биллинг",
-    description: "Счета, платежи, документы и статусы подписки.",
-    locked: true,
-    companyOnly: true,
-  },
-  {
-    category: "marketplace",
-    label: "Торговая площадка",
-    description: "Объявления, предложения и статусы сделок.",
-    companyOnly: true,
-  },
-  {
-    category: "moderation",
-    label: "Модерация",
-    description: "Решения по жалобам, ограничения и предупреждения.",
-  },
-  {
-    category: "support",
-    label: "Поддержка",
-    description: "Ответы администратора и статусы обращений.",
-  },
-  {
-    category: "system",
-    label: "Системные",
-    description: "Правила, обновления и технические работы.",
-  },
-];
-
-const SUPPORT_CATEGORY_LABELS: Record<string, string> = {
-  billing: "Биллинг",
-  moderation_review: "Модерация",
-  company_management: "Компания",
-  technical: "Технический вопрос",
-  data_deletion: "Удаление данных",
-  other: "Другое",
-};
-
-const SUPPORT_STATUS_LABELS: Record<string, string> = {
-  new: "Новое",
-  open: "Открыт",
-  in_progress: "В работе",
-  awaiting_user: "Ждёт ответа",
-  resolved: "Решён",
-  closed: "Закрыт",
-};
-
-function accountDash(value: ReactNode) {
-  return value || <span className="account-muted">Не заполнено</span>;
-}
-
-function formatAccountDateTime(value?: string | Date | null) {
-  return value ? new Date(value).toLocaleString("ru-RU") : "—";
-}
-
-function formatAccountDate(value?: string | Date | null) {
-  return value ? new Date(value).toLocaleDateString("ru-RU") : "—";
-}
-
-function describeSessionDevice(userAgent?: string | null) {
-  if (!userAgent) return "Неизвестное устройство";
-  const browser = /Edg\//i.test(userAgent)
-    ? "Edge"
-    : /Firefox\//i.test(userAgent)
-      ? "Firefox"
-      : /Chrome\//i.test(userAgent)
-        ? "Chrome"
-        : /Safari\//i.test(userAgent)
-          ? "Safari"
-          : "Браузер";
-  const os = /Windows NT/i.test(userAgent)
-    ? "Windows"
-    : /Mac OS X|Macintosh/i.test(userAgent)
-      ? "macOS"
-      : /Android/i.test(userAgent)
-        ? "Android"
-        : /iPhone|iPad/i.test(userAgent)
-          ? "iOS"
-          : /Linux/i.test(userAgent)
-            ? "Linux"
-            : "ОС";
-  return `${browser} · ${os}`;
-}
-
-function AccountDetailList({ rows }: { rows: Array<{ label: string; value: ReactNode }> }) {
-  return (
-    <dl className="account-detail-list">
-      {rows.map((row) => (
-        <div className="account-detail-row" key={row.label}>
-          <dt>{row.label}</dt>
-          <dd>{accountDash(row.value)}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function getAccountModuleCards(companyType?: string | null, status?: string | null, plan?: string | null) {
-  const locked = status === "suspended" || status === "blocked" || status === "archived";
-  const baseAccess = locked ? "Закрыто" : "Доступно";
-  const buyerRole = companyType === "collector" ? "Мои объявления" : "Мои предложения";
-
-  return [
-    {
-      title: "Торговая площадка",
-      state: locked ? "Закрыто" : companyType === "collector" ? "Продавец" : "Покупатель",
-      description: companyType ? buyerRole : "Сценарий зависит от типа компании.",
-    },
-    {
-      title: "Новости и индексы",
-      state: baseAccess,
-      description: "Открыты в демо, базовой и расширенной подписке.",
-    },
-    {
-      title: "База знаний",
-      state: baseAccess,
-      description: "Сырьё, справочники и документация по рынку.",
-    },
-    {
-      title: "Обучение",
-      state: plan === "extended" ? "Расширенное" : locked ? "Закрыто" : "Базовое",
-      description: "Расширенные модули требуют расширенной подписки или разовой покупки.",
-    },
-    {
-      title: "Калькуляторы и инструменты",
-      state: locked ? "Закрыто" : "По доступу",
-      description: "Часть инструментов открывается подпиской, часть — разовой покупкой.",
-    },
-    {
-      title: "Магазин и форум",
-      state: locked ? "Закрыто" : "В кабинете",
-      description: "Покупки доступны активным компаниям; форум входит в общий контур.",
-    },
-  ];
-}
-
 export function AccountView() {
-  const { user, token, logout } = useAuth();
+  const { user, logout } = useAuth();
   const isPlatformStaff = (user?.platformRoles?.length ?? 0) > 0;
   const { data: billing } = useApiData<any | null>(isPlatformStaff ? null : "/billing/status", null);
-  const {
-    data: sessions,
-    setData: setSessions,
-    state: sessionsState,
-  } = useApiData<AccountSession[]>("/auth/sessions", []);
-  const {
-    data: notificationPreferences,
-    setData: setNotificationPreferences,
-    state: notificationPreferencesState,
-  } = useApiData<NotificationPreferences | null>("/notifications/preferences", null);
-  const { data: supportTickets, state: supportState } = useApiData<AccountSupportTicket[]>(
-    isPlatformStaff ? null : "/support/tickets",
-    [],
-  );
-  const [activeTab, setActiveTab] = useState<AccountTab>("profile");
-  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
-  const [passwordSaving, setPasswordSaving] = useState(false);
-  const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
-  const [notificationBusyKey, setNotificationBusyKey] = useState<string | null>(null);
-
-  const tabs = useMemo(
-    () => ACCOUNT_TABS.filter((tab) => !tab.companyOnly || !isPlatformStaff),
-    [isPlatformStaff],
-  );
-
-  useEffect(() => {
-    if (!tabs.some((tab) => tab.id === activeTab)) {
-      setActiveTab(tabs[0]?.id ?? "profile");
-    }
-  }, [activeTab, tabs]);
 
   // Подписка и статус компании теперь рендерятся в отдельных карточках —
   // форма поддержки переехала в drawer (иконка «?» в шапке), чтобы личный
@@ -2399,118 +2152,6 @@ export function AccountView() {
   const initials = user
     ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase()
     : "";
-  const company = billing ?? user?.company ?? null;
-  const latestSubscription = billing?.subscriptions?.[0] ?? null;
-  const supportPreview = supportTickets.slice(0, 4);
-
-  function openSupport() {
-    window.dispatchEvent(new Event("support:open"));
-  }
-
-  async function onChangePassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token) return;
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const currentPassword = String(formData.get("currentPassword") ?? "");
-    const newPassword = String(formData.get("newPassword") ?? "");
-    const repeatPassword = String(formData.get("repeatPassword") ?? "");
-
-    setPasswordMessage(null);
-    if (newPassword !== repeatPassword) {
-      setPasswordMessage("Новый пароль и повтор не совпадают.");
-      return;
-    }
-
-    setPasswordSaving(true);
-    try {
-      await apiFetch("/auth/change-password", {
-        method: "POST",
-        token,
-        body: { currentPassword, newPassword },
-      });
-      form.reset();
-      setPasswordMessage("Пароль изменён. Остальные активные сессии отозваны.");
-      setSessions((current) => current.filter((session) => session.current));
-      window.dispatchEvent(new Event("notifications:changed"));
-    } catch (error) {
-      setPasswordMessage(error instanceof Error ? error.message : "Не удалось изменить пароль.");
-    } finally {
-      setPasswordSaving(false);
-    }
-  }
-
-  async function revokeSession(sessionId: string) {
-    if (!token) return;
-    setSessionBusyId(sessionId);
-    try {
-      const result = await apiFetch<{ revokedCurrent: boolean }>(`/auth/sessions/${sessionId}/revoke`, {
-        method: "POST",
-        token,
-      });
-      if (result.revokedCurrent) {
-        clearAccessToken();
-        window.location.assign("/login");
-        return;
-      }
-      setSessions((current) => current.filter((session) => session.id !== sessionId));
-    } finally {
-      setSessionBusyId(null);
-    }
-  }
-
-  async function logoutEverywhere() {
-    if (!token) return;
-    const ok = window.confirm("Завершить все активные сессии и перейти на страницу входа?");
-    if (!ok) return;
-    setSessionBusyId("all");
-    try {
-      await apiFetch("/auth/sessions/logout-all", { method: "POST", token });
-      clearAccessToken();
-      window.location.assign("/login");
-    } finally {
-      setSessionBusyId(null);
-    }
-  }
-
-  function notificationEnabled(category: string, channel: "in_app" | "email") {
-    if (category === "security" || category === "billing") return true;
-    const muted =
-      channel === "in_app"
-        ? notificationPreferences?.inAppMutedCategories ?? []
-        : notificationPreferences?.emailMutedCategories ?? [];
-    return !muted.includes(category);
-  }
-
-  async function updateNotificationPreference(category: string, channel: "in_app" | "email", enabled: boolean) {
-    if (!token || category === "security" || category === "billing") return;
-    const field = channel === "in_app" ? "inAppMutedCategories" : "emailMutedCategories";
-    const currentPreferences = notificationPreferences ?? {
-      inAppMutedCategories: [],
-      emailMutedCategories: [],
-    };
-    const currentMuted = currentPreferences[field];
-    const nextMuted = enabled
-      ? currentMuted.filter((item) => item !== category)
-      : [...new Set([...currentMuted, category])];
-    const nextPreferences = {
-      ...currentPreferences,
-      [field]: nextMuted,
-    };
-    const busyKey = `${category}:${channel}`;
-    setNotificationBusyKey(busyKey);
-    setNotificationPreferences(nextPreferences);
-    try {
-      const saved = await apiFetch<NotificationPreferences>("/notifications/preferences", {
-        method: "PATCH",
-        token,
-        body: nextPreferences,
-      });
-      setNotificationPreferences(saved);
-    } finally {
-      setNotificationBusyKey(null);
-    }
-  }
 
   return (
     <AppShell>
@@ -2518,15 +2159,12 @@ export function AccountView() {
         {/* Hero: крупный аватар и основная идентификация пользователя.
             Раньше аватар был 40px и терялся среди карточек. */}
         <header className="account-hero">
-          <div className="account-hero-profile">
-            <div className="account-hero-avatar" aria-hidden={!user?.avatarUrl}>
-              {user?.avatarUrl ? (
-                <img alt="" src={user.avatarUrl} />
-              ) : (
-                <span className="account-hero-initials">{initials || "?"}</span>
-              )}
-            </div>
-            <button className="button secondary" onClick={logout}>Выйти</button>
+          <div className="account-hero-avatar" aria-hidden={!user?.avatarUrl}>
+            {user?.avatarUrl ? (
+              <img alt="" src={user.avatarUrl} />
+            ) : (
+              <span className="account-hero-initials">{initials || "?"}</span>
+            )}
           </div>
           <div className="account-hero-info">
             <h1 className="account-hero-name">{fullName}</h1>
@@ -2551,368 +2189,53 @@ export function AccountView() {
               загрузить своё появится в следующих обновлениях.
             </p>
           </div>
+          <div className="account-hero-actions">
+            <button className="button secondary" onClick={logout}>Выйти</button>
+          </div>
         </header>
 
-        <nav className="account-tabs" aria-label="Разделы личного кабинета">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                className={`account-tab ${activeTab === tab.id ? "active" : ""}`}
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                type="button"
-              >
-                <Icon size={16} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {activeTab === "profile" ? (
-          <div className="account-section-grid">
+        <div className="account-grid">
+          {isPlatformStaff ? (
             <article className="card account-card">
-              <h2>Пользователь</h2>
-              <AccountDetailList
-                rows={[
-                  { label: "Имя", value: fullName },
-                  { label: "Email", value: user?.email },
-                  { label: "Телефон", value: user?.phone },
-                  { label: "Статус", value: <span className="status-pill">Активен</span> },
-                ]}
-              />
+              <h2>Сотрудник платформы</h2>
+              <p>Этот аккаунт не привязан к компании.</p>
             </article>
-            <article className="card account-card">
-              <h2>Контакты</h2>
-              <p className="page-subtitle">
-                Email используется для безопасности, биллинга и уведомлений. Телефон нужен для SMS-кодов.
-              </p>
-              <div className="account-action-list">
-                <button className="button secondary" type="button" disabled>
-                  Сменить email
-                </button>
-                <button className="button secondary" type="button" disabled>
-                  Сменить телефон
-                </button>
-              </div>
-            </article>
-            {isPlatformStaff ? (
-              <article className="card account-card">
-                <h2>Сотрудник платформы</h2>
-                <p className="page-subtitle">Этот аккаунт не привязан к клиентской компании.</p>
-                <div className="account-pill-row">
-                  {user?.platformRoles?.map((role) => (
-                    <span className="status-pill primary" key={role}>
-                      {ROLE_LABELS[role] ?? role}
-                    </span>
-                  ))}
-                </div>
-              </article>
-            ) : null}
-          </div>
-        ) : null}
-
-        {activeTab === "company" && !isPlatformStaff ? (
-          <div className="account-panel-stack">
-            <div className="account-section-grid">
+          ) : (
+            <>
               <article className="card account-card">
                 <h2>Компания</h2>
-                <AccountDetailList
-                  rows={[
-                    { label: "Название", value: company?.organizationName },
-                    {
-                      label: "Тип",
-                      value: company?.type ? COMPANY_TYPE_LABELS[company.type] ?? company.type : null,
-                    },
-                    {
-                      label: "Статус",
-                      value: company?.status ? (
-                        <span className="status-pill">{COMPANY_STATUS_LABELS[company.status] ?? company.status}</span>
-                      ) : null,
-                    },
-                  ]}
-                />
-              </article>
-              <article className="card account-card">
-                <h2>Реквизиты</h2>
-                <AccountDetailList
-                  rows={[
-                    { label: "ИНН", value: company?.billingInn },
-                    { label: "КПП", value: company?.billingKpp },
-                    { label: "Юридический адрес", value: company?.legalAddress },
-                    { label: "Банк", value: company?.bankName },
-                    { label: "БИК", value: company?.bankBik },
-                    { label: "Расчётный счёт", value: company?.bankAccount },
-                    { label: "Корр. счёт", value: company?.correspondentAccount },
-                  ]}
-                />
-                <div className="account-action-list">
-                  <button className="button secondary" type="button" disabled>
-                    Редактировать реквизиты
-                  </button>
-                </div>
-              </article>
-            </div>
-            <section className="account-module-grid" aria-label="Доступные модули">
-              {getAccountModuleCards(company?.type, company?.status, company?.subscriptionPlan).map((item) => (
-                <article className="account-module-card" key={item.title}>
-                  <div>
-                    <h2>{item.title}</h2>
-                    <p>{item.description}</p>
-                  </div>
-                  <span className="status-pill">{item.state}</span>
-                </article>
-              ))}
-            </section>
-          </div>
-        ) : null}
-
-        {activeTab === "billing" && !isPlatformStaff ? (
-          <div className="account-panel-stack">
-            {company?.status === "demo" || company?.status === "past_due" || company?.status === "suspended" ? (
-              <div className={`account-state-banner status-${company.status}`}>
-                <strong>{subscription.tariff}</strong>
-                <span>{subscription.note}</span>
-              </div>
-            ) : null}
-            <div className="account-section-grid">
-              <article className="card account-card">
-                <h2>Текущий тариф</h2>
-                <AccountDetailList
-                  rows={[
-                    { label: "Тариф", value: subscription.tariff },
-                    { label: "Статус", value: companyStatusLabel },
-                    { label: "Начало периода", value: formatAccountDate(latestSubscription?.startsAt) },
-                    {
-                      label: "Окончание периода",
-                      value: formatAccountDate(company?.subscriptionEndsAt ?? latestSubscription?.endsAt ?? company?.demoEndsAt),
-                    },
-                    { label: "Автопродление", value: <span className="account-muted">Отключено</span> },
-                  ]}
-                />
-                <div className="account-action-list">
-                  <button className="button" type="button" disabled>
-                    Оплатить / продлить
-                  </button>
-                  <button className="button secondary" type="button" disabled>
-                    Сменить тариф
-                  </button>
-                  <button className="button secondary" type="button" onClick={openSupport}>
-                    Связаться по биллингу
-                  </button>
-                </div>
-              </article>
-              <article className="card account-card">
-                <h2>Покупки и документы</h2>
-                <div className="account-doc-grid">
-                  <div>
-                    <strong>Покупки компании</strong>
-                    <p className="page-subtitle">Появятся после покупки модулей, инструментов или готовых решений.</p>
-                  </div>
-                  <div>
-                    <strong>Финансовые документы</strong>
-                    <p className="page-subtitle">Счета, чеки и акты будут доступны после первой оплаты.</p>
-                  </div>
-                </div>
-              </article>
-            </div>
-            <article className="card account-card">
-              <h2>История подписок</h2>
-              {billing?.subscriptions?.length ? (
-                <div className="account-history-list">
-                  {billing.subscriptions.map((item: any) => (
-                    <div className="account-history-row" key={item.id}>
-                      <div>
-                        <strong>{item.plan === "basic" ? "Базовая подписка" : "Расширенная подписка"}</strong>
-                        <span>
-                          {formatAccountDate(item.startsAt)} — {formatAccountDate(item.endsAt)}
-                        </span>
-                      </div>
-                      <span className="status-pill">{item.status}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="page-subtitle">История появится после активации подписки.</p>
-              )}
-            </article>
-          </div>
-        ) : null}
-
-        {activeTab === "security" ? (
-          <div className="account-panel-stack">
-            <div className="account-section-grid">
-              <article className="card account-card">
-                <h2>Смена пароля</h2>
-                <form className="account-form" onSubmit={onChangePassword}>
-                  <label>
-                    <span>Текущий пароль</span>
-                    <input className="input" name="currentPassword" type="password" autoComplete="current-password" required />
-                  </label>
-                  <label>
-                    <span>Новый пароль</span>
-                    <input className="input" name="newPassword" type="password" autoComplete="new-password" minLength={10} required />
-                  </label>
-                  <label>
-                    <span>Повтор нового пароля</span>
-                    <input className="input" name="repeatPassword" type="password" autoComplete="new-password" minLength={10} required />
-                  </label>
-                  {passwordMessage ? <p className="account-form-message">{passwordMessage}</p> : null}
-                  <button className="button" type="submit" disabled={passwordSaving}>
-                    <KeyRound size={16} />
-                    {passwordSaving ? "Сохраняем..." : "Сменить пароль"}
-                  </button>
-                </form>
-              </article>
-              <article className="card account-card">
-                <h2>Дополнительная защита</h2>
-                <div className="account-security-actions">
-                  <div>
-                    <Smartphone size={20} />
-                    <span>Двухфакторная аутентификация по SMS</span>
-                  </div>
-                  <button className="button secondary" type="button" disabled>
-                    Включить
-                  </button>
-                </div>
-                <button className="button secondary" type="button" onClick={logout}>
-                  <LogOut size={16} />
-                  Завершить эту сессию
-                </button>
-              </article>
-            </div>
-            <article className="card account-card">
-              <div className="account-card-head">
-                <div>
-                  <h2>Активные сессии</h2>
-                  <p className="page-subtitle">Устройства, с которых сейчас открыт кабинет.</p>
-                </div>
-                <button
-                  className="button secondary danger"
-                  onClick={logoutEverywhere}
-                  type="button"
-                  disabled={sessionBusyId === "all"}
-                >
-                  Выйти со всех устройств
-                </button>
-              </div>
-              {sessionsState === "loading" ? <p className="page-subtitle">Загружаем сессии...</p> : null}
-              <div className="account-session-list">
-                {sessions.map((session) => (
-                  <div className="account-session-row" key={session.id}>
-                    <div>
-                      <strong>
-                        {describeSessionDevice(session.userAgent)}
-                        {session.current ? <span className="status-pill primary">Текущая</span> : null}
-                      </strong>
-                      <span>
-                        IP {session.ipAddress ?? "—"} · последний раз {formatAccountDateTime(session.updatedAt)} · до{" "}
-                        {formatAccountDateTime(session.expiresAt)}
-                      </span>
-                    </div>
-                    {!session.current ? (
-                      <button
-                        className="button secondary"
-                        onClick={() => void revokeSession(session.id)}
-                        type="button"
-                        disabled={sessionBusyId === session.id}
-                      >
-                        Отозвать
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                {sessionsState !== "loading" && sessions.length === 0 ? (
-                  <p className="page-subtitle">Активных сессий не найдено.</p>
+                <p className="account-card-primary">
+                  {billing?.organizationName ?? user?.company?.organizationName ?? "Данные появятся после входа"}
+                </p>
+                {user?.company?.type ? (
+                  <p className="page-subtitle">{COMPANY_TYPE_LABELS[user.company.type] ?? user.company.type}</p>
                 ) : null}
-              </div>
-            </article>
-          </div>
-        ) : null}
-
-        {activeTab === "notifications" ? (
+              </article>
+              <article className="card account-card">
+                <h2>Подписка</h2>
+                <p className="account-card-primary">Тариф: {subscription.tariff}</p>
+                <p className="page-subtitle">{subscription.note}</p>
+              </article>
+            </>
+          )}
           <article className="card account-card">
-            <h2>Настройки уведомлений</h2>
-            <div className="account-notification-table">
-              <div className="account-notification-head">
-                <span>Категория</span>
-                <span>В кабинете</span>
-                <span>Email</span>
-              </div>
-              {NOTIFICATION_ROWS.filter((row) => !row.companyOnly || !isPlatformStaff).map((row) => (
-                <div className="account-notification-row" key={row.category}>
-                  <div>
-                    <strong>{row.label}</strong>
-                    <p>{row.description}</p>
-                  </div>
-                  {(["in_app", "email"] as const).map((channel) => {
-                    const busyKey = `${row.category}:${channel}`;
-                    return (
-                      <label className="account-toggle" key={channel}>
-                        <input
-                          checked={notificationEnabled(row.category, channel)}
-                          disabled={
-                            row.locked ||
-                            notificationPreferencesState === "loading" ||
-                            notificationBusyKey === busyKey
-                          }
-                          onChange={(event) =>
-                            void updateNotificationPreference(row.category, channel, event.currentTarget.checked)
-                          }
-                          type="checkbox"
-                        />
-                        <span>{row.locked ? "Всегда" : notificationEnabled(row.category, channel) ? "Вкл" : "Выкл"}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              ))}
+            <h2>Безопасность</h2>
+            <p className="page-subtitle">
+              Если вы заметили подозрительную активность — выйдите из аккаунта на
+              всех устройствах и смените пароль.
+            </p>
+            <div className="auth-actions" style={{ marginTop: 12 }}>
+              <button className="button secondary" onClick={logout}>Завершить эту сессию</button>
             </div>
-            {notificationPreferencesState === "error" ? (
-              <p className="account-form-message">Не удалось загрузить настройки уведомлений.</p>
-            ) : null}
           </article>
-        ) : null}
-
-        {activeTab === "support" && !isPlatformStaff ? (
-          <div className="account-section-grid">
-            <article className="card account-card">
-              <h2>Поддержка</h2>
-              <p className="page-subtitle">
-                Создайте обращение или продолжите переписку с администратором платформы.
-              </p>
-              <div className="account-action-list">
-                <button className="button" type="button" onClick={openSupport}>
-                  <LifeBuoy size={16} />
-                  Открыть поддержку
-                </button>
-              </div>
-            </article>
-            <article className="card account-card">
-              <h2>Последние обращения</h2>
-              {supportState === "loading" ? <p className="page-subtitle">Загружаем обращения...</p> : null}
-              {supportPreview.length > 0 ? (
-                <div className="account-history-list">
-                  {supportPreview.map((ticket) => (
-                    <button className="account-ticket-row" key={ticket.id} type="button" onClick={openSupport}>
-                      <div>
-                        <strong>{ticket.subject}</strong>
-                        <span>
-                          {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
-                          {formatAccountDateTime(ticket.updatedAt)}
-                        </span>
-                      </div>
-                      <span className="status-pill">{SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : supportState !== "loading" ? (
-                <p className="page-subtitle">Обращений пока нет.</p>
-              ) : null}
-            </article>
-          </div>
-        ) : null}
+          <article className="card account-card">
+            <h2>Поддержка</h2>
+            <p className="page-subtitle">
+              Все обращения теперь живут в окне «?» в правом верхнем углу.
+              Откройте его, чтобы написать в поддержку или продолжить переписку.
+            </p>
+          </article>
+        </div>
       </section>
     </AppShell>
   );
@@ -2951,11 +2274,11 @@ function AccessClosed({ title }: { title: string }) {
   );
 }
 
-function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <header className="page-header">
       <h1 className="page-title">{title}</h1>
-      {subtitle ? <p className="page-subtitle">{subtitle}</p> : null}
+      <p className="page-subtitle">{subtitle}</p>
     </header>
   );
 }

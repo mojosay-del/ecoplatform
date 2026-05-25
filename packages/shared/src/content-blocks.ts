@@ -11,6 +11,7 @@ export const contentBlockKinds = [
   "file",
   "checklist",
   "image_checklist",
+  "lesson_tasks",
 ] as const;
 
 export type ContentBlockKind = (typeof contentBlockKinds)[number];
@@ -95,14 +96,32 @@ export const baseContentBlockSchema = z.discriminatedUnion("type", [
 
 export type BaseContentBlock = z.infer<typeof baseContentBlockSchema>;
 
+export const lessonTasksBlockSchema = z.object({
+  type: z.literal("lesson_tasks"),
+  payload: z.object({
+    tasks: z
+      .array(
+        z.object({
+          title: z.string().min(1),
+          description: z.string().optional(),
+        }),
+      )
+      .min(1),
+  }),
+});
+
+export const lessonContentBlockSchema = z.union([baseContentBlockSchema, lessonTasksBlockSchema]);
+
+export type LessonContentBlock = z.infer<typeof lessonContentBlockSchema>;
+
 export const newsBlockSchema = baseContentBlockSchema.refine(
   (block) => ["heading", "subheading", "paragraph", "image", "gallery", "video", "audio"].includes(block.type),
   "Новости поддерживают только стандартные медиа- и текстовые блоки.",
 );
 
-export const lessonBlockSchema = baseContentBlockSchema.refine(
-  (block) => ["heading", "subheading", "paragraph", "image", "gallery", "video"].includes(block.type),
-  "Уроки MVP не поддерживают audio, file и специальные блоки базы знаний.",
+export const lessonBlockSchema = lessonContentBlockSchema.refine(
+  (block) => ["heading", "subheading", "paragraph", "image", "gallery", "video", "lesson_tasks"].includes(block.type),
+  "Уроки поддерживают только учебные текстовые, медиа- и task-блоки.",
 );
 
 export const knowledgeBaseSectionTitles = [
@@ -119,14 +138,12 @@ export const knowledgeBaseSectionTitles = [
 
 export type KnowledgeBaseSectionTitle = (typeof knowledgeBaseSectionTitles)[number];
 
-type BlockParseResult =
-  | { success: true }
-  | { success: false; error: { issues: Array<{ message: string }> } };
+type BlockParseResult = { success: true } | { success: false; error: { issues: Array<{ message: string }> } };
 
 type BlockSchema = { safeParse: (value: unknown) => BlockParseResult };
 
 export function validateContentBlocks(
-  blocks: BaseContentBlock[],
+  blocks: unknown[],
   schema: BlockSchema = baseContentBlockSchema,
 ): { ok: true } | { ok: false; message: string } {
   if (blocks.length === 0) {
@@ -144,10 +161,10 @@ export function validateContentBlocks(
   return { ok: true };
 }
 
-export function validateNewsBlocks(blocks: BaseContentBlock[]): { ok: true } | { ok: false; message: string } {
+export function validateNewsBlocks(blocks: unknown[]): { ok: true } | { ok: false; message: string } {
   return validateContentBlocks(blocks, newsBlockSchema);
 }
 
-export function validateLessonBlocks(blocks: BaseContentBlock[]): { ok: true } | { ok: false; message: string } {
+export function validateLessonBlocks(blocks: unknown[]): { ok: true } | { ok: false; message: string } {
   return validateContentBlocks(blocks, lessonBlockSchema);
 }
