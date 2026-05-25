@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { FileAccessLevel } from "@prisma/client";
 import { FilesService } from "./files.service";
 
 function serviceWithPrisma(prisma: Record<string, unknown>) {
@@ -70,5 +71,28 @@ describe("FilesService cleanup", () => {
     await service.deleteIfUnreferenced(["file-1"]);
 
     expect(prisma.fileAsset.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("FilesService file listing", () => {
+  it("возвращает по ids только публичные файлы", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findMany: vi.fn().mockResolvedValue([]),
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await service.findManyByIds(["public-file", "private-file", "public-file"]);
+
+    expect(prisma.fileAsset.findMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ["public-file", "private-file"] },
+        accessLevel: FileAccessLevel.public,
+      },
+      orderBy: { createdAt: "desc" },
+    });
   });
 });

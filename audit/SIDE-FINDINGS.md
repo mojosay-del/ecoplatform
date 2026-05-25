@@ -37,27 +37,12 @@
 - **Когда**: ДО Волны 6 (это P0, заявленный как сделанный).
 - **Effort**: S (1-2 часа).
 
-### S-6. Волна 5.6 ❌ findManyByIds не фильтрует по public (P1 security)
-
-- **Где**: `apps/api/src/files/files.service.ts:302-313` (`findManyByIds`).
-- **Что PROGRESS заявил**: «`findManyByIds` теперь фильтрует по `accessLevel: public` — приватные файлы больше не утекают» — ✅.
-- **Что в реальности**:
-  ```ts
-  async findManyByIds(ids: string[]) {
-    const assets = await this.prisma.fileAsset.findMany({
-      where: { id: { in: uniqueIds } },  // ← фильтра по accessLevel НЕТ
-      orderBy: { createdAt: "desc" },
-    });
-    return assets.map((asset) => this.toResponse(asset));
-  }
-  ```
-- **Последствие**: любой авторизованный пользователь, передав в `/api/files?ids=…` чужой id, получает metadata приватного файла (originalName, sizeBytes, mimeType, publicUrl=null). Сам файл не утекает (publicUrl null), но факт существования + метаданные — да.
-- **Что сделать**: добавить `accessLevel: FileAccessLevel.public` в `where`. Юнит-тест: запросить id приватного файла → не возвращается.
-- **Когда**: ДО Волны 6.
-- **Effort**: XS (15 минут).
-
 ## Закрытые
 
 ### S-3. Старый `content.service.ts` и старый `DataViews.tsx` параллельно с новыми сплитами
 
 - **Закрыто 2026-05-25**: split доведён до конца. Controller переключён на 4 split-сервиса, все 9 страниц — на views/. Старые god-файлы удалены. По пути найден и починен баг в `FilesService.replaceFileReferences` (orphan-fileId фильтрация). PROGRESS Волн 3.1/3.2/4.1 переведены из 🟦 в ✅.
+
+### S-6. Волна 5.6 findManyByIds не фильтровал public
+
+- **Закрыто 2026-05-25**: `apps/api/src/files/files.service.ts` теперь добавляет `accessLevel: FileAccessLevel.public` в `findManyByIds`. `apps/api/src/files/files.service.test.ts` проверяет Prisma-where и дедуп ids. Проверка: `pnpm --filter @ecoplatform/api test -- files.service.test.ts` — 17/17.

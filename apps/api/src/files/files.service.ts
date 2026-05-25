@@ -319,7 +319,7 @@ export class FilesService {
     }
 
     const assets = await this.prisma.fileAsset.findMany({
-      where: { id: { in: uniqueIds } },
+      where: { id: { in: uniqueIds }, accessLevel: FileAccessLevel.public },
       orderBy: { createdAt: "desc" },
     });
 
