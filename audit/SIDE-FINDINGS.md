@@ -24,6 +24,38 @@
 - **Урок**: при работе над волнами писать в PROGRESS только после фактического прогона `lint + test + integration + build` (а не «по плану»).
 - **Что сделать**: ничего отдельного — следить за дисциплиной в следующих волнах.
 
+### S-5. Волна 1.5 ❌ MIME-валидация file-type не сделана (P0 security)
+
+- **Где**: `apps/api/src/files/files.service.ts:upload` (line 261-310).
+- **Что PROGRESS заявил**: «MIME-валидация file upload (file-type + блок HTML/SVG)» — ✅.
+- **Что в реальности**: пакет `file-type ^16.5.4` установлен в `apps/api/package.json:33`, но НИГДЕ не импортируется (`grep -r "file-type" apps/api/src/` пусто). В `upload` проверяется только размер; `mimeType` приходит из multipart-заголовка и идёт прямиком в S3 как `ContentType`. Защита есть только в `processCoverImage` (sharp), но и она проверяет лишь заголовок, не magic-number.
+- **Последствие**: атакующий загружает HTML с `mimeType: "text/html"` → S3 отдаёт с этим Content-Type → stored-XSS. Ровно тот P0 из `audit/01-security.md#4`, который PROGRESS пометил ✅.
+- **Что сделать**:
+  1. В `files.service.ts:upload` — после получения buffer вызвать `fileTypeFromBuffer(file.buffer)`; сравнить с заявленным `file.mimetype`; при рассинхроне или отсутствии — `BadRequestException`.
+  2. Завести whitelist разрешённых типов (`image/jpeg|png|webp|gif`, `application/pdf`, `application/zip`, `audio/*`, `video/*`); явно запретить `text/html`, `application/xhtml+xml`, `image/svg+xml`, `application/x-msdownload`.
+  3. Юнит-тесты: подсунуть HTML с заголовком `image/png` → ожидать 400.
+- **Когда**: ДО Волны 6 (это P0, заявленный как сделанный).
+- **Effort**: S (1-2 часа).
+
+### S-6. Волна 5.6 ❌ findManyByIds не фильтрует по public (P1 security)
+
+- **Где**: `apps/api/src/files/files.service.ts:302-313` (`findManyByIds`).
+- **Что PROGRESS заявил**: «`findManyByIds` теперь фильтрует по `accessLevel: public` — приватные файлы больше не утекают» — ✅.
+- **Что в реальности**:
+  ```ts
+  async findManyByIds(ids: string[]) {
+    const assets = await this.prisma.fileAsset.findMany({
+      where: { id: { in: uniqueIds } },  // ← фильтра по accessLevel НЕТ
+      orderBy: { createdAt: "desc" },
+    });
+    return assets.map((asset) => this.toResponse(asset));
+  }
+  ```
+- **Последствие**: любой авторизованный пользователь, передав в `/api/files?ids=…` чужой id, получает metadata приватного файла (originalName, sizeBytes, mimeType, publicUrl=null). Сам файл не утекает (publicUrl null), но факт существования + метаданные — да.
+- **Что сделать**: добавить `accessLevel: FileAccessLevel.public` в `where`. Юнит-тест: запросить id приватного файла → не возвращается.
+- **Когда**: ДО Волны 6.
+- **Effort**: XS (15 минут).
+
 ## Закрытые
 
 ### S-3. Старый `content.service.ts` и старый `DataViews.tsx` параллельно с новыми сплитами
