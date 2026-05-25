@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { FileAccessLevel, type FileAsset } from "@prisma/client";
+import { fromBuffer } from "file-type";
 import { randomUUID } from "crypto";
 import { extname } from "path";
 import { PrismaService } from "../prisma/prisma.service";
@@ -18,10 +19,64 @@ export type FileAssetResponse = FileAsset & {
 };
 
 type FileReferenceBlock = { payload: unknown };
+type ValidatedUpload = {
+  buffer: Buffer;
+  extension?: string;
+  mimeType: string;
+  contentDisposition?: string;
+};
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_COVER_UPLOAD_BYTES = 10 * 1024 * 1024;
 const SAFE_NAME_PATTERN = /[^a-zA-Z0-9._-]+/g;
+const GENERIC_DECLARED_MIME_TYPES = new Set(["application/octet-stream", "binary/octet-stream"]);
+const BLOCKED_UPLOAD_MIME_TYPES = new Set([
+  "text/html",
+  "application/xhtml+xml",
+  "image/svg+xml",
+  "application/xml",
+  "text/xml",
+  "application/javascript",
+  "text/javascript",
+  "application/x-msdownload",
+]);
+const BLOCKED_UPLOAD_EXTENSIONS = new Set([
+  ".bat",
+  ".cmd",
+  ".com",
+  ".cpl",
+  ".dll",
+  ".exe",
+  ".htm",
+  ".html",
+  ".js",
+  ".mjs",
+  ".msi",
+  ".php",
+  ".ps1",
+  ".scr",
+  ".sh",
+  ".svg",
+  ".xhtml",
+  ".xml",
+]);
+const ALLOWED_DETECTED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "application/zip",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.oasis.opendocument.text",
+  "application/vnd.oasis.opendocument.spreadsheet",
+]);
+const MIME_ALIASES: Record<string, string[]> = {
+  "application/zip": ["application/x-zip-compressed", "multipart/x-zip"],
+  "application/pdf": ["application/x-pdf"],
+  "image/jpeg": ["image/pjpeg"],
+  "video/quicktime": ["video/mov"],
+};
 
 @Injectable()
 export class FilesService {
@@ -225,6 +280,83 @@ export class FilesService {
     return Object.values(record).some((value) => this.payloadContainsFileId(value, fileId));
   }
 
+  private normalizeMimeType(mimeType: string | undefined | null): string {
+    return (mimeType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+  }
+
+  private isAllowedDetectedMime(mimeType: string): boolean {
+    return (
+      ALLOWED_DETECTED_MIME_TYPES.has(mimeType) ||
+      mimeType.startsWith("audio/") ||
+      mimeType.startsWith("video/")
+    );
+  }
+
+  private isDeclaredMimeCompatible(declaredMime: string, detectedMime: string): boolean {
+    if (!declaredMime || GENERIC_DECLARED_MIME_TYPES.has(declaredMime)) {
+      return true;
+    }
+    if (declaredMime === detectedMime) {
+      return true;
+    }
+
+    return (MIME_ALIASES[detectedMime] ?? []).includes(declaredMime);
+  }
+
+  private hasBlockedExtension(originalName: string): boolean {
+    return BLOCKED_UPLOAD_EXTENSIONS.has(extname(originalName).toLowerCase());
+  }
+
+  private attachmentDisposition(originalName: string): string {
+    const fallback = (originalName.replace(/[^\x20-\x7E]+/g, "_").replace(/["\\]/g, "_") || "file").slice(0, 120);
+    return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(originalName)}`;
+  }
+
+  private contentDisposition(mimeType: string, originalName: string): string | undefined {
+    if (mimeType.startsWith("image/") || mimeType.startsWith("audio/") || mimeType.startsWith("video/")) {
+      return undefined;
+    }
+
+    return this.attachmentDisposition(originalName);
+  }
+
+  private async detectUploadMime(buffer: Buffer): Promise<string | null> {
+    try {
+      return this.normalizeMimeType((await fromBuffer(buffer))?.mime);
+    } catch {
+      return null;
+    }
+  }
+
+  private async validateUpload(file: UploadedMemoryFile, input: { imagePreset?: "cover" }): Promise<ValidatedUpload> {
+    const declaredMime = this.normalizeMimeType(file.mimetype);
+    if (BLOCKED_UPLOAD_MIME_TYPES.has(declaredMime) || this.hasBlockedExtension(file.originalname)) {
+      throw new BadRequestException("Формат файла не поддерживается.");
+    }
+
+    const detectedMime = await this.detectUploadMime(file.buffer);
+    if (!detectedMime) {
+      throw new BadRequestException("Не удалось определить безопасный тип файла.");
+    }
+    if (BLOCKED_UPLOAD_MIME_TYPES.has(detectedMime) || !this.isAllowedDetectedMime(detectedMime)) {
+      throw new BadRequestException("Формат файла не поддерживается.");
+    }
+    if (!this.isDeclaredMimeCompatible(declaredMime, detectedMime)) {
+      throw new BadRequestException("Тип файла не совпадает с его содержимым.");
+    }
+
+    if (input.imagePreset === "cover") {
+      return processCoverImage(file.buffer, detectedMime);
+    }
+
+    return {
+      buffer: file.buffer,
+      extension: undefined,
+      mimeType: detectedMime,
+      contentDisposition: this.contentDisposition(detectedMime, file.originalname),
+    };
+  }
+
   private storageKey(originalName: string, extensionOverride?: string): string {
     const originalExtension = extname(originalName).toLowerCase();
     const extension = extensionOverride ?? originalExtension;
@@ -276,16 +408,9 @@ export class FilesService {
       throw new BadRequestException("Обложка больше 10 МБ.");
     }
 
+    const upload = await this.validateUpload(file, input);
     const { client, bucket } = this.getClient();
     const accessLevel = input.accessLevel ?? FileAccessLevel.public;
-    const upload =
-      input.imagePreset === "cover"
-        ? await processCoverImage(file.buffer, file.mimetype)
-        : {
-            buffer: file.buffer,
-            extension: undefined,
-            mimeType: file.mimetype,
-          };
     const storageKey = this.storageKey(file.originalname, upload.extension);
 
     await client.send(
@@ -294,6 +419,7 @@ export class FilesService {
         Key: storageKey,
         Body: upload.buffer,
         ContentType: upload.mimeType,
+        ContentDisposition: upload.contentDisposition,
         ContentLength: upload.buffer.length,
       }),
     );

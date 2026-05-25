@@ -96,3 +96,94 @@ describe("FilesService file listing", () => {
     });
   });
 });
+
+describe("FilesService upload validation", () => {
+  it("отклоняет HTML, даже если multipart-заголовок притворяется картинкой", async () => {
+    const prisma = referencePrisma();
+    const service = serviceWithPrisma(prisma);
+    const buffer = Buffer.from("<!doctype html><script>alert(1)</script>");
+
+    await expect(
+      service.upload(
+        {
+          originalname: "attack.png",
+          mimetype: "image/png",
+          size: buffer.length,
+          buffer,
+        },
+        {},
+        "user-1",
+      ),
+    ).rejects.toThrow("Не удалось определить безопасный тип файла.");
+  });
+
+  it("явно блокирует SVG по MIME и расширению", async () => {
+    const prisma = referencePrisma();
+    const service = serviceWithPrisma(prisma);
+    const buffer = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+
+    await expect(
+      service.upload(
+        {
+          originalname: "vector.svg",
+          mimetype: "image/svg+xml",
+          size: buffer.length,
+          buffer,
+        },
+        {},
+        "user-1",
+      ),
+    ).rejects.toThrow("Формат файла не поддерживается.");
+  });
+
+  it("сохраняет разрешённый PDF как attachment с реальным MIME из magic-number", async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        create: vi.fn().mockImplementation(({ data }) =>
+          Promise.resolve({
+            id: "file-pdf",
+            createdAt: new Date("2026-05-25T00:00:00.000Z"),
+            ...data,
+          }),
+        ),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+    (service as unknown as { getClient: () => unknown }).getClient = () => ({
+      client: { send },
+      bucket: "bucket",
+    });
+
+    const result = await service.upload(
+      {
+        originalname: "report.pdf",
+        mimetype: "application/pdf",
+        size: pdf.length,
+        buffer: pdf,
+      },
+      {},
+      "user-1",
+    );
+
+    const command = send.mock.calls[0]?.[0] as { input?: Record<string, unknown> } | undefined;
+    expect(command?.input).toMatchObject({
+      Bucket: "bucket",
+      ContentType: "application/pdf",
+      ContentDisposition: expect.stringContaining("attachment;"),
+      ContentLength: pdf.length,
+    });
+    expect(prisma.fileAsset.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        originalName: "report.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: pdf.length,
+        uploadedById: "user-1",
+      }),
+    });
+    expect(result.mimeType).toBe("application/pdf");
+  });
+});
