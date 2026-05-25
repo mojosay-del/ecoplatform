@@ -305,7 +305,7 @@ describe("Content publish", () => {
 
     // До публикации — публичный список не содержит её
     const before = await ctx.http.get("/api/news").set("Authorization", `Bearer ${userToken}`);
-    expect(before.body.find((n: { slug: string }) => n.slug === slug)).toBeUndefined();
+    expect(before.body.items.find((n: { slug: string }) => n.slug === slug)).toBeUndefined();
 
     const publish = await ctx.http
       .post(`/api/admin/content/news/${draft.body.id}/publish`)
@@ -314,7 +314,7 @@ describe("Content publish", () => {
     expect(publish.body.status).toBe(ContentStatus.published);
 
     const after = await ctx.http.get("/api/news").set("Authorization", `Bearer ${userToken}`);
-    expect(after.body.find((n: { slug: string }) => n.slug === slug)).toBeTruthy();
+    expect(after.body.items.find((n: { slug: string }) => n.slug === slug)).toBeTruthy();
   });
 
   it("новость с некорректным блоком (paragraph без html) отбивается 400", async () => {
@@ -624,7 +624,7 @@ describe("Moderation", () => {
 
     const publicNewsFeed = await ctx.http.get("/api/news").set("Authorization", `Bearer ${reporter.token}`);
     expect(publicNewsFeed.status).toBe(200);
-    expect(publicNewsFeed.body.some((item: { id: string }) => item.id === news.id)).toBe(false);
+    expect(publicNewsFeed.body.items.some((item: { id: string }) => item.id === news.id)).toBe(false);
 
     const reporterUser = await ctx.prisma.user.findUnique({ where: { email: "user0000053@test.local" } });
     const complaintNotice = await ctx.prisma.inAppNotification.findFirst({
@@ -1695,7 +1695,7 @@ describe("Content lifecycle: news", () => {
     expect(likeComment.status).toBe(201);
 
     const before = await ctx.http.get("/api/news").set("Authorization", `Bearer ${reader.token}`);
-    expect(before.body.find((item: { id: string }) => item.id === news.id)).toBeTruthy();
+    expect(before.body.items.find((item: { id: string }) => item.id === news.id)).toBeTruthy();
 
     const del = await ctx.http
       .delete(`/api/admin/content/news/${news.id}`)
@@ -1704,7 +1704,7 @@ describe("Content lifecycle: news", () => {
     expect(del.status).toBe(200);
 
     const after = await ctx.http.get("/api/news").set("Authorization", `Bearer ${reader.token}`);
-    expect(after.body.find((item: { id: string }) => item.id === news.id)).toBeUndefined();
+    expect(after.body.items.find((item: { id: string }) => item.id === news.id)).toBeUndefined();
 
     const direct = await ctx.http.get(`/api/news/${news.slug}`).set("Authorization", `Bearer ${reader.token}`);
     expect(direct.status).toBe(404);

@@ -25,8 +25,6 @@ import { api, clearAccessToken } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { AuthRequired, ErrorState, useApiQuery, resolveUpgradeCta } from "./_shared";
 
-export { KnowledgeBaseView, KnowledgeArticleView } from "../views/knowledge-base-view";
-
 const ROLE_LABELS: Record<string, string> = {
   admin: "Администратор",
   moderator: "Модератор",

@@ -109,13 +109,26 @@ export class FilesService {
     fileIds: Array<string | null | undefined>,
   ): Promise<void> {
     const uniqueIds = this.compactFileIds(fileIds);
+    // Фильтруем orphan-id: админ мог в payload ввести произвольный id,
+    // которого нет в FileAsset (типичный сценарий — старый/стёртый файл
+    // или хардкод в integration-тесте). FileReference имеет FK с CASCADE —
+    // вставка несуществующего id даёт FK violation и 500. Тихо пропускаем.
+    const existing =
+      uniqueIds.length > 0
+        ? await this.prisma.fileAsset.findMany({
+            where: { id: { in: uniqueIds } },
+            select: { id: true },
+          })
+        : [];
+    const validIds = new Set(existing.map((asset) => asset.id));
+    const filtered = uniqueIds.filter((id) => validIds.has(id));
     await this.prisma.$transaction(async (tx) => {
       await tx.fileReference.deleteMany({ where: { entityType, entityId } });
-      if (uniqueIds.length === 0) {
+      if (filtered.length === 0) {
         return;
       }
       await tx.fileReference.createMany({
-        data: uniqueIds.map((fileId) => ({ fileId, entityType, entityId })),
+        data: filtered.map((fileId) => ({ fileId, entityType, entityId })),
         skipDuplicates: true,
       });
     });

@@ -23,86 +23,126 @@ import {
   priceIndexInputSchema,
   priceIndexValueInputSchema,
 } from "./content.schemas";
-import { ContentService } from "./content.service";
+import { IndicesService } from "./services/indices.service";
+import { KnowledgeBaseService } from "./services/knowledge-base.service";
+import { LearningService } from "./services/learning.service";
+import { NewsService } from "./services/news.service";
 
+// Контроллер контент-домена. Инжектит 4 доменных сервиса (по результатам
+// Волны 3.2 split). Маршруты сгруппированы по доменам — секции News /
+// Indices / Learning / KnowledgeBase. Внутри каждой — сперва публичные,
+// потом /admin/*. Порядок маршрутов важен: специфичные пути (например,
+// `admin/content/news/tags`) идут ПЕРЕД `admin/content/news/:id`, иначе
+// NestJS попытается интерпретировать "tags" как `:id`.
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class ContentController {
-  constructor(private readonly content: ContentService) {}
+  constructor(
+    private readonly news: NewsService,
+    private readonly indices: IndicesService,
+    private readonly learning: LearningService,
+    private readonly knowledgeBase: KnowledgeBaseService,
+  ) {}
+
+  // ── Публичные: новости ──────────────────────────────────────────────────
 
   @Get("news")
-  async news(@CurrentUser() user: RequestUser) {
-    return this.content.listNews(user);
+  async listNews(
+    @CurrentUser() user: RequestUser,
+    @Query("limit") limitRaw?: string,
+    @Query("offset") offsetRaw?: string,
+  ) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.news.listNews(user, { limit, offset });
   }
 
   @Get("news/:slug")
   async newsPost(@Param("slug") slug: string, @CurrentUser() user: RequestUser) {
-    return this.content.getNews(slug, user);
+    return this.news.getNews(slug, user);
   }
 
   @Post("news/:id/like")
   async likeNews(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.content.toggleNewsLike(id, user);
+    return this.news.toggleNewsLike(id, user);
   }
 
   @Post("news/comments/:id/like")
   async likeNewsComment(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.content.toggleNewsCommentLike(id, user);
+    return this.news.toggleNewsCommentLike(id, user);
   }
 
   @Post("news/:id/comments")
   async commentNews(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(commentInputSchema, body);
-    return this.content.addNewsComment(id, user, input);
+    return this.news.addNewsComment(id, user, input);
   }
 
+  // ── Публичные: индексы цен ─────────────────────────────────────────────
+
   @Get("indices")
-  async indices(@CurrentUser() user: RequestUser) {
-    return this.content.listIndices(user);
+  async indicesList(@CurrentUser() user: RequestUser) {
+    return this.indices.listIndices(user);
   }
+
+  // ── Публичные: обучение ────────────────────────────────────────────────
 
   @Get("education/modules")
   async learningModules(@CurrentUser() user: RequestUser) {
-    return this.content.listLearningModules(user);
+    return this.learning.listLearningModules(user);
   }
 
   @Get("education/modules/:id")
   async learningModule(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.content.getLearningModule(id, user);
+    return this.learning.getLearningModule(id, user);
   }
 
   @Post("education/lessons/:id/complete")
   async completeLesson(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.content.completeLesson(id, user);
+    return this.learning.completeLesson(id, user);
   }
+
+  // ── Публичные: база знаний ─────────────────────────────────────────────
 
   @Get("knowledge-base")
   async knowledgeTree(@CurrentUser() user: RequestUser) {
-    return this.content.knowledgeTree(user);
+    return this.knowledgeBase.knowledgeTree(user);
   }
 
   @Get("knowledge-base/search")
   async knowledgeSearch(@Query("q") query = "", @CurrentUser() user: RequestUser) {
-    return this.content.searchKnowledge(query, user);
+    return this.knowledgeBase.searchKnowledge(query, user);
   }
 
   @Get("knowledge-base/:slug")
   async knowledgeArticle(@Param("slug") slug: string, @CurrentUser() user: RequestUser) {
-    return this.content.getKnowledgeArticle(slug, user);
+    return this.knowledgeBase.getKnowledgeArticle(slug, user);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles("admin", "content_manager")
-  @Get("admin/content/news")
-  async adminNews() {
-    return this.content.adminListNews();
-  }
+  // ── Админ-CMS: новости ──────────────────────────────────────────────────
+  // ВНИМАНИЕ: `tags` ОБЯЗАТЕЛЬНО до `:id`, иначе NestJS зовёт getAdminNews("tags").
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/news/tags")
   async adminNewsTags() {
-    return this.content.adminListNewsTags();
+    return this.news.adminListNewsTags();
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
+  @Get("admin/content/news")
+  async adminListNews(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.news.adminListNews({ limit, offset });
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin", "content_manager")
+  @Get("admin/content/news/:id")
+  async adminGetNews(@Param("id") id: string) {
+    return this.news.getAdminNews(id);
   }
 
   @UseGuards(RolesGuard)
@@ -110,7 +150,7 @@ export class ContentController {
   @Post("admin/content/news")
   async createNews(@Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(newsInputSchema, body);
-    return this.content.createNews(input, user);
+    return this.news.createNews(input, user);
   }
 
   @UseGuards(RolesGuard)
@@ -118,14 +158,14 @@ export class ContentController {
   @Patch("admin/content/news/:id")
   async updateNews(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(newsInputSchema, body);
-    return this.content.updateNews(id, input, user);
+    return this.news.updateNews(id, input, user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/news/:id/publish")
   async publishNews(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.content.publishNews(id, user);
+    return this.news.publishNews(id, user);
   }
 
   @UseGuards(RolesGuard)
@@ -136,7 +176,7 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.unpublishNews(id, user, body?.reason);
+    return this.news.unpublishNews(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
@@ -147,28 +187,30 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.deleteNews(id, user, body?.reason);
+    return this.news.deleteNews(id, user, body?.reason);
   }
+
+  // ── Админ-CMS: индексы цен ─────────────────────────────────────────────
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/indices")
   async adminIndices() {
-    return this.content.adminListIndices();
+    return this.indices.adminListIndices();
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/indices/categories")
   async createCategory(@Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.createCategory(parseBody(categoryInputSchema, body), user);
+    return this.indices.createCategory(parseBody(categoryInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Patch("admin/content/indices/categories/:id")
   async updateCategory(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.updateCategory(id, parseBody(categoryUpdateInputSchema, body), user);
+    return this.indices.updateCategory(id, parseBody(categoryUpdateInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
@@ -179,21 +221,21 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.deleteCategory(id, user, body?.reason);
+    return this.indices.deleteCategory(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/indices/nomenclature")
   async createNomenclature(@Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.createNomenclature(parseBody(nomenclatureInputSchema, body), user);
+    return this.indices.createNomenclature(parseBody(nomenclatureInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Patch("admin/content/indices/nomenclature/:id")
   async updateNomenclature(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.updateNomenclature(id, parseBody(nomenclatureUpdateInputSchema, body), user);
+    return this.indices.updateNomenclature(id, parseBody(nomenclatureUpdateInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
@@ -204,21 +246,21 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.deleteNomenclature(id, user, body?.reason);
+    return this.indices.deleteNomenclature(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/indices")
   async createPriceIndex(@Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.createPriceIndex(parseBody(priceIndexInputSchema, body), user);
+    return this.indices.createPriceIndex(parseBody(priceIndexInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/indices/:id/values")
   async addPriceValue(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.addPriceValue(id, parseBody(priceIndexValueInputSchema, body), user);
+    return this.indices.addPriceValue(id, parseBody(priceIndexValueInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
@@ -229,14 +271,14 @@ export class ContentController {
     @Param("valueId") valueId: string,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.deletePriceValue(id, valueId, user);
+    return this.indices.deletePriceValue(id, valueId, user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/indices/:id/publish")
   async publishPriceIndex(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.content.publishPriceIndex(id, user);
+    return this.indices.publishPriceIndex(id, user);
   }
 
   @UseGuards(RolesGuard)
@@ -247,7 +289,7 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.unpublishPriceIndex(id, user, body?.reason);
+    return this.indices.unpublishPriceIndex(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
@@ -258,35 +300,37 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.deletePriceIndex(id, user, body?.reason);
+    return this.indices.deletePriceIndex(id, user, body?.reason);
   }
+
+  // ── Админ-CMS: обучение ────────────────────────────────────────────────
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/education")
   async adminEducation() {
-    return this.content.adminListLearningModules();
+    return this.learning.adminListLearningModules();
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/education/modules")
   async createLearningModule(@Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.createLearningModule(parseBody(learningModuleInputSchema, body), user);
+    return this.learning.createLearningModule(parseBody(learningModuleInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Patch("admin/content/education/modules/:id")
   async updateLearningModule(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.updateLearningModule(id, parseBody(learningModuleUpdateInputSchema, body), user);
+    return this.learning.updateLearningModule(id, parseBody(learningModuleUpdateInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/education/modules/:id/publish")
   async publishLearningModule(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.content.publishLearningModule(id, user);
+    return this.learning.publishLearningModule(id, user);
   }
 
   @UseGuards(RolesGuard)
@@ -297,7 +341,7 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.unpublishLearningModule(id, user, body?.reason);
+    return this.learning.unpublishLearningModule(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
@@ -308,7 +352,7 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.deleteLearningModule(id, user, body?.reason);
+    return this.learning.deleteLearningModule(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
@@ -319,14 +363,14 @@ export class ContentController {
     @Body() body: unknown,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.createChapter(moduleId, parseBody(chapterInputSchema, body), user);
+    return this.learning.createChapter(moduleId, parseBody(chapterInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Patch("admin/content/education/chapters/:id")
   async updateChapter(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.updateChapter(id, parseBody(chapterUpdateInputSchema, body), user);
+    return this.learning.updateChapter(id, parseBody(chapterUpdateInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
@@ -337,7 +381,7 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.deleteChapter(id, user, body?.reason);
+    return this.learning.deleteChapter(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
@@ -348,14 +392,14 @@ export class ContentController {
     @Body() body: unknown,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.createLesson(chapterId, parseBody(lessonInputSchema, body), user);
+    return this.learning.createLesson(chapterId, parseBody(lessonInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Patch("admin/content/education/lessons/:id")
   async updateLesson(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.updateLesson(id, parseBody(lessonUpdateInputSchema, body), user);
+    return this.learning.updateLesson(id, parseBody(lessonUpdateInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
@@ -366,7 +410,7 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.deleteLesson(id, user, body?.reason);
+    return this.learning.deleteLesson(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
@@ -377,28 +421,30 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.unpublishLesson(id, user, body?.reason);
+    return this.learning.unpublishLesson(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/education/lessons/:id/publish")
   async publishLesson(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.content.publishLesson(id, user);
+    return this.learning.publishLesson(id, user);
   }
+
+  // ── Админ-CMS: база знаний ─────────────────────────────────────────────
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/knowledge-base")
   async adminKnowledge() {
-    return this.content.adminListKnowledge();
+    return this.knowledgeBase.adminListKnowledge();
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/knowledge-base")
   async createKnowledgeArticle(@Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.content.createKnowledgeArticle(parseBody(knowledgeArticleInputSchema, body), user);
+    return this.knowledgeBase.createKnowledgeArticle(parseBody(knowledgeArticleInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
@@ -409,14 +455,14 @@ export class ContentController {
     @Body() body: unknown,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.updateKnowledgeArticle(id, parseBody(knowledgeArticleInputSchema, body), user);
+    return this.knowledgeBase.updateKnowledgeArticle(id, parseBody(knowledgeArticleInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("admin/content/knowledge-base/:id/publish")
   async publishKnowledgeArticle(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.content.publishKnowledgeArticle(id, user);
+    return this.knowledgeBase.publishKnowledgeArticle(id, user);
   }
 
   @UseGuards(RolesGuard)
@@ -427,7 +473,7 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.unpublishKnowledgeArticle(id, user, body?.reason);
+    return this.knowledgeBase.unpublishKnowledgeArticle(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
@@ -438,7 +484,7 @@ export class ContentController {
     @Body() body: unknown,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.moveKnowledgeArticle(id, parseBody(knowledgeMoveInputSchema, body), user);
+    return this.knowledgeBase.moveKnowledgeArticle(id, parseBody(knowledgeMoveInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)
@@ -449,6 +495,6 @@ export class ContentController {
     @Body() body: { reason?: string } | undefined,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.content.deleteKnowledgeArticle(id, user, body?.reason);
+    return this.knowledgeBase.deleteKnowledgeArticle(id, user, body?.reason);
   }
 }

@@ -4,11 +4,27 @@ import { AdminActionLogService } from "../common/admin-action-log.service";
 import { ModuleAccessService } from "../common/module-access.service";
 import { FilesModule } from "../files/files.module";
 import { ContentController } from "./content.controller";
-import { ContentService } from "./content.service";
+import { ContentCommonService } from "./services/content-common.service";
+import { IndicesService } from "./services/indices.service";
+import { KnowledgeBaseService } from "./services/knowledge-base.service";
+import { LearningService } from "./services/learning.service";
+import { NewsService } from "./services/news.service";
 
 @Module({
   imports: [AuthModule, FilesModule],
   controllers: [ContentController],
-  providers: [ContentService, AdminActionLogService, ModuleAccessService],
+  providers: [
+    // 4 доменных сервиса (split по результатам Волны 3.2: было одно
+    // ContentService на 2120 строк → 5 фокусных). Common — общие хелперы
+    // (assertFunctionalAccess, payload, FileReference-операции, slug);
+    // используется через инжект внутри доменных сервисов.
+    ContentCommonService,
+    NewsService,
+    IndicesService,
+    LearningService,
+    KnowledgeBaseService,
+    AdminActionLogService,
+    ModuleAccessService,
+  ],
 })
 export class ContentModule {}

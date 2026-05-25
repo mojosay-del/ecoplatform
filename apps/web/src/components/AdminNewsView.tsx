@@ -6,7 +6,7 @@ import { Eye, ImageIcon, Plus, X } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { Block, BlocksEditor, NEWS_BLOCK_KINDS } from "./BlocksEditor";
-import { ContentBlocks } from "./DataViews";
+import { ContentBlocks } from "../views/content-blocks";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, apiFetch } from "../lib/api";
