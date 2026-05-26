@@ -135,10 +135,7 @@ export class NotificationsService {
     return Promise.all(admins.map((admin) => this.createInApp({ ...input, userId: admin.userId })));
   }
 
-  async list(
-    user: RequestUser,
-    options: { includeArchived?: boolean; limit?: number; offset?: number } = {},
-  ) {
+  async list(user: RequestUser, options: { includeArchived?: boolean; limit?: number; offset?: number } = {}) {
     const limit = Math.min(Math.max(options.limit ?? 30, 1), 100);
     const offset = Math.max(options.offset ?? 0, 0);
     const where: Prisma.InAppNotificationWhereInput = {

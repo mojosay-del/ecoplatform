@@ -352,9 +352,7 @@ export function AdminNewsView() {
               })}
             </div>
             <div ref={newsQuery.sentinelRef} aria-hidden="true" />
-            {newsQuery.isLoadingMore ? (
-              <p className="page-subtitle news-list-more">Загружаем ещё…</p>
-            ) : null}
+            {newsQuery.isLoadingMore ? <p className="page-subtitle news-list-more">Загружаем ещё…</p> : null}
             {!newsQuery.hasMore && items.length > 0 ? (
               <p className="page-subtitle news-list-more">Это все новости.</p>
             ) : null}

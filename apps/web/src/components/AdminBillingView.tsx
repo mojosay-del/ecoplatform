@@ -35,16 +35,16 @@ export function AdminBillingView() {
   const [state, setState] = useState<ViewState>("unauthenticated");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const companiesQuery = useInfiniteApiQuery<CompanyItem>(token ? "admin-billing-companies" : null, 50, async ({
-    limit,
-    offset,
-  }) => {
-    const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-    return apiFetch<{ items: CompanyItem[]; total: number; hasMore: boolean }>(
-      `/admin/billing/companies?${query}`,
-      { token },
-    );
-  });
+  const companiesQuery = useInfiniteApiQuery<CompanyItem>(
+    token ? "admin-billing-companies" : null,
+    50,
+    async ({ limit, offset }) => {
+      const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+      return apiFetch<{ items: CompanyItem[]; total: number; hasMore: boolean }>(`/admin/billing/companies?${query}`, {
+        token,
+      });
+    },
+  );
   const companies = companiesQuery.items;
 
   const [form, setForm] = useState({

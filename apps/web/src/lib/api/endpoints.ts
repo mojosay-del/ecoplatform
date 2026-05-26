@@ -51,7 +51,8 @@ function paginationSuffix(pagination: PaginationInput = {}) {
 export const api = {
   // ── Новости ─────────────────────────────────────────────────────────────
   news: {
-    list: (pagination: PaginationInput = {}) => apiFetch<PaginatedResponse<NewsListItem>>(`/news${paginationSuffix(pagination)}`),
+    list: (pagination: PaginationInput = {}) =>
+      apiFetch<PaginatedResponse<NewsListItem>>(`/news${paginationSuffix(pagination)}`),
     get: (slug: string) => apiFetch<NewsPostDetail>(`/news/${enc(slug)}`),
     like: (id: string) => apiFetch<LikeResult>(`/news/${enc(id)}/like`, { method: "POST" }),
     addComment: (postId: string, body: { text: string; parentCommentId?: string }) =>

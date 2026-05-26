@@ -36,10 +36,8 @@ import { ContentBlocks } from "./content-blocks";
 const NEWS_PAGE_SIZE = 20;
 
 export function NewsView() {
-  const feed = useInfiniteApiQuery(
-    "news-feed",
-    NEWS_PAGE_SIZE,
-    ({ limit, offset }) => api.news.list({ limit, offset }),
+  const feed = useInfiniteApiQuery("news-feed", NEWS_PAGE_SIZE, ({ limit, offset }) =>
+    api.news.list({ limit, offset }),
   );
   const { items, setItems, state, errorMessage, hasMore, isLoadingMore, sentinelRef } = feed;
   const covers = useCoverAssets(items);
@@ -84,7 +82,11 @@ export function NewsView() {
           <h1>Последние обновления</h1>
         </header>
 
-        {items.length === 0 ? (
+        {state === "loading" ? (
+          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
+            Загрузка…
+          </p>
+        ) : items.length === 0 ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
             Пока нет публикаций.
           </p>

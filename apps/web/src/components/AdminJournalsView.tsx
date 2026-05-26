@@ -46,7 +46,9 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
   const [filters, setFilters] = useState({ action: "", entityType: "", actorId: "", from: "", to: "" });
   const take = 25;
   const journalsQuery = useInfiniteApiQuery<JournalEntry>(
-    token ? `admin-journals:${filters.action}:${filters.entityType}:${filters.actorId}:${filters.from}:${filters.to}` : null,
+    token
+      ? `admin-journals:${filters.action}:${filters.entityType}:${filters.actorId}:${filters.from}:${filters.to}`
+      : null,
     take,
     async ({ limit, offset }) => {
       const params = new URLSearchParams();
