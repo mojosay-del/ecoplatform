@@ -267,12 +267,44 @@ export type BillingStatus = {
   demoEndsAt: IsoDateString | null;
   billingInn: string | null;
   billingKpp: string | null;
+  // Старая «одна строка» — для обратной совместимости с UI до Волны 7.4.
   legalAddress: string | null;
   bankName: string | null;
   bankBik: string | null;
   bankAccount: string | null;
   correspondentAccount: string | null;
+  // Контакты компании (Волна 7.3).
+  websiteUrl: string | null;
+  corporatePhone: string | null;
+  corporateEmail: string | null;
+  about: string | null;
+  logoFileId: string | null;
+  contactPersonName: string | null;
+  contactPersonPhone: string | null;
+  contactPersonEmail: string | null;
+  // Структурированные адреса (Волна 7.2). Опциональные; для большинства
+  // компаний пока пусто.
+  factualAddress: CompanyAddress | null;
+  structuredLegalAddress: CompanyAddress | null;
   subscriptions: BillingSubscription[];
+};
+
+// Развёрнутый адрес как часть Company-снапшота в /billing/status.
+// Прайма Decimal сериализуется в строку — храним latitude/longitude как строку
+// чтобы не терять точность при JSON round-trip.
+export type CompanyAddress = {
+  id: string;
+  country: string;
+  region: string | null;
+  city: string;
+  street: string | null;
+  building: string | null;
+  apartment: string | null;
+  postcode: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  formatted: string;
+  source: string;
 };
 
 export type AuthMeUser = {

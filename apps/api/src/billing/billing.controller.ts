@@ -1,5 +1,5 @@
-import { Body, Controller, ForbiddenException, Get, Headers, Post, Query, UseGuards } from "@nestjs/common";
-import { manualSubscriptionDtoSchema } from "@ecoplatform/shared";
+import { Body, Controller, ForbiddenException, Get, Headers, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { companyProfileUpdateDtoSchema, manualSubscriptionDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
@@ -21,6 +21,15 @@ export class BillingController {
       throw new ForbiddenException("Биллинг доступен только пользователям компаний.");
     }
     return this.billing.getOwnStatus(user.companyId);
+  }
+
+  @Patch("billing/company")
+  async updateCompanyProfile(@CurrentUser() user: RequestUser, @Body() body: unknown) {
+    if (!user.companyId) {
+      throw new ForbiddenException("Профиль компании доступен только пользователям компаний.");
+    }
+    const input = parseBody(companyProfileUpdateDtoSchema, body);
+    return this.billing.updateOwnProfile(user.companyId, input);
   }
 
   @UseGuards(RolesGuard)

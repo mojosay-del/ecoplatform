@@ -84,3 +84,85 @@ export const supportTicketDtoSchema = z.object({
 });
 
 export type SupportTicketDto = z.infer<typeof supportTicketDtoSchema>;
+
+// Адрес как опциональная структура внутри company-profile patch'а.
+// formatted — единственное обязательное поле; остальное заполняется по мере
+// готовности данных (автокомплит Яндекс/dadata подтянет всё сразу).
+// Если все поля null, кроме formatted='Не указан' — это «затрущенный» legacy-адрес.
+export const addressDtoSchema = z.object({
+  country: z.string().trim().max(64).default("Россия"),
+  region: z.string().trim().max(120).nullish(),
+  city: z.string().trim().min(1).max(120),
+  street: z.string().trim().max(200).nullish(),
+  building: z.string().trim().max(40).nullish(),
+  apartment: z.string().trim().max(40).nullish(),
+  postcode: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Индекс — 6 цифр")
+    .nullish(),
+  // formatted — авторитетный текст для отображения. Если не передан, бэк
+  // соберёт его сам из остальных полей.
+  formatted: z.string().trim().min(1).max(500).nullish(),
+});
+
+export type AddressDto = z.infer<typeof addressDtoSchema>;
+
+// PATCH /api/billing/company — частичное обновление профиля компании.
+// Все поля опциональны, не передал — не меняется. null означает «очистить».
+export const companyProfileUpdateDtoSchema = z.object({
+  organizationName: z.string().trim().min(2).max(255).optional(),
+  websiteUrl: z.string().trim().url("Введите корректный URL, например https://example.com").or(z.literal("")).nullish(),
+  corporatePhone: z
+    .string()
+    .trim()
+    .regex(/^\+?\d[\d\s()-]{6,30}$/, "Телефон в формате +7XXXXXXXXXX")
+    .or(z.literal(""))
+    .nullish(),
+  corporateEmail: z.string().trim().email().or(z.literal("")).nullish(),
+  about: z.string().trim().max(2000).nullish(),
+  contactPersonName: z.string().trim().max(200).nullish(),
+  contactPersonPhone: z
+    .string()
+    .trim()
+    .regex(/^\+?\d[\d\s()-]{6,30}$/, "Телефон в формате +7XXXXXXXXXX")
+    .or(z.literal(""))
+    .nullish(),
+  contactPersonEmail: z.string().trim().email().or(z.literal("")).nullish(),
+  billingInn: z
+    .string()
+    .trim()
+    .regex(/^(\d{10}|\d{12})$/, "ИНН — 10 или 12 цифр")
+    .or(z.literal(""))
+    .nullish(),
+  billingKpp: z
+    .string()
+    .trim()
+    .regex(/^\d{9}$/, "КПП — 9 цифр")
+    .or(z.literal(""))
+    .nullish(),
+  bankName: z.string().trim().max(255).nullish(),
+  bankBik: z
+    .string()
+    .trim()
+    .regex(/^\d{9}$/, "БИК — 9 цифр")
+    .or(z.literal(""))
+    .nullish(),
+  bankAccount: z
+    .string()
+    .trim()
+    .regex(/^\d{20}$/, "Счёт — 20 цифр")
+    .or(z.literal(""))
+    .nullish(),
+  correspondentAccount: z
+    .string()
+    .trim()
+    .regex(/^\d{20}$/, "Кор. счёт — 20 цифр")
+    .or(z.literal(""))
+    .nullish(),
+  // Адреса: передать объект — заменить целиком; null — очистить.
+  factualAddress: addressDtoSchema.nullish(),
+  structuredLegalAddress: addressDtoSchema.nullish(),
+});
+
+export type CompanyProfileUpdateDto = z.infer<typeof companyProfileUpdateDtoSchema>;

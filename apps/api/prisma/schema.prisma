@@ -217,25 +217,75 @@ model User {
 }
 
 model Company {
-  id                   String            @id @default(cuid())
-  organizationName     String
-  type                 CompanyType       @default(collector)
-  status               CompanyStatus     @default(demo)
-  demoEndsAt           DateTime?
-  subscriptionPlan     SubscriptionPlan?
-  subscriptionEndsAt   DateTime?
-  billingInn           String?
-  billingKpp           String?
-  legalAddress         String?
-  bankName             String?
-  bankBik              String?
-  bankAccount          String?
-  correspondentAccount String?
-  users                User[]
-  subscriptions        Subscription[]
-  supportTickets       SupportTicket[]
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  id                       String            @id @default(cuid())
+  organizationName         String
+  type                     CompanyType       @default(collector)
+  status                   CompanyStatus     @default(demo)
+  demoEndsAt               DateTime?
+  subscriptionPlan         SubscriptionPlan?
+  subscriptionEndsAt       DateTime?
+  billingInn               String?
+  billingKpp               String?
+  // Старое текстовое поле legalAddress оставлено для обратной совместимости
+  // (на форму биллинга, где адрес показывается как одна строка). Полноценная
+  // структура адреса — в Address (factualAddress/legalAddress relation'ами).
+  legalAddress             String?
+  factualAddressId         String?           @unique
+  factualAddress           Address?          @relation("CompanyFactualAddress", fields: [factualAddressId], references: [id])
+  structuredLegalAddressId String?           @unique
+  structuredLegalAddress   Address?          @relation("CompanyStructuredLegalAddress", fields: [structuredLegalAddressId], references: [id])
+  // Контакты компании. Все опциональные, заполняются в /account → Компания.
+  websiteUrl               String?
+  corporatePhone           String?
+  corporateEmail           String?
+  about                    String?
+  logoFileId               String?
+  // Контактное лицо: если у компании назначен «менеджер по входящим обращениям»
+  // отличный от первого зарегистрированного user'а. В MVP — просто текстовые поля.
+  contactPersonName        String?
+  contactPersonPhone       String?
+  contactPersonEmail       String?
+  bankName                 String?
+  bankBik                  String?
+  bankAccount              String?
+  correspondentAccount     String?
+  users                    User[]
+  subscriptions            Subscription[]
+  supportTickets           SupportTicket[]
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+}
+
+// Address — самостоятельная сущность для адресов: и фактических, и юридических,
+// и в перспективе адресов складов/филиалов/доставки/листингов торговой площадки.
+// Хранит и raw-структуру (страна, регион, город, улица, дом, кв., индекс),
+// и одну `formatted`-строку для отображения, и координаты под карту.
+//
+// source: 'manual' — пользователь ввёл руками; 'yandex'/'dadata' — пришло
+// из подсказки автокомплита (Волна 11+); 'legacy' — миграция старого
+// текстового Company.legalAddress в одну `formatted`-строку.
+model Address {
+  id        String   @id @default(cuid())
+  country   String   @default("Россия")
+  region    String?
+  city      String
+  street    String?
+  building  String?
+  apartment String?
+  postcode  String?
+  // Координаты (Decimal(10,7) — точность до ~1 см, хватит и под Яндекс-карту,
+  // и под кадастровые расчёты).
+  latitude  Decimal? @db.Decimal(10, 7)
+  longitude Decimal? @db.Decimal(10, 7)
+  // Одна строка для UI — собирается из полей при сохранении или приходит
+  // из автокомплита как авторитетное значение.
+  formatted String
+  source    String   @default("manual")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyAsFactual Company? @relation("CompanyFactualAddress")
+  companyAsLegal   Company? @relation("CompanyStructuredLegalAddress")
 }
 
 model Subscription {

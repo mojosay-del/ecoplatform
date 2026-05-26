@@ -9,6 +9,7 @@
 
 import type {
   BillingStatus,
+  CompanyProfileUpdateDto,
   ConsentRecordItem,
   ConsentSource,
   KnowledgeArticleDetail,
@@ -78,6 +79,8 @@ export const api = {
   // ── Биллинг / кабинет ───────────────────────────────────────────────────
   billing: {
     status: () => apiFetch<BillingStatus>("/billing/status"),
+    updateCompanyProfile: (input: CompanyProfileUpdateDto) =>
+      apiFetch<BillingStatus>("/billing/company", { method: "PATCH", body: JSON.stringify(input) }),
   },
 
   // ── Аутентификация / сессии ────────────────────────────────────────────

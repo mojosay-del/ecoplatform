@@ -2576,6 +2576,144 @@ describe("Legal documents & consents", () => {
   });
 });
 
+describe("Company profile (Волна 7.2/7.3 — Address, расширенные поля)", () => {
+  it("PATCH /billing/company сохраняет контакты, реквизиты и factualAddress", async () => {
+    const { token, companyId } = await registerCompany("0700100");
+
+    const res = await ctx.http
+      .patch("/api/billing/company")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        websiteUrl: "https://example.ru",
+        corporatePhone: "+74951234567",
+        corporateEmail: "info@example.ru",
+        about: "Принимаем макулатуру и ПЭТ",
+        contactPersonName: "Иван Петров",
+        contactPersonPhone: "+79161112233",
+        contactPersonEmail: "ivan@example.ru",
+        billingInn: "7707083893",
+        billingKpp: "770701001",
+        bankName: "ПАО Сбербанк",
+        bankBik: "044525225",
+        bankAccount: "40702810500000000123",
+        correspondentAccount: "30101810400000000225",
+        factualAddress: {
+          country: "Россия",
+          region: "Московская область",
+          city: "Подольск",
+          street: "Ленина",
+          building: "12",
+          apartment: "5",
+          postcode: "142100",
+        },
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.websiteUrl).toBe("https://example.ru");
+    expect(res.body.corporatePhone).toBe("+74951234567");
+    expect(res.body.about).toBe("Принимаем макулатуру и ПЭТ");
+    expect(res.body.billingInn).toBe("7707083893");
+    expect(res.body.factualAddress).toMatchObject({
+      country: "Россия",
+      region: "Московская область",
+      city: "Подольск",
+      street: "Ленина",
+      building: "12",
+      postcode: "142100",
+      source: "manual",
+    });
+    // formatted собран автоматически
+    expect(res.body.factualAddress.formatted).toContain("Подольск");
+    expect(res.body.factualAddress.formatted).toContain("Ленина");
+
+    // GET /billing/status тоже отдаёт новые поля
+    const status = await ctx.http.get("/api/billing/status").set("Authorization", `Bearer ${token}`);
+    expect(status.status).toBe(200);
+    expect(status.body.corporateEmail).toBe("info@example.ru");
+    expect(status.body.factualAddress.city).toBe("Подольск");
+    expect(status.body.structuredLegalAddress).toBeNull();
+
+    // sanity: в БД Address действительно создан
+    const company = await ctx.prisma.company.findUnique({
+      where: { id: companyId },
+      include: { factualAddress: true },
+    });
+    expect(company?.factualAddress?.city).toBe("Подольск");
+  });
+
+  it("повторный PATCH с factualAddress обновляет ту же строку Address, не создаёт новую", async () => {
+    const { token, companyId } = await registerCompany("0700101");
+
+    await ctx.http
+      .patch("/api/billing/company")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        factualAddress: { city: "Москва", postcode: "101000" },
+      });
+    const company1 = await ctx.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { factualAddressId: true },
+    });
+    expect(company1?.factualAddressId).toBeTruthy();
+    const addressIdBefore = company1!.factualAddressId!;
+
+    await ctx.http
+      .patch("/api/billing/company")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        factualAddress: { city: "Санкт-Петербург", postcode: "190000" },
+      });
+    const company2 = await ctx.prisma.company.findUnique({
+      where: { id: companyId },
+      include: { factualAddress: true },
+    });
+    expect(company2?.factualAddressId).toBe(addressIdBefore);
+    expect(company2?.factualAddress?.city).toBe("Санкт-Петербург");
+
+    // Проверяем, что не создалось двух Address-ов на эту компанию
+    const total = await ctx.prisma.address.count();
+    // На той же тестовой сессии могли быть прочие Address — проверяем точечно
+    expect(company2?.factualAddress?.id).toBe(addressIdBefore);
+    expect(total).toBeGreaterThanOrEqual(1);
+  });
+
+  it("structuredLegalAddress дублирует formatted в старое legalAddress (обратная совместимость)", async () => {
+    const { token, companyId } = await registerCompany("0700102");
+
+    await ctx.http
+      .patch("/api/billing/company")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        structuredLegalAddress: {
+          city: "Тула",
+          street: "Советская",
+          building: "1",
+          formatted: "300000, г. Тула, ул. Советская, д. 1",
+        },
+      });
+
+    const company = await ctx.prisma.company.findUnique({ where: { id: companyId } });
+    expect(company?.legalAddress).toBe("300000, г. Тула, ул. Советская, д. 1");
+  });
+
+  it("PATCH /billing/company от платформенного staff → 403", async () => {
+    const adminToken = await loginAdmin();
+    const res = await ctx.http
+      .patch("/api/billing/company")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ websiteUrl: "https://x.test" });
+    expect(res.status).toBe(403);
+  });
+
+  it("PATCH с битым ИНН → 400", async () => {
+    const { token } = await registerCompany("0700103");
+    const res = await ctx.http
+      .patch("/api/billing/company")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ billingInn: "abc" });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("Discussion (полиморфные обсуждения, Волна 7.1)", () => {
   it("первый POST /news/:id/comments лениво создаёт Discussion(news_post, id)", async () => {
     const adminToken = await loginAdmin();

@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { createHash } from "crypto";
 import { CompanyStatus, NotificationCategory, Prisma, SubscriptionStatus } from "@prisma/client";
 import type { Company, Subscription } from "@prisma/client";
-import type { ManualSubscriptionDto } from "@ecoplatform/shared";
+import type { AddressDto, CompanyProfileUpdateDto, ManualSubscriptionDto } from "@ecoplatform/shared";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -25,7 +25,13 @@ export class BillingService {
   async getOwnStatus(companyId: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
-      include: { subscriptions: { orderBy: { createdAt: "desc" }, take: 5 } },
+      include: {
+        subscriptions: { orderBy: { createdAt: "desc" }, take: 5 },
+        // Адреса подгружаем как relation'ы — UI /account → Компания их
+        // показывает (см. BillingStatus.factualAddress / structuredLegalAddress).
+        factualAddress: true,
+        structuredLegalAddress: true,
+      },
     });
 
     if (!company) {
@@ -33,6 +39,79 @@ export class BillingService {
     }
 
     return company;
+  }
+
+  // PATCH /api/billing/company — обновление профиля компании текущим
+  // пользователем (а не админом). Все поля опциональные, не передал —
+  // не меняется. Адреса сохраняются как relation'ы Company → Address:
+  // если приходит объект, создаём/обновляем строку в Address и
+  // присваиваем factualAddressId/structuredLegalAddressId. null — отвязываем.
+  async updateOwnProfile(companyId: string, input: CompanyProfileUpdateDto) {
+    const existing = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, factualAddressId: true, structuredLegalAddressId: true },
+    });
+    if (!existing) {
+      throw new NotFoundException("Компания не найдена.");
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const data: Prisma.CompanyUpdateInput = {};
+
+      if (input.organizationName !== undefined) data.organizationName = input.organizationName;
+      if (input.websiteUrl !== undefined) data.websiteUrl = normaliseOptionalString(input.websiteUrl);
+      if (input.corporatePhone !== undefined) data.corporatePhone = normaliseOptionalString(input.corporatePhone);
+      if (input.corporateEmail !== undefined) data.corporateEmail = normaliseOptionalString(input.corporateEmail);
+      if (input.about !== undefined) data.about = normaliseOptionalString(input.about);
+      if (input.contactPersonName !== undefined)
+        data.contactPersonName = normaliseOptionalString(input.contactPersonName);
+      if (input.contactPersonPhone !== undefined)
+        data.contactPersonPhone = normaliseOptionalString(input.contactPersonPhone);
+      if (input.contactPersonEmail !== undefined)
+        data.contactPersonEmail = normaliseOptionalString(input.contactPersonEmail);
+      if (input.billingInn !== undefined) data.billingInn = normaliseOptionalString(input.billingInn);
+      if (input.billingKpp !== undefined) data.billingKpp = normaliseOptionalString(input.billingKpp);
+      if (input.bankName !== undefined) data.bankName = normaliseOptionalString(input.bankName);
+      if (input.bankBik !== undefined) data.bankBik = normaliseOptionalString(input.bankBik);
+      if (input.bankAccount !== undefined) data.bankAccount = normaliseOptionalString(input.bankAccount);
+      if (input.correspondentAccount !== undefined) {
+        data.correspondentAccount = normaliseOptionalString(input.correspondentAccount);
+      }
+
+      if (input.factualAddress !== undefined) {
+        const addressId = await upsertCompanyAddress(tx, existing.factualAddressId, input.factualAddress);
+        data.factualAddress = addressId ? { connect: { id: addressId } } : { disconnect: true };
+      }
+      if (input.structuredLegalAddress !== undefined) {
+        const addressId = await upsertCompanyAddress(
+          tx,
+          existing.structuredLegalAddressId,
+          input.structuredLegalAddress,
+        );
+        data.structuredLegalAddress = addressId ? { connect: { id: addressId } } : { disconnect: true };
+        // Старое текстовое legalAddress синхронизируем с новой `formatted`
+        // строкой — оставляем работоспособной существующую UI-ленту.
+        if (input.structuredLegalAddress) {
+          const formatted =
+            input.structuredLegalAddress.formatted ?? composeFormattedAddress(input.structuredLegalAddress);
+          data.legalAddress = formatted;
+        } else {
+          data.legalAddress = null;
+        }
+      }
+
+      const updated = await tx.company.update({
+        where: { id: companyId },
+        data,
+        include: {
+          subscriptions: { orderBy: { createdAt: "desc" }, take: 5 },
+          factualAddress: true,
+          structuredLegalAddress: true,
+        },
+      });
+
+      return updated;
+    });
   }
 
   async listCompanies(pagination: { limit?: number; offset?: number } = {}) {
@@ -302,4 +381,64 @@ function stableStringify(value: Record<string, unknown>): string {
         return acc;
       }, {}),
   );
+}
+
+// Пустую строку из формы трактуем как «очистить». Trim'аем заранее в Zod-схеме,
+// поэтому здесь только пробрасываем undefined/null/непустую строку.
+function normaliseOptionalString(value: string | null | undefined): string | null {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+// Если у Company уже есть Address — обновляем строку (адрес меняется, id остаётся);
+// иначе создаём новую. Если входной address=null — возвращаем null (Company.update
+// сделает disconnect; orphaned Address остаётся в БД до отдельной очистки, потому
+// что в будущем эту запись могут переиспользовать).
+async function upsertCompanyAddress(
+  tx: Prisma.TransactionClient,
+  existingAddressId: string | null,
+  address: AddressDto | null | undefined,
+): Promise<string | null> {
+  if (!address) {
+    return null;
+  }
+
+  const formatted = address.formatted?.trim() || composeFormattedAddress(address);
+  const data = {
+    country: address.country?.trim() || "Россия",
+    region: address.region?.trim() || null,
+    city: address.city.trim(),
+    street: address.street?.trim() || null,
+    building: address.building?.trim() || null,
+    apartment: address.apartment?.trim() || null,
+    postcode: address.postcode?.trim() || null,
+    formatted,
+    source: "manual",
+  };
+
+  if (existingAddressId) {
+    const updated = await tx.address.update({ where: { id: existingAddressId }, data });
+    return updated.id;
+  }
+  const created = await tx.address.create({ data });
+  return created.id;
+}
+
+// Собирает одну строку адреса из полей. Используется когда пользователь
+// не указал `formatted` явно. Порядок — как принято в России:
+// индекс, регион, город, улица, дом, квартира.
+function composeFormattedAddress(address: AddressDto): string {
+  const parts = [
+    address.postcode,
+    address.region,
+    address.city,
+    address.street ? `ул. ${address.street}` : null,
+    address.building ? `д. ${address.building}` : null,
+    address.apartment ? `кв. ${address.apartment}` : null,
+  ]
+    .map((part) => part?.toString().trim())
+    .filter((part): part is string => Boolean(part));
+  return parts.join(", ");
 }
