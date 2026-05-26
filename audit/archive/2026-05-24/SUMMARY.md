@@ -198,13 +198,13 @@
 
 | Отчёт | Покрывает |
 | --- | --- |
-| [audit/00-baseline.md](audit/00-baseline.md) | Инвентаризация проекта, проверка чистоты base |
-| [audit/01-security.md](audit/01-security.md) | 5 P0 / 8 P1 / 6 P2 — безопасность |
-| [audit/02-stability.md](audit/02-stability.md) | 3 P0 / 6 P1 / 5 P2 — стабильность |
-| [audit/03-bugs.md](audit/03-bugs.md) | 3 P0 / 8 P1 / 7 P2 — UX и баги |
-| [audit/04-performance.md](audit/04-performance.md) | 3 P0 / 6 P1 / 6 P2 — производительность |
-| [audit/05-architecture.md](audit/05-architecture.md) | 3 P0 / 5 P1 / 9 P2 — архитектура |
-| [audit/06-deploy.md](audit/06-deploy.md) | 6 P0 / 7 P1 / 7 P2 — деплой Timeweb |
+| [audit/00-baseline.md](00-baseline.md) | Инвентаризация проекта, проверка чистоты base |
+| [audit/01-security.md](01-security.md) | 5 P0 / 8 P1 / 6 P2 — безопасность |
+| [audit/02-stability.md](02-stability.md) | 3 P0 / 6 P1 / 5 P2 — стабильность |
+| [audit/03-bugs.md](03-bugs.md) | 3 P0 / 8 P1 / 7 P2 — UX и баги |
+| [audit/04-performance.md](04-performance.md) | 3 P0 / 6 P1 / 6 P2 — производительность |
+| [audit/05-architecture.md](05-architecture.md) | 3 P0 / 5 P1 / 9 P2 — архитектура |
+| [audit/06-deploy.md](06-deploy.md) | 6 P0 / 7 P1 / 7 P2 — деплой Timeweb |
 
 ---
 

@@ -94,7 +94,7 @@
 - 9.10 — политика пароля: длина 12 + проверка через HaveIBeenPwned pwned-passwords API.
 - 9.11 — документ политики безопасности (security.md + responsible-disclosure).
 
-### Дальше по плану (`audit/EXECUTION-PLAN.md`)
+### Дальше по плану (`audit/ROADMAP.md`)
 
 - **Волна 10** — наблюдаемость: pino structured logging + `LOG_LEVEL`, Sentry, Prometheus метрики, distributed health, прод smoke-test.
 - **Волна 11** — UX/дизайн-система: токены, типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»).
