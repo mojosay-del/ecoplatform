@@ -189,7 +189,7 @@ async function createPublishedNewsWithComment(adminToken: string, authorToken: s
   return { news: publish.body, comment: comment.body };
 }
 
-async function createPublishedNews(adminToken: string, suffix: string) {
+async function createPublishedNews(adminToken: string, suffix: string, tags: string[] = [`moderation-${suffix}`]) {
   const draft = await ctx.http
     .post("/api/admin/content/news")
     .set("Authorization", `Bearer ${adminToken}`)
@@ -197,7 +197,7 @@ async function createPublishedNews(adminToken: string, suffix: string) {
       title: `Новость для модерации ${suffix}`,
       lead: "Лид новости",
       blocks: [{ type: "paragraph", payload: { html: "<p>Тело новости.</p>" } }],
-      tags: [`moderation-${suffix}`],
+      tags,
     });
   expect(draft.status).toBe(201);
 
@@ -482,6 +482,38 @@ describe("Content publish", () => {
       expect.arrayContaining(["рынок", "переработка", "экология"]),
     );
     expect(res.body.find((tag: { name: string }) => tag.name === "рынок").usageCount).toBe(2);
+  });
+
+  it("публичный список тегов возвращает топ тегов по usageCount с limit", async () => {
+    const adminToken = await loginAdmin();
+    const { token: userToken } = await registerCompany("0000021");
+
+    await createPublishedNews(adminToken, "tags-top-1", ["рынок", "пластик"]);
+    await createPublishedNews(adminToken, "tags-top-2", ["рынок", "экология"]);
+
+    const res = await ctx.http.get("/api/news/tags?limit=1").set("Authorization", `Bearer ${userToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).toMatchObject({ name: "рынок", usageCount: 2 });
+    expect(res.body[0].slug).toBeTruthy();
+  });
+
+  it("фильтрует публичный /api/news по tags[] с AND-семантикой", async () => {
+    const adminToken = await loginAdmin();
+    const { token: userToken } = await registerCompany("0000021");
+
+    const target = await createPublishedNews(adminToken, "tags-and-target", ["рынок", "пластик"]);
+    await createPublishedNews(adminToken, "tags-and-market", ["рынок"]);
+    await createPublishedNews(adminToken, "tags-and-plastic", ["пластик", "экология"]);
+
+    const res = await ctx.http
+      .get("/api/news")
+      .query({ "tags[]": ["рынок", "пластик"], limit: 20, offset: 0 })
+      .set("Authorization", `Bearer ${userToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(1);
+    expect(res.body.items.map((item: { id: string }) => item.id)).toEqual([target.id]);
+    expect(res.body.hasMore).toBe(false);
   });
 
   it("пользователь может поставить и снять лайк с комментария к новости", async () => {

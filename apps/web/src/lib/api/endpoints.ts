@@ -21,12 +21,14 @@ import type {
   LegalDocumentType,
   NewsListItem,
   NewsPostDetail,
+  NewsTagSummary,
   NomenclatureCategoryListItem,
   PaginatedResponse,
 } from "@ecoplatform/shared";
 import { apiFetch, type FileAsset } from "./core";
 
 type PaginationInput = { limit?: number; offset?: number };
+type NewsListInput = PaginationInput & { tags?: string[] };
 
 // Лайки и комментарии возвращают одинаковую полезную нагрузку — выносим.
 export type LikeResult = {
@@ -48,11 +50,20 @@ function paginationSuffix(pagination: PaginationInput = {}) {
   return query.toString() ? `?${query.toString()}` : "";
 }
 
+function newsListSuffix(input: NewsListInput = {}) {
+  const query = new URLSearchParams();
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  if (input.offset !== undefined) query.set("offset", String(input.offset));
+  input.tags?.forEach((tag) => query.append("tags[]", tag));
+  return query.toString() ? `?${query.toString()}` : "";
+}
+
 export const api = {
   // ── Новости ─────────────────────────────────────────────────────────────
   news: {
-    list: (pagination: PaginationInput = {}) =>
-      apiFetch<PaginatedResponse<NewsListItem>>(`/news${paginationSuffix(pagination)}`),
+    list: (input: NewsListInput = {}) => apiFetch<PaginatedResponse<NewsListItem>>(`/news${newsListSuffix(input)}`),
+    tags: (options: { limit?: number } = {}) =>
+      apiFetch<NewsTagSummary[]>(`/news/tags${options.limit !== undefined ? `?limit=${options.limit}` : ""}`),
     get: (slug: string) => apiFetch<NewsPostDetail>(`/news/${enc(slug)}`),
     like: (id: string) => apiFetch<LikeResult>(`/news/${enc(id)}/like`, { method: "POST" }),
     addComment: (postId: string, body: { text: string; parentCommentId?: string }) =>

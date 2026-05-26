@@ -28,6 +28,10 @@ import { KnowledgeBaseService } from "./services/knowledge-base.service";
 import { LearningService } from "./services/learning.service";
 import { NewsService } from "./services/news.service";
 
+function parseStringArrayQuery(...values: Array<string | string[] | undefined>): string[] {
+  return values.flatMap((value) => (Array.isArray(value) ? value : value !== undefined ? [value] : []));
+}
+
 // Контроллер контент-домена. Инжектит 4 доменных сервиса (по результатам
 // Волны 3.2 split). Маршруты сгруппированы по доменам — секции News /
 // Indices / Learning / KnowledgeBase. Внутри каждой — сперва публичные,
@@ -51,10 +55,18 @@ export class ContentController {
     @CurrentUser() user: RequestUser,
     @Query("limit") limitRaw?: string,
     @Query("offset") offsetRaw?: string,
+    @Query("tags") tagsRaw?: string | string[],
+    @Query("tags[]") bracketTagsRaw?: string | string[],
   ) {
     const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
     const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.news.listNews(user, { limit, offset });
+    return this.news.listNews(user, { limit, offset, tags: parseStringArrayQuery(tagsRaw, bracketTagsRaw) });
+  }
+
+  @Get("news/tags")
+  async newsTags(@CurrentUser() user: RequestUser, @Query("limit") limitRaw?: string) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    return this.news.listNewsTags(user, { limit });
   }
 
   @Get("news/:slug")

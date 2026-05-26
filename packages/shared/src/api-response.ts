@@ -48,6 +48,10 @@ export type NewsTag = {
   slug: string;
 };
 
+export type NewsTagSummary = NewsTag & {
+  usageCount: number;
+};
+
 export type NewsTagLink = {
   newsTag: NewsTag;
 };

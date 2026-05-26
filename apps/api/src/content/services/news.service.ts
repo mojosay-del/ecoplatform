@@ -4,6 +4,7 @@ import { newsBlockSchema, slugify, validateContentBlocks } from "@ecoplatform/sh
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { ModuleAccessService } from "../../common/module-access.service";
+import { paginatedResponse, resolvePagination, type PaginationInput } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import type { z } from "zod";
 import type { newsInputSchema } from "../content.schemas";
@@ -64,6 +65,10 @@ function resolveProfileAvatarUrl(platformRoles: string[], companyType: string | 
   return `/avatars/company/${companyPrefix}${suffix}.png`;
 }
 
+function normaliseTagFilters(tagNames: string[] = []): string[] {
+  return Array.from(new Set(tagNames.map((name) => name.trim()).filter(Boolean)));
+}
+
 // Раздел «Новости»: чтение, CRUD, теги, лайки, комментарии. Вынесен из
 // 2120-строчного ContentService — теперь автономный сервис, который инжектит
 // ContentCommonService для shared-хелперов (assertFunctionalAccess, payload,
@@ -77,23 +82,30 @@ export class NewsService {
     private readonly common: ContentCommonService,
   ) {}
 
-  async listNews(user: RequestUser, pagination: { limit?: number; offset?: number } = {}) {
+  async listNews(user: RequestUser, paginationInput: PaginationInput & { tags?: string[] } = {}) {
     this.common.assertFunctionalAccess(user);
 
-    // Лимит ограничен сверху, чтобы клиент случайно не выкачал всю таблицу
-    // одним запросом. Дефолт 20 — комфортный размер для первого экрана ленты.
-    const limit = Math.min(Math.max(pagination.limit ?? 20, 1), 100);
-    const offset = Math.max(pagination.offset ?? 0, 0);
+    const pagination = resolvePagination(paginationInput, { defaultLimit: 20, maxLimit: 100 });
+    const tagFilters = normaliseTagFilters(paginationInput.tags);
 
-    const where = { status: ContentStatus.published };
+    const where: Prisma.NewsPostWhereInput = {
+      status: ContentStatus.published,
+      ...(tagFilters.length > 0
+        ? {
+            AND: tagFilters.map((name) => ({
+              tags: { some: { newsTag: { name } } },
+            })),
+          }
+        : {}),
+    };
 
     const [total, posts] = await this.prisma.$transaction([
       this.prisma.newsPost.count({ where }),
       this.prisma.newsPost.findMany({
         where,
         orderBy: { firstPublishedAt: "desc" },
-        take: limit,
-        skip: offset,
+        take: pagination.limit,
+        skip: pagination.offset,
         include: {
           tags: { include: { newsTag: true } },
           likes: { where: { userId: user.id }, select: { id: true } },
@@ -112,11 +124,25 @@ export class NewsService {
       _count: { likes: _count.likes, comments: commentCounts.get(post.id) ?? 0 },
       likedByMe: likes.length > 0,
     }));
-    return {
-      items,
-      total,
-      hasMore: offset + items.length < total,
-    };
+    return paginatedResponse(items, total, pagination);
+  }
+
+  async listNewsTags(user: RequestUser, options: { limit?: number } = {}) {
+    this.common.assertFunctionalAccess(user);
+    const limit = resolvePagination({ limit: options.limit }, { defaultLimit: 20, maxLimit: 100 }).limit;
+
+    return this.prisma.newsTag.findMany({
+      where: {
+        posts: {
+          some: {
+            newsPost: { status: ContentStatus.published },
+          },
+        },
+      },
+      orderBy: [{ usageCount: "desc" }, { name: "asc" }],
+      take: limit,
+      select: { id: true, name: true, slug: true, usageCount: true },
+    });
   }
 
   // Для списочного эндпоинта /news и админ-листинга. На вход — id новостей,
