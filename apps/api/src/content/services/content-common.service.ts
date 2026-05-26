@@ -26,12 +26,18 @@ export class ContentCommonService {
 
   // Готовит payload блока для записи в БД. Для paragraph — сначала прогоняет
   // HTML через санитайзер (единый для api/web, см. packages/shared/sanitize-html).
+  //
+  // В payload автоматически вставляется ключ `v: 1` (Волна 7.7). Это
+  // версия формата блока — нужна, чтобы в будущем подключить второй парсер
+  // (например, paragraph v2 с inline-форматированием) без массовой миграции
+  // старых строк.
   payload(block: { type: string; payload: unknown }): Prisma.InputJsonValue {
     if (block.type === "paragraph") {
       const { html } = block.payload as { html: string };
-      return { html: sanitizeParagraphHtml(html) } as Prisma.InputJsonValue;
+      return { v: 1, html: sanitizeParagraphHtml(html) } as Prisma.InputJsonValue;
     }
-    return block.payload as Prisma.InputJsonValue;
+    const original = (block.payload as Record<string, unknown>) ?? {};
+    return { v: 1, ...original } as Prisma.InputJsonValue;
   }
 
   // Рекурсивно собирает все fileId, упомянутые внутри payload блоков.

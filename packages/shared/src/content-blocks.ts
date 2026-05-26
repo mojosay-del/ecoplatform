@@ -16,6 +16,24 @@ export const contentBlockKinds = [
 
 export type ContentBlockKind = (typeof contentBlockKinds)[number];
 
+// Версионирование payload-блоков (Волна 7.7). Все блоки в БД получают
+// ключ `v` внутри payload (jsonb). Сейчас единственная версия — 1.
+//
+// Идея: когда формат блока меняется (например, paragraph_v2 с расширенным
+// inline-форматированием), старые строки остаются как `v: 1` и читаются
+// старым парсером, новые — `v: 2` и читаются новым. Никакой массовой
+// миграции данных при изменении формата не нужно.
+//
+// Конкретные TS-типы блоков (BaseContentBlock, LessonContentBlock) — это
+// «текущая» (= v1) форма. ContentBlockV1 — обобщённая обёртка для слоёв,
+// которые работают с блоком «снаружи payload» (например, рендер-роутер).
+export const CURRENT_CONTENT_BLOCK_VERSION = 1 as const;
+
+export type ContentBlockV1<TPayload = Record<string, unknown>> = {
+  type: ContentBlockKind;
+  payload: TPayload & { v: 1 };
+};
+
 const imagePayloadSchema = z.object({
   fileId: z.string().min(1),
   caption: z.string().optional(),

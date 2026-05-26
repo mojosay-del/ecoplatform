@@ -285,6 +285,7 @@ model Company {
   supportTickets           SupportTicket[]
   paymentMethods           PaymentMethod[]
   payments                 Payment[]
+  apiKeys                  ApiKey[]
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
 }
@@ -307,6 +308,30 @@ model PaymentMethod {
   payments      Payment[]
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
+
+  @@index([companyId, isActive])
+}
+
+// Ключи внешнего API компании (Волна 7.8). UI и эндпоинты для генерации/
+// отзыва ключей в MVP не реализованы — только модель, чтобы при подключении
+// внешнего ERP-интегратора был стабильный фундамент.
+//
+// Безопасность: храним bcrypt-hash секрета (`keyHash`), не сам секрет.
+// При создании секрет возвращается один раз и больше нигде в БД не лежит.
+// `scopes` — массив строк типа `news:read`, `indices:read` для будущего
+// scope-based авторизатора.
+model ApiKey {
+  id         String    @id @default(cuid())
+  companyId  String
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name       String
+  keyHash    String    @unique
+  scopes     String[]  @default([])
+  isActive   Boolean   @default(true)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  createdBy  String
 
   @@index([companyId, isActive])
 }
