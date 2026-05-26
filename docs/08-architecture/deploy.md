@@ -20,7 +20,7 @@ updated: 2026-05-24
 
 | Имя | Где задаётся | Пример |
 | --- | --- | --- |
-| `DATABASE_URL` | оба контейнера | `postgresql://USER:PASS@HOST:6432/db?schema=public&sslmode=require` |
+| `DATABASE_URL` | оба контейнера | `postgresql://USER:PASS@HOST:6432/db?schema=public&sslmode=require&connection_limit=20` |
 | `JWT_ACCESS_SECRET` | api | минимум 32 символа, `openssl rand -hex 32` |
 | `JWT_REFRESH_SECRET` | api | минимум 32 символа, отдельный от access |
 | `WEB_ORIGIN` | api | публичный URL фронта, например `https://app.eco-platform.ru` |
@@ -43,9 +43,13 @@ updated: 2026-05-24
 
 1. Создайте кластер PostgreSQL 18 в панели Timeweb.
 2. На вкладке «Доступ» возьмите host/port/credentials.
-3. В `DATABASE_URL` обязательно добавьте `?sslmode=require` — managed-Postgres у Timeweb требует TLS.
-4. Если у кластера self-signed корневой сертификат, добавьте `&sslaccept=accept_invalid_certs` (Prisma).
-5. Совместимость: Prisma 6 официально документирована до PG 17, но wire-protocol совместим. Прогоните integration-тесты против PG 18 локально (поднимите второй контейнер postgres:18 на :5434) перед первым прод-деплоем.
+3. В `DATABASE_URL` обязательно добавьте `sslmode=require` — managed-Postgres у Timeweb требует TLS.
+4. Держите `connection_limit=20` в `DATABASE_URL`: одна API-реплика держит до 20 соединений, поэтому при N репликах закладывайте примерно `N * 20` соединений плюс запас под миграции и ручные админские подключения.
+5. Если тариф БД даёт маленький max connections, уменьшите `connection_limit` до 10 и масштабируйте API реплики после проверки метрик.
+6. Если у кластера self-signed корневой сертификат, добавьте `&sslaccept=accept_invalid_certs` (Prisma).
+7. Совместимость: Prisma 6 официально документирована до PG 17, но wire-protocol совместим. Прогоните integration-тесты против PG 18 локально (поднимите второй контейнер postgres:18 на :5434) перед первым прод-деплоем.
+
+`PrismaService` дополнительно страхует конфигурацию: если в `DATABASE_URL` забыли `connection_limit`, он добавит значение `20` при создании `PrismaClient`. Клиент стартует с `errorFormat: "minimal"` и логами `warn/error`; query-логи в проде не включаем, чтобы не шуметь и не рисковать чувствительными данными в логах.
 
 ---
 
