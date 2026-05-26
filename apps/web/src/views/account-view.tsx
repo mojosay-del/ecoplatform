@@ -29,6 +29,7 @@ import type {
   CompanyProfileUpdateDto,
   PaginatedResponse,
 } from "@ecoplatform/shared";
+import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { api, clearAccessToken } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -740,7 +741,7 @@ export function AccountView() {
                       name="newPassword"
                       type="password"
                       autoComplete="new-password"
-                      minLength={10}
+                      minLength={MIN_PASSWORD_LENGTH}
                       required
                     />
                   </label>
@@ -751,7 +752,7 @@ export function AccountView() {
                       name="repeatPassword"
                       type="password"
                       autoComplete="new-password"
-                      minLength={10}
+                      minLength={MIN_PASSWORD_LENGTH}
                       required
                     />
                   </label>

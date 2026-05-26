@@ -10,12 +10,13 @@ import { JwtService } from "@nestjs/jwt";
 import { CompanyStatus, NotificationCategory, UserStatus } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { randomBytes } from "crypto";
-import type { AuthMeUser, LoginDto, RegisterDto } from "@ecoplatform/shared";
+import { MIN_PASSWORD_LENGTH, type AuthMeUser, type LoginDto, type RegisterDto } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
+import { PasswordPolicyService } from "./password-policy.service";
 
 type SessionTokens = {
   accessToken: string;
@@ -52,6 +53,7 @@ export class AuthService {
     @Inject(forwardRef(() => NotificationsService))
     private readonly notifications: NotificationsService,
     private readonly sessionCache: SessionCacheService,
+    private readonly passwordPolicy: PasswordPolicyService,
   ) {}
 
   async register(input: RegisterDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {
@@ -91,6 +93,8 @@ export class AuthService {
         })
       : [];
     const consentDocumentIds = Array.from(new Set(optionalAcceptedActive.map((d) => d.id)));
+
+    await this.passwordPolicy.assertAcceptablePassword(input.password);
 
     const passwordHash = await hash(input.password, 12);
     const demoHours = await this.settings.getValue("demo.duration_hours");
@@ -221,8 +225,8 @@ export class AuthService {
     sessionId: string,
     input: { currentPassword: string; newPassword: string },
   ): Promise<{ ok: true }> {
-    if (input.newPassword.length < 10) {
-      throw new BadRequestException("Новый пароль должен содержать не менее 10 символов.");
+    if (input.newPassword.length < MIN_PASSWORD_LENGTH) {
+      throw new BadRequestException(`Новый пароль должен содержать не менее ${MIN_PASSWORD_LENGTH} символов.`);
     }
     if (input.newPassword === input.currentPassword) {
       throw new BadRequestException("Новый пароль должен отличаться от текущего.");
@@ -237,6 +241,8 @@ export class AuthService {
     if (!ok) {
       throw new UnauthorizedException("Текущий пароль указан неверно.");
     }
+
+    await this.passwordPolicy.assertAcceptablePassword(input.newPassword);
 
     const passwordHash = await hash(input.newPassword, 12);
     await this.prisma.$transaction(async (tx) => {

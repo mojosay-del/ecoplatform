@@ -7,6 +7,7 @@ import { RedisModule } from "../redis/redis.module";
 import { AuthDataExportService } from "./auth-data-export.service";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
+import { PasswordPolicyService } from "./password-policy.service";
 
 @Module({
   // forwardRef разрывает цикл AuthModule ↔ NotificationsModule:
@@ -14,9 +15,9 @@ import { AuthService } from "./auth.service";
   // а authService инжектит NotificationsService для уведомлений безопасности.
   imports: [JwtModule.register({}), RedisModule, forwardRef(() => NotificationsModule)],
   controllers: [AuthController],
-  providers: [AuthService, AuthDataExportService, JwtAuthGuard, RolesGuard],
+  providers: [AuthService, AuthDataExportService, PasswordPolicyService, JwtAuthGuard, RolesGuard],
   // JwtModule реэкспортируем, чтобы гварды, импортированные в другие модули,
   // могли получить JwtService через AuthModule.
-  exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
+  exports: [AuthService, PasswordPolicyService, JwtAuthGuard, RolesGuard, JwtModule],
 })
 export class AuthModule {}

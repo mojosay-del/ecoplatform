@@ -9,6 +9,7 @@ loadEnv({ path: resolve(__dirname, "../../../../.env") });
 // Integration-сценарии за секунды делают десятки register/login/refresh —
 // прод-лимит в 10/мин уронил бы их. На прод этот флаг не выставляется.
 process.env.THROTTLER_DISABLED = "1";
+process.env.PWNED_PASSWORDS_CHECK_ENABLED = "0";
 
 // DATABASE_URL приходит из globalSetup (process.env уже изменён в parent-процессе vitest).
 if (!process.env.DATABASE_URL?.includes("_test")) {

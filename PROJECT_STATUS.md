@@ -4,11 +4,11 @@
 
 ## Текущий этап
 
-Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ и лимиты файлов (Волна 9 — пункты 9.1–9.5, 9.8–9.9).
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, лимиты файлов и политика новых паролей (Волна 9 — пункты 9.1–9.6, 9.8–9.10).
 
-В работе сейчас: пункт 9.6 — запрос пользователя на удаление аккаунта с 30-дневной отсрочкой (бэк, UI «Опасная зона», ночной cron для физического удаления). Код лежит в рабочей копии (uncommitted), integration-тесты по нему уже написаны.
+В работе сейчас: пункт 9.7 — audit-trail с before/after на критические admin-действия (параллельная работа Claude).
 
-Целевой следующий шаг: добиить остаток Волны 9 (audit-trail с before/after, политика пароля с проверкой по HaveIBeenPwned, документ политики безопасности), затем перейти к Волне 10 (структурное логирование pino, Sentry, метрики Prometheus, прод smoke-test).
+Целевой следующий шаг: добить остаток Волны 9 (9.7 audit-trail before/after и 9.11 документ политики безопасности), затем перейти к Волне 10 (структурное логирование pino, Sentry, метрики Prometheus, прод smoke-test).
 
 ## Что уже сделано
 
@@ -73,8 +73,9 @@
 - Экспорт «моих данных» по 152-ФЗ: `POST /api/auth/me/export-data` отдаёт ZIP с 14 JSON-файлами (профиль, компания, согласия, сессии, уведомления, тикеты, прогресс, комментарии, реакции, модерация, FileAsset metadata, авторский контент, audit-log). Никаких `passwordHash`/`refreshTokenHash`/`providerToken`/`keyHash`. UI: `/account → Безопасность → Мои данные`.
 - Лимиты файлового аплоадера: throttle 20 запросов/мин, дневная квота 500 МБ на компанию (или на пользователя для платформенного staff без компании).
 - Защита cover-image: news/learning/knowledge create/update принимают только публичные изображения; content-manager — только свои, admin может ставить чужие публичные.
+- Политика новых паролей: общий `MIN_PASSWORD_LENGTH=12`; регистрация, смена пароля и создание staff проверяют пароль через Have I Been Pwned Pwned Passwords range API по SHA-1 k-anonymity (`/range/{first5}`) без отправки plaintext.
 
-### В работе сейчас (uncommitted)
+### Последние закрытые задачи Волны 9
 
 - **Пункт 9.6 — запрос на удаление аккаунта**:
   - Миграция `20260526150000_account_deletion_request`: `User.deletionRequestedAt`, `Company.statusBeforeDeletion`, новый статус `CompanyStatus.pending_deletion`, индекс по `deletionRequestedAt`.
@@ -84,14 +85,16 @@
   - UI: блок «Опасная зона» в `/account → Безопасность` с двумя сценариями («Запросить удаление» / «Передумал»).
   - `AuthMeUser` расширен `deletionRequestedAt` и `deletionScheduledFor`; `companyStatuses` в shared включает `pending_deletion`.
   - 2 integration-теста: полный сценарий request → cancel и cleanup через 30 дней.
+- **Пункт 9.10 — политика новых паролей**:
+  - `MIN_PASSWORD_LENGTH` поднят до 12 в `@ecoplatform/shared`, UI регистрации/account/admin-staff берёт тот же минимум.
+  - `PasswordPolicyService` проверяет новые пароли через Have I Been Pwned range API с `Add-Padding: true`, локальным SHA-1 suffix-сравнением, cache и fail-open при недоступности внешнего API.
+  - Внешняя проверка отключается для integration/offline через `PWNED_PASSWORDS_CHECK_ENABLED=0`.
 
 ## Что осталось
 
-### Волна 9 (5 пунктов)
+### Волна 9 (2 пункта)
 
-- 9.6 — запрос на удаление аккаунта (в работе сейчас, см. выше).
 - 9.7 — audit-trail с before/after на критические admin-действия (сейчас `AdminActionLog` пишет только `payload`).
-- 9.10 — политика пароля: длина 12 + проверка через HaveIBeenPwned pwned-passwords API.
 - 9.11 — документ политики безопасности (security.md + responsible-disclosure).
 
 ### Дальше по плану (`audit/ROADMAP.md`)

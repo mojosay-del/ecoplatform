@@ -112,7 +112,7 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
     gender: "male",
     phone: `+7900${suffix}`,
     email: `user${suffix}@test.local`,
-    password: "User123456",
+    password: "User12345678",
     acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
   });
   expect(res.status).toBe(201);
@@ -335,7 +335,7 @@ describe("Auth", () => {
       gender: "female",
       phone: "+71111111112",
       email: "trader-female@test.local",
-      password: "User123456",
+      password: "User12345678",
       acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
     });
     expect(res.status).toBe(201);
@@ -358,7 +358,7 @@ describe("Auth", () => {
       gender: "male",
       phone: "+71111111111",
       email: "user0000002@test.local",
-      password: "User123456",
+      password: "User12345678",
     });
     expect(dup.status).toBe(409);
   });
@@ -394,7 +394,7 @@ describe("Auth", () => {
 
     const blockedEvenWithCorrectPassword = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0000004@test.local", password: "User123456" });
+      .send({ email: "user0000004@test.local", password: "User12345678" });
     expect(blockedEvenWithCorrectPassword.status).toBe(401);
     expect(blockedEvenWithCorrectPassword.body.message).toContain("Учётная запись временно заблокирована");
 
@@ -405,7 +405,7 @@ describe("Auth", () => {
 
     const loginAfterLockout = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0000004@test.local", password: "User123456" });
+      .send({ email: "user0000004@test.local", password: "User12345678" });
     expect(loginAfterLockout.status).toBe(201);
     expect(loginAfterLockout.body.accessToken).toMatch(/\./);
 
@@ -480,7 +480,7 @@ describe("Auth", () => {
     const { token, companyId, userId } = await registerCompany("0000006");
     const secondLogin = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0000006@test.local", password: "User123456" });
+      .send({ email: "user0000006@test.local", password: "User12345678" });
     expect(secondLogin.status).toBe(201);
 
     const requestDeletion = await ctx.http
@@ -665,6 +665,20 @@ describe("Demo gating", () => {
     expect(logs).toHaveLength(1);
     expect(notifications).toHaveLength(1);
     expect(deliveries).toHaveLength(2);
+
+    // Волна 9.7: payload админ-журнала пишется в формате before/after/diff.
+    const auditPayload = logs[0].payload as {
+      before: { status: string; subscriptionPlan: string };
+      after: { status: string; subscriptionPlan: string };
+      diff: Record<string, { before: unknown; after: unknown }>;
+      subscriptionId: string;
+    };
+    expect(auditPayload.before.status).toBe("demo");
+    expect(auditPayload.after.status).toBe("active");
+    expect(auditPayload.after.subscriptionPlan).toBe("extended");
+    expect(auditPayload.diff.status).toEqual({ before: "demo", after: "active" });
+    expect(auditPayload.diff.subscriptionPlan.after).toBe("extended");
+    expect(auditPayload.subscriptionId).toBe(subscriptions[0].id);
   });
 });
 
@@ -1221,8 +1235,22 @@ describe("Admin users panel", () => {
 
     const relogin = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0100004@test.local", password: "User123456" });
+      .send({ email: "user0100004@test.local", password: "User12345678" });
     expect(relogin.status).toBe(401);
+
+    const blockLog = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: target.userId, action: "admin.user.block" },
+    });
+    const blockPayload = blockLog?.payload as {
+      before: { status: string };
+      after: { status: string };
+      diff: Record<string, { before: unknown; after: unknown }>;
+      reasonCode: string;
+    };
+    expect(blockPayload.before.status).toBe("active");
+    expect(blockPayload.after.status).toBe("blocked");
+    expect(blockPayload.diff.status).toEqual({ before: "active", after: "blocked" });
+    expect(blockPayload.reasonCode).toBe("policy_violation");
 
     const unblock = await ctx.http
       .post(`/api/admin/users/${target.userId}/unblock`)
@@ -1231,9 +1259,17 @@ describe("Admin users panel", () => {
     expect(unblock.status).toBe(201);
     expect(unblock.body.status).toBe(UserStatus.active);
 
+    const unblockLog = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: target.userId, action: "admin.user.unblock" },
+    });
+    const unblockPayload = unblockLog?.payload as {
+      diff: Record<string, { before: unknown; after: unknown }>;
+    };
+    expect(unblockPayload.diff.status).toEqual({ before: "blocked", after: "active" });
+
     const reloginOk = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0100004@test.local", password: "User123456" });
+      .send({ email: "user0100004@test.local", password: "User12345678" });
     expect(reloginOk.status).toBe(201);
   });
 
@@ -1352,6 +1388,14 @@ describe("Admin companies panel", () => {
       where: { entityId: target.companyId, action: "admin.company.status" },
     });
     expect(log).toBeTruthy();
+    const payload = log?.payload as {
+      before: { status: string };
+      after: { status: string };
+      diff: Record<string, { before: unknown; after: unknown }>;
+      reasonCode: string;
+    };
+    expect(payload.diff.status).toEqual({ before: "demo", after: "blocked" });
+    expect(payload.reasonCode).toBe("policy_violation");
   });
 
   it("отказывает в смене статуса на тот же самый", async () => {
@@ -1371,7 +1415,7 @@ describe("Email channel queue (задел)", () => {
     const company = await registerCompany("0700001");
     const login = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0700001@test.local", password: "User123456" });
+      .send({ email: "user0700001@test.local", password: "User12345678" });
     expect(login.status).toBe(201);
 
     const deliveries = await ctx.prisma.notificationDelivery.findMany({
@@ -1537,7 +1581,7 @@ describe("Auth security notifications", () => {
     // но повторный логин должен создать notification.
     const login = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0500001@test.local", password: "User123456" });
+      .send({ email: "user0500001@test.local", password: "User12345678" });
     expect(login.status).toBe(201);
 
     const note = await ctx.prisma.inAppNotification.findFirst({
@@ -1554,7 +1598,7 @@ describe("Auth security notifications", () => {
     const login = await ctx.http
       .post("/api/auth/login")
       .set("User-Agent", "DifferentBrowser/1.0")
-      .send({ email: "user0500002@test.local", password: "User123456" });
+      .send({ email: "user0500002@test.local", password: "User12345678" });
     expect(login.status).toBe(201);
 
     const note = await ctx.prisma.inAppNotification.findFirst({
@@ -1571,7 +1615,7 @@ describe("Auth security notifications", () => {
     // Открываем вторую сессию параллельно.
     const second = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0500003@test.local", password: "User123456" });
+      .send({ email: "user0500003@test.local", password: "User12345678" });
     expect(second.status).toBe(201);
     const secondToken = second.body.accessToken as string;
 
@@ -1579,7 +1623,7 @@ describe("Auth security notifications", () => {
     const change = await ctx.http
       .post("/api/auth/change-password")
       .set("Authorization", `Bearer ${secondToken}`)
-      .send({ currentPassword: "User123456", newPassword: "NewPassw0rd!" });
+      .send({ currentPassword: "User12345678", newPassword: "NewPassw0rd!" });
     expect(change.status).toBe(201);
 
     // Первая сессия отозвана — endpoint /auth/me с её токеном вернёт 401.
@@ -1593,7 +1637,7 @@ describe("Auth security notifications", () => {
     // Логин со старым паролем не работает, с новым — работает.
     const oldLogin = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0500003@test.local", password: "User123456" });
+      .send({ email: "user0500003@test.local", password: "User12345678" });
     expect(oldLogin.status).toBe(401);
 
     const newLogin = await ctx.http
@@ -1624,7 +1668,7 @@ describe("Auth security notifications", () => {
     const res = await ctx.http
       .post("/api/auth/change-password")
       .set("Authorization", `Bearer ${company.token}`)
-      .send({ currentPassword: "User123456", newPassword: "short" });
+      .send({ currentPassword: "User12345678", newPassword: "short" });
     expect(res.status).toBe(400);
   });
 });
@@ -1656,6 +1700,13 @@ describe("Admin journals", () => {
       .get("/api/admin/journals?action=admin.user.block")
       .set("Authorization", `Bearer ${adminToken}`);
     expect(byAction.body.items.every((item: { action: string }) => item.action === "admin.user.block")).toBe(true);
+    // Волна 9.7: GET /admin/journals возвращает payload в формате before/after/diff.
+    const blockEntry = byAction.body.items.find((item: { entityId: string }) => item.entityId === company.userId);
+    expect(blockEntry).toBeTruthy();
+    expect(blockEntry.payload.diff.status).toEqual({ before: "active", after: "blocked" });
+    expect(blockEntry.payload.before.status).toBe("active");
+    expect(blockEntry.payload.after.status).toBe("blocked");
+    expect(blockEntry.payload.reasonCode).toBe("policy_violation");
 
     const byEntity = await ctx.http
       .get("/api/admin/journals?entityType=PlatformSetting")
@@ -1728,6 +1779,10 @@ describe("Platform settings", () => {
       where: { entityId: "moderation.lock_duration_minutes", action: "admin.setting.update" },
     });
     expect(log).toBeTruthy();
+    const payload = log?.payload as {
+      diff: Record<string, { before: unknown; after: unknown }>;
+    };
+    expect(payload.diff.value).toEqual({ before: 15, after: 30 });
   });
 
   it("отказывает в значении вне диапазона", async () => {
@@ -1825,7 +1880,7 @@ describe("Admin staff panel", () => {
         firstName: "Новый",
         lastName: "Модератор",
         gender: "female",
-        password: "Moder12345!",
+        password: "Moder1234567!",
         roles: ["moderator"],
       });
     expect(res.status).toBe(201);
@@ -1834,7 +1889,7 @@ describe("Admin staff panel", () => {
 
     const login = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "moder.new@test.local", password: "Moder12345!" });
+      .send({ email: "moder.new@test.local", password: "Moder1234567!" });
     expect(login.status).toBe(201);
 
     const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${login.body.accessToken}`);
@@ -1853,7 +1908,7 @@ describe("Admin staff panel", () => {
         firstName: "А",
         lastName: "Б",
         gender: "male",
-        password: "Password1!",
+        password: "Password1234!",
         roles: ["moderator"],
       });
     expect(res.status).toBe(409);
@@ -1870,7 +1925,7 @@ describe("Admin staff panel", () => {
         firstName: "К",
         lastName: "М",
         gender: "male",
-        password: "Password1!",
+        password: "Password1234!",
         roles: ["content_manager"],
       });
     expect(created.status).toBe(201);
@@ -1899,14 +1954,14 @@ describe("Admin staff panel", () => {
         firstName: "К",
         lastName: "М",
         gender: "male",
-        password: "Password1!",
+        password: "Password1234!",
         roles: ["moderator"],
       });
     expect(created.status).toBe(201);
 
     const login = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "deact.staff@test.local", password: "Password1!" });
+      .send({ email: "deact.staff@test.local", password: "Password1234!" });
     expect(login.status).toBe(201);
 
     const update = await ctx.http
@@ -1984,7 +2039,7 @@ describe("Admin sanctions", () => {
 
     const relogin = await ctx.http
       .post("/api/auth/login")
-      .send({ email: `user0000060@test.local`, password: "User123456" });
+      .send({ email: `user0000060@test.local`, password: "User12345678" });
     expect(relogin.status).toBe(401);
   });
 
@@ -2094,7 +2149,7 @@ describe("Admin sanctions", () => {
 
     const relogin = await ctx.http
       .post("/api/auth/login")
-      .send({ email: "user0000070@test.local", password: "User123456" });
+      .send({ email: "user0000070@test.local", password: "User12345678" });
     expect(relogin.status).toBe(201);
   });
 
@@ -2876,7 +2931,7 @@ describe("Legal documents & consents", () => {
       gender: "male",
       phone: "+79000000300",
       email: "noconsents@test.local",
-      password: "User123456",
+      password: "User12345678",
       acceptedDocumentIds: ["test-doc-privacy", "test-doc-terms"], // не хватает personal_data_consent
     });
     expect(res.status).toBe(400);

@@ -1,11 +1,9 @@
 import { z } from "zod";
 import { companyTypes, consentSources, legalDocumentTypes, userGenders } from "./domain";
 
-// Единое правило сложности пароля. До этого было три разных:
-// register=8, changePassword=10, admin-staff=10. 10 — компромисс между
-// безопасностью и обратной совместимостью с существующими паролями.
+// Единое правило сложности пароля для новых паролей.
 // Регулярка покрывает кириллицу + латиницу, требует минимум одну букву и одну цифру.
-export const MIN_PASSWORD_LENGTH = 10;
+export const MIN_PASSWORD_LENGTH = 12;
 export const passwordSchema = z
   .string()
   .min(MIN_PASSWORD_LENGTH, `Пароль должен быть не короче ${MIN_PASSWORD_LENGTH} символов.`)

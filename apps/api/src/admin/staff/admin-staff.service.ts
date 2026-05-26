@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { hash } from "bcryptjs";
+import { PasswordPolicyService } from "../../auth/password-policy.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import type { RequestUser } from "../../common/request-user";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -16,6 +17,7 @@ export class AdminStaffService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AdminActionLogService,
     private readonly sessionCache: SessionCacheService,
+    private readonly passwordPolicy: PasswordPolicyService,
   ) {}
 
   async listStaff(pagination: { limit?: number; offset?: number } = {}) {
@@ -59,6 +61,8 @@ export class AdminStaffService {
     if (existing) {
       throw new ConflictException("Пользователь с такой почтой или телефоном уже существует.");
     }
+
+    await this.passwordPolicy.assertAcceptablePassword(input.password);
 
     const passwordHash = await hash(input.password, 12);
     const created = await this.prisma.user.create({

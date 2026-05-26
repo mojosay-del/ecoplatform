@@ -14,6 +14,7 @@ function createService(prisma: Record<string, unknown>) {
     {} as any,
     { createInApp: vi.fn() } as any,
     { invalidateUser: vi.fn(), invalidateSession: vi.fn() } as any,
+    { assertAcceptablePassword: vi.fn() } as any,
   );
 }
 

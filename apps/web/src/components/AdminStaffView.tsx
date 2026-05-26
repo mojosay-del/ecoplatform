@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { FormEvent, useState } from "react";
+import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
 import { apiFetch } from "../lib/api";
@@ -174,9 +175,9 @@ export function AdminStaffView() {
             </label>
             <input
               className="input"
-              minLength={10}
+              minLength={MIN_PASSWORD_LENGTH}
               onChange={(event) => setCreateForm((form) => ({ ...form, password: event.target.value }))}
-              placeholder="Временный пароль (>= 10 символов)"
+              placeholder={`Временный пароль (>= ${MIN_PASSWORD_LENGTH} символов)`}
               required
               value={createForm.password}
             />
