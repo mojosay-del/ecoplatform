@@ -4,11 +4,11 @@
 
 ## Текущий этап
 
-Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL` закрыто.
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL` и Sentry error tracking закрыты.
 
 Текущий рабочий блок — Волна 10: наблюдаемость и операции.
 
-Целевой следующий шаг: начать 10.2 — Sentry для error tracking.
+Целевой следующий шаг: начать 10.3 — Prometheus метрики.
 
 ## Что уже сделано
 
@@ -22,7 +22,7 @@
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
 - 110 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 7 в `apps/web`, 60 в `apps/api`.
+- Unit-тесты: 7 в `packages/shared`, 10 в `apps/web`, 63 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
@@ -84,6 +84,9 @@
 - Request-логи содержат `traceId`, `path`, `method`, `statusCode`, `durationMs`, а после JWT-auth — `userId`, `sessionId`, `companyId`, `actorRole`.
 - `traceId` берётся из безопасного `X-Request-Id` или генерируется заново и возвращается в ответе как `X-Request-Id`.
 - Authorization/cookie/CSRF и token/password-поля редактируются перед записью в лог.
+- Sentry error tracking подключён на API и web: API отправляет только 5xx и process-level сбои, web ловит App Router/server/client render errors через `@sentry/nextjs`.
+- Sentry `beforeSend` на обеих сторонах вычищает Authorization/cookie/CSRF, token/password/session, email/phone/address/bank-поля и оставляет только безопасный `user.id`.
+- Sentry build-plugin и sourcemap upload включаются только при заданных CI-переменных `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + project, runtime-capture работает и без них при наличии DSN.
 
 ### Последние закрытые задачи Волны 9
 
@@ -113,7 +116,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 10** — наблюдаемость: Sentry, Prometheus метрики, distributed health, прод smoke-test.
+- **Волна 10** — наблюдаемость: Prometheus метрики, distributed health, прод smoke-test.
 - **Волна 11** — UX/дизайн-система: токены, типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»).
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
@@ -158,11 +161,11 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-26 (после Волны 10.1).
+Дата: 2026-05-26 (после Волны 10.2).
 
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 7/7, api 60/60.
-- `pnpm test:integration` — успешно, 110/110 на повторном полном прогоне (первый прогон: transient `407`, 109/110).
+- `pnpm test` — успешно: shared 7/7, web 10/10, api 63/63.
+- `pnpm test:integration` — успешно: API integration 110/110.
 - `pnpm build` — успешно (3/3).
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.

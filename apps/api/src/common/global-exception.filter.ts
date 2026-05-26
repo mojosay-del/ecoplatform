@@ -1,5 +1,6 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, HttpStatus, Logger } from "@nestjs/common";
 import type { Request, Response } from "express";
+import { captureApiException } from "./sentry";
 
 // Глобальный filter ловит ВСЁ, что вылетает из контроллеров/сервисов.
 // Цель — гарантировать, что:
@@ -34,6 +35,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (isServerError) {
       const stack = exception instanceof Error ? exception.stack : String(exception);
+      captureApiException(exception, request, status);
       this.logger.error(baseContext, stack);
     } else if (status >= 400) {
       this.logger.warn(`${baseContext} ${JSON.stringify(payload)}`);
@@ -48,9 +50,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 export function registerProcessErrorHandlers() {
   const logger = new Logger("Process");
   process.on("unhandledRejection", (reason) => {
+    captureApiException(reason);
     logger.error(`unhandledRejection: ${reason instanceof Error ? reason.stack : String(reason)}`);
   });
   process.on("uncaughtException", (error) => {
+    captureApiException(error);
     logger.error(`uncaughtException: ${error.stack ?? error.message}`);
   });
 }

@@ -6,6 +6,10 @@ import { resolve } from "path";
 // чтобы Prisma, JWT и Nest могли читать их через process.env без явного экспорта.
 loadEnv({ path: resolve(__dirname, "../../../.env") });
 
+import { initializeApiSentry } from "./common/sentry";
+
+initializeApiSentry();
+
 import cookieParser from "cookie-parser";
 import compression from "compression";
 import helmet from "helmet";

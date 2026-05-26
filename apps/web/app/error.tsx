@@ -1,12 +1,12 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { useEffect } from "react";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  // Логируем рантайм-ошибку, чтобы в проде попасть в browser-console / sentry breadcrumb.
   useEffect(() => {
-    console.error("UI runtime error:", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

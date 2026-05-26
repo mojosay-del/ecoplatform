@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,7 +17,7 @@ const contentSecurityPolicyReportOnly = [
   "img-src 'self' data: https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
-  "connect-src 'self' http://localhost:4000 https://s3.twcstorage.ru",
+  "connect-src 'self' http://localhost:4000 https://s3.twcstorage.ru https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
   "font-src 'self'",
   "frame-src https://rutube.ru https://*.rutube.ru",
 ].join("; ");
@@ -57,6 +58,12 @@ const nextConfig: NextConfig = {
   // Так как мы внутри Turborepo, standalone должен искать workspace-зависимости
   // относительно корня проекта, а не apps/web.
   outputFileTracingRoot: projectRoot,
+  env: {
+    NEXT_PUBLIC_GIT_SHA: process.env.GIT_SHA ?? "dev",
+  },
+  experimental: {
+    clientTraceMetadata: ["baggage", "sentry-trace"],
+  },
   turbopack: {
     root: projectRoot,
   },
@@ -93,4 +100,26 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const sentryBuildConfig = {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT_WEB ?? process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  telemetry: false,
+  silent: !process.env.CI,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
+};
+
+const shouldEnableSentryBuildPlugin = Boolean(
+  process.env.SENTRY_AUTH_TOKEN &&
+  process.env.SENTRY_ORG &&
+  (process.env.SENTRY_PROJECT_WEB ?? process.env.SENTRY_PROJECT),
+);
+
+export default shouldEnableSentryBuildPlugin ? withSentryConfig(nextConfig, sentryBuildConfig) : nextConfig;
