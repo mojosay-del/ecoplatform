@@ -269,6 +269,59 @@ function responseCookiePart(response: { headers: Record<string, string | string[
   return responseCookieParts(response).find((cookie) => cookie.startsWith(`${name}=`));
 }
 
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
+
+describe("Observability", () => {
+  it("отдаёт Prometheus-метрики API", async () => {
+    await ctx.rawHttp.get("/api/health");
+    await loginAdmin();
+
+    const res = await ctx.rawHttp.get("/api/metrics");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/plain");
+    expect(res.text).toContain("# HELP http_request_duration_seconds");
+    expect(res.text).toContain("# HELP prisma_query_duration_seconds");
+    expect(res.text).toContain("# HELP auth_cache_miss_total");
+    expect(res.text).toContain("# HELP users_registered_total");
+    expect(res.text).toContain("# HELP notifications_sent_total");
+    expect(res.text).toContain("# HELP subscriptions_active");
+  });
+
+  it("в production закрывает /api/metrics через Basic Auth", async () => {
+    const previous = {
+      nodeEnv: process.env.NODE_ENV,
+      user: process.env.METRICS_BASIC_USER,
+      password: process.env.METRICS_BASIC_PASSWORD,
+    };
+    process.env.NODE_ENV = "production";
+    process.env.METRICS_BASIC_USER = "prometheus";
+    process.env.METRICS_BASIC_PASSWORD = "super-secret-metrics-password";
+
+    try {
+      const missingAuth = await ctx.rawHttp.get("/api/metrics");
+      expect(missingAuth.status).toBe(401);
+      expect(missingAuth.headers["www-authenticate"]).toContain("Basic");
+
+      const ok = await ctx.rawHttp
+        .get("/api/metrics")
+        .set("Authorization", `Basic ${Buffer.from("prometheus:super-secret-metrics-password").toString("base64")}`);
+      expect(ok.status).toBe(200);
+      expect(ok.text).toContain("# HELP http_request_duration_seconds");
+    } finally {
+      restoreEnv("NODE_ENV", previous.nodeEnv);
+      restoreEnv("METRICS_BASIC_USER", previous.user);
+      restoreEnv("METRICS_BASIC_PASSWORD", previous.password);
+    }
+  });
+});
+
 describe("Auth", () => {
   it("выдаёт csrf-token cookie для double-submit защиты", async () => {
     const res = await ctx.rawHttp.get("/api/auth/csrf");

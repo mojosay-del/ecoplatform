@@ -6,6 +6,7 @@ import { PinoLogger } from "nestjs-pino";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
 import { resolveActorRole } from "./logging";
+import { recordAuthCacheHit, recordAuthCacheMiss } from "../observability/metrics.registry";
 import type { RequestUser } from "./request-user";
 
 type RequestWithUser = Request & { user?: RequestUser };
@@ -38,10 +39,12 @@ export class JwtAuthGuard implements CanActivate {
 
       const cached = await this.sessionCache?.get(payload.sessionId);
       if (cached?.id === payload.sub) {
+        recordAuthCacheHit();
         request.user = cached;
         this.assignUserLogFields(cached);
         return true;
       }
+      recordAuthCacheMiss();
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },

@@ -15,6 +15,7 @@ import { HealthModule } from "./health/health.module";
 import { LegalModule } from "./legal/legal.module";
 import { ModerationModule } from "./moderation/moderation.module";
 import { NotificationsModule } from "./notifications/notifications.module";
+import { ObservabilityModule } from "./observability/observability.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RedisModule } from "./redis/redis.module";
 import { RedisThrottlerStorageService } from "./redis/redis-throttler-storage.service";
@@ -71,6 +72,7 @@ function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
     LegalModule,
     ModerationModule,
     NotificationsModule,
+    ObservabilityModule,
     SchedulerModule,
     SupportModule,
   ],

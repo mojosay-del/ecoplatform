@@ -4,11 +4,11 @@
 
 ## Текущий этап
 
-Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL` и Sentry error tracking закрыты.
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL`, Sentry error tracking и Prometheus metrics закрыты.
 
 Текущий рабочий блок — Волна 10: наблюдаемость и операции.
 
-Целевой следующий шаг: начать 10.3 — Prometheus метрики.
+Целевой следующий шаг: решить судьбу 10.4 — Distributed tracing (опционально).
 
 ## Что уже сделано
 
@@ -87,6 +87,8 @@
 - Sentry error tracking подключён на API и web: API отправляет только 5xx и process-level сбои, web ловит App Router/server/client render errors через `@sentry/nextjs`.
 - Sentry `beforeSend` на обеих сторонах вычищает Authorization/cookie/CSRF, token/password/session, email/phone/address/bank-поля и оставляет только безопасный `user.id`.
 - Sentry build-plugin и sourcemap upload включаются только при заданных CI-переменных `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + project, runtime-capture работает и без них при наличии DSN.
+- Prometheus endpoint `/api/metrics` на API отдаёт text format через `prom-client`: default Node.js/process metrics, HTTP histogram, Prisma query histogram, auth cache hit/miss counters и бизнес-метрики регистраций, активных подписок и уведомлений.
+- В production `/api/metrics` закрыт Basic Auth через `METRICS_BASIC_USER`/`METRICS_BASIC_PASSWORD`; если credentials не заданы, endpoint не раскрывает метрики.
 
 ### Последние закрытые задачи Волны 9
 
@@ -116,7 +118,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 10** — наблюдаемость: Prometheus метрики, distributed health, прод smoke-test.
+- **Волна 10** — наблюдаемость: distributed tracing (опционально), backup/runbook, прод smoke-test.
 - **Волна 11** — UX/дизайн-система: токены, типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»).
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
@@ -161,11 +163,11 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-26 (после Волны 10.2).
+Дата: 2026-05-26 (после Волны 10.3).
 
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 10/10, api 63/63.
-- `pnpm test:integration` — успешно: API integration 110/110.
+- `pnpm test` — успешно: shared 7/7, web 10/10, api 66/66.
+- `pnpm test:integration` — успешно: API integration 112/112.
 - `pnpm build` — успешно (3/3).
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.
@@ -191,4 +193,5 @@ pnpm format:check                                     # prettier
 - `/admin/journals` для новых change-событий показывает before/after/diff; старые audit payload остаются читаемым JSON.
 - Все unsafe-методы API требуют совпадения `csrf-token` cookie и `X-CSRF-Token` header. Исключение: `/auth/login` и `/auth/register`. Web-клиент это делает прозрачно.
 - 10 неудачных логинов за 15 минут → lockout на 15 минут (`User.lockedUntil`).
+- `/api/metrics` в production требует Basic Auth; credentials задаются только через env/secrets.
 - Distributed cron: `billing-hourly-check` и `cleanup-deleted-accounts` берут `pg_try_advisory_xact_lock`; реплика без lock пропускает tick.

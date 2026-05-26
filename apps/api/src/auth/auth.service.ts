@@ -14,6 +14,7 @@ import { MIN_PASSWORD_LENGTH, type AuthMeUser, type LoginDto, type RegisterDto }
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
+import { recordUserRegistered } from "../observability/metrics.registry";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
 import { PasswordPolicyService } from "./password-policy.service";
@@ -132,7 +133,9 @@ export class AuthService {
       });
     }
 
-    return this.createSession(user.id, meta, false);
+    const tokens = await this.createSession(user.id, meta, false);
+    recordUserRegistered();
+    return tokens;
   }
 
   async login(input: LoginDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {

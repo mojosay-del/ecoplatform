@@ -277,9 +277,9 @@ Prometheus + AlertManager (если развернём Grafana) — alerts:
 
 ## Проверки Волны 10
 
-- [ ] Логи в проде — JSON с полями userId/traceId.
-- [ ] Sentry получает 5xx ошибки.
-- [ ] /api/metrics возвращает prometheus-формат.
+- [x] Логи в проде — JSON с полями userId/traceId.
+- [x] Sentry получает 5xx ошибки.
+- [x] /api/metrics возвращает prometheus-формат.
 - [ ] Smoke-test проходит после деплоя.
 - [ ] Runbook откатывает миграцию на dev-стенде.
 

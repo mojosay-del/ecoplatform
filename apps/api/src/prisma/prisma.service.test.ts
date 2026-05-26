@@ -23,13 +23,13 @@ describe("PrismaService production options", () => {
     expect(new URL(result!).searchParams.get("connection_limit")).toBe("8");
   });
 
-  it("configures Prisma Client with minimal errors and production-safe logs", () => {
+  it("configures Prisma Client with minimal errors and query metrics events", () => {
     const options = prismaClientOptions({
       DATABASE_URL: "postgresql://user:pass@db.example.com:6432/ecoplatform?schema=public",
     } as NodeJS.ProcessEnv);
 
     expect(options.errorFormat).toBe("minimal");
-    expect(options.log).toEqual(["warn", "error"]);
+    expect(options.log).toEqual([{ emit: "event", level: "query" }, "warn", "error"]);
     expect(options.datasources?.db?.url).toContain("connection_limit=20");
   });
 });

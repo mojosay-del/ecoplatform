@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import type { RequestUser } from "../common/request-user";
+import { recordNotificationSent } from "../observability/metrics.registry";
 
 export type CreateInAppNotificationInput = {
   userId: string;
@@ -58,7 +59,7 @@ export class NotificationsService {
       !(MUTABLE_CATEGORIES.has(input.category) && prefs?.emailMutedCategories.includes(input.category));
     const emailAddress = await this.lookupEmailAddress(input.userId);
 
-    return this.prisma.$transaction(async (tx) => {
+    const notification = await this.prisma.$transaction(async (tx) => {
       const delivery = await tx.notificationDelivery.upsert({
         where: {
           domainEventId_recipientUserId_channel: {
@@ -119,6 +120,11 @@ export class NotificationsService {
         update: { deliveryId: delivery.id },
       });
     });
+    recordNotificationSent(input.category, "in_app");
+    if (emailQueued && emailAddress) {
+      recordNotificationSent(input.category, "email");
+    }
+    return notification;
   }
 
   private async lookupEmailAddress(userId: string): Promise<string | null> {
