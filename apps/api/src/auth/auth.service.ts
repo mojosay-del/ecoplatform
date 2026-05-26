@@ -22,6 +22,10 @@ type SessionTokens = {
   refreshToken: string;
 };
 
+// Реальный bcrypt-compare должен выполняться и для неизвестного email,
+// иначе login выдаёт существование пользователя через заметно более быстрый ответ.
+const LOGIN_DUMMY_PASSWORD_HASH = "$2a$12$abcdefghijklmnopqrstuv.WkOaBPyDV7c9o6XhOuLNS8tIeS5wXa";
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -115,8 +119,9 @@ export class AuthService {
       where: { email: input.email.toLowerCase() },
       include: { company: true },
     });
+    const passwordMatches = await compare(input.password, user?.passwordHash ?? LOGIN_DUMMY_PASSWORD_HASH);
 
-    if (!user || !(await compare(input.password, user.passwordHash))) {
+    if (!user || !passwordMatches) {
       throw new UnauthorizedException("Неверный email или пароль.");
     }
 

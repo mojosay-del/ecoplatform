@@ -40,8 +40,9 @@
 
 ## 🟡 P1 — серьёзные
 
-### 6. Email-enumeration через тайминг логина
-- **Где**: [apps/api/src/auth/auth.service.ts:64–71](apps/api/src/auth/auth.service.ts#L64).
+### 6. Email-enumeration через тайминг логина ✅ DONE 2026-05-26
+> `AuthService.login()` всегда выполняет `bcryptjs.compare`: для найденного пользователя — с реальным `passwordHash`, для неизвестного email — с фиксированным dummy bcrypt hash. Быстрый путь без bcrypt убран, ошибка осталась общей: «Неверный email или пароль.».
+- **Где**: [apps/api/src/auth/auth.service.ts](apps/api/src/auth/auth.service.ts), [apps/api/src/auth/auth.service.test.ts](apps/api/src/auth/auth.service.test.ts).
 - **Что**: `if (!user || !(await compare(...)))` — для несуществующего email сравнения bcrypt не происходит. Ответ возвращается за 1 мс, а для существующего — за ~100 мс. Атакующий может проверить, какие emails зарегистрированы (полезно для дальнейшего phishing/брюта).
 - **Чем чинить**: всегда выполнять bcrypt-сравнение против фиксированного «заглушка-хеша», даже если пользователь не найден.
 
