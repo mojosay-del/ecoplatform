@@ -25,6 +25,16 @@ type SessionTokens = {
 // Реальный bcrypt-compare должен выполняться и для неизвестного email,
 // иначе login выдаёт существование пользователя через заметно более быстрый ответ.
 const LOGIN_DUMMY_PASSWORD_HASH = "$2a$12$abcdefghijklmnopqrstuv.WkOaBPyDV7c9o6XhOuLNS8tIeS5wXa";
+const LOGIN_LOCKOUT_THRESHOLD = 10;
+const LOGIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+
+type LoginLockoutState = {
+  id: string;
+  failedLoginAttempts: number;
+  failedLoginWindowStartedAt: Date | null;
+  lockedUntil: Date | null;
+};
 
 @Injectable()
 export class AuthService {
@@ -121,7 +131,17 @@ export class AuthService {
     });
     const passwordMatches = await compare(input.password, user?.passwordHash ?? LOGIN_DUMMY_PASSWORD_HASH);
 
+    if (user && this.isLoginLocked(user)) {
+      throw new UnauthorizedException(this.loginLockoutMessage(user.lockedUntil));
+    }
+
     if (!user || !passwordMatches) {
+      if (user) {
+        const lockedUntil = await this.recordFailedLogin(user);
+        if (lockedUntil) {
+          throw new UnauthorizedException(this.loginLockoutMessage(lockedUntil));
+        }
+      }
       throw new UnauthorizedException("Неверный email или пароль.");
     }
 
@@ -133,11 +153,60 @@ export class AuthService {
       throw new UnauthorizedException("Доступ к кабинету компании закрыт.");
     }
 
+    await this.resetFailedLoginState(user);
+
     const newDevice = await this.detectNewDevice(user.id, meta);
     const tokens = await this.createSession(user.id, meta, Boolean(input.rememberMe));
     await this.notifyLogin(user.id, meta, newDevice).catch(swallowAndLog("auth.login.notify", { userId: user.id }));
 
     return tokens;
+  }
+
+  private isLoginLocked(user: LoginLockoutState): boolean {
+    return Boolean(user.lockedUntil && user.lockedUntil.getTime() > Date.now());
+  }
+
+  private loginLockoutMessage(lockedUntil: Date | null): string {
+    const remainingMs = Math.max((lockedUntil?.getTime() ?? Date.now()) - Date.now(), 1);
+    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+    return `Учётная запись временно заблокирована за слишком много попыток. Попробуйте через ${remainingMinutes} минут.`;
+  }
+
+  private async recordFailedLogin(user: LoginLockoutState): Promise<Date | null> {
+    const now = new Date();
+    const windowStartedAt = user.failedLoginWindowStartedAt;
+    const withinWindow = Boolean(
+      windowStartedAt && now.getTime() - windowStartedAt.getTime() <= LOGIN_LOCKOUT_WINDOW_MS,
+    );
+    const failedLoginAttempts = withinWindow ? user.failedLoginAttempts + 1 : 1;
+    const failedLoginWindowStartedAt = withinWindow ? windowStartedAt : now;
+    const lockedUntil =
+      failedLoginAttempts >= LOGIN_LOCKOUT_THRESHOLD ? new Date(now.getTime() + LOGIN_LOCKOUT_DURATION_MS) : null;
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts,
+        failedLoginWindowStartedAt,
+        lockedUntil,
+      },
+    });
+
+    return lockedUntil;
+  }
+
+  private async resetFailedLoginState(user: LoginLockoutState): Promise<void> {
+    if (user.failedLoginAttempts === 0 && !user.failedLoginWindowStartedAt && !user.lockedUntil) {
+      return;
+    }
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: 0,
+        failedLoginWindowStartedAt: null,
+        lockedUntil: null,
+      },
+    });
   }
 
   async changePassword(

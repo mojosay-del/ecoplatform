@@ -346,6 +346,52 @@ describe("Auth", () => {
     expect(res.status).toBe(401);
   });
 
+  it("после 10 неверных паролей временно блокирует вход и сбрасывает счётчик после успешного входа", async () => {
+    await registerCompany("0000004");
+
+    for (let i = 1; i <= 10; i += 1) {
+      const attempt = await ctx.http
+        .post("/api/auth/login")
+        .send({ email: "user0000004@test.local", password: "wrong-password" });
+      expect(attempt.status).toBe(401);
+      if (i < 10) {
+        expect(attempt.body.message).toBe("Неверный email или пароль.");
+      } else {
+        expect(attempt.body.message).toContain("Учётная запись временно заблокирована");
+      }
+    }
+
+    const userAfterFailures = await ctx.prisma.user.findUniqueOrThrow({
+      where: { email: "user0000004@test.local" },
+    });
+    expect(userAfterFailures.failedLoginAttempts).toBe(10);
+    expect(userAfterFailures.lockedUntil!.getTime()).toBeGreaterThan(Date.now());
+
+    const blockedEvenWithCorrectPassword = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0000004@test.local", password: "User123456" });
+    expect(blockedEvenWithCorrectPassword.status).toBe(401);
+    expect(blockedEvenWithCorrectPassword.body.message).toContain("Учётная запись временно заблокирована");
+
+    await ctx.prisma.user.update({
+      where: { id: userAfterFailures.id },
+      data: { lockedUntil: new Date(Date.now() - 60_000) },
+    });
+
+    const loginAfterLockout = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0000004@test.local", password: "User123456" });
+    expect(loginAfterLockout.status).toBe(201);
+    expect(loginAfterLockout.body.accessToken).toMatch(/\./);
+
+    const userAfterSuccess = await ctx.prisma.user.findUniqueOrThrow({
+      where: { id: userAfterFailures.id },
+    });
+    expect(userAfterSuccess.failedLoginAttempts).toBe(0);
+    expect(userAfterSuccess.failedLoginWindowStartedAt).toBeNull();
+    expect(userAfterSuccess.lockedUntil).toBeNull();
+  });
+
   it("/auth/me без токена отвечает 401", async () => {
     const res = await ctx.http.get("/api/auth/me");
     expect(res.status).toBe(401);
