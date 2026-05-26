@@ -60,8 +60,12 @@ function extractApiErrorMessage(raw: string): string {
 type AccessTokenListener = (token: string | null) => void;
 type ApiRequestInit = Omit<RequestInit, "headers"> & { headers?: Record<string, string> };
 
+const CSRF_COOKIE_NAME = "csrf-token";
+const CSRF_HEADER_NAME = "X-CSRF-Token";
+
 const accessTokenListeners = new Set<AccessTokenListener>();
 let refreshPromise: Promise<string> | null = null;
+let currentCsrfToken: string | null = null;
 
 // Access-токен живёт ТОЛЬКО в памяти модуля — никогда не пишется в localStorage.
 // Это закрывает классическую stored-XSS-атаку «утянули token из localStorage».
@@ -81,6 +85,7 @@ export function setAccessToken(token: string) {
 
 export function clearAccessToken() {
   currentAccessToken = null;
+  currentCsrfToken = null;
   accessTokenListeners.forEach((listener) => listener(null));
 }
 
@@ -110,6 +115,62 @@ function isAuthEntryPath(path: string) {
   return path === "/auth/login" || path === "/auth/register" || path === "/auth/refresh";
 }
 
+function requestPath(path: string) {
+  return path.split("?")[0];
+}
+
+function needsCsrfToken(path: string, method = "GET") {
+  const normalizedMethod = method.toUpperCase();
+  if (normalizedMethod === "GET" || normalizedMethod === "HEAD" || normalizedMethod === "OPTIONS") return false;
+  const normalizedPath = requestPath(path);
+  return normalizedPath !== "/auth/login" && normalizedPath !== "/auth/register";
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const prefix = `${name}=`;
+  const match = document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix));
+  return match ? decodeURIComponent(match.slice(prefix.length)) : null;
+}
+
+async function ensureCsrfToken(): Promise<string> {
+  const cookieToken = readCookie(CSRF_COOKIE_NAME);
+  if (cookieToken) {
+    currentCsrfToken = cookieToken;
+    return cookieToken;
+  }
+  if (currentCsrfToken) {
+    return currentCsrfToken;
+  }
+
+  const response = await fetch(`${API_URL}/auth/csrf`, {
+    method: "GET",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const message = extractApiErrorMessage(await response.text());
+    throw new ApiError(message || "Не удалось подготовить CSRF-токен.", response.status);
+  }
+
+  const result = (await response.json()) as { csrfToken?: string };
+  const token = result.csrfToken ?? readCookie(CSRF_COOKIE_NAME);
+  if (!token) {
+    throw new ApiError("Не удалось подготовить CSRF-токен.", 403);
+  }
+
+  currentCsrfToken = token;
+  return token;
+}
+
+async function csrfHeadersForRequest(path: string, method = "GET"): Promise<Record<string, string>> {
+  if (!needsCsrfToken(path, method)) return {};
+  return { [CSRF_HEADER_NAME]: await ensureCsrfToken() };
+}
+
 async function refreshAccessToken() {
   if (refreshPromise) {
     return refreshPromise;
@@ -119,6 +180,7 @@ async function refreshAccessToken() {
     const response = await fetch(`${API_URL}/auth/refresh`, {
       method: "POST",
       credentials: "include",
+      headers: await csrfHeadersForRequest("/auth/refresh", "POST"),
     });
 
     if (!response.ok) {
@@ -157,12 +219,14 @@ function withAuthorization(headers: Record<string, string> | undefined, token: s
 }
 
 async function fetchWithAuthRetry(path: string, init: ApiRequestInit, token?: string | null) {
-  const request = (nextToken: string | null) =>
-    fetch(`${API_URL}${path}`, {
+  const request = async (nextToken: string | null) => {
+    const csrfHeaders = await csrfHeadersForRequest(path, init.method);
+    return fetch(`${API_URL}${path}`, {
       ...init,
-      headers: withAuthorization(init.headers, nextToken),
+      headers: withAuthorization({ ...init.headers, ...csrfHeaders }, nextToken),
       credentials: "include",
     });
+  };
 
   const currentToken = token ?? getAccessToken();
   let response = await request(currentToken);

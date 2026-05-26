@@ -12,6 +12,7 @@ import helmet from "helmet";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
+import { csrfCookieMiddleware, CsrfGuard } from "./common/csrf.guard";
 import { GlobalExceptionFilter, registerProcessErrorHandlers } from "./common/global-exception.filter";
 import { FilesService } from "./files/files.service";
 
@@ -48,12 +49,15 @@ async function bootstrap() {
 
   app.setGlobalPrefix("api");
   app.use(cookieParser());
+  app.use(csrfCookieMiddleware);
+  app.useGlobalGuards(new CsrfGuard());
   // За reverse-proxy Timeweb/nginx — иначе request.ip = IP балансировщика
   // и журнал сессий/будущий rate-limit будут привязаны к одной точке.
   app.set("trust proxy", 1);
   app.enableCors({
     origin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-CSRF-Token"],
     // CORS-preflight кешируется браузером на сутки — иначе на каждый запрос
     // улетает лишний OPTIONS.
     maxAge: 86_400,

@@ -183,6 +183,8 @@ curl -I -H 'Accept-Encoding: br,gzip' https://app.eco-platform.ru/
 
 - `WEB_ORIGIN` должен указывать на ПУБЛИЧНЫЙ URL фронта.
 - На прод-домене (HTTPS) refresh-cookie получает флаги `HttpOnly + Secure + SameSite=lax + Path=/api/auth`.
+- CSRF-защита использует double-submit: API выдаёт cookie `csrf-token` (`Secure + SameSite=Strict + Path=/`, не HttpOnly), web читает cookie там, где домен это позволяет, либо получает токен через `GET /api/auth/csrf`, затем шлёт его в `X-CSRF-Token` на `/auth/refresh`, `/auth/logout`, `/auth/change-password` и все `POST/PATCH/DELETE` ручки, кроме `/auth/login` и `/auth/register`.
+- CORS должен пропускать заголовки `Authorization`, `Idempotency-Key` и `X-CSRF-Token`.
 - Если API и web на разных поддоменах одного корня (например, `api.eco-platform.ru` и `app.eco-platform.ru`), `SameSite=lax` работает. Если домены разные — нужен `SameSite=none + Secure`, поправить в `auth.controller.ts:setRefreshCookie`.
 
 ---
@@ -193,6 +195,7 @@ curl -I -H 'Accept-Encoding: br,gzip' https://app.eco-platform.ru/
 - [ ] Сгенерили новые `JWT_ACCESS_SECRET` и `JWT_REFRESH_SECRET` (НЕ переиспользуем dev-значения).
 - [ ] Бакет S3 в Timeweb создан, его ключи добавлены в env-переменные API.
 - [ ] CORS: `WEB_ORIGIN` подставлен.
+- [ ] CSRF smoke: `GET /api/auth/csrf` отдаёт `csrf-token`, а mutating-запрос без `X-CSRF-Token` получает 403.
 - [ ] CDN перед web-доменом включён и уважает origin `Cache-Control`.
 - [ ] CDN/reverse-proxy отдаёт `Content-Encoding: br` или `gzip` для web-ответов с `Accept-Encoding: br,gzip`.
 - [ ] API отдаёт `Content-Encoding: br` или `gzip` для больших JSON/HTML-ответов с `Accept-Encoding: br,gzip`.

@@ -1,14 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiFetch } from "./api";
+import { apiFetch, clearAccessToken } from "./api";
 
 describe("apiFetch", () => {
   afterEach(() => {
+    clearAccessToken();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
   it("sends bearer token and JSON body", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ csrfToken: "csrf-token" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await apiFetch<{ ok: true }>("/test", {
@@ -18,7 +22,16 @@ describe("apiFetch", () => {
     });
 
     expect(result).toEqual({ ok: true });
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "http://localhost:4000/api/auth/csrf",
+      expect.objectContaining({
+        method: "GET",
+        credentials: "include",
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
       "http://localhost:4000/api/test",
       expect.objectContaining({
         method: "POST",
@@ -27,6 +40,7 @@ describe("apiFetch", () => {
         headers: expect.objectContaining({
           Authorization: "Bearer access-token",
           "Content-Type": "application/json",
+          "X-CSRF-Token": "csrf-token",
         }),
       }),
     );
@@ -42,6 +56,7 @@ describe("apiFetch", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response("Токен недействителен.", { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ csrfToken: "csrf-token" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ accessToken: "new-access-token" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -51,14 +66,25 @@ describe("apiFetch", () => {
     expect(result).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "http://localhost:4000/api/auth/refresh",
+      "http://localhost:4000/api/auth/csrf",
       expect.objectContaining({
-        method: "POST",
+        method: "GET",
         credentials: "include",
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
+      "http://localhost:4000/api/auth/refresh",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        headers: expect.objectContaining({
+          "X-CSRF-Token": "csrf-token",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
       "http://localhost:4000/api/protected",
       expect.objectContaining({
         headers: expect.objectContaining({

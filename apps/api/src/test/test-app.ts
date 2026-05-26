@@ -6,13 +6,34 @@ import { INestApplication } from "@nestjs/common";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../app.module";
+import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME, csrfCookieMiddleware, CsrfGuard } from "../common/csrf.guard";
 import { PrismaService } from "../prisma/prisma.service";
 
 export interface TestApp {
   app: INestApplication;
   prisma: PrismaService;
   http: request.SuperTest<request.Test>;
+  rawHttp: request.SuperTest<request.Test>;
   close: () => Promise<void>;
+}
+
+const TEST_CSRF_TOKEN = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO12";
+const UNSAFE_METHODS = new Set(["post", "patch", "delete", "put"]);
+
+function withDefaultCsrf(http: request.SuperTest<request.Test>): request.SuperTest<request.Test> {
+  return new Proxy(http, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof property === "string" && UNSAFE_METHODS.has(property) && typeof value === "function") {
+        return (...args: unknown[]) =>
+          value
+            .apply(target, args)
+            .set("Cookie", `${CSRF_COOKIE_NAME}=${TEST_CSRF_TOKEN}`)
+            .set(CSRF_HEADER_NAME, TEST_CSRF_TOKEN);
+      }
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as request.SuperTest<request.Test>;
 }
 
 export async function createTestApp(): Promise<TestApp> {
@@ -23,15 +44,19 @@ export async function createTestApp(): Promise<TestApp> {
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix("api");
   app.use(cookieParser());
+  app.use(csrfCookieMiddleware);
+  app.useGlobalGuards(new CsrfGuard());
   await app.init();
 
   const prisma = app.get(PrismaService);
-  const http = request(app.getHttpServer()) as unknown as request.SuperTest<request.Test>;
+  const rawHttp = request(app.getHttpServer()) as unknown as request.SuperTest<request.Test>;
+  const http = withDefaultCsrf(rawHttp);
 
   return {
     app,
     prisma,
     http,
+    rawHttp,
     close: async () => {
       await app.close();
     },

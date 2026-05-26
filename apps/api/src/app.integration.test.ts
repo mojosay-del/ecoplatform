@@ -234,7 +234,50 @@ function expectPaginatedEnvelope(body: { items?: unknown; total?: unknown; hasMo
   expect(typeof body.hasMore).toBe("boolean");
 }
 
+function responseCookieParts(response: { headers: Record<string, string | string[] | undefined> }) {
+  const setCookie = response.headers["set-cookie"];
+  const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+  return cookies.map((cookie) => cookie.split(";")[0]);
+}
+
+function responseCookiePart(response: { headers: Record<string, string | string[] | undefined> }, name: string) {
+  return responseCookieParts(response).find((cookie) => cookie.startsWith(`${name}=`));
+}
+
 describe("Auth", () => {
+  it("выдаёт csrf-token cookie для double-submit защиты", async () => {
+    const res = await ctx.rawHttp.get("/api/auth/csrf");
+    expect(res.status).toBe(200);
+    expect(res.body.csrfToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(responseCookiePart(res, "csrf-token")).toBe(`csrf-token=${res.body.csrfToken}`);
+
+    const setCookie = (res.headers["set-cookie"] as string[]).join("; ");
+    expect(setCookie).toContain("SameSite=Strict");
+  });
+
+  it("требует совпадающий CSRF cookie/header на /auth/refresh", async () => {
+    const login = await ctx.rawHttp.post("/api/auth/login").send({ email: "admin@test.local", password: "Admin12345" });
+    expect(login.status).toBe(201);
+
+    const refreshCookie = responseCookiePart(login, "refreshToken");
+    const csrfCookie = responseCookiePart(login, "csrf-token");
+    expect(refreshCookie).toBeDefined();
+    expect(csrfCookie).toBeDefined();
+
+    const missingHeader = await ctx.rawHttp.post("/api/auth/refresh").set("Cookie", [refreshCookie!, csrfCookie!]);
+    expect(missingHeader.status).toBe(403);
+    expect(missingHeader.body.message).toBe("CSRF-токен отсутствует или недействителен.");
+
+    const csrfToken = csrfCookie!.slice("csrf-token=".length);
+    const ok = await ctx.rawHttp
+      .post("/api/auth/refresh")
+      .set("Cookie", [refreshCookie!, csrfCookie!])
+      .set("X-CSRF-Token", csrfToken);
+
+    expect(ok.status).toBe(201);
+    expect(ok.body.accessToken).toMatch(/\./);
+  });
+
   it("регистрация создаёт компанию в demo-статусе и возвращает access-токен", async () => {
     const { token, companyId } = await registerCompany("0000001");
     expect(token).toMatch(/\./);
