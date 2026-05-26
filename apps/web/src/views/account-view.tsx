@@ -614,6 +614,30 @@ export function AccountView() {
                 <p className="page-subtitle">История появится после активации подписки.</p>
               )}
             </article>
+            <div className="account-section-grid">
+              <article className="card account-card">
+                <h2>Способы оплаты</h2>
+                <p className="page-subtitle">
+                  Здесь появятся сохранённые карты и реквизиты для безналичной оплаты. Подключим в ближайшем обновлении
+                  — пока подписки активируются вручную поддержкой.
+                </p>
+                <div className="account-action-list">
+                  <button className="button secondary" type="button" disabled>
+                    Добавить карту
+                  </button>
+                  <button className="button secondary" type="button" disabled>
+                    Добавить расчётный счёт
+                  </button>
+                </div>
+              </article>
+              <article className="card account-card">
+                <h2>История платежей</h2>
+                <p className="page-subtitle">
+                  Платежи появятся здесь после оплаты подписки или покупок в магазине. Чек и счёт-фактуру можно будет
+                  скачать рядом с каждой записью.
+                </p>
+              </article>
+            </div>
           </div>
         ) : null}
 

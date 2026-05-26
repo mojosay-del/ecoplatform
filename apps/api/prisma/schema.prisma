@@ -77,6 +77,11 @@ enum SupportTicketCategory {
   technical
   data_deletion
   other
+  // На вырост — категории заявок для торговой площадки, форума, магазина.
+  marketplace_dispute
+  forum_complaint
+  shop_purchase
+  refund_request
 }
 
 enum CommentStatus {
@@ -100,12 +105,23 @@ enum NotificationCategory {
   moderation
   support
   system
+  // Категории «на вырост» — для будущих модулей форума, магазина,
+  // отзывов и геолокации. Сейчас никто не пишет нотификации в эти
+  // категории, но enum нужно расширять заранее, иначе при подключении
+  // модуля придётся пересчитывать все пользовательские mute-listы.
+  forum
+  solutions_shop
+  reviews
+  geo_alert
+  price_alert
 }
 
 enum NotificationChannel {
   in_app
   email
   sms
+  telegram
+  push
 }
 
 enum NotificationDeliveryStatus {
@@ -172,6 +188,21 @@ enum ConsentSource {
   cookie_banner
   settings
   admin_action
+}
+
+// Биллинг: способы оплаты (карта Тинькофф, банковский счёт) и статусы
+// платежей. UI пока скрыт за заглушкой «Подключим в ближайшем обновлении»,
+// но модели Payment/PaymentMethod (см. ниже) уже завязаны на эти enum'ы.
+enum PaymentMethodType {
+  card_tinkoff
+  bank_invoice
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  refunded
 }
 
 // Полиморфные обсуждения: ветка комментариев привязывается не к конкретной
@@ -252,8 +283,61 @@ model Company {
   users                    User[]
   subscriptions            Subscription[]
   supportTickets           SupportTicket[]
+  paymentMethods           PaymentMethod[]
+  payments                 Payment[]
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
+}
+
+// Сохранённый способ оплаты компании. В MVP UI заглушен «Подключим в
+// ближайшем обновлении» — но модель уже стоит, чтобы при подключении
+// Тинькофф-Кассы не пришлось двигать миграции с реальными платежами на
+// проде. Маска карты и `providerToken` (рекуррентный токен) — единственное,
+// что бэк хранит локально; PAN/CVV никогда не покидают платёжного провайдера.
+model PaymentMethod {
+  id            String            @id @default(cuid())
+  companyId     String
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type          PaymentMethodType
+  cardMask      String?
+  cardExpiry    String?
+  providerToken String?
+  isDefault     Boolean           @default(false)
+  isActive      Boolean           @default(true)
+  payments      Payment[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([companyId, isActive])
+}
+
+// История платежей компании. Сейчас пишется только из ручной активации
+// подписки админом — будут попадать как `purpose=subscription_manual` после
+// подключения Тинькофф-Кассы. UI заглушен empty-state'ом.
+model Payment {
+  id              String         @id @default(cuid())
+  companyId       String
+  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  amount          Decimal        @db.Decimal(12, 2)
+  currency        String         @default("RUB")
+  status          PaymentStatus  @default(pending)
+  // Назначение платежа: 'subscription_initial' | 'subscription_renewal' |
+  // 'product_purchase' | 'subscription_manual'. Строка, а не enum — чтобы
+  // не плодить enum-расширения при появлении новых продуктов в магазине.
+  purpose         String
+  subscriptionId  String?
+  paymentMethodId String?
+  paymentMethod   PaymentMethod? @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  providerName    String         @default("tinkoff_kassa")
+  providerOrderId String?        @unique
+  providerError   String?
+  receiptUrl      String?
+  invoiceUrl      String?
+  createdAt       DateTime       @default(now())
+  paidAt          DateTime?
+
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
 }
 
 // Address — самостоятельная сущность для адресов: и фактических, и юридических,
