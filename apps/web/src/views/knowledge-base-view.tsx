@@ -89,7 +89,7 @@ function KnowledgeBaseLayout({
           <aside className="knowledge-nav-panel" aria-label="Навигация по базе знаний">
             <div className="knowledge-nav-heading">
               <span className="knowledge-nav-kicker">База знаний</span>
-              <h1>Навигация по сырью</h1>
+              <h2>Навигация по сырью</h2>
             </div>
             {tree.length === 0 ? (
               <p className="page-subtitle">Статей пока нет.</p>

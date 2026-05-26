@@ -16,6 +16,14 @@ body {
     sans-serif;
 }
 
+h1 {
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: left;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -272,10 +280,11 @@ select {
 
 .page-title {
   margin: 0 0 6px;
-  font-size: 28px;
+  font-size: var(--text-2xl);
   line-height: 1.2;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  text-align: left;
 }
 
 .page-subtitle {
@@ -503,18 +512,19 @@ select {
 /* Masonry-плитки новостей: разная высота карточек, 4 колонки на широком
    экране, чтобы получался ритм как в дизайнерском макете. */
 .news-feed-header {
-  text-align: center;
-  margin: 0 auto 32px;
+  text-align: left;
+  margin: 0 0 32px;
   padding: 8px 0 24px;
   border-bottom: 1px solid var(--line);
-  max-width: 480px;
 }
 
 .news-feed-header h1 {
   margin: 0;
-  font-size: 36px;
+  font-size: var(--text-2xl);
+  line-height: 1.2;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  text-align: left;
   color: var(--text);
 }
 
@@ -565,6 +575,7 @@ select {
 }
 
 .news-tile-cover {
+  position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
   background: var(--panel-soft);
@@ -946,9 +957,11 @@ select {
 
 .lesson-title {
   margin: 0 0 18px;
-  font-size: 26px;
+  font-size: var(--text-2xl);
+  line-height: 1.2;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  text-align: left;
   color: var(--text);
 }
 
@@ -1199,10 +1212,11 @@ body.news-modal-open .app-shell {
 
 .news-article-title {
   margin: 0;
-  font-size: 28px;
+  font-size: var(--text-2xl);
   font-weight: 700;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  text-align: left;
   color: var(--text);
 }
 
@@ -1619,10 +1633,12 @@ body.news-modal-open .app-shell {
 
 .auth-card-title {
   margin: 0 0 6px;
-  font-size: 26px;
+  font-size: var(--text-2xl);
+  line-height: 1.2;
   font-weight: 700;
   color: var(--text);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  text-align: left;
 }
 
 .auth-card-sub {
@@ -1918,7 +1934,7 @@ body.news-modal-open .app-shell {
   }
 
   .auth-card-title {
-    font-size: 22px;
+    font-size: var(--text-2xl);
   }
 }
 
@@ -2012,11 +2028,13 @@ body.news-modal-open .app-shell {
   text-transform: uppercase;
 }
 
-.knowledge-nav-heading h1 {
+.knowledge-nav-heading h2 {
   margin: 0;
   color: var(--text);
-  font-size: 22px;
+  font-size: var(--text-xl);
   line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .knowledge-nav-list,
@@ -2131,8 +2149,10 @@ body.news-modal-open .app-shell {
 
 .knowledge-content-head h1 {
   margin: 0;
-  font-size: 30px;
+  font-size: var(--text-3xl);
   line-height: 1.18;
+  letter-spacing: 0;
+  text-align: left;
 }
 
 .knowledge-content-head p {
@@ -3601,7 +3621,7 @@ a.topbar-breadcrumb-current:hover {
   }
 
   .knowledge-content-head h1 {
-    font-size: 26px;
+    font-size: var(--text-2xl);
   }
 
   .indices-workspace-grid,
@@ -3640,11 +3660,11 @@ a.topbar-breadcrumb-current:hover {
   }
 
   .news-feed-header h1 {
-    font-size: 26px;
+    font-size: var(--text-2xl);
   }
 
   .page-title {
-    font-size: 22px;
+    font-size: var(--text-2xl);
   }
 }
 
@@ -4371,10 +4391,11 @@ a.topbar-breadcrumb-current:hover {
 
 .module-hero-title {
   margin: 0;
-  font-size: 32px;
+  font-size: var(--text-3xl);
   line-height: 1.15;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  text-align: left;
   color: var(--text);
 }
 
@@ -6394,10 +6415,12 @@ li.tree-add-row + li.tree-add-row,
 }
 
 .account-hero-name {
-  font-size: 24px;
+  font-size: var(--text-2xl);
   font-weight: 700;
   margin: 0;
   line-height: 1.2;
+  letter-spacing: 0;
+  text-align: left;
 }
 
 .account-hero-email {
@@ -7020,7 +7043,10 @@ li.tree-add-row + li.tree-add-row,
 }
 
 .legal-doc h1 {
-  font-size: 28px;
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-align: left;
   margin: 0 0 8px;
 }
 

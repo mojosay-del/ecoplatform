@@ -6,9 +6,7 @@ export default function NotFound() {
       <div className="auth-layout">
         <div className="auth-form-panel">
           <div className="auth-card" style={{ textAlign: "center" }}>
-            <h1 className="auth-card-title" style={{ fontSize: "44px" }}>
-              404
-            </h1>
+            <h1 className="auth-card-title">404</h1>
             <p className="auth-card-sub">Страница не найдена.</p>
             <p className="page-subtitle">
               Возможно, ссылка устарела или адрес введён с опечаткой. Из этой точки удобнее вернуться к ленте новостей

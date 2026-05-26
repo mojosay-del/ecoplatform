@@ -80,7 +80,7 @@ export function NewsView() {
     <AppShell>
       <section className="page">
         <header className="news-feed-header">
-          <h1>Последние обновления</h1>
+          <h1>Новости рынка</h1>
         </header>
 
         {state === "loading" ? (
