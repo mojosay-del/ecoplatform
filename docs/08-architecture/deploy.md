@@ -1,7 +1,7 @@
 ---
 title: Деплой на Timeweb Cloud
 status: draft
-updated: 2026-05-24
+updated: 2026-05-26
 ---
 
 # Деплой ЭкоПлатформы на Timeweb
@@ -144,7 +144,25 @@ API экспонирует два эндпоинта:
 
 ---
 
-## 8. CORS и cookie
+## 8. CDN и cache headers
+
+Перед web-контейнером ставим CDN:
+
+- **MVP-вариант**: Cloudflare Free перед доменом `app.eco-platform.ru`.
+- **Timeweb-вариант**: Timeweb CDN перед web-инстансом, если он доступен в выбранной конфигурации.
+
+Правила кеширования:
+
+- HTML, `/api/*` и auth-роуты не кешируются на CDN.
+- `/_next/static/*` Next.js отдаёт как immutable-ассеты с hash в имени файла; CDN должен уважать origin `Cache-Control`.
+- Статичные файлы приложения из `apps/web/public/brand/*` и `apps/web/public/avatars/*` отдаются через `headers()` в `apps/web/next.config.ts` с `Cache-Control: public, max-age=31536000, immutable`.
+- Пользовательские файлы идут через S3/CDN-домен из `S3_PUBLIC_BASE_URL`, а не через web-контейнер.
+
+Если меняются файлы в `/brand` или `/avatars` без смены имени, при релизе нужно сделать purge соответствующих путей в CDN. Для новых публичных ассетов лучше добавлять версию в имени файла (`logo-v2.webp`) или переносить их в static import, чтобы Next.js сам дал hash.
+
+---
+
+## 9. CORS и cookie
 
 - `WEB_ORIGIN` должен указывать на ПУБЛИЧНЫЙ URL фронта.
 - На прод-домене (HTTPS) refresh-cookie получает флаги `HttpOnly + Secure + SameSite=lax + Path=/api/auth`.
@@ -152,12 +170,14 @@ API экспонирует два эндпоинта:
 
 ---
 
-## 9. Чек-лист перед первым деплоем
+## 10. Чек-лист перед первым деплоем
 
 - [ ] Прогнали `pnpm --filter @ecoplatform/api test:integration` против postgres:18 локально.
 - [ ] Сгенерили новые `JWT_ACCESS_SECRET` и `JWT_REFRESH_SECRET` (НЕ переиспользуем dev-значения).
 - [ ] Бакет S3 в Timeweb создан, его ключи добавлены в env-переменные API.
 - [ ] CORS: `WEB_ORIGIN` подставлен.
+- [ ] CDN перед web-доменом включён и уважает origin `Cache-Control`.
+- [ ] `/brand/logo.webp` и `/avatars/*` отдают `Cache-Control: public, max-age=31536000, immutable`.
 - [ ] Health-пробы настроены на `/api/health` и `/api/ready`.
 - [ ] DNS и SSL-сертификаты Timeweb выпустил.
 - [ ] Записан владелец бэкапов и расписание тестового восстановления.

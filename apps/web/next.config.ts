@@ -4,6 +4,13 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
+const immutablePublicAssetHeaders = [
+  {
+    key: "Cache-Control",
+    value: "public, max-age=31536000, immutable",
+  },
+];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // `standalone` собирает в `.next/standalone` минимальный набор файлов +
@@ -29,6 +36,18 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "localhost", pathname: "/**" },
       { protocol: "http", hostname: "127.0.0.1", pathname: "/**" },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/brand/:path*",
+        headers: immutablePublicAssetHeaders,
+      },
+      {
+        source: "/avatars/:path*",
+        headers: immutablePublicAssetHeaders,
+      },
+    ];
   },
 };
 
