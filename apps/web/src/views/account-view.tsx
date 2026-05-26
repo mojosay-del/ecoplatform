@@ -4,7 +4,7 @@
 // биллинг и список тикетов поддержки. Самый крупный view в проекте — раньше
 // жил в DataViews.tsx, теперь изолирован.
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import {
   Bell,
   Building2,
@@ -19,7 +19,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Image from "next/image";
-import type { BillingStatus, BillingSubscription, PaginatedResponse } from "@ecoplatform/shared";
+import type {
+  AddressDto,
+  BillingStatus,
+  BillingSubscription,
+  CompanyProfileUpdateDto,
+  PaginatedResponse,
+} from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { api, clearAccessToken } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -282,7 +288,7 @@ function getAccountModuleCards(companyType?: string | null, status?: string | nu
 export function AccountView() {
   const { user, token, logout } = useAuth();
   const isPlatformStaff = (user?.platformRoles?.length ?? 0) > 0;
-  const { data: billing } = useApiQuery<BillingStatus | null>(
+  const { data: billing, setData: setBilling } = useApiQuery<BillingStatus | null>(
     isPlatformStaff ? null : "billing-status",
     () => api.billing.status(),
     null,
@@ -533,59 +539,8 @@ export function AccountView() {
           </div>
         ) : null}
 
-        {activeTab === "company" && !isPlatformStaff ? (
-          <div className="account-panel-stack">
-            <div className="account-section-grid">
-              <article className="card account-card">
-                <h2>Компания</h2>
-                <AccountDetailList
-                  rows={[
-                    { label: "Название", value: company?.organizationName },
-                    {
-                      label: "Тип",
-                      value: company?.type ? (COMPANY_TYPE_LABELS[company.type] ?? company.type) : null,
-                    },
-                    {
-                      label: "Статус",
-                      value: company?.status ? (
-                        <span className="status-pill">{COMPANY_STATUS_LABELS[company.status] ?? company.status}</span>
-                      ) : null,
-                    },
-                  ]}
-                />
-              </article>
-              <article className="card account-card">
-                <h2>Реквизиты</h2>
-                <AccountDetailList
-                  rows={[
-                    { label: "ИНН", value: company?.billingInn },
-                    { label: "КПП", value: company?.billingKpp },
-                    { label: "Юридический адрес", value: company?.legalAddress },
-                    { label: "Банк", value: company?.bankName },
-                    { label: "БИК", value: company?.bankBik },
-                    { label: "Расчётный счёт", value: company?.bankAccount },
-                    { label: "Корр. счёт", value: company?.correspondentAccount },
-                  ]}
-                />
-                <div className="account-action-list">
-                  <button className="button secondary" type="button" disabled>
-                    Редактировать реквизиты
-                  </button>
-                </div>
-              </article>
-            </div>
-            <section className="account-module-grid" aria-label="Доступные модули">
-              {getAccountModuleCards(company?.type, company?.status, company?.subscriptionPlan).map((item) => (
-                <article className="account-module-card" key={item.title}>
-                  <div>
-                    <h2>{item.title}</h2>
-                    <p>{item.description}</p>
-                  </div>
-                  <span className="status-pill">{item.state}</span>
-                </article>
-              ))}
-            </section>
-          </div>
+        {activeTab === "company" && !isPlatformStaff && billing ? (
+          <CompanyProfileForm billing={billing} onSaved={(updated) => setBilling(updated)} />
         ) : null}
 
         {activeTab === "billing" && !isPlatformStaff ? (
@@ -855,5 +810,452 @@ export function AccountView() {
         ) : null}
       </section>
     </AppShell>
+  );
+}
+
+// ── /account → Компания (Волна 7.4) ─────────────────────────────────────────
+// Редактируемый профиль компании: 4 секции (Основное / Контакты / Адреса /
+// Реквизиты). Один Save-кнопка внизу — собирает все изменённые поля и
+// отправляет одним PATCH. Поля type/status/createdAt — read-only (управляются
+// бэком), остальное — текстовые input'ы с inline-валидацией от бэка.
+type AddressFormState = {
+  country: string;
+  region: string;
+  city: string;
+  street: string;
+  building: string;
+  apartment: string;
+  postcode: string;
+};
+
+type CompanyFormState = {
+  organizationName: string;
+  websiteUrl: string;
+  corporatePhone: string;
+  corporateEmail: string;
+  about: string;
+  contactPersonName: string;
+  contactPersonPhone: string;
+  contactPersonEmail: string;
+  billingInn: string;
+  billingKpp: string;
+  bankName: string;
+  bankBik: string;
+  bankAccount: string;
+  correspondentAccount: string;
+  factualAddress: AddressFormState;
+  structuredLegalAddress: AddressFormState;
+};
+
+function emptyAddress(): AddressFormState {
+  return { country: "Россия", region: "", city: "", street: "", building: "", apartment: "", postcode: "" };
+}
+
+function addressFromBilling(address: BillingStatus["factualAddress"]): AddressFormState {
+  if (!address) return emptyAddress();
+  return {
+    country: address.country ?? "Россия",
+    region: address.region ?? "",
+    city: address.city ?? "",
+    street: address.street ?? "",
+    building: address.building ?? "",
+    apartment: address.apartment ?? "",
+    postcode: address.postcode ?? "",
+  };
+}
+
+function billingToFormState(billing: BillingStatus): CompanyFormState {
+  return {
+    organizationName: billing.organizationName,
+    websiteUrl: billing.websiteUrl ?? "",
+    corporatePhone: billing.corporatePhone ?? "",
+    corporateEmail: billing.corporateEmail ?? "",
+    about: billing.about ?? "",
+    contactPersonName: billing.contactPersonName ?? "",
+    contactPersonPhone: billing.contactPersonPhone ?? "",
+    contactPersonEmail: billing.contactPersonEmail ?? "",
+    billingInn: billing.billingInn ?? "",
+    billingKpp: billing.billingKpp ?? "",
+    bankName: billing.bankName ?? "",
+    bankBik: billing.bankBik ?? "",
+    bankAccount: billing.bankAccount ?? "",
+    correspondentAccount: billing.correspondentAccount ?? "",
+    factualAddress: addressFromBilling(billing.factualAddress),
+    structuredLegalAddress: addressFromBilling(billing.structuredLegalAddress),
+  };
+}
+
+// Адрес считаем заполненным, если указан город. Не передаём бэку пустой адрес
+// (Zod-схема требует city.min(1)) — отправляем null = «отвязать».
+function addressToDto(address: AddressFormState): AddressDto | null {
+  if (!address.city.trim()) return null;
+  return {
+    country: address.country.trim() || "Россия",
+    region: address.region.trim() || null,
+    city: address.city.trim(),
+    street: address.street.trim() || null,
+    building: address.building.trim() || null,
+    apartment: address.apartment.trim() || null,
+    postcode: address.postcode.trim() || null,
+    formatted: null,
+  };
+}
+
+function CompanyProfileForm({
+  billing,
+  onSaved,
+}: {
+  billing: BillingStatus;
+  onSaved: (updated: BillingStatus) => void;
+}) {
+  const [form, setForm] = useState<CompanyFormState>(() => billingToFormState(billing));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  // Если внешние данные billing изменились (например, после успешного сейва) —
+  // подтянуть форму, чтобы не редактировать «исторические» значения.
+  useEffect(() => {
+    setForm(billingToFormState(billing));
+  }, [billing]);
+
+  function setField<K extends keyof CompanyFormState>(key: K, value: CompanyFormState[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function setAddressField(
+    section: "factualAddress" | "structuredLegalAddress",
+    key: keyof AddressFormState,
+    value: string,
+  ) {
+    setForm((current) => ({
+      ...current,
+      [section]: { ...current[section], [key]: value },
+    }));
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage(null);
+    setSaving(true);
+    const dto: CompanyProfileUpdateDto = {
+      organizationName: form.organizationName.trim() || undefined,
+      websiteUrl: form.websiteUrl.trim() || null,
+      corporatePhone: form.corporatePhone.trim() || null,
+      corporateEmail: form.corporateEmail.trim() || null,
+      about: form.about.trim() || null,
+      contactPersonName: form.contactPersonName.trim() || null,
+      contactPersonPhone: form.contactPersonPhone.trim() || null,
+      contactPersonEmail: form.contactPersonEmail.trim() || null,
+      billingInn: form.billingInn.trim() || null,
+      billingKpp: form.billingKpp.trim() || null,
+      bankName: form.bankName.trim() || null,
+      bankBik: form.bankBik.trim() || null,
+      bankAccount: form.bankAccount.trim() || null,
+      correspondentAccount: form.correspondentAccount.trim() || null,
+      factualAddress: addressToDto(form.factualAddress),
+      structuredLegalAddress: addressToDto(form.structuredLegalAddress),
+    };
+    try {
+      const updated = await api.billing.updateCompanyProfile(dto);
+      onSaved(updated);
+      setMessage({ type: "ok", text: "Сохранено." });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Не удалось сохранить.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className="account-panel-stack" onSubmit={onSubmit}>
+      <div className="account-section-grid">
+        <article className="card account-card">
+          <h2>Основное</h2>
+          <label className="account-form-field">
+            <span>Название компании</span>
+            <input
+              className="input"
+              type="text"
+              value={form.organizationName}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setField("organizationName", event.target.value)}
+              required
+            />
+          </label>
+          <AccountDetailList
+            rows={[
+              {
+                label: "Тип",
+                value: billing.type ? (COMPANY_TYPE_LABELS[billing.type] ?? billing.type) : null,
+              },
+              {
+                label: "Статус",
+                value: billing.status ? (
+                  <span className="status-pill">{COMPANY_STATUS_LABELS[billing.status] ?? billing.status}</span>
+                ) : null,
+              },
+            ]}
+          />
+          <label className="account-form-field">
+            <span>О компании</span>
+            <textarea
+              className="input"
+              rows={4}
+              maxLength={2000}
+              value={form.about}
+              onChange={(event) => setField("about", event.target.value)}
+              placeholder="Несколько предложений о вашей компании — для коллег, партнёров и админов"
+            />
+          </label>
+        </article>
+
+        <article className="card account-card">
+          <h2>Контакты</h2>
+          <label className="account-form-field">
+            <span>Сайт</span>
+            <input
+              className="input"
+              type="url"
+              value={form.websiteUrl}
+              onChange={(event) => setField("websiteUrl", event.target.value)}
+              placeholder="https://example.ru"
+            />
+          </label>
+          <label className="account-form-field">
+            <span>Корпоративный телефон</span>
+            <input
+              className="input"
+              type="tel"
+              value={form.corporatePhone}
+              onChange={(event) => setField("corporatePhone", event.target.value)}
+              placeholder="+74951234567"
+            />
+          </label>
+          <label className="account-form-field">
+            <span>Корпоративный email</span>
+            <input
+              className="input"
+              type="email"
+              value={form.corporateEmail}
+              onChange={(event) => setField("corporateEmail", event.target.value)}
+              placeholder="info@example.ru"
+            />
+          </label>
+          <h3 className="account-form-subhead">Контактное лицо</h3>
+          <label className="account-form-field">
+            <span>ФИО</span>
+            <input
+              className="input"
+              type="text"
+              value={form.contactPersonName}
+              onChange={(event) => setField("contactPersonName", event.target.value)}
+              placeholder="Иван Петров"
+            />
+          </label>
+          <label className="account-form-field">
+            <span>Телефон</span>
+            <input
+              className="input"
+              type="tel"
+              value={form.contactPersonPhone}
+              onChange={(event) => setField("contactPersonPhone", event.target.value)}
+              placeholder="+79161112233"
+            />
+          </label>
+          <label className="account-form-field">
+            <span>Email</span>
+            <input
+              className="input"
+              type="email"
+              value={form.contactPersonEmail}
+              onChange={(event) => setField("contactPersonEmail", event.target.value)}
+              placeholder="ivan@example.ru"
+            />
+          </label>
+        </article>
+      </div>
+
+      <div className="account-section-grid">
+        <article className="card account-card">
+          <h2>Фактический адрес</h2>
+          <AddressFields
+            address={form.factualAddress}
+            onChange={(key, value) => setAddressField("factualAddress", key, value)}
+          />
+        </article>
+
+        <article className="card account-card">
+          <h2>Юридический адрес</h2>
+          <AddressFields
+            address={form.structuredLegalAddress}
+            onChange={(key, value) => setAddressField("structuredLegalAddress", key, value)}
+          />
+          <p className="page-subtitle">
+            Этот адрес уходит в счета, акты и договоры. Если совпадает с фактическим — продублируйте.
+          </p>
+        </article>
+      </div>
+
+      <article className="card account-card">
+        <h2>Банковские реквизиты</h2>
+        <div className="account-form-grid-2">
+          <label className="account-form-field">
+            <span>ИНН</span>
+            <input
+              className="input"
+              type="text"
+              inputMode="numeric"
+              value={form.billingInn}
+              onChange={(event) => setField("billingInn", event.target.value)}
+              placeholder="7707083893"
+              maxLength={12}
+            />
+          </label>
+          <label className="account-form-field">
+            <span>КПП</span>
+            <input
+              className="input"
+              type="text"
+              inputMode="numeric"
+              value={form.billingKpp}
+              onChange={(event) => setField("billingKpp", event.target.value)}
+              placeholder="770701001"
+              maxLength={9}
+            />
+          </label>
+          <label className="account-form-field account-form-field-wide">
+            <span>Банк</span>
+            <input
+              className="input"
+              type="text"
+              value={form.bankName}
+              onChange={(event) => setField("bankName", event.target.value)}
+              placeholder="ПАО Сбербанк"
+            />
+          </label>
+          <label className="account-form-field">
+            <span>БИК</span>
+            <input
+              className="input"
+              type="text"
+              inputMode="numeric"
+              value={form.bankBik}
+              onChange={(event) => setField("bankBik", event.target.value)}
+              placeholder="044525225"
+              maxLength={9}
+            />
+          </label>
+          <label className="account-form-field account-form-field-wide">
+            <span>Расчётный счёт</span>
+            <input
+              className="input"
+              type="text"
+              inputMode="numeric"
+              value={form.bankAccount}
+              onChange={(event) => setField("bankAccount", event.target.value)}
+              placeholder="40702810500000000123"
+              maxLength={20}
+            />
+          </label>
+          <label className="account-form-field account-form-field-wide">
+            <span>Корреспондентский счёт</span>
+            <input
+              className="input"
+              type="text"
+              inputMode="numeric"
+              value={form.correspondentAccount}
+              onChange={(event) => setField("correspondentAccount", event.target.value)}
+              placeholder="30101810400000000225"
+              maxLength={20}
+            />
+          </label>
+        </div>
+      </article>
+
+      {message ? <p className={`account-form-message account-form-message-${message.type}`}>{message.text}</p> : null}
+
+      <div className="account-action-list">
+        <button className="button" type="submit" disabled={saving}>
+          {saving ? "Сохраняем..." : "Сохранить изменения"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function AddressFields({
+  address,
+  onChange,
+}: {
+  address: AddressFormState;
+  onChange: (key: keyof AddressFormState, value: string) => void;
+}) {
+  return (
+    <div className="account-form-grid-2">
+      <label className="account-form-field account-form-field-wide">
+        <span>Город *</span>
+        <input
+          className="input"
+          type="text"
+          value={address.city}
+          onChange={(event) => onChange("city", event.target.value)}
+          placeholder="Москва"
+        />
+      </label>
+      <label className="account-form-field">
+        <span>Индекс</span>
+        <input
+          className="input"
+          type="text"
+          inputMode="numeric"
+          value={address.postcode}
+          onChange={(event) => onChange("postcode", event.target.value)}
+          placeholder="101000"
+          maxLength={6}
+        />
+      </label>
+      <label className="account-form-field">
+        <span>Регион</span>
+        <input
+          className="input"
+          type="text"
+          value={address.region}
+          onChange={(event) => onChange("region", event.target.value)}
+          placeholder="Московская область"
+        />
+      </label>
+      <label className="account-form-field account-form-field-wide">
+        <span>Улица</span>
+        <input
+          className="input"
+          type="text"
+          value={address.street}
+          onChange={(event) => onChange("street", event.target.value)}
+          placeholder="Ленина"
+        />
+      </label>
+      <label className="account-form-field">
+        <span>Дом</span>
+        <input
+          className="input"
+          type="text"
+          value={address.building}
+          onChange={(event) => onChange("building", event.target.value)}
+          placeholder="12"
+        />
+      </label>
+      <label className="account-form-field">
+        <span>Кв./офис</span>
+        <input
+          className="input"
+          type="text"
+          value={address.apartment}
+          onChange={(event) => onChange("apartment", event.target.value)}
+          placeholder="5"
+        />
+      </label>
+    </div>
   );
 }

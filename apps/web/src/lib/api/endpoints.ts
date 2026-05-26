@@ -80,7 +80,7 @@ export const api = {
   billing: {
     status: () => apiFetch<BillingStatus>("/billing/status"),
     updateCompanyProfile: (input: CompanyProfileUpdateDto) =>
-      apiFetch<BillingStatus>("/billing/company", { method: "PATCH", body: JSON.stringify(input) }),
+      apiFetch<BillingStatus>("/billing/company", { method: "PATCH", body: input }),
   },
 
   // ── Аутентификация / сессии ────────────────────────────────────────────

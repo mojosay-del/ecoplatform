@@ -6471,6 +6471,57 @@ li.tree-add-row + li.tree-add-row,
   font-weight: 600;
 }
 
+/* Форма «Компания» в /account (Волна 7.4): структурированный профиль с
+   четырьмя секциями. Поля занимают всю ширину карточки на узких экранах,
+   двухколоночная сетка — на широких. */
+.account-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.account-form-field span {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.account-form-subhead {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.account-form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.account-form-field-wide {
+  grid-column: span 2;
+}
+
+.account-form-message {
+  margin: 0;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.account-form-message-ok {
+  background: rgba(46, 160, 67, 0.1);
+  color: #1f7a36;
+}
+
+.account-form-message-error {
+  background: rgba(207, 34, 46, 0.1);
+  color: #a40e1c;
+}
+
 .status-pill.primary {
   background: var(--text);
   color: #fff;
