@@ -1836,20 +1836,27 @@ describe("Content lifecycle: news", () => {
     const direct = await ctx.http.get(`/api/news/${news.slug}`).set("Authorization", `Bearer ${reader.token}`);
     expect(direct.status).toBe(404);
 
-    const [post, blockCount, postTagCount, postLikeCount, commentCount, commentLikeCount] = await Promise.all([
-      ctx.prisma.newsPost.findUnique({ where: { id: news.id } }),
-      ctx.prisma.newsContentBlock.count({ where: { newsPostId: news.id } }),
-      ctx.prisma.newsPostTag.count({ where: { newsPostId: news.id } }),
-      ctx.prisma.newsLike.count({ where: { newsPostId: news.id } }),
-      ctx.prisma.comment.count({ where: { newsPostId: news.id } }),
-      ctx.prisma.commentLike.count({ where: { commentId: comment.id } }),
-    ]);
+    const [post, blockCount, postTagCount, postLikeCount, commentCount, commentLikeCount, discussionCount] =
+      await Promise.all([
+        ctx.prisma.newsPost.findUnique({ where: { id: news.id } }),
+        ctx.prisma.newsContentBlock.count({ where: { newsPostId: news.id } }),
+        ctx.prisma.newsPostTag.count({ where: { newsPostId: news.id } }),
+        ctx.prisma.newsLike.count({ where: { newsPostId: news.id } }),
+        // Comment теперь живёт в Discussion(news_post, news.id) — каскад
+        // через Discussion должен снести и комментарии тоже.
+        ctx.prisma.comment.count({
+          where: { discussion: { targetType: "news_post", targetId: news.id } },
+        }),
+        ctx.prisma.commentLike.count({ where: { commentId: comment.id } }),
+        ctx.prisma.discussion.count({ where: { targetType: "news_post", targetId: news.id } }),
+      ]);
     expect(post).toBeNull();
     expect(blockCount).toBe(0);
     expect(postTagCount).toBe(0);
     expect(postLikeCount).toBe(0);
     expect(commentCount).toBe(0);
     expect(commentLikeCount).toBe(0);
+    expect(discussionCount).toBe(0);
   });
 });
 
@@ -2566,5 +2573,72 @@ describe("Legal documents & consents", () => {
     // sanity: всего 4 записи — 3 при регистрации + 1 на v2
     const count = await ctx.prisma.consentRecord.count({ where: { userId } });
     expect(count).toBe(4);
+  });
+});
+
+describe("Discussion (полиморфные обсуждения, Волна 7.1)", () => {
+  it("первый POST /news/:id/comments лениво создаёт Discussion(news_post, id)", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0700001");
+    const news = await createPublishedNews(adminToken, "discussion-lazy");
+
+    // До первого комментария Discussion ещё нет.
+    const before = await ctx.prisma.discussion.findUnique({
+      where: { targetType_targetId: { targetType: "news_post", targetId: news.id } },
+    });
+    expect(before).toBeNull();
+
+    const res = await ctx.http
+      .post(`/api/news/${news.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Первый комментарий" });
+    expect(res.status).toBe(201);
+
+    const after = await ctx.prisma.discussion.findUnique({
+      where: { targetType_targetId: { targetType: "news_post", targetId: news.id } },
+      include: { comments: true },
+    });
+    expect(after).toBeTruthy();
+    expect(after?.comments).toHaveLength(1);
+    expect(after?.comments[0].text).toBe("Первый комментарий");
+  });
+
+  it("второй комментарий переиспользует существующую Discussion (не создаёт дубль)", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0700002");
+    const news = await createPublishedNews(adminToken, "discussion-reuse");
+
+    await ctx.http
+      .post(`/api/news/${news.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Первый" });
+    await ctx.http
+      .post(`/api/news/${news.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Второй" });
+
+    const discussions = await ctx.prisma.discussion.findMany({
+      where: { targetType: "news_post", targetId: news.id },
+      include: { comments: true },
+    });
+    expect(discussions).toHaveLength(1);
+    expect(discussions[0].comments).toHaveLength(2);
+  });
+
+  it("GET /news/:slug возвращает комментарии через Discussion и счётчик _count.comments", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0700003");
+    const news = await createPublishedNews(adminToken, "discussion-fetch");
+
+    await ctx.http
+      .post(`/api/news/${news.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Видимый комментарий" });
+
+    const res = await ctx.http.get(`/api/news/${news.slug}`).set("Authorization", `Bearer ${author.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.comments).toHaveLength(1);
+    expect(res.body.comments[0].text).toBe("Видимый комментарий");
+    expect(res.body._count.comments).toBe(1);
   });
 });

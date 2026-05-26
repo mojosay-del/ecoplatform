@@ -10,6 +10,7 @@ import {
   CompanyStatus,
   ComplaintStatus,
   ContentStatus,
+  DiscussionTargetType,
   ModerationCaseStatus,
   ModerationDecisionType,
   NotificationCategory,
@@ -671,15 +672,22 @@ export class ModerationService {
       const comment = await this.prisma.comment.findUnique({
         where: { id: entityId },
         include: {
-          newsPost: { select: { status: true } },
+          discussion: { select: { targetType: true, targetId: true } },
           user: { select: { id: true, companyId: true } },
         },
       });
       if (
         !comment ||
         comment.status !== CommentStatus.published ||
-        comment.newsPost.status !== ContentStatus.published
+        comment.discussion.targetType !== DiscussionTargetType.news_post
       ) {
+        throw new NotFoundException("Комментарий не найден или недоступен для жалобы.");
+      }
+      const newsPost = await this.prisma.newsPost.findUnique({
+        where: { id: comment.discussion.targetId },
+        select: { status: true },
+      });
+      if (!newsPost || newsPost.status !== ContentStatus.published) {
         throw new NotFoundException("Комментарий не найден или недоступен для жалобы.");
       }
       return { type: "news_comment", authorUserId: comment.userId, authorCompanyId: comment.user.companyId };
@@ -837,10 +845,10 @@ export class ModerationService {
     const newsPostIds = cases.filter((item) => item.entityType === "news_post").map((item) => item.entityId);
     const articleIds = cases.filter((item) => item.entityType === "knowledge_article").map((item) => item.entityId);
 
-    const [comments, newsPosts, articles] = await Promise.all([
+    const [commentsRaw, newsPosts, articles] = await Promise.all([
       this.prisma.comment.findMany({
         where: { id: { in: commentIds } },
-        include: { newsPost: { select: { id: true, title: true, slug: true } } },
+        include: { discussion: { select: { targetType: true, targetId: true } } },
       }),
       this.prisma.newsPost.findMany({
         where: { id: { in: newsPostIds } },
@@ -851,6 +859,36 @@ export class ModerationService {
         select: { id: true, title: true, slug: true, status: true },
       }),
     ]);
+
+    // Подмешиваем NewsPost к Comment через Discussion. Раньше это было прямой
+    // join (Comment.newsPost), сейчас — отдельный батч-запрос по targetId.
+    const commentNewsPostIds = commentsRaw
+      .filter((c) => c.discussion.targetType === DiscussionTargetType.news_post)
+      .map((c) => c.discussion.targetId);
+    const commentNewsPosts =
+      commentNewsPostIds.length > 0
+        ? await this.prisma.newsPost.findMany({
+            where: { id: { in: commentNewsPostIds } },
+            select: { id: true, title: true, slug: true },
+          })
+        : [];
+    const commentNewsPostMap = new Map(commentNewsPosts.map((post) => [post.id, post]));
+    const comments = commentsRaw
+      .map((comment) => {
+        const post =
+          comment.discussion.targetType === DiscussionTargetType.news_post
+            ? commentNewsPostMap.get(comment.discussion.targetId)
+            : null;
+        if (!post) return null;
+        return {
+          id: comment.id,
+          text: comment.text,
+          status: comment.status,
+          createdAt: comment.createdAt,
+          newsPost: post,
+        };
+      })
+      .filter((value): value is NonNullable<typeof value> => value !== null);
 
     const commentMap = new Map(comments.map((comment) => [comment.id, comment]));
     const newsPostMap = new Map(newsPosts.map((item) => [item.id, item]));
@@ -948,10 +986,15 @@ export class ModerationService {
     if (found.entityType === "news_comment") {
       const comment = await this.prisma.comment.findUnique({
         where: { id: found.entityId },
-        include: { newsPost: { select: { id: true, title: true, slug: true } } },
+        include: { discussion: { select: { targetType: true, targetId: true } } },
       });
-      if (!comment) return null;
-      return { title: comment.newsPost.title, link: `/news/${comment.newsPost.slug}` };
+      if (!comment || comment.discussion.targetType !== DiscussionTargetType.news_post) return null;
+      const newsPost = await this.prisma.newsPost.findUnique({
+        where: { id: comment.discussion.targetId },
+        select: { title: true, slug: true },
+      });
+      if (!newsPost) return null;
+      return { title: newsPost.title, link: `/news/${newsPost.slug}` };
     }
     if (found.entityType === "news_post") {
       const post = await this.prisma.newsPost.findUnique({

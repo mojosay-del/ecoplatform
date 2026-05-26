@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { CommentStatus, ContentStatus, Prisma } from "@prisma/client";
+import { CommentStatus, ContentStatus, DiscussionTargetType, Prisma } from "@prisma/client";
 import { newsBlockSchema, slugify, validateContentBlocks } from "@ecoplatform/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
@@ -97,17 +97,50 @@ export class NewsService {
         include: {
           tags: { include: { newsTag: true } },
           likes: { where: { userId: user.id }, select: { id: true } },
-          _count: { select: { likes: true, comments: { where: { status: CommentStatus.published } } } },
+          _count: { select: { likes: true } },
         },
       }),
     ]);
 
-    const items = posts.map(({ likes, ...post }) => ({ ...post, likedByMe: likes.length > 0 }));
+    // Комментарии теперь живут в Discussion(targetType=news_post, targetId=NewsPost.id).
+    // Считаем их батчем для всех новостей страницы — иначе на каждую карточку
+    // отдельный запрос.
+    const commentCounts = await this.loadPublishedCommentCounts(posts.map((post) => post.id));
+
+    const items = posts.map(({ likes, _count, ...post }) => ({
+      ...post,
+      _count: { likes: _count.likes, comments: commentCounts.get(post.id) ?? 0 },
+      likedByMe: likes.length > 0,
+    }));
     return {
       items,
       total,
       hasMore: offset + items.length < total,
     };
+  }
+
+  // Для списочного эндпоинта /news и админ-листинга. На вход — id новостей,
+  // на выход — Map(newsPostId → число опубликованных комментариев).
+  // Один SQL: Discussion ⋈ Comment (group by discussionId).
+  private async loadPublishedCommentCounts(newsPostIds: string[]): Promise<Map<string, number>> {
+    if (newsPostIds.length === 0) return new Map();
+
+    const discussions = await this.prisma.discussion.findMany({
+      where: { targetType: DiscussionTargetType.news_post, targetId: { in: newsPostIds } },
+      select: { id: true, targetId: true },
+    });
+    if (discussions.length === 0) return new Map();
+
+    const counts = await this.prisma.comment.groupBy({
+      by: ["discussionId"],
+      where: {
+        discussionId: { in: discussions.map((d) => d.id) },
+        status: CommentStatus.published,
+      },
+      _count: { _all: true },
+    });
+    const countByDiscussion = new Map(counts.map((row) => [row.discussionId, row._count._all]));
+    return new Map(discussions.map((d) => [d.targetId, countByDiscussion.get(d.id) ?? 0]));
   }
 
   async getNews(slug: string, user: RequestUser) {
@@ -119,25 +152,7 @@ export class NewsService {
         blocks: { orderBy: { position: "asc" } },
         tags: { include: { newsTag: true } },
         likes: { where: { userId: user.id }, select: { id: true } },
-        comments: {
-          where: { parentCommentId: null, status: CommentStatus.published },
-          orderBy: { createdAt: "desc" },
-          include: {
-            replies: {
-              where: { status: CommentStatus.published },
-              orderBy: { createdAt: "asc" },
-              include: {
-                user: { select: commentAuthorSelect },
-                likes: { where: { userId: user.id }, select: { id: true } },
-                _count: { select: { likes: true } },
-              },
-            },
-            user: { select: commentAuthorSelect },
-            likes: { where: { userId: user.id }, select: { id: true } },
-            _count: { select: { likes: true } },
-          },
-        },
-        _count: { select: { likes: true, comments: { where: { status: CommentStatus.published } } } },
+        _count: { select: { likes: true } },
       },
     });
 
@@ -145,10 +160,40 @@ export class NewsService {
       throw new NotFoundException("Новость не найдена.");
     }
 
-    const { likes, ...payload } = post;
+    // Комментарии берём через Discussion. Если её ещё нет (никто не комментировал),
+    // отдаём пустой массив и 0 в счётчике — Discussion создастся лениво при первом
+    // POST /comments.
+    const discussionWhere = {
+      discussion: { targetType: DiscussionTargetType.news_post, targetId: post.id },
+    } satisfies Prisma.CommentWhereInput;
+
+    const [comments, commentsCount] = await Promise.all([
+      this.prisma.comment.findMany({
+        where: { ...discussionWhere, parentCommentId: null, status: CommentStatus.published },
+        orderBy: { createdAt: "desc" },
+        include: {
+          replies: {
+            where: { status: CommentStatus.published },
+            orderBy: { createdAt: "asc" },
+            include: {
+              user: { select: commentAuthorSelect },
+              likes: { where: { userId: user.id }, select: { id: true } },
+              _count: { select: { likes: true } },
+            },
+          },
+          user: { select: commentAuthorSelect },
+          likes: { where: { userId: user.id }, select: { id: true } },
+          _count: { select: { likes: true } },
+        },
+      }),
+      this.prisma.comment.count({ where: { ...discussionWhere, status: CommentStatus.published } }),
+    ]);
+
+    const { likes, _count, ...payload } = post;
     return {
       ...payload,
-      comments: payload.comments.map((comment) => this.decorateNewsComment(comment)),
+      _count: { likes: _count.likes, comments: commentsCount },
+      comments: comments.map((comment) => this.decorateNewsComment(comment)),
       likedByMe: likes.length > 0,
     };
   }
@@ -339,30 +384,37 @@ export class NewsService {
       include: {
         tags: true,
         blocks: true,
-        comments: { include: { attachments: true } },
       },
     });
     if (!existing) {
       throw new NotFoundException("Новость не найдена.");
     }
 
+    // Файлы комментариев берём через Discussion — у Comment больше нет прямой
+    // ссылки на NewsPost.
+    const commentAttachments = await this.prisma.commentAttachment.findMany({
+      where: { comment: { discussion: { targetType: DiscussionTargetType.news_post, targetId: id } } },
+      select: { fileId: true },
+    });
+
     const affectedTagIds = existing.tags.map((tag) => tag.newsTagId);
     const deletedFileIds = this.common.compactFileIds([
       existing.coverImageId,
       ...this.common.collectFileIdsFromBlocks(existing.blocks),
-      ...existing.comments.flatMap((comment) => comment.attachments.map((attachment) => attachment.fileId)),
+      ...commentAttachments.map((attachment) => attachment.fileId),
     ]);
 
-    // Комментарии физически удаляются каскадом Comment.newsPost (onDelete: Cascade
-    // в schema.prisma). Раньше пытались помечать статусом removed_with_news перед
-    // delete — но статус не сохранялся, потому что строки сносились микросекундой
-    // позже. Аудит-лог делает запись со slug и title удалённой новости.
+    // Discussion(targetType=news_post, targetId=id) удаляем явно ДО NewsPost.delete,
+    // потому что прямого FK NewsPost ↔ Comment больше нет. Каскад Discussion → Comment
+    // → CommentLike/CommentAttachment продолжает работать через onDelete: Cascade.
+    await this.prisma.discussion.deleteMany({
+      where: { targetType: DiscussionTargetType.news_post, targetId: id },
+    });
     await this.prisma.newsPost.delete({ where: { id } });
 
     await this.refreshTagUsage(affectedTagIds);
     // FileReference для этой новости очищаем ДО cleanupDetachedFiles, иначе
-    // ссылки бы блокировали удаление файла. Аналогично для comments — но
-    // комментарии каскадом удалены вместе с newsPost.
+    // ссылки бы блокировали удаление файла.
     await this.common.clearEntityReferences("news_post", id);
     await this.common.cleanupDetachedFiles(deletedFileIds);
 
@@ -386,7 +438,7 @@ export class NewsService {
     const limit = Math.min(Math.max(pagination.limit ?? 20, 1), 100);
     const offset = Math.max(pagination.offset ?? 0, 0);
 
-    const [total, items] = await this.prisma.$transaction([
+    const [total, postsRaw] = await this.prisma.$transaction([
       this.prisma.newsPost.count(),
       this.prisma.newsPost.findMany({
         orderBy: { updatedAt: "desc" },
@@ -394,16 +446,46 @@ export class NewsService {
         skip: offset,
         include: {
           tags: { include: { newsTag: true } },
-          _count: { select: { blocks: true, comments: true, likes: true } },
+          _count: { select: { blocks: true, likes: true } },
         },
       }),
     ]);
+
+    // Комментарии — через Discussion (см. listNews). В админ-таблице считаем
+    // ВСЕ комментарии без фильтра по статусу: модератор должен видеть, что
+    // у новости есть скрытые/удалённые комментарии в очереди модерации.
+    const commentCounts = await this.loadAllCommentCounts(postsRaw.map((post) => post.id));
+
+    const items = postsRaw.map(({ _count, ...post }) => ({
+      ...post,
+      _count: { blocks: _count.blocks, likes: _count.likes, comments: commentCounts.get(post.id) ?? 0 },
+    }));
 
     return {
       items,
       total,
       hasMore: offset + items.length < total,
     };
+  }
+
+  // То же, что loadPublishedCommentCounts, но без фильтра по status — для
+  // админ-листинга, где важно видеть общее количество.
+  private async loadAllCommentCounts(newsPostIds: string[]): Promise<Map<string, number>> {
+    if (newsPostIds.length === 0) return new Map();
+
+    const discussions = await this.prisma.discussion.findMany({
+      where: { targetType: DiscussionTargetType.news_post, targetId: { in: newsPostIds } },
+      select: { id: true, targetId: true },
+    });
+    if (discussions.length === 0) return new Map();
+
+    const counts = await this.prisma.comment.groupBy({
+      by: ["discussionId"],
+      where: { discussionId: { in: discussions.map((d) => d.id) } },
+      _count: { _all: true },
+    });
+    const countByDiscussion = new Map(counts.map((row) => [row.discussionId, row._count._all]));
+    return new Map(discussions.map((d) => [d.targetId, countByDiscussion.get(d.id) ?? 0]));
   }
 
   async adminListNewsTags() {
@@ -518,9 +600,25 @@ export class NewsService {
 
     const comment = await this.prisma.comment.findUnique({
       where: { id },
-      select: { id: true, status: true, newsPost: { select: { status: true } } },
+      select: {
+        id: true,
+        status: true,
+        discussion: { select: { targetType: true, targetId: true } },
+      },
     });
-    if (!comment || comment.status !== CommentStatus.published || comment.newsPost.status !== ContentStatus.published) {
+    if (!comment || comment.status !== CommentStatus.published) {
+      throw new NotFoundException("Комментарий не найден.");
+    }
+    if (comment.discussion.targetType !== DiscussionTargetType.news_post) {
+      // На уроки/КБ/листинги/форум комментарии в MVP отображения нет;
+      // защищаемся на уровне сервиса, чтобы не лайкнуть «невидимый» коммент.
+      throw new NotFoundException("Комментарий не найден.");
+    }
+    const newsPost = await this.prisma.newsPost.findUnique({
+      where: { id: comment.discussion.targetId },
+      select: { status: true },
+    });
+    if (!newsPost || newsPost.status !== ContentStatus.published) {
       throw new NotFoundException("Комментарий не найден.");
     }
 
@@ -551,9 +649,26 @@ export class NewsService {
       parentCommentId = parent?.parentCommentId ?? parentCommentId;
     }
 
+    // Discussion для этой новости создаём лениво при первом комментарии.
+    // upsert — атомарно, чтобы два параллельных POST не нарвались на
+    // unique(targetType, targetId).
+    const discussion = await this.prisma.discussion.upsert({
+      where: {
+        targetType_targetId: {
+          targetType: DiscussionTargetType.news_post,
+          targetId: newsPostId,
+        },
+      },
+      create: {
+        targetType: DiscussionTargetType.news_post,
+        targetId: newsPostId,
+      },
+      update: {},
+    });
+
     return this.prisma.comment.create({
       data: {
-        newsPostId,
+        discussionId: discussion.id,
         userId: user.id,
         text: input.text,
         parentCommentId,

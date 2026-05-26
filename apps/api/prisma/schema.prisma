@@ -174,6 +174,19 @@ enum ConsentSource {
   admin_action
 }
 
+// Полиморфные обсуждения: ветка комментариев привязывается не к конкретной
+// сущности (NewsPost), а к Discussion с парой (targetType, targetId).
+// Это позволяет лениво подключать комментарии к урокам, статьям базы знаний,
+// объявлениям торговой площадки и темам форума без расщепления Comment.
+enum DiscussionTargetType {
+  news_post
+  lesson
+  knowledge_article
+  listing
+  forum_thread
+  solution_review
+}
+
 model User {
   id                      String                       @id @default(cuid())
   email                   String                       @unique
@@ -357,7 +370,9 @@ model NewsPost {
   blocks           NewsContentBlock[]
   tags             NewsPostTag[]
   likes            NewsLike[]
-  comments         Comment[]
+  // Комментарии хранятся в Discussion(targetType=news_post, targetId=NewsPost.id).
+  // FK прямого NewsPost↔Comment не существует — каскад удаления реализован в
+  // news.service.ts (Discussion удаляется до NewsPost.delete).
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
@@ -410,10 +425,23 @@ model NewsLike {
   @@unique([userId, newsPostId])
 }
 
+model Discussion {
+  id         String               @id @default(cuid())
+  targetType DiscussionTargetType
+  targetId   String
+  isLocked   Boolean              @default(false)
+  comments   Comment[]
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  @@unique([targetType, targetId])
+  @@index([targetType, targetId])
+}
+
 model Comment {
   id              String              @id @default(cuid())
-  newsPostId      String
-  newsPost        NewsPost            @relation(fields: [newsPostId], references: [id], onDelete: Cascade)
+  discussionId    String
+  discussion      Discussion          @relation(fields: [discussionId], references: [id], onDelete: Cascade)
   parentCommentId String?
   parentComment   Comment?            @relation("CommentThread", fields: [parentCommentId], references: [id])
   replies         Comment[]           @relation("CommentThread")
@@ -426,10 +454,9 @@ model Comment {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
-  // Главный запрос — дерево комментариев к новости: фильтрация по
-  // (newsPostId, parentCommentId=null, status=published), затем reply'ы.
-  // Без индекса всё дерево перебирается seq-scan'ом на каждую открытую новость.
-  @@index([newsPostId, parentCommentId, status, createdAt(sort: Desc)])
+  // Главный запрос — дерево комментариев обсуждения: фильтрация по
+  // (discussionId, parentCommentId=null, status=published), затем reply'ы.
+  @@index([discussionId, parentCommentId, status, createdAt(sort: Desc)])
   @@index([parentCommentId, status, createdAt])
 }
 
