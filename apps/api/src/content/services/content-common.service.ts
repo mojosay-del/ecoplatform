@@ -77,6 +77,10 @@ export class ContentCommonService {
     await this.files.deleteIfUnreferenced(fileIds);
   }
 
+  async assertCoverImageAllowed(fileId: string | null | undefined, user: RequestUser): Promise<void> {
+    await this.files.assertCoverImageAllowed(fileId, user);
+  }
+
   // Зарегистрировать ВСЕ файлы, на которые ссылается данная сущность (новость,
   // модуль, статья базы знаний…), в FileReference. Идемпотентно: старые
   // ссылки этой же entity (entityType, entityId) сначала удаляются, потом

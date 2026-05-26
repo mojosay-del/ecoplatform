@@ -136,6 +136,7 @@ export class KnowledgeBaseService {
     if (!check.ok) {
       throw new ForbiddenException(check.message);
     }
+    await this.common.assertCoverImageAllowed(input.coverImageId, user);
 
     await this.assertKnowledgeDepth(input.parentId ?? null);
 
@@ -187,6 +188,7 @@ export class KnowledgeBaseService {
     if (!check.ok) {
       throw new ForbiddenException(check.message);
     }
+    await this.common.assertCoverImageAllowed(input.coverImageId, user);
 
     const existing = await this.prisma.knowledgeBaseArticle.findUnique({
       where: { id },

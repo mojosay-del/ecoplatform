@@ -248,6 +248,7 @@ export class NewsService {
     if (!check.ok) {
       throw new ForbiddenException(check.message);
     }
+    await this.common.assertCoverImageAllowed(input.coverImageId, user);
 
     const slug =
       input.slug ??
@@ -296,6 +297,7 @@ export class NewsService {
     if (!check.ok) {
       throw new ForbiddenException(check.message);
     }
+    await this.common.assertCoverImageAllowed(input.coverImageId, user);
 
     const before = await this.prisma.newsPost.findUnique({
       where: { id },

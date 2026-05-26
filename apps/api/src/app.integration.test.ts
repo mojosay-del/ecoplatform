@@ -9,6 +9,7 @@ import {
   CommentStatus,
   CompanyStatus,
   ContentStatus,
+  FileAccessLevel,
   LegalDocumentType,
   PlatformRole,
   SanctionType,
@@ -217,6 +218,19 @@ async function createPublishedNews(adminToken: string, suffix: string, tags: str
   expect(publish.status).toBe(201);
 
   return publish.body as { id: string; slug: string; title: string };
+}
+
+async function createCoverAsset(uploadedById: string, suffix: string) {
+  return ctx.prisma.fileAsset.create({
+    data: {
+      originalName: `${suffix}.webp`,
+      mimeType: "image/webp",
+      sizeBytes: 1200,
+      storageKey: `test/${suffix}.webp`,
+      accessLevel: FileAccessLevel.public,
+      uploadedById,
+    },
+  });
 }
 
 async function createPublishedKnowledgeArticle(adminToken: string, suffix: string) {
@@ -2281,6 +2295,26 @@ describe("Content lifecycle: learning modules", () => {
 });
 
 describe("Content updates (PATCH)", () => {
+  it("content manager не может поставить чужой файл как coverImageId", async () => {
+    const managerToken = await loginContentManager();
+    const admin = await ctx.prisma.user.findUniqueOrThrow({ where: { email: "admin@test.local" } });
+    const cover = await createCoverAsset(admin.id, "foreign-news-cover");
+
+    const draft = await ctx.http
+      .post("/api/admin/content/news")
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({
+        title: "Новость с чужой обложкой",
+        lead: "Лид",
+        coverImageId: cover.id,
+        blocks: [{ type: "paragraph", payload: { html: "<p>Текст.</p>" } }],
+        tags: ["security"],
+      });
+
+    expect(draft.status).toBe(403);
+    expect(draft.body.message).toContain("загруженный вами");
+  });
+
   it("PATCH новости меняет title и блоки, оставляет slug прежним", async () => {
     const adminToken = await loginAdmin();
     const draft = await ctx.http
@@ -2316,6 +2350,8 @@ describe("Content updates (PATCH)", () => {
 
   it("PATCH модуля обновляет accessLevel и preview", async () => {
     const adminToken = await loginAdmin();
+    const admin = await ctx.prisma.user.findUniqueOrThrow({ where: { email: "admin@test.local" } });
+    const cover = await createCoverAsset(admin.id, "learning-cover");
     const moduleRes = await ctx.http
       .post("/api/admin/content/education/modules")
       .set("Authorization", `Bearer ${adminToken}`)
@@ -2334,13 +2370,13 @@ describe("Content updates (PATCH)", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({
         title: "Модуль после",
-        coverImageId: "test-learning-cover",
+        coverImageId: cover.id,
         accessLevel: "extended",
         preview: { promotionalDescription: "Превью после", whatYouWillLearn: ["Пункт 1", "Пункт 2"] },
       });
     expect(patched.status).toBe(200);
     expect(patched.body.title).toBe("Модуль после");
-    expect(patched.body.coverImageId).toBe("test-learning-cover");
+    expect(patched.body.coverImageId).toBe(cover.id);
     expect(patched.body.accessLevel).toBe("extended");
     expect(patched.body.preview.whatYouWillLearn).toEqual(["Пункт 1", "Пункт 2"]);
   });

@@ -18,11 +18,16 @@ function referencePrisma(overrides: Record<string, unknown> = {}) {
     lessonContentBlock: { findMany: vi.fn().mockResolvedValue([]) },
     knowledgeBaseBlock: { findMany: vi.fn().mockResolvedValue([]) },
     fileReference: { count: vi.fn().mockResolvedValue(0) },
+    user: {
+      findUnique: vi.fn().mockResolvedValue({ companyId: null }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     fileAsset: {
       findUnique: vi.fn().mockResolvedValue({
         id: "file-1",
         storageKey: "uploads/2026-05-22/file.webp",
       }),
+      aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
       delete: vi.fn().mockResolvedValue({}),
     },
     ...overrides,
@@ -111,6 +116,7 @@ describe("FilesService file listing", () => {
       fileAsset: {
         findMany: vi.fn().mockResolvedValue([]),
         findUnique: vi.fn(),
+        aggregate: vi.fn(),
         delete: vi.fn(),
       },
     });
@@ -174,6 +180,7 @@ describe("FilesService upload validation", () => {
       fileAsset: {
         findUnique: vi.fn(),
         delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
         create: vi.fn().mockImplementation(({ data }) =>
           Promise.resolve({
             id: "file-pdf",
@@ -234,6 +241,7 @@ describe("FilesService upload validation", () => {
       fileAsset: {
         findUnique: vi.fn(),
         delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
         create: vi.fn().mockImplementation(({ data }) =>
           Promise.resolve({
             id: "file-cover",
@@ -282,5 +290,92 @@ describe("FilesService upload validation", () => {
     });
     expect(result.mimeType).toBe("image/webp");
     expect(result.variants?.avif?.storageKey).toMatch(/\.avif$/);
+  });
+
+  it("отклоняет upload, если компания превысила дневной лимит 500 МБ", async () => {
+    const almostFull = 499 * 1024 * 1024;
+    const prisma = referencePrisma({
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ companyId: "company-1" }),
+        findMany: vi.fn().mockResolvedValue([{ id: "user-1" }, { id: "user-2" }]),
+      },
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: almostFull } }),
+        create: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+    (service as unknown as { getClient: () => unknown }).getClient = vi.fn();
+    const buffer = Buffer.alloc(2 * 1024 * 1024);
+
+    await expect(
+      service.upload(
+        {
+          originalname: "too-much.pdf",
+          mimetype: "application/pdf",
+          size: buffer.length,
+          buffer,
+        },
+        {},
+        "user-1",
+      ),
+    ).rejects.toThrow("Дневной лимит загрузок исчерпан.");
+
+    expect(prisma.fileAsset.aggregate).toHaveBeenCalledWith({
+      where: {
+        uploadedById: { in: ["user-1", "user-2"] },
+        createdAt: { gte: expect.any(Date) },
+      },
+      _sum: { sizeBytes: true },
+    });
+    expect((service as unknown as { getClient: () => unknown }).getClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("FilesService cover ownership", () => {
+  it("запрещает content manager использовать чужой файл как обложку", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn().mockResolvedValue({
+          accessLevel: FileAccessLevel.public,
+          mimeType: "image/webp",
+          uploadedById: "other-user",
+        }),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
+        delete: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      service.assertCoverImageAllowed("cover-1", {
+        id: "content-manager-1",
+        platformRoles: ["content_manager"],
+      } as any),
+    ).rejects.toThrow("В качестве обложки можно использовать только файл, загруженный вами.");
+  });
+
+  it("разрешает админу использовать публичное изображение другого автора", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn().mockResolvedValue({
+          accessLevel: FileAccessLevel.public,
+          mimeType: "image/webp",
+          uploadedById: "content-manager-1",
+        }),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
+        delete: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      service.assertCoverImageAllowed("cover-1", {
+        id: "admin-1",
+        platformRoles: ["admin"],
+      } as any),
+    ).resolves.toBeUndefined();
   });
 });

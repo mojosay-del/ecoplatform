@@ -11,6 +11,7 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { Throttle } from "@nestjs/throttler";
 import { z } from "zod";
 import { FileAccessLevel } from "@prisma/client";
 import { CurrentUser } from "../common/current-user.decorator";
@@ -27,6 +28,10 @@ const fileMetadataSchema = z.object({
   sizeBytes: z.number().int().positive(),
   accessLevel: z.nativeEnum(FileAccessLevel).optional(),
 });
+const FILE_UPLOAD_THROTTLE = {
+  short: { limit: 20, ttl: 60_000 },
+  long: { limit: 20, ttl: 60_000 },
+};
 
 @UseGuards(JwtAuthGuard)
 @Controller("files")
@@ -54,6 +59,7 @@ export class FilesController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Post("upload")
+  @Throttle(FILE_UPLOAD_THROTTLE)
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 100 * 1024 * 1024 } }))
   async upload(
     @UploadedFile() file: UploadedMemoryFile | undefined,

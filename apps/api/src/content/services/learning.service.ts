@@ -198,6 +198,7 @@ export class LearningService {
         }
       }
     }
+    await this.common.assertCoverImageAllowed(input.coverImageId, user);
 
     // LearningModule.position уникально на уровне БД, поэтому aggregate+create
     // без атомарности — это гонка: два админа жмут «создать» одновременно,
@@ -376,6 +377,9 @@ export class LearningService {
     });
     if (!existing) {
       throw new NotFoundException("Модуль не найден.");
+    }
+    if (input.coverImageId !== undefined) {
+      await this.common.assertCoverImageAllowed(input.coverImageId, user);
     }
 
     const data: Prisma.LearningModuleUpdateInput = {};

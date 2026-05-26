@@ -1,9 +1,17 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
 import { fromBuffer } from "file-type";
 import { randomUUID } from "crypto";
 import { extname } from "path";
+import type { RequestUser } from "../common/request-user";
 import { PrismaService } from "../prisma/prisma.service";
 import { processCoverImage, type ProcessedImageVariant } from "./image-presets";
 
@@ -40,6 +48,7 @@ type ValidatedUpload = {
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_COVER_UPLOAD_BYTES = 10 * 1024 * 1024;
+const DAILY_UPLOAD_QUOTA_BYTES = 500 * 1024 * 1024;
 const SAFE_NAME_PATTERN = /[^a-zA-Z0-9._-]+/g;
 const GENERIC_DECLARED_MIME_TYPES = new Set(["application/octet-stream", "binary/octet-stream"]);
 const BLOCKED_UPLOAD_MIME_TYPES = new Set([
@@ -430,6 +439,68 @@ export class FilesService {
     return Array.from(new Set([asset.storageKey, ...variants]));
   }
 
+  private async dailyUploadScopeUserIds(userId: string): Promise<string[]> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { companyId: true },
+    });
+    if (!user?.companyId) {
+      return [userId];
+    }
+
+    const companyUsers = await this.prisma.user.findMany({
+      where: { companyId: user.companyId },
+      select: { id: true },
+    });
+    return companyUsers.length > 0 ? companyUsers.map((companyUser) => companyUser.id) : [userId];
+  }
+
+  private quotaResetHours(windowStart: Date): number {
+    const resetAt = windowStart.getTime() + 24 * 60 * 60 * 1000;
+    return Math.max(1, Math.ceil((resetAt - Date.now()) / (60 * 60 * 1000)));
+  }
+
+  private async assertDailyUploadQuota(userId: string, nextFileBytes: number): Promise<void> {
+    const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const userIds = await this.dailyUploadScopeUserIds(userId);
+    const aggregate = await this.prisma.fileAsset.aggregate({
+      where: {
+        uploadedById: { in: userIds },
+        createdAt: { gte: windowStart },
+      },
+      _sum: { sizeBytes: true },
+    });
+    const usedBytes = aggregate._sum.sizeBytes ?? 0;
+    if (usedBytes + nextFileBytes <= DAILY_UPLOAD_QUOTA_BYTES) {
+      return;
+    }
+
+    throw new HttpException(
+      `Дневной лимит загрузок исчерпан. Будет сброшен через ${this.quotaResetHours(windowStart)} ч.`,
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+
+  async assertCoverImageAllowed(fileId: string | null | undefined, user: RequestUser): Promise<void> {
+    if (!fileId) {
+      return;
+    }
+
+    const asset = await this.prisma.fileAsset.findUnique({
+      where: { id: fileId },
+      select: { accessLevel: true, mimeType: true, uploadedById: true },
+    });
+    if (!asset) {
+      throw new NotFoundException("Файл обложки не найден.");
+    }
+    if (asset.accessLevel !== FileAccessLevel.public || !asset.mimeType.startsWith("image/")) {
+      throw new ForbiddenException("В качестве обложки можно использовать только публичное изображение.");
+    }
+    if (!user.platformRoles.includes("admin") && asset.uploadedById !== user.id) {
+      throw new ForbiddenException("В качестве обложки можно использовать только файл, загруженный вами.");
+    }
+  }
+
   async createMetadata(
     input: { originalName: string; mimeType: string; sizeBytes: number; accessLevel?: FileAccessLevel },
     userId: string,
@@ -465,6 +536,8 @@ export class FilesService {
     if (input.imagePreset === "cover" && file.size > MAX_COVER_UPLOAD_BYTES) {
       throw new BadRequestException("Обложка больше 10 МБ.");
     }
+
+    await this.assertDailyUploadQuota(userId, file.size);
 
     const upload = await this.validateUpload(file, input);
     const { client, bucket } = this.getClient();
