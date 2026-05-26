@@ -7,6 +7,7 @@ import { resolve } from "path";
 loadEnv({ path: resolve(__dirname, "../../../.env") });
 
 import cookieParser from "cookie-parser";
+import compression from "compression";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
@@ -32,6 +33,7 @@ async function bootstrap() {
   registerProcessErrorHandlers();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.use(compression());
 
   // Все 5xx/4xx будут логироваться единообразно с URL, методом, actorId и
   // (для 5xx) stack-трейсом. См. GlobalExceptionFilter.

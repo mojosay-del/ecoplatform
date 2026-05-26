@@ -162,7 +162,24 @@ API экспонирует два эндпоинта:
 
 ---
 
-## 9. CORS и cookie
+## 9. Сжатие ответов
+
+API включает Express middleware `compression()` в `apps/api/src/main.ts`. Он сжимает compressible-ответы при наличии `Accept-Encoding` у клиента: `br` для Brotli на поддерживаемых Node.js-версиях, `gzip`/`deflate` как fallback. Маленькие ответы ниже порога middleware могут уходить без `Content-Encoding`, это нормально.
+
+Web-контейнер на `next start` оставляем с дефолтным `compress: true`: Next.js отдаёт gzip для rendered content и static files. Brotli для web-трафика включается на CDN/reverse-proxy слое (Cloudflare/Timeweb CDN/nginx). Если отдельный reverse-proxy полностью берёт gzip/Brotli на себя, тогда в `apps/web/next.config.ts` можно явно поставить `compress: false`, чтобы не делать двойную работу.
+
+Проверка после деплоя:
+
+```bash
+curl -I -H 'Accept-Encoding: br,gzip' https://api.eco-platform.ru/api/news
+curl -I -H 'Accept-Encoding: br,gzip' https://app.eco-platform.ru/
+```
+
+В ответе должен быть `Content-Encoding: br` или `Content-Encoding: gzip` для достаточно больших compressible-ответов.
+
+---
+
+## 10. CORS и cookie
 
 - `WEB_ORIGIN` должен указывать на ПУБЛИЧНЫЙ URL фронта.
 - На прод-домене (HTTPS) refresh-cookie получает флаги `HttpOnly + Secure + SameSite=lax + Path=/api/auth`.
@@ -170,13 +187,15 @@ API экспонирует два эндпоинта:
 
 ---
 
-## 10. Чек-лист перед первым деплоем
+## 11. Чек-лист перед первым деплоем
 
 - [ ] Прогнали `pnpm --filter @ecoplatform/api test:integration` против postgres:18 локально.
 - [ ] Сгенерили новые `JWT_ACCESS_SECRET` и `JWT_REFRESH_SECRET` (НЕ переиспользуем dev-значения).
 - [ ] Бакет S3 в Timeweb создан, его ключи добавлены в env-переменные API.
 - [ ] CORS: `WEB_ORIGIN` подставлен.
 - [ ] CDN перед web-доменом включён и уважает origin `Cache-Control`.
+- [ ] CDN/reverse-proxy отдаёт `Content-Encoding: br` или `gzip` для web-ответов с `Accept-Encoding: br,gzip`.
+- [ ] API отдаёт `Content-Encoding: br` или `gzip` для больших JSON/HTML-ответов с `Accept-Encoding: br,gzip`.
 - [ ] `/brand/logo.webp` и `/avatars/*` отдают `Cache-Control: public, max-age=31536000, immutable`.
 - [ ] Health-пробы настроены на `/api/health` и `/api/ready`.
 - [ ] DNS и SSL-сертификаты Timeweb выпустил.
