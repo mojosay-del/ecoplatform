@@ -4,11 +4,11 @@
 
 ## Текущий этап
 
-Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL`, Sentry error tracking и Prometheus metrics закрыты; distributed tracing осознанно отложен как опциональный post-MVP пункт.
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL`, Sentry error tracking, Prometheus metrics и backup/runbook закрыты; distributed tracing осознанно отложен как опциональный post-MVP пункт.
 
 Текущий рабочий блок — Волна 10: наблюдаемость и операции.
 
-Целевой следующий шаг: 10.5 — Backup и runbook.
+Целевой следующий шаг: 10.6 — Smoke-test на проде через Playwright.
 
 ## Что уже сделано
 
@@ -89,6 +89,7 @@
 - Sentry build-plugin и sourcemap upload включаются только при заданных CI-переменных `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + project, runtime-capture работает и без них при наличии DSN.
 - Prometheus endpoint `/api/metrics` на API отдаёт text format через `prom-client`: default Node.js/process metrics, HTTP histogram, Prisma query histogram, auth cache hit/miss counters и бизнес-метрики регистраций, активных подписок и уведомлений.
 - В production `/api/metrics` закрыт Basic Auth через `METRICS_BASIC_USER`/`METRICS_BASIC_PASSWORD`; если credentials не заданы, endpoint не раскрывает метрики.
+- Backup/runbook для Timeweb: daily physical backups PostgreSQL с retention 30 копий/дней, daily `pg_dump -x --no-owner` в приватный Timeweb S3 с lifecycle 90 дней, pre-migration dump, monthly restore-smoke на dev/staging и безопасный rollback-runbook для Prisma-миграций без ручной правки `_prisma_migrations`.
 
 ### Последние закрытые задачи Волны 9
 
@@ -118,7 +119,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 10** — наблюдаемость: distributed tracing осознанно отложен, дальше backup/runbook и прод smoke-test.
+- **Волна 10** — наблюдаемость: distributed tracing осознанно отложен, дальше prod smoke-test через Playwright.
 - **Волна 11** — UX/дизайн-система: токены, типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»).
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
@@ -177,7 +178,7 @@ pnpm format:check                                     # prettier
 
 **Timeweb PostgreSQL 18.** Альтернативы (MySQL, MongoDB, ClickHouse) не подходят: Prisma datasource зафиксирован на `postgresql`, миграции и сидер написаны под PG. Redis вынесен на отдельный сервис.
 
-Подробности по env-переменным, SSL, бэкапам, CDN и чек-листу первого деплоя — в `docs/08-architecture/deploy.md`.
+Подробности по env-переменным, SSL, бэкапам, rollback-runbook, CDN и чек-листу первого деплоя — в `docs/08-architecture/deploy.md`.
 
 ## Важные решения, которые легко забыть
 

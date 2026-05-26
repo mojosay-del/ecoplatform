@@ -121,6 +121,7 @@ Integration-тесты создают отдельную БД `ecoplatform_test`
 - Prisma connection pooling (`connection_limit=20` по умолчанию).
 - CDN cache headers на `/brand/*` и `/avatars/*` (immutable, max-age=1 год).
 - WebP/AVIF варианты cover-изображений через `sharp`.
+- Backup/runbook для Timeweb: daily physical backups, ежедневный `pg_dump` в S3 с retention 90 дней и безопасная процедура отката Prisma-миграций.
 - Lighthouse baseline зафиксирован: см. [audit/lighthouse-baseline.md](audit/lighthouse-baseline.md).
 
 ## Как читать код без опыта разработки

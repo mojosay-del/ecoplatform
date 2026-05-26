@@ -75,39 +75,150 @@ docker build \
 
 ---
 
-## 4. Миграции
+## 4. Миграции и rollback-runbook
 
 При старте контейнера API в CMD прописано `pnpm prisma migrate deploy && node dist/main.js`. Это значит:
 
 - На каждом старте проверяются и накатываются НОВЫЕ миграции. Уже применённые скипаются (idempotent).
 - На rolling-deploy с несколькими репликами миграция идёт у того контейнера, который стартовал первым; второй увидит `No pending migrations` и продолжит.
 
-### Rollback миграции
-Prisma `migrate` — forward-only. Чтобы откатить, нужно:
+Prisma `migrate deploy` используется только для staging/prod. Он накатывает ожидающие миграции и не делает reset базы.
 
-1. Зайти в БД и вручную выполнить обратный SQL (`DROP COLUMN`, `ALTER TYPE` и т.п.).
-2. Удалить запись в `_prisma_migrations` для откатываемой миграции.
-3. Удалить папку миграции из `apps/api/prisma/migrations/`.
-4. Перезапустить контейнер — он не найдёт «потерянную» миграцию и не упадёт.
+### Перед каждой prod-миграцией
 
-### Правило: для каждой не-аддитивной миграции (drop/rename/тип) — заранее напишите ROLLBACK-черновик в `apps/api/prisma/migrations/_rollback/<timestamp>_<name>.sql`. Это сэкономит 30 минут при инциденте.
+1. Остановить новый deploy, если предыдущий ещё не полностью зелёный.
+2. Проверить, что последний nightly backup есть в Timeweb и ежедневный `pg_dump` ушёл в S3.
+3. Сделать ручной `pg_dump` по инструкции ниже и подписать файл номером релиза.
+4. Для не-аддитивных миграций (drop/rename/тип) заранее написать rollback-черновик SQL в тикете релиза. В репозиторий его не кладём, если он содержит продовые имена, данные или ручные команды под конкретный инцидент.
+5. Выполнить deploy только после зелёного `pnpm test:integration` на staging.
+
+### Если миграция упала
+
+1. Не перезапускать API в цикле и не удалять строки из `_prisma_migrations` руками.
+2. Перевести web в maintenance-режим или временно остановить mutating-трафик на API.
+3. Зафиксировать имя миграции и ошибку:
+
+   ```bash
+   cd apps/api
+   DATABASE_URL="$PROD_DATABASE_URL" pnpm exec prisma migrate status --schema=prisma/schema.prisma
+   ```
+
+4. Если миграция успела частично изменить схему, восстановить prod-БД из последнего проверенного backup на отдельный новый кластер/БД и прогнать smoke на нём. Менять `DATABASE_URL` прода на восстановленный кластер только после проверки `/api/ready`, login и ключевых листингов.
+5. Если причина понятна и частичные изменения вручную отменены или база восстановлена до безопасного состояния, пометить именно упавшую миграцию как rolled back:
+
+   ```bash
+   cd apps/api
+   DATABASE_URL="$PROD_DATABASE_URL" pnpm exec prisma migrate resolve --rolled-back "<migration_name>" --schema=prisma/schema.prisma
+   ```
+
+6. Исправить миграцию новым коммитом или заменить релиз на предыдущий образ. После этого снова запустить:
+
+   ```bash
+   cd apps/api
+   DATABASE_URL="$PROD_DATABASE_URL" pnpm exec prisma migrate deploy --schema=prisma/schema.prisma
+   ```
+
+`prisma migrate resolve --rolled-back` применяем только к неуспешной миграции. Если миграция уже успешно применена, откат делаем либо новой forward-миграцией, либо восстановлением всей БД из backup на отдельный кластер.
 
 ---
 
 ## 5. Бэкапы
 
-Timeweb Managed Postgres делает автоматические снапшоты (стандартно — ежедневно). При создании кластера фиксируем:
+Цель для MVP: пережить ошибочную миграцию, случайное удаление данных и сбой кластера без потери больше суток данных.
 
-- **Retention**: минимум 7 дней (рекомендуется 14).
-- **Procedure**: восстановление из snapshot тестируется раз в квартал на отдельной dev-БД (поднять snapshot → подключить dev-API → пройти smoke-тест на login + listNews).
-- **Ответственный**: записать конкретное имя/email в этом файле.
+### Политика
 
-Дополнительно для критических точек (миграции, ручные правки) — `pg_dump` в S3 перед операцией:
+- **Managed backup Timeweb**: физический backup кластера каждый день, хранить 30 копий/дней. Если панель на выбранном тарифе ограничивает количество копий, ставим максимум и отдельно держим manual S3 backup 90 дней.
+- **Manual backup**: ежедневный `pg_dump -x --no-owner` в приватный Timeweb Cloud Storage bucket, retention 90 дней через lifecycle rule.
+- **Перед миграцией**: отдельный manual `pg_dump` с префиксом `pre-migration/`.
+- **Проверка восстановления**: один раз в месяц восстановить последний S3 dump на dev/staging-БД и пройти smoke: `/api/ready`, login, `/news`, `/indices`, `/account`.
+- **Ответственный**: владелец backup-процесса фиксируется в продовом runbook вместе с доступом к Timeweb-панели и приватному bucket.
+
+### Timeweb Managed PostgreSQL
+
+В панели Timeweb:
+
+1. Открыть `Базы данных` → prod-кластер PostgreSQL.
+2. На вкладке `Бэкапы` включить автоматические физические бэкапы.
+3. Поставить ежедневное расписание и 30 хранимых копий/дней.
+4. После первого backup создать test-restore в отдельный кластер или БД и не переключать prod, пока smoke не зелёный.
+
+Физический backup нужен для быстрого восстановления всего кластера. Логические backups Timeweb пока не считаем единственным способом защиты: они полезны как дополнительная копия, но для нашего runbook базовый независимый слой — собственный `pg_dump` в S3.
+
+### Daily pg_dump в Timeweb Cloud Storage
+
+Запускать с отдельного ops-runner/cron-хоста, а не из API-контейнера. В логах не печатать `DATABASE_URL`, S3 secret и полный вывод `pg_dump`.
 
 ```bash
-pg_dump "$DATABASE_URL" | gzip > backup-$(date +%Y%m%d-%H%M).sql.gz
-aws s3 cp backup-$(date +%Y%m%d-%H%M).sql.gz s3://ecoplatform-backups/
+export PROD_DATABASE_URL="postgresql://USER:PASS@HOST:6432/DB?schema=public&sslmode=require"
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
+export AWS_DEFAULT_REGION="ru-1"
+export AWS_ENDPOINT_URL="https://s3.twcstorage.ru"
+export BACKUP_BUCKET="s3://ecoplatform-backups/prod-postgres"
+
+backup_file="ecoplatform-prod-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+
+pg_dump -x --no-owner "$PROD_DATABASE_URL" | gzip -9 > "$backup_file"
+aws s3 cp "$backup_file" "$BACKUP_BUCKET/daily/$backup_file" --endpoint-url "$AWS_ENDPOINT_URL"
+rm -f "$backup_file"
 ```
+
+Cron, каждый день в 02:15 UTC:
+
+```cron
+15 2 * * * /opt/ecoplatform/bin/backup-postgres-to-s3 >> /var/log/ecoplatform/postgres-backup.log 2>&1
+```
+
+S3 lifecycle для retention 90 дней:
+
+```json
+{
+  "Rules": [
+    {
+      "ID": "delete-prod-postgres-backups-after-90-days",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "prod-postgres/" },
+      "Expiration": { "Days": 90 }
+    }
+  ]
+}
+```
+
+Применение:
+
+```bash
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket ecoplatform-backups \
+  --lifecycle-configuration file://lifecycle-backups-90d.json \
+  --endpoint-url https://s3.twcstorage.ru
+```
+
+### Восстановление из manual S3 backup
+
+Восстанавливаем сначала на отдельную пустую БД или новый Timeweb-кластер. Прямое восстановление поверх prod разрешено только после отдельного подтверждения владельца проекта.
+
+```bash
+export RESTORE_DATABASE_URL="postgresql://USER:PASS@HOST:6432/RESTORE_DB?schema=public&sslmode=require"
+export AWS_ENDPOINT_URL="https://s3.twcstorage.ru"
+
+aws s3 cp \
+  s3://ecoplatform-backups/prod-postgres/daily/ecoplatform-prod-YYYYMMDDTHHMMSSZ.sql.gz \
+  ./restore.sql.gz \
+  --endpoint-url "$AWS_ENDPOINT_URL"
+
+gzip -dc ./restore.sql.gz | psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1
+
+cd apps/api
+DATABASE_URL="$RESTORE_DATABASE_URL" pnpm exec prisma migrate status --schema=prisma/schema.prisma
+```
+
+После restore:
+
+- `GET /api/ready` должен вернуть 200.
+- Login admin/demo должен пройти.
+- `/news` и `/indices` должны вернуть данные.
+- Если restore нужен для prod, сначала переключить staging/API на восстановленную БД, затем уже менять prod `DATABASE_URL`.
 
 ---
 
@@ -202,6 +313,9 @@ curl -I -H 'Accept-Encoding: br,gzip' https://app.eco-platform.ru/
 - [ ] `/brand/logo.webp` и `/avatars/*` отдают `Cache-Control: public, max-age=31536000, immutable`.
 - [ ] Health-пробы настроены на `/api/health` и `/api/ready`.
 - [ ] DNS и SSL-сертификаты Timeweb выпустил.
-- [ ] Записан владелец бэкапов и расписание тестового восстановления.
+- [ ] Timeweb physical backups включены: daily, 30 копий/дней или максимум тарифа.
+- [ ] Daily `pg_dump` уходит в приватный S3 bucket, lifecycle удаляет `prod-postgres/` через 90 дней.
+- [ ] Последний S3 dump восстановлен на dev/staging-БД и прошёл smoke.
+- [ ] Записан владелец бэкапов, доступы к панели и расписание тестового восстановления.
 - [ ] Прод-БД и dev/test-БД физически разные кластеры (или хотя бы разные db-имена).
-- [ ] Команда знает rollback-процедуру миграции.
+- [ ] Команда знает rollback-процедуру миграции и не правит `_prisma_migrations` руками.
