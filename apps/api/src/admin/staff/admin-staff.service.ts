@@ -18,26 +18,33 @@ export class AdminStaffService {
     private readonly sessionCache: SessionCacheService,
   ) {}
 
-  async listStaff() {
-    const staff = await this.prisma.platformStaff.findMany({
-      orderBy: { createdAt: "asc" },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            phone: true,
-            firstName: true,
-            lastName: true,
-            gender: true,
-            status: true,
-            createdAt: true,
+  async listStaff(pagination: { limit?: number; offset?: number } = {}) {
+    const limit = Math.min(Math.max(pagination.limit ?? 30, 1), 100);
+    const offset = Math.max(pagination.offset ?? 0, 0);
+    const [total, items] = await Promise.all([
+      this.prisma.platformStaff.count(),
+      this.prisma.platformStaff.findMany({
+        orderBy: { createdAt: "asc" },
+        take: limit,
+        skip: offset,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              phone: true,
+              firstName: true,
+              lastName: true,
+              gender: true,
+              status: true,
+              createdAt: true,
+            },
           },
         },
-      },
-    });
+      }),
+    ]);
 
-    return staff;
+    return { items, total, hasMore: offset + items.length < total };
   }
 
   async createStaff(input: CreateInput, actor: RequestUser) {

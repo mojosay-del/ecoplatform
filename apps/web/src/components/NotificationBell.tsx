@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import type { InfinitePage } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
 import { NotificationsPopover } from "./NotificationsPopover";
 
@@ -47,8 +48,8 @@ export function NotificationBell() {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await apiFetch<Notification[]>("/notifications", { token });
-      setItems(data);
+      const data = await apiFetch<InfinitePage<Notification>>("/notifications?limit=10&offset=0", { token });
+      setItems(data.items);
     } catch {
       setItems([]);
     } finally {

@@ -9,9 +9,10 @@ import { Block, BlocksEditor, NEWS_BLOCK_KINDS } from "./BlocksEditor";
 import { ContentBlocks } from "../views/content-blocks";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
-import { ApiError, apiFetch } from "../lib/api";
+import { ApiError, api, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCoverAssets } from "../lib/use-cover-assets";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type NewsTag = {
   id: string;
@@ -29,10 +30,14 @@ type NewsItem = {
   slug: string;
   status: "draft" | "published";
   coverImageId: string | null;
-  blocks: Block[];
   tags: Array<{ newsTagId: string; newsTag: NewsTag }>;
   createdAt: string;
   updatedAt: string;
+  _count?: { blocks: number; comments: number; likes: number };
+};
+
+type NewsDetail = NewsItem & {
+  blocks: Block[];
 };
 
 type ViewState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
@@ -55,33 +60,27 @@ const EMPTY_DRAFT: DraftState = {
   blocks: [{ type: "paragraph", payload: { html: "" } }],
 };
 
-const NEWS_LIST_STEP = 5;
+const NEWS_LIST_PAGE_SIZE = 20;
 
 export function AdminNewsView() {
   const { token } = useAuth();
   const [state, setState] = useState<ViewState>("unauthenticated");
-  const [items, setItems] = useState<NewsItem[]>([]);
-  const [visibleNewsCount, setVisibleNewsCount] = useState(NEWS_LIST_STEP);
   const [tagOptions, setTagOptions] = useState<NewsTagOption[]>([]);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
+  const [editingOriginal, setEditingOriginal] = useState<NewsDetail | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const newsQuery = useInfiniteApiQuery<NewsItem>(
+    token ? "admin-news" : null,
+    NEWS_LIST_PAGE_SIZE,
+    ({ limit, offset }) =>
+      api.admin.news.list({ limit, offset }) as Promise<{ items: NewsItem[]; total: number; hasMore: boolean }>,
+  );
+  const items = newsQuery.items;
 
   const covers = useCoverAssets(items);
-
-  const sortedItems = useMemo(
-    () =>
-      [...items].sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() ||
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-      ),
-    [items],
-  );
-  const visibleItems = sortedItems.slice(0, visibleNewsCount);
-  const hasMoreNews = visibleNewsCount < sortedItems.length;
 
   // Все сохранённые теги — основа автокомплита. Теги из списка новостей
   // оставляем как локальный fallback, если список тегов ещё обновляется.
@@ -102,8 +101,8 @@ export function AdminNewsView() {
   // Запоминаем «оригинал» текущей открытой новости — нужен для индикатора
   // «есть несохранённые изменения» внизу формы.
   const original = useMemo(
-    () => (draft.id ? (items.find((item) => item.id === draft.id) ?? null) : null),
-    [draft.id, items],
+    () => (draft.id && editingOriginal?.id === draft.id ? editingOriginal : null),
+    [draft.id, editingOriginal],
   );
 
   const hasChanges = useMemo(() => {
@@ -138,12 +137,8 @@ export function AdminNewsView() {
     setState("loading");
     setMessage(null);
     try {
-      const [data, tags] = await Promise.all([
-        apiFetch<NewsItem[]>("/admin/content/news", { token }),
-        apiFetch<NewsTagOption[]>("/admin/content/news/tags", { token }),
-      ]);
-      setItems(data);
-      setVisibleNewsCount(NEWS_LIST_STEP);
+      const tags = await apiFetch<NewsTagOption[]>("/admin/content/news/tags", { token });
+      newsQuery.reload();
       setTagOptions(tags);
       setState("ready");
     } catch (error) {
@@ -158,17 +153,22 @@ export function AdminNewsView() {
 
   function startNew() {
     setDraft(EMPTY_DRAFT);
+    setEditingOriginal(null);
     setTagDraft("");
   }
 
-  function startEdit(item: NewsItem) {
+  async function startEdit(item: NewsItem) {
+    if (!token) return;
+    setMessage(null);
+    const detail = (await api.admin.news.get(item.id)) as NewsDetail;
+    setEditingOriginal(detail);
     setDraft({
-      id: item.id,
-      title: item.title,
-      lead: item.lead,
-      coverImageId: item.coverImageId ?? "",
-      tags: item.tags.map((t) => t.newsTag.name),
-      blocks: item.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
+      id: detail.id,
+      title: detail.title,
+      lead: detail.lead,
+      coverImageId: detail.coverImageId ?? "",
+      tags: detail.tags.map((t) => t.newsTag.name),
+      blocks: detail.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
     });
     setTagDraft("");
   }
@@ -197,13 +197,15 @@ export function AdminNewsView() {
         tags: draft.tags,
         blocks: draft.blocks,
       };
+      let saved: NewsDetail;
       if (draft.id) {
-        await apiFetch(`/admin/content/news/${draft.id}`, { method: "PATCH", token, body });
+        saved = (await apiFetch(`/admin/content/news/${draft.id}`, { method: "PATCH", token, body })) as NewsDetail;
       } else {
-        await apiFetch("/admin/content/news", { method: "POST", token, body });
+        saved = (await apiFetch("/admin/content/news", { method: "POST", token, body })) as NewsDetail;
       }
       setMessage(draft.id ? "Новость обновлена." : "Новость создана как черновик.");
-      await loadList();
+      setEditingOriginal(saved);
+      newsQuery.reload();
       if (!draft.id) startNew();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось сохранить новость.");
@@ -220,7 +222,7 @@ export function AdminNewsView() {
         : `/admin/content/news/${item.id}/publish`;
     try {
       await apiFetch(path, { method: "POST", token });
-      await loadList();
+      newsQuery.reload();
       setMessage(item.status === "published" ? "Снято с публикации." : "Опубликовано.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось изменить статус.");
@@ -232,7 +234,7 @@ export function AdminNewsView() {
     if (!confirm(`Полностью удалить новость «${item.title}»? Действие необратимо.`)) return;
     try {
       await apiFetch(`/admin/content/news/${item.id}`, { method: "DELETE", token });
-      await loadList();
+      newsQuery.reload();
       if (draft.id === item.id) startNew();
       setMessage("Новость удалена.");
     } catch (error) {
@@ -279,7 +281,7 @@ export function AdminNewsView() {
           <p className="page-subtitle">Создание и редактирование новостных публикаций.</p>
         </header>
         <CmsTabs />
-        {message ? <p className="cms-flash">{message}</p> : null}
+        {message || newsQuery.errorMessage ? <p className="cms-flash">{message ?? newsQuery.errorMessage}</p> : null}
 
         <div className="moderation-layout cms-vertical-layout">
           <div className="education-tree">
@@ -295,9 +297,11 @@ export function AdminNewsView() {
                 <Plus size={14} />
               </button>
             </div>
-            {items.length === 0 ? <p className="education-tree-empty">Новостей пока нет.</p> : null}
+            {items.length === 0 && !newsQuery.isInitialLoading ? (
+              <p className="education-tree-empty">Новостей пока нет.</p>
+            ) : null}
             <div className="news-list">
-              {visibleItems.map((item) => {
+              {items.map((item) => {
                 const coverUrl = item.coverImageId ? covers.get(item.coverImageId)?.publicUrl : null;
                 const actions: ActionItem[] = [
                   {
@@ -309,7 +313,7 @@ export function AdminNewsView() {
                 const isActive = draft.id === item.id;
                 return (
                   <article key={item.id} className={`news-row${isActive ? " is-active" : ""}`}>
-                    <button type="button" className="news-row-main" onClick={() => startEdit(item)}>
+                    <button type="button" className="news-row-main" onClick={() => void startEdit(item)}>
                       <div className="news-row-thumb">
                         {coverUrl ? (
                           <img alt="" src={coverUrl} />
@@ -347,14 +351,12 @@ export function AdminNewsView() {
                 );
               })}
             </div>
-            {hasMoreNews ? (
-              <button
-                className="button secondary news-list-more"
-                type="button"
-                onClick={() => setVisibleNewsCount((count) => count + NEWS_LIST_STEP)}
-              >
-                Показать больше
-              </button>
+            <div ref={newsQuery.sentinelRef} aria-hidden="true" />
+            {newsQuery.isLoadingMore ? (
+              <p className="page-subtitle news-list-more">Загружаем ещё…</p>
+            ) : null}
+            {!newsQuery.hasMore && items.length > 0 ? (
+              <p className="page-subtitle news-list-more">Это все новости.</p>
             ) : null}
           </div>
 

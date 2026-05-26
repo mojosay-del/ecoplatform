@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ChevronLeft, MessageSquare, Plus, X } from "lucide-react";
 import { api, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 // Drawer (правая выезжающая панель), открываемый по иконке «?» в шапке.
 // Цель — дать обычному пользователю быстрый доступ к поддержке без
@@ -52,38 +53,26 @@ type DrawerProps = {
 export function UserSupportDrawer({ open, onClose }: DrawerProps) {
   const { token } = useAuth();
   const [tab, setTab] = useState<"list" | "new">("list");
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [loading, setLoading] = useState(false);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  const loadTickets = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const page = await api.support.listMyTickets({ limit: 100 });
-      setTickets(page.items as Ticket[]);
-    } catch (error) {
-      // Тихо игнорируем — пользователь может быть платформенным стаффом
-      // без companyId (API в этом случае вернёт 403). Drawer всё равно
-      // открыт, просто список будет пустой.
-      setTickets([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
+  const ticketsQuery = useInfiniteApiQuery<Ticket>(
+    open && token ? "support-drawer-tickets" : null,
+    30,
+    ({ limit, offset }) =>
+      api.support.listMyTickets({ limit, offset }) as Promise<{ items: Ticket[]; total: number; hasMore: boolean }>,
+  );
+  const tickets = ticketsQuery.items;
 
   // Подгружаем список при открытии drawer'а и подписываемся на
   // глобальное событие — если где-то ещё в приложении создадут тикет,
   // список обновится.
   useEffect(() => {
     if (!open) return;
-    void loadTickets();
-    const handler = () => void loadTickets();
+    const handler = () => ticketsQuery.reload();
     window.addEventListener("support:changed", handler);
     return () => window.removeEventListener("support:changed", handler);
-  }, [open, loadTickets]);
+  }, [open, ticketsQuery.reload]);
 
   // Закрытие по Escape — стандартная пользовательская привычка для модалок.
   useEffect(() => {
@@ -124,7 +113,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
       event.currentTarget.reset();
       setMessage("Обращение создано. Мы ответим в ближайшее время.");
       // Переключаемся на список, чтобы пользователь увидел свежий тикет.
-      await loadTickets();
+      ticketsQuery.reload();
       setTab("list");
       window.dispatchEvent(new Event("support:changed"));
     } catch (error) {
@@ -166,7 +155,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
           <TicketThread
             ticket={activeTicket}
             onReplied={() => {
-              void loadTickets();
+              ticketsQuery.reload();
             }}
           />
         ) : (
@@ -190,8 +179,8 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
 
             {tab === "list" ? (
               <div className="support-drawer-body">
-                {loading ? <p className="page-subtitle">Загружаем…</p> : null}
-                {!loading && tickets.length === 0 ? (
+                {ticketsQuery.isInitialLoading ? <p className="page-subtitle">Загружаем…</p> : null}
+                {!ticketsQuery.isInitialLoading && tickets.length === 0 ? (
                   <div className="support-drawer-empty">
                     <p>У вас пока нет обращений в поддержку.</p>
                     <button type="button" className="button" onClick={() => setTab("new")}>
@@ -221,6 +210,11 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                     </li>
                   ))}
                 </ul>
+                <div ref={ticketsQuery.sentinelRef} aria-hidden="true" />
+                {ticketsQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
+                {!ticketsQuery.hasMore && tickets.length > 0 ? (
+                  <p className="page-subtitle">Это все обращения.</p>
+                ) : null}
               </div>
             ) : (
               <form className="support-drawer-body support-drawer-form" onSubmit={onSubmit}>

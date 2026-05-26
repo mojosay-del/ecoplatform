@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../../common/current-user.decorator";
 import { JwtAuthGuard } from "../../common/jwt-auth.guard";
 import { Roles } from "../../common/roles.decorator";
@@ -15,8 +15,11 @@ export class AdminStaffController {
   constructor(private readonly service: AdminStaffService) {}
 
   @Get()
-  async list() {
-    return this.service.listStaff();
+  async list(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
+    return this.service.listStaff({
+      limit: limitRaw !== undefined ? Number(limitRaw) : undefined,
+      offset: offsetRaw !== undefined ? Number(offsetRaw) : undefined,
+    });
   }
 
   @Post()

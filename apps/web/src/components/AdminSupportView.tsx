@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { apiFetch } from "../lib/api";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
 
 // Inbox-режим админской поддержки: слева — список тикетов с фильтрами,
@@ -61,29 +62,22 @@ export function AdminSupportView() {
   const { token } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [filter, setFilter] = useState<Filter>("active");
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const ticketsQuery = useInfiniteApiQuery<Ticket>(token ? "admin-support-tickets" : null, 50, async ({
+    limit,
+    offset,
+  }) => {
+    const queryString = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    return apiFetch<{ items: Ticket[]; total: number; hasMore: boolean }>(`/admin/support/tickets?${queryString}`, {
+      token,
+    });
+  });
+  const tickets = ticketsQuery.items;
 
   const selectedId = searchParams?.get("ticketId") ?? null;
-
-  const loadTickets = useCallback(async () => {
-    if (!token) return;
-    try {
-      const page = await apiFetch<{ items: Ticket[]; total: number; hasMore: boolean }>("/admin/support/tickets", {
-        token,
-      });
-      setTickets(page.items);
-    } catch {
-      setTickets([]);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    void loadTickets();
-  }, [loadTickets]);
 
   const filteredTickets = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -144,7 +138,7 @@ export function AdminSupportView() {
         body: { text },
       });
       event.currentTarget.reset();
-      await loadTickets();
+      ticketsQuery.reload();
     } catch (error) {
       setResult(error instanceof Error ? error.message : "Не удалось отправить ответ.");
     } finally {
@@ -215,6 +209,9 @@ export function AdminSupportView() {
                 );
               })}
             </ul>
+            <div ref={ticketsQuery.sentinelRef} aria-hidden="true" />
+            {ticketsQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
+            {!ticketsQuery.hasMore && tickets.length > 0 ? <p className="page-subtitle">Это все обращения.</p> : null}
           </aside>
 
           {/* Правая колонка: выбранный тикет, его сообщения и форма ответа. */}

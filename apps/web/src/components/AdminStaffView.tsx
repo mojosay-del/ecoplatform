@@ -1,13 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
-import { ApiError, apiFetch } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-
-type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type StaffItem = {
   id: string;
@@ -36,9 +35,12 @@ const genderOptions = [
 
 export function AdminStaffView() {
   const { token } = useAuth();
-  const [state, setState] = useState<ApiState>("unauthenticated");
-  const [items, setItems] = useState<StaffItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const staffQuery = useInfiniteApiQuery<StaffItem>(token ? "admin-staff" : null, 30, async ({ limit, offset }) => {
+    const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    return apiFetch<{ items: StaffItem[]; total: number; hasMore: boolean }>(`/admin/staff?${query}`, { token });
+  });
+  const items = staffQuery.items;
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -50,27 +52,6 @@ export function AdminStaffView() {
     password: "",
     roles: ["moderator"] as string[],
   });
-
-  async function loadList() {
-    if (!token) {
-      setState("unauthenticated");
-      return;
-    }
-    setState("loading");
-    setErrorMessage(null);
-    try {
-      const data = await apiFetch<StaffItem[]>("/admin/staff", { token });
-      setItems(data);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить сотрудников");
-    }
-  }
 
   async function createStaff(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,7 +68,7 @@ export function AdminStaffView() {
         password: "",
         roles: ["moderator"],
       });
-      await loadList();
+      staffQuery.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось создать сотрудника");
     }
@@ -97,18 +78,13 @@ export function AdminStaffView() {
     if (!token) return;
     try {
       await apiFetch(`/admin/staff/${userId}`, { method: "PATCH", token, body: patch });
-      await loadList();
+      staffQuery.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось обновить сотрудника");
     }
   }
 
-  useEffect(() => {
-    void loadList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  if (state === "unauthenticated") {
+  if (!token || staffQuery.state === "unauthenticated") {
     return (
       <AppShell>
         <section className="page">
@@ -119,7 +95,7 @@ export function AdminStaffView() {
     );
   }
 
-  if (state === "forbidden") {
+  if (staffQuery.state === "forbidden") {
     return (
       <AppShell>
         <section className="page">
@@ -139,8 +115,10 @@ export function AdminStaffView() {
         </header>
         <AdminPeopleTabs />
 
-        {errorMessage ? <p className="status-pill">{errorMessage}</p> : null}
-        {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
+        {errorMessage || staffQuery.errorMessage ? (
+          <p className="status-pill">{errorMessage ?? staffQuery.errorMessage}</p>
+        ) : null}
+        {staffQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
         <div className="auth-actions">
           <button className="button" onClick={() => setCreateOpen((value) => !value)} type="button">
@@ -280,6 +258,9 @@ export function AdminStaffView() {
               </div>
             </article>
           ))}
+          <div ref={staffQuery.sentinelRef} aria-hidden="true" />
+          {staffQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
+          {!staffQuery.hasMore && items.length > 0 ? <p className="page-subtitle">Это все сотрудники.</p> : null}
         </div>
       </section>
     </AppShell>

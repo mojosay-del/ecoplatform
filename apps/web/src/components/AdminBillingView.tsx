@@ -2,8 +2,9 @@
 
 import { FormEvent, useEffect, useRef, useState, type SetStateAction } from "react";
 import { AppShell } from "./AppShell";
-import { ApiError, apiFetch } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type CompanyItem = {
   id: string;
@@ -32,9 +33,19 @@ const plans = [
 export function AdminBillingView() {
   const { token } = useAuth();
   const [state, setState] = useState<ViewState>("unauthenticated");
-  const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const companiesQuery = useInfiniteApiQuery<CompanyItem>(token ? "admin-billing-companies" : null, 50, async ({
+    limit,
+    offset,
+  }) => {
+    const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    return apiFetch<{ items: CompanyItem[]; total: number; hasMore: boolean }>(
+      `/admin/billing/companies?${query}`,
+      { token },
+    );
+  });
+  const companies = companiesQuery.items;
 
   const [form, setForm] = useState({
     companyId: "",
@@ -51,28 +62,14 @@ export function AdminBillingView() {
     setForm(next);
   }
 
-  async function loadCompanies() {
+  function loadCompanies() {
     if (!token) {
       setState("unauthenticated");
       return;
     }
-    setState("loading");
+    setState("ready");
     setErrorMessage(null);
-    try {
-      const page = await apiFetch<{ items: CompanyItem[]; total: number; hasMore: boolean }>(
-        "/admin/billing/companies",
-        { token },
-      );
-      setCompanies(page.items);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить компании");
-    }
+    companiesQuery.reload();
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -97,7 +94,7 @@ export function AdminBillingView() {
       setSuccessMessage("Подписка активирована.");
       idempotencyKey.current = createIdempotencyKey();
       setForm((prev) => ({ ...prev, reason: "" }));
-      await loadCompanies();
+      loadCompanies();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось активировать подписку");
     } finally {
@@ -111,7 +108,7 @@ export function AdminBillingView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  if (state === "unauthenticated") {
+  if (state === "unauthenticated" || companiesQuery.state === "unauthenticated") {
     return (
       <AppShell>
         <section className="page">
@@ -122,7 +119,7 @@ export function AdminBillingView() {
     );
   }
 
-  if (state === "forbidden") {
+  if (state === "forbidden" || companiesQuery.state === "forbidden") {
     return (
       <AppShell>
         <section className="page">
@@ -143,8 +140,10 @@ export function AdminBillingView() {
           </p>
         </header>
         {successMessage ? <p className="status-pill">{successMessage}</p> : null}
-        {errorMessage ? <p className="status-pill">{errorMessage}</p> : null}
-        {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
+        {errorMessage || companiesQuery.errorMessage ? (
+          <p className="status-pill">{errorMessage ?? companiesQuery.errorMessage}</p>
+        ) : null}
+        {state === "loading" || companiesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
         <form className="form" onSubmit={submit}>
           <label className="form-field">
@@ -229,6 +228,9 @@ export function AdminBillingView() {
               ) : null}
             </article>
           ))}
+          <div ref={companiesQuery.sentinelRef} aria-hidden="true" />
+          {companiesQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
+          {!companiesQuery.hasMore && companies.length > 0 ? <p className="page-subtitle">Это все компании.</p> : null}
         </section>
       </section>
     </AppShell>

@@ -1,12 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
-import { ApiError, apiFetch } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-
-type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type AdminCompanyListItem = {
   id: string;
@@ -73,47 +72,32 @@ const statusReasons: ReadonlyArray<readonly [string, string]> = [
 
 export function AdminCompaniesView() {
   const { token } = useAuth();
-  const [state, setState] = useState<ApiState>("unauthenticated");
-  const [list, setList] = useState<AdminCompanyList | null>(null);
   const [selected, setSelected] = useState<AdminCompanyDetail | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [planFilter, setPlanFilter] = useState<string>("");
-  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({ search: "", status: "", plan: "" });
   const take = 20;
+  const companiesQuery = useInfiniteApiQuery<AdminCompanyListItem>(
+    token ? `admin-companies:${filters.search}:${filters.status}:${filters.plan}` : null,
+    take,
+    async ({ limit, offset }) => {
+      const params = new URLSearchParams();
+      params.set("take", String(limit));
+      params.set("page", String(Math.floor(offset / limit) + 1));
+      if (filters.search) params.set("search", filters.search);
+      if (filters.status) params.set("status", filters.status);
+      if (filters.plan) params.set("plan", filters.plan);
+      const data = await apiFetch<AdminCompanyList>(`/admin/companies?${params.toString()}`, { token });
+      return { items: data.items, total: data.total, hasMore: data.page * data.take < data.total };
+    },
+  );
 
   const [nextStatus, setNextStatus] = useState<string>("active");
   const [statusReason, setStatusReason] = useState<string>("manual_activation");
   const [statusComment, setStatusComment] = useState("");
-
-  async function loadList(opts: { page?: number } = {}) {
-    if (!token) {
-      setState("unauthenticated");
-      return;
-    }
-    setState("loading");
-    setErrorMessage(null);
-    try {
-      const params = new URLSearchParams();
-      params.set("take", String(take));
-      params.set("page", String(opts.page ?? page));
-      if (search) params.set("search", search);
-      if (statusFilter) params.set("status", statusFilter);
-      if (planFilter) params.set("plan", planFilter);
-      const data = await apiFetch<AdminCompanyList>(`/admin/companies?${params.toString()}`, { token });
-      setList(data);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить компании");
-    }
-  }
 
   async function openCompany(id: string) {
     if (!token) return;
@@ -140,18 +124,13 @@ export function AdminCompaniesView() {
       });
       setSelected(data);
       setStatusComment("");
-      await loadList();
+      companiesQuery.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось сменить статус");
     }
   }
 
-  useEffect(() => {
-    void loadList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  if (state === "unauthenticated") {
+  if (!token || companiesQuery.state === "unauthenticated") {
     return (
       <AppShell>
         <section className="page">
@@ -162,7 +141,7 @@ export function AdminCompaniesView() {
     );
   }
 
-  if (state === "forbidden") {
+  if (companiesQuery.state === "forbidden") {
     return (
       <AppShell>
         <section className="page">
@@ -186,8 +165,7 @@ export function AdminCompaniesView() {
           className="form"
           onSubmit={(event) => {
             event.preventDefault();
-            setPage(1);
-            void loadList({ page: 1 });
+            setFilters({ search: search.trim(), status: statusFilter, plan: planFilter });
           }}
         >
           <div className="auth-actions">
@@ -220,16 +198,18 @@ export function AdminCompaniesView() {
           </div>
         </form>
 
-        {errorMessage ? <p className="status-pill">{errorMessage}</p> : null}
-        {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
+        {errorMessage || companiesQuery.errorMessage ? (
+          <p className="status-pill">{errorMessage ?? companiesQuery.errorMessage}</p>
+        ) : null}
+        {companiesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
-        {list ? (
+        {companiesQuery.state === "ready" || companiesQuery.items.length > 0 ? (
           <div className="moderation-layout">
             <div className="stack-list">
               <p className="page-subtitle">
-                Всего: {list.total}, страница {list.page}.
+                Загружено {companiesQuery.items.length} из {companiesQuery.total}.
               </p>
-              {list.items.map((item) => (
+              {companiesQuery.items.map((item) => (
                 <button
                   className={`moderation-case-row ${selected?.id === item.id ? "active" : ""}`}
                   key={item.id}
@@ -247,32 +227,11 @@ export function AdminCompaniesView() {
                 </button>
               ))}
 
-              <div className="auth-actions">
-                <button
-                  className="button secondary"
-                  disabled={list.page <= 1}
-                  onClick={() => {
-                    const next = list.page - 1;
-                    setPage(next);
-                    void loadList({ page: next });
-                  }}
-                  type="button"
-                >
-                  ← Назад
-                </button>
-                <button
-                  className="button secondary"
-                  disabled={list.page * list.take >= list.total}
-                  onClick={() => {
-                    const next = list.page + 1;
-                    setPage(next);
-                    void loadList({ page: next });
-                  }}
-                  type="button"
-                >
-                  Дальше →
-                </button>
-              </div>
+              <div ref={companiesQuery.sentinelRef} aria-hidden="true" />
+              {companiesQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
+              {!companiesQuery.hasMore && companiesQuery.items.length > 0 ? (
+                <p className="page-subtitle">Это все компании.</p>
+              ) : null}
             </div>
 
             <div className="moderation-detail">

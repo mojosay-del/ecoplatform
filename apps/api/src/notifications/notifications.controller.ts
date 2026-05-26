@@ -18,8 +18,17 @@ export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
   @Get()
-  async list(@CurrentUser() user: RequestUser, @Query("archived") archived?: string) {
-    return this.notifications.list(user, archived === "true");
+  async list(
+    @CurrentUser() user: RequestUser,
+    @Query("archived") archived?: string,
+    @Query("limit") limitRaw?: string,
+    @Query("offset") offsetRaw?: string,
+  ) {
+    return this.notifications.list(user, {
+      includeArchived: archived === "true",
+      limit: limitRaw !== undefined ? Number(limitRaw) : undefined,
+      offset: offsetRaw !== undefined ? Number(offsetRaw) : undefined,
+    });
   }
 
   @Get("unread-count")

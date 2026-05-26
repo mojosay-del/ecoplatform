@@ -1475,8 +1475,9 @@ describe("Admin staff panel", () => {
 
     const list = await ctx.http.get("/api/admin/staff").set("Authorization", `Bearer ${adminToken}`);
     expect(list.status).toBe(200);
-    expect(list.body.length).toBeGreaterThanOrEqual(2);
-    expect(list.body.map((item: { user: { email: string } }) => item.user.email)).toEqual(
+    expect(list.body.items.length).toBeGreaterThanOrEqual(2);
+    expect(list.body.hasMore).toBe(false);
+    expect(list.body.items.map((item: { user: { email: string } }) => item.user.email)).toEqual(
       expect.arrayContaining(["admin@test.local", "moderator@test.local"]),
     );
   });

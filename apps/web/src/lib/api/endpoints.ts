@@ -26,6 +26,8 @@ import type {
 } from "@ecoplatform/shared";
 import { apiFetch, type FileAsset } from "./core";
 
+type PaginationInput = { limit?: number; offset?: number };
+
 // Лайки и комментарии возвращают одинаковую полезную нагрузку — выносим.
 export type LikeResult = {
   liked: boolean;
@@ -39,16 +41,17 @@ function enc(value: string): string {
   return encodeURIComponent(value);
 }
 
+function paginationSuffix(pagination: PaginationInput = {}) {
+  const query = new URLSearchParams();
+  if (pagination.limit !== undefined) query.set("limit", String(pagination.limit));
+  if (pagination.offset !== undefined) query.set("offset", String(pagination.offset));
+  return query.toString() ? `?${query.toString()}` : "";
+}
+
 export const api = {
   // ── Новости ─────────────────────────────────────────────────────────────
   news: {
-    list: (pagination: { limit?: number; offset?: number } = {}) => {
-      const query = new URLSearchParams();
-      if (pagination.limit !== undefined) query.set("limit", String(pagination.limit));
-      if (pagination.offset !== undefined) query.set("offset", String(pagination.offset));
-      const suffix = query.toString() ? `?${query.toString()}` : "";
-      return apiFetch<PaginatedResponse<NewsListItem>>(`/news${suffix}`);
-    },
+    list: (pagination: PaginationInput = {}) => apiFetch<PaginatedResponse<NewsListItem>>(`/news${paginationSuffix(pagination)}`),
     get: (slug: string) => apiFetch<NewsPostDetail>(`/news/${enc(slug)}`),
     like: (id: string) => apiFetch<LikeResult>(`/news/${enc(id)}/like`, { method: "POST" }),
     addComment: (postId: string, body: { text: string; parentCommentId?: string }) =>
@@ -107,6 +110,20 @@ export const api = {
 
   // ── Уведомления ─────────────────────────────────────────────────────────
   notifications: {
+    list: (pagination: PaginationInput = {}) =>
+      apiFetch<
+        PaginatedResponse<{
+          id: string;
+          category: string;
+          eventType: string;
+          title: string;
+          body: string;
+          link: string | null;
+          readAt: string | null;
+          archivedAt: string | null;
+          createdAt: string;
+        }>
+      >(`/notifications${paginationSuffix(pagination)}`),
     preferences: {
       get: () =>
         apiFetch<{ inAppMutedCategories: string[]; emailMutedCategories: string[] }>("/notifications/preferences"),
@@ -124,12 +141,8 @@ export const api = {
     // первые 4 (через .slice), drawer показывает весь список (default 50,
     // max 200). Сами messages сохранены в выдаче — UI рендерит thread без
     // отдельного /tickets/:id-запроса.
-    listMyTickets: (pagination: { limit?: number; offset?: number } = {}) => {
-      const query = new URLSearchParams();
-      if (pagination.limit !== undefined) query.set("limit", String(pagination.limit));
-      if (pagination.offset !== undefined) query.set("offset", String(pagination.offset));
-      const suffix = query.toString() ? `?${query.toString()}` : "";
-      return apiFetch<
+    listMyTickets: (pagination: PaginationInput = {}) =>
+      apiFetch<
         PaginatedResponse<{
           id: string;
           category: string;
@@ -145,8 +158,7 @@ export const api = {
             isInternal: boolean;
           }>;
         }>
-      >(`/support/tickets${suffix}`);
-    },
+      >(`/support/tickets${paginationSuffix(pagination)}`),
   },
 
   // ── Админ-CMS ───────────────────────────────────────────────────────────
@@ -157,12 +169,8 @@ export const api = {
     news: {
       // Возвращает paginated envelope БЕЗ blocks (для таблицы).
       // Получение detail для редактора — `admin.news.get(id)`.
-      list: (pagination: { limit?: number; offset?: number } = {}) => {
-        const query = new URLSearchParams();
-        if (pagination.limit !== undefined) query.set("limit", String(pagination.limit));
-        if (pagination.offset !== undefined) query.set("offset", String(pagination.offset));
-        const suffix = query.toString() ? `?${query.toString()}` : "";
-        return apiFetch<
+      list: (pagination: PaginationInput = {}) =>
+        apiFetch<
           PaginatedResponse<{
             id: string;
             title: string;
@@ -176,8 +184,7 @@ export const api = {
             tags: Array<{ newsTagId: string; newsTag: { id: string; name: string; slug: string } }>;
             _count: { blocks: number; comments: number; likes: number };
           }>
-        >(`/admin/content/news${suffix}`);
-      },
+        >(`/admin/content/news${paginationSuffix(pagination)}`),
       get: (id: string) =>
         apiFetch<{
           id: string;

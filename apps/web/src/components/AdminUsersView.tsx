@@ -1,12 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
-import { ApiError, apiFetch } from "../lib/api";
+import { apiFetch } from "../lib/api";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
-
-type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
 type AdminUserListItem = {
   id: string;
@@ -67,46 +66,31 @@ type AdminUsersViewProps = {
 
 export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
   const { token } = useAuth();
-  const [state, setState] = useState<ApiState>("unauthenticated");
-  const [list, setList] = useState<AdminUserList | null>(null);
   const [selected, setSelected] = useState<AdminUserDetail | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "blocked">("");
-  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({ search: "", status: "" });
   const take = 20;
+  const usersQuery = useInfiniteApiQuery<AdminUserListItem>(
+    token ? `admin-users:${filters.search}:${filters.status}` : null,
+    take,
+    async ({ limit, offset }) => {
+      const params = new URLSearchParams();
+      params.set("take", String(limit));
+      params.set("page", String(Math.floor(offset / limit) + 1));
+      if (filters.search) params.set("search", filters.search);
+      if (filters.status) params.set("status", filters.status);
+      const data = await apiFetch<AdminUserList>(`/admin/users?${params.toString()}`, { token });
+      return { items: data.items, total: data.total, hasMore: data.page * data.take < data.total };
+    },
+  );
 
   const [blockReason, setBlockReason] = useState<string>("policy_violation");
   const [blockComment, setBlockComment] = useState("");
 
   const [rolesDraft, setRolesDraft] = useState<string[]>([]);
-
-  async function loadList(opts: { search?: string; status?: string; page?: number } = {}) {
-    if (!token) {
-      setState("unauthenticated");
-      return;
-    }
-    setState("loading");
-    setErrorMessage(null);
-    try {
-      const params = new URLSearchParams();
-      params.set("take", String(take));
-      params.set("page", String(opts.page ?? page));
-      if (opts.search ?? search) params.set("search", opts.search ?? search);
-      if (opts.status ?? statusFilter) params.set("status", opts.status ?? statusFilter);
-      const data = await apiFetch<AdminUserList>(`/admin/users?${params.toString()}`, { token });
-      setList(data);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить пользователей");
-    }
-  }
 
   async function openUser(id: string) {
     if (!token) return;
@@ -130,7 +114,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       });
       setSelected(data);
       setBlockComment("");
-      await loadList();
+      usersQuery.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось заблокировать пользователя");
     }
@@ -145,7 +129,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
         body: { comment: blockComment.trim() || undefined },
       });
       setSelected(data);
-      await loadList();
+      usersQuery.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось разблокировать пользователя");
     }
@@ -160,18 +144,13 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
         body: { roles: rolesDraft, isActive: rolesDraft.length > 0 },
       });
       setSelected(data);
-      await loadList();
+      usersQuery.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось обновить роли");
     }
   }
 
-  useEffect(() => {
-    void loadList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  if (state === "unauthenticated") {
+  if (!token || usersQuery.state === "unauthenticated") {
     const content = (
       <>
         <h1 className="page-title">Пользователи</h1>
@@ -187,7 +166,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
     );
   }
 
-  if (state === "forbidden") {
+  if (usersQuery.state === "forbidden") {
     const content = (
       <>
         <h1 className="page-title">Пользователи</h1>
@@ -215,8 +194,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
         className="form"
         onSubmit={(event) => {
           event.preventDefault();
-          setPage(1);
-          void loadList({ page: 1 });
+          setFilters({ search: search.trim(), status: statusFilter });
         }}
       >
         <div className="auth-actions">
@@ -242,16 +220,18 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
         </div>
       </form>
 
-      {errorMessage ? <p className="status-pill">{errorMessage}</p> : null}
-      {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
+      {errorMessage || usersQuery.errorMessage ? (
+        <p className="status-pill">{errorMessage ?? usersQuery.errorMessage}</p>
+      ) : null}
+      {usersQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
-      {list ? (
+      {usersQuery.state === "ready" || usersQuery.items.length > 0 ? (
         <div className="moderation-layout">
           <div className="stack-list">
             <p className="page-subtitle">
-              Всего: {list.total}, страница {list.page}.
+              Загружено {usersQuery.items.length} из {usersQuery.total}.
             </p>
-            {list.items.map((item) => (
+            {usersQuery.items.map((item) => (
               <button
                 className={`moderation-case-row ${selected?.id === item.id ? "active" : ""}`}
                 key={item.id}
@@ -272,32 +252,11 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
               </button>
             ))}
 
-            <div className="auth-actions">
-              <button
-                className="button secondary"
-                disabled={list.page <= 1}
-                onClick={() => {
-                  const next = list.page - 1;
-                  setPage(next);
-                  void loadList({ page: next });
-                }}
-                type="button"
-              >
-                ← Назад
-              </button>
-              <button
-                className="button secondary"
-                disabled={list.page * list.take >= list.total}
-                onClick={() => {
-                  const next = list.page + 1;
-                  setPage(next);
-                  void loadList({ page: next });
-                }}
-                type="button"
-              >
-                Дальше →
-              </button>
-            </div>
+            <div ref={usersQuery.sentinelRef} aria-hidden="true" />
+            {usersQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
+            {!usersQuery.hasMore && usersQuery.items.length > 0 ? (
+              <p className="page-subtitle">Это все пользователи.</p>
+            ) : null}
           </div>
 
           <div className="moderation-detail">

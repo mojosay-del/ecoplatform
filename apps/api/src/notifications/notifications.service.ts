@@ -135,15 +135,28 @@ export class NotificationsService {
     return Promise.all(admins.map((admin) => this.createInApp({ ...input, userId: admin.userId })));
   }
 
-  async list(user: RequestUser, includeArchived = false) {
-    return this.prisma.inAppNotification.findMany({
-      where: {
-        userId: user.id,
-        ...(includeArchived ? {} : { archivedAt: null }),
-      },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+  async list(
+    user: RequestUser,
+    options: { includeArchived?: boolean; limit?: number; offset?: number } = {},
+  ) {
+    const limit = Math.min(Math.max(options.limit ?? 30, 1), 100);
+    const offset = Math.max(options.offset ?? 0, 0);
+    const where: Prisma.InAppNotificationWhereInput = {
+      userId: user.id,
+      ...(options.includeArchived ? {} : { archivedAt: null }),
+    };
+
+    const [total, items] = await Promise.all([
+      this.prisma.inAppNotification.count({ where }),
+      this.prisma.inAppNotification.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+    ]);
+
+    return { items, total, hasMore: offset + items.length < total };
   }
 
   async unreadCount(user: RequestUser) {

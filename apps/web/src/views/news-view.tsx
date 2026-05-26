@@ -10,11 +10,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useEffect, useState, type FormEvent } from "react";
 import { Flag, MessageCircle, Send, ThumbsUp, X } from "lucide-react";
-import type { NewsCommentDecorated, NewsListItem, NewsPostDetail, PaginatedResponse } from "@ecoplatform/shared";
+import type { NewsCommentDecorated, NewsListItem, NewsPostDetail } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { ApiError, api, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCoverAssets } from "../lib/use-cover-assets";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import {
   AccessClosed,
   AuthRequired,
@@ -25,7 +26,6 @@ import {
   formatNewsDate,
   getCommentAuthor,
   getNewsFeedSnapshot,
-  useApiQuery,
   withUpdatedCommentLike,
   withUpdatedNewsLike,
   type ApiState,
@@ -33,17 +33,15 @@ import {
 } from "./_shared";
 import { ContentBlocks } from "./content-blocks";
 
-const INITIAL_NEWS_PAGE: PaginatedResponse<NewsListItem> = { items: [], total: 0, hasMore: false };
+const NEWS_PAGE_SIZE = 20;
 
 export function NewsView() {
-  // API теперь возвращает страничный envelope; пока показываем первую страницу,
-  // infinite-scroll подключим в следующем раунде (UX-итерация).
-  const { data, setData, state, errorMessage } = useApiQuery(
+  const feed = useInfiniteApiQuery(
     "news-feed",
-    () => api.news.list({ limit: 20, offset: 0 }),
-    INITIAL_NEWS_PAGE,
+    NEWS_PAGE_SIZE,
+    ({ limit, offset }) => api.news.list({ limit, offset }),
   );
-  const items = data.items;
+  const { items, setItems, state, errorMessage, hasMore, isLoadingMore, sentinelRef } = feed;
   const covers = useCoverAssets(items);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -62,12 +60,9 @@ export function NewsView() {
   }
 
   function updatePostInFeed(updatedPost: NewsPostDetail) {
-    setData((current) => ({
-      ...current,
-      items: current.items.map((post) =>
-        post.id === updatedPost.id ? { ...post, ...getNewsFeedSnapshot(updatedPost) } : post,
-      ),
-    }));
+    setItems((current) =>
+      current.map((post) => (post.id === updatedPost.id ? { ...post, ...getNewsFeedSnapshot(updatedPost) } : post)),
+    );
   }
 
   if (state === "unauthenticated") {
@@ -149,6 +144,17 @@ export function NewsView() {
             })}
           </div>
         )}
+        <div ref={sentinelRef} aria-hidden="true" />
+        {isLoadingMore ? (
+          <p className="page-subtitle" style={{ textAlign: "center" }}>
+            Загружаем ещё…
+          </p>
+        ) : null}
+        {!hasMore && items.length > 0 ? (
+          <p className="page-subtitle" style={{ textAlign: "center" }}>
+            Это все записи.
+          </p>
+        ) : null}
       </section>
       {openedSlug ? <NewsModal slug={openedSlug} onClose={closePost} onPostUpdate={updatePostInFeed} /> : null}
     </AppShell>

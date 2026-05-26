@@ -1,11 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { AppShell } from "./AppShell";
-import { ApiError, apiFetch } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-
-type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type JournalEntry = {
   id: string;
@@ -37,8 +36,6 @@ type AdminJournalsViewProps = {
 
 export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) {
   const { token } = useAuth();
-  const [state, setState] = useState<ApiState>("unauthenticated");
-  const [list, setList] = useState<JournalList | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [action, setAction] = useState("");
@@ -46,50 +43,31 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
   const [actorId, setActorId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({ action: "", entityType: "", actorId: "", from: "", to: "" });
   const take = 25;
-
-  async function loadList(opts: { page?: number } = {}) {
-    if (!token) {
-      setState("unauthenticated");
-      return;
-    }
-    setState("loading");
-    setErrorMessage(null);
-    try {
+  const journalsQuery = useInfiniteApiQuery<JournalEntry>(
+    token ? `admin-journals:${filters.action}:${filters.entityType}:${filters.actorId}:${filters.from}:${filters.to}` : null,
+    take,
+    async ({ limit, offset }) => {
       const params = new URLSearchParams();
-      params.set("take", String(take));
-      params.set("page", String(opts.page ?? page));
-      if (action) params.set("action", action);
-      if (entityType) params.set("entityType", entityType);
-      if (actorId) params.set("actorId", actorId);
-      if (from) params.set("from", new Date(from).toISOString());
-      if (to) params.set("to", new Date(to).toISOString());
+      params.set("take", String(limit));
+      params.set("page", String(Math.floor(offset / limit) + 1));
+      if (filters.action) params.set("action", filters.action);
+      if (filters.entityType) params.set("entityType", filters.entityType);
+      if (filters.actorId) params.set("actorId", filters.actorId);
+      if (filters.from) params.set("from", new Date(filters.from).toISOString());
+      if (filters.to) params.set("to", new Date(filters.to).toISOString());
       const data = await apiFetch<JournalList>(`/admin/journals?${params.toString()}`, { token });
-      setList(data);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить журнал");
-    }
-  }
+      return { items: data.items, total: data.total, hasMore: data.page * data.take < data.total };
+    },
+  );
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPage(1);
-    void loadList({ page: 1 });
+    setFilters({ action: action.trim(), entityType: entityType.trim(), actorId: actorId.trim(), from, to });
   }
 
-  useEffect(() => {
-    void loadList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  if (state === "unauthenticated") {
+  if (!token || journalsQuery.state === "unauthenticated") {
     const content = (
       <>
         <h1 className="page-title">Журнал</h1>
@@ -105,7 +83,7 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
     );
   }
 
-  if (state === "forbidden") {
+  if (journalsQuery.state === "forbidden") {
     const content = (
       <>
         <h1 className="page-title">Журнал</h1>
@@ -168,15 +146,17 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
         </div>
       </form>
 
-      {errorMessage ? <p className="status-pill">{errorMessage}</p> : null}
-      {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
+      {errorMessage || journalsQuery.errorMessage ? (
+        <p className="status-pill">{errorMessage ?? journalsQuery.errorMessage}</p>
+      ) : null}
+      {journalsQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
-      {list ? (
+      {journalsQuery.state === "ready" || journalsQuery.items.length > 0 ? (
         <div className="stack-list">
           <p className="page-subtitle">
-            Всего записей: {list.total}, страница {list.page}.
+            Загружено {journalsQuery.items.length} из {journalsQuery.total}.
           </p>
-          {list.items.map((entry) => (
+          {journalsQuery.items.map((entry) => (
             <article className="checklist-block" key={entry.id}>
               <strong>{entry.action}</strong>
               <p>
@@ -191,32 +171,11 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
             </article>
           ))}
 
-          <div className="auth-actions">
-            <button
-              className="button secondary"
-              disabled={list.page <= 1}
-              onClick={() => {
-                const next = list.page - 1;
-                setPage(next);
-                void loadList({ page: next });
-              }}
-              type="button"
-            >
-              ← Назад
-            </button>
-            <button
-              className="button secondary"
-              disabled={list.page * list.take >= list.total}
-              onClick={() => {
-                const next = list.page + 1;
-                setPage(next);
-                void loadList({ page: next });
-              }}
-              type="button"
-            >
-              Дальше →
-            </button>
-          </div>
+          <div ref={journalsQuery.sentinelRef} aria-hidden="true" />
+          {journalsQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
+          {!journalsQuery.hasMore && journalsQuery.items.length > 0 ? (
+            <p className="page-subtitle">Это все записи.</p>
+          ) : null}
         </div>
       ) : null}
     </>

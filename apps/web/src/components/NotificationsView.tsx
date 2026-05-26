@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CreditCard, HelpCircle, type LucideIcon, MessageSquare, Settings, Shield, ShoppingBag } from "lucide-react";
 import { AppShell } from "./AppShell";
-import { apiFetch } from "../lib/api";
+import { api, apiFetch } from "../lib/api";
+import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
 
 type Notification = {
@@ -45,31 +46,33 @@ const categoryIcons: Record<string, LucideIcon> = {
 const preferenceCategories = ["marketplace", "moderation", "support", "system"];
 const lockedCategories = ["security", "billing"];
 const defaultPreferences: NotificationPreferences = { inAppMutedCategories: [], emailMutedCategories: [] };
+const NOTIFICATIONS_PAGE_SIZE = 30;
 
 type ViewState = "unauthenticated" | "loading" | "ready" | "error";
 
 export function NotificationsView() {
   const { token } = useAuth();
-  const [items, setItems] = useState<Notification[]>([]);
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [state, setState] = useState<ViewState>("unauthenticated");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savingCategory, setSavingCategory] = useState<string | null>(null);
+  const notifications = useInfiniteApiQuery<Notification>(
+    token ? "notifications" : null,
+    NOTIFICATIONS_PAGE_SIZE,
+    ({ limit, offset }) => api.notifications.list({ limit, offset }),
+  );
+  const items = notifications.items;
+  const setItems = notifications.setItems;
 
   const load = useCallback(() => {
     if (!token) {
       setState("unauthenticated");
-      setItems([]);
       setPreferences(defaultPreferences);
       return;
     }
     setState("loading");
-    Promise.all([
-      apiFetch<Notification[]>("/notifications", { token }),
-      apiFetch<NotificationPreferences>("/notifications/preferences", { token }),
-    ])
-      .then(([notifications, nextPreferences]) => {
-        setItems(notifications);
+    apiFetch<NotificationPreferences>("/notifications/preferences", { token })
+      .then((nextPreferences) => {
         setPreferences(nextPreferences);
         setState("ready");
         setErrorMessage(null);
@@ -163,7 +166,7 @@ export function NotificationsView() {
     }
   }
 
-  if (state === "unauthenticated") {
+  if (state === "unauthenticated" || notifications.state === "unauthenticated") {
     return (
       <AppShell>
         <section className="page">
@@ -188,9 +191,11 @@ export function NotificationsView() {
           <h1 className="page-title">Уведомления</h1>
           <p className="page-subtitle">Все системные сообщения по вашему аккаунту.</p>
         </header>
-        {errorMessage && state !== "loading" ? <p className="status-pill">{errorMessage}</p> : null}
-        {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
-        {state === "ready" ? (
+        {(errorMessage || notifications.errorMessage) && state !== "loading" && !notifications.isInitialLoading ? (
+          <p className="status-pill">{errorMessage ?? notifications.errorMessage}</p>
+        ) : null}
+        {state === "loading" || notifications.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
+        {state === "ready" && notifications.state !== "error" ? (
           <>
             <div className="notifications-toolbar">
               <button className="button secondary" onClick={markAllRead} disabled={items.every((item) => item.readAt)}>
@@ -234,6 +239,9 @@ export function NotificationsView() {
                 })}
               </div>
             )}
+            <div ref={notifications.sentinelRef} aria-hidden="true" />
+            {notifications.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
+            {!notifications.hasMore && items.length > 0 ? <p className="page-subtitle">Это все записи.</p> : null}
             <section className="notification-preferences">
               <h2>Настройки</h2>
               <p className="page-subtitle">
