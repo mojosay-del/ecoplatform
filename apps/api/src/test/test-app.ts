@@ -4,6 +4,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
 import cookieParser from "cookie-parser";
+import { Logger as PinoNestLogger } from "nestjs-pino";
 import request from "supertest";
 import { AppModule } from "../app.module";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME, csrfCookieMiddleware, CsrfGuard } from "../common/csrf.guard";
@@ -42,6 +43,7 @@ export async function createTestApp(): Promise<TestApp> {
   }).compile();
 
   const app = moduleRef.createNestApplication();
+  app.useLogger(app.get(PinoNestLogger));
   app.setGlobalPrefix("api");
   app.use(cookieParser());
   app.use(csrfCookieMiddleware);

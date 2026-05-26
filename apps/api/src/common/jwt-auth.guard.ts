@@ -2,8 +2,10 @@ import { CanActivate, ExecutionContext, Injectable, Optional, UnauthorizedExcept
 import { JwtService } from "@nestjs/jwt";
 import { UserStatus } from "@prisma/client";
 import type { Request } from "express";
+import { PinoLogger } from "nestjs-pino";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
+import { resolveActorRole } from "./logging";
 import type { RequestUser } from "./request-user";
 
 type RequestWithUser = Request & { user?: RequestUser };
@@ -15,6 +17,8 @@ export class JwtAuthGuard implements CanActivate {
     private readonly prisma: PrismaService,
     @Optional()
     private readonly sessionCache?: SessionCacheService,
+    @Optional()
+    private readonly logger?: PinoLogger,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -35,6 +39,7 @@ export class JwtAuthGuard implements CanActivate {
       const cached = await this.sessionCache?.get(payload.sessionId);
       if (cached?.id === payload.sub) {
         request.user = cached;
+        this.assignUserLogFields(cached);
         return true;
       }
 
@@ -87,6 +92,7 @@ export class JwtAuthGuard implements CanActivate {
         sessionId: payload.sessionId,
       };
       request.user = requestUser;
+      this.assignUserLogFields(requestUser);
       await this.sessionCache?.set(requestUser);
 
       return true;
@@ -97,5 +103,14 @@ export class JwtAuthGuard implements CanActivate {
 
       throw new UnauthorizedException("Токен недействителен.");
     }
+  }
+
+  private assignUserLogFields(user: RequestUser) {
+    this.logger?.assign({
+      userId: user.id,
+      sessionId: user.sessionId,
+      companyId: user.companyId,
+      actorRole: resolveActorRole(user),
+    });
   }
 }

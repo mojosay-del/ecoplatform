@@ -4,10 +4,10 @@
 
 ## Текущая точка
 
-- **Текущая волна:** 9 — Безопасность и 152-ФЗ, 11/11 закрыто.
-- **Открытые задачи:** нет по Волне 9.
-- **Следующая волна:** 10 — Наблюдаемость и операции (pino, Sentry, Prometheus, distributed cron, прод smoke-test).
-- **Закрытые волны:** 1–9 целиком (волны 3 и 5 — с осознанно отложенными подпунктами 3.3, 5.2, 5.3, 5.4).
+- **Текущая волна:** 10 — Наблюдаемость и операции, 1/6 закрыто.
+- **Открытые задачи:** 10.2–10.6.
+- **Следующая задача:** 10.2 — Sentry для error tracking.
+- **Закрытые волны:** 1–9 целиком (волны 3 и 5 — с осознанно отложенными подпунктами 3.3, 5.2, 5.3).
 - **Последнее обновление журнала:** 2026-05-26.
 
 ## Легенда статусов
@@ -78,7 +78,7 @@
 | 5.1 | GitHub Actions `ci.yml`: 2 job'а — static-checks (prettier/lint/test/build) + integration (Postgres 18 service) + `format:check` скрипт + `.prettierrc` + `.prettierignore` + auto-format 36 файлов | [05-architecture.md#15, 16](archive/2026-05-24/05-architecture.md) | ✅ |
 | 5.2 | Декомпозиция integration-тестов на доменные файлы | [05-architecture.md#8](archive/2026-05-24/05-architecture.md) | ⬜ Отложено |
 | 5.3 | OpenAPI/Swagger | [05-architecture.md#9](archive/2026-05-24/05-architecture.md) | ⬜ Отложено |
-| 5.4 | Структурное логирование pino + LOG_LEVEL | [06-deploy.md#8](archive/2026-05-24/06-deploy.md) | ⬜ Отложено |
+| 5.4 | Структурное логирование pino + LOG_LEVEL | [06-deploy.md#8](archive/2026-05-24/06-deploy.md) | ✅ Закрыто в Волне 10.1 |
 | 5.5 | DOMPurify-hook: rel="noopener noreferrer" — закрыто ещё в Волне 3 при объединении sanitize-html | [01-security.md#8](archive/2026-05-24/01-security.md) | ✅ |
 | 5.6 | `findManyByIds` теперь фильтрует по `accessLevel: public` — приватные файлы не утекают через `/files?ids=...` | [01-security.md#9](archive/2026-05-24/01-security.md) | ✅ (закрыто 2026-05-25): `apps/api/src/files/files.service.ts` добавляет `accessLevel: FileAccessLevel.public` в `findManyByIds`; `apps/api/src/files/files.service.test.ts` проверяет Prisma-where и дедуп ids. |
 | 5.7 | `MIN_PASSWORD_LENGTH = 10` + `passwordSchema` в `packages/shared/src/dto.ts`. Применено в register, change-password, admin-staff. Тесты обновлены (User12345 → User123456) | [01-security.md#10](archive/2026-05-24/01-security.md) | ✅ |
@@ -154,6 +154,19 @@
 
 ---
 
+## Волна 10 — Наблюдаемость и операции
+
+| #    | Задача                                                                                                    | Файл плана                    | Статус |
+| ---- | --------------------------------------------------------------------------------------------------------- | ----------------------------- | ------ |
+| 10.1 | Структурное логирование pino + `LOG_LEVEL`: `nestjs-pino`, dev `pino-pretty`, prod JSON, `traceId`, `userId`, `sessionId`, `companyId`, `actorRole`, `path`, `method`, `statusCode`, `durationMs`; `console.*` в API production-коде убран | [ROADMAP.md#101-структурное-логирование-pino](ROADMAP.md#101-структурное-логирование-pino) | ✅      |
+| 10.2 | Sentry для error tracking                                                                                | [ROADMAP.md#102-sentry-для-error-tracking](ROADMAP.md#102-sentry-для-error-tracking) | ⬜      |
+| 10.3 | Prometheus метрики                                                                                       | [ROADMAP.md#103-prometheus-метрики](ROADMAP.md#103-prometheus-метрики) | ⬜      |
+| 10.4 | Distributed tracing (опционально)                                                                        | [ROADMAP.md#104-distributed-tracing-опционально](ROADMAP.md#104-distributed-tracing-опционально) | ⬜      |
+| 10.5 | Backup и runbook                                                                                        | [ROADMAP.md#105-backup-и-runbook](ROADMAP.md#105-backup-и-runbook) | ⬜      |
+| 10.6 | Smoke-test на проде через Playwright                                                                     | [ROADMAP.md#106-smoke-test-на-проде-через-playwright](ROADMAP.md#106-smoke-test-на-проде-через-playwright) | ⬜      |
+
+---
+
 ---
 
 ## Журнал работы
@@ -180,3 +193,4 @@
 | 2026-05-26 | Волна 9, задача 9.10 (password policy + Have I Been Pwned) закрыта. **Shared/Web:** общий `MIN_PASSWORD_LENGTH` поднят с 10 до 12; регистрация, смена пароля и создание platform-staff используют тот же минимум и UI-подсказки. **API:** добавлен `PasswordPolicyService`: новые пароли проверяются через Pwned Passwords range API по SHA-1 k-anonymity (`/range/{first5}`), с `Add-Padding: true`, локальным сравнением suffix/count, часовым cache по prefix, таймаутом и fail-open при недоступности внешнего API; plaintext-пароль наружу не уходит. Проверка подключена к `register`, `change-password` и `admin/staff`; integration-тесты отключают внешний вызов через `PWNED_PASSWORDS_CHECK_ENABLED=0`. **Тестовые данные:** integration-пароли обновлены под минимум 12. Проверки: `pnpm --filter @ecoplatform/shared build`; `pnpm exec prettier --check` по затронутым TS/TSX-файлам; `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/web lint`; targeted API unit `vitest ... password-policy.service.test.ts auth.service.test.ts` зелёный (**9/9**); полный API integration `pnpm --filter @ecoplatform/api test:integration -- -t "смена пароля|создаёт модератора"` фактически прогнал весь файл и прошёл **110/110**. На момент закрытия 9.10 `pnpm --filter @ecoplatform/api lint` был заблокирован параллельной незавершённой работой 9.7 (`apps/api/src/billing/billing.service.ts`, TS2322 вокруг audit diff payload), к 9.10 ошибка не относилась. | Codex |
 | 2026-05-26 | Волна 9, задача 9.7 (audit-trail before/after) закрыта. **API:** добавлен `AdminActionLogService.recordChange()` с payload `{ before, after, diff }`; ручная активация подписки, block/unblock пользователей, platform-roles, staff update, настройки платформы, статусы компаний и admin-санкции модерации пишут before/after вместо старого разрозненного payload. Для `module_restriction` дополнительно проверено, что diff фиксирует появление ограничения. **Shared/Web:** `AdminJournalEntry`/`AdminJournalPayload` вынесены в shared, `/admin/journals` показывает diff как «старое → новое» с красным старым и зелёным новым значением, legacy-payload остаётся JSON. **UI-проверка:** локально открыт `http://localhost:3000/admin/journals`, тестовая смена `moderation.lock_duration_minutes` 15→16→15 отобразилась в журнале как красно-зелёный diff. Проверки: `pnpm lint` зелёный (4/4), `pnpm test` зелёный (shared 7/7 + web 7/7 + api 56/56), `pnpm test:integration` зелёный (API integration **110/110**), `pnpm build` зелёный (3/3), `pnpm format:check` clean, `git diff --check` clean. | Codex |
 | 2026-05-26 | **Волна 9 закрыта (11/11)**: добавлен `docs/08-architecture/security.md` с текущей технической политикой безопасности MVP: хранение паролей bcrypt cost=12, access-token в памяти и refresh-cookie, JWT-секреты, lockout, Helmet/web security headers, CSP report-only, CSRF double-submit, 152-ФЗ-флоу экспорта и удаления, MIME/cover-image/upload limits, before/after audit trail, запрет секретов в логах, checklist перед prod и responsible disclosure. `docs/README.md` получил ссылку на документ. Проверки для docs-only: `pnpm exec prettier --check docs/08-architecture/security.md docs/README.md audit/PROGRESS.md audit/ROADMAP.md PROJECT_STATUS.md`, `pnpm lint`, `git diff --check`. | Codex |
+| 2026-05-26 | Волна 10, задача 10.1 (структурное логирование pino + `LOG_LEVEL`) закрыта. **API:** добавлены `nestjs-pino`, `pino`, `pino-http`, `pino-pretty`; `LoggerModule` подключён в `AppModule`, а Nest bootstrap использует pino как основной logger. В dev включён `pino-pretty`, в prod — JSON, `LOG_LEVEL` управляет уровнем логов; по умолчанию test-окружение молчит. **Поля логов:** `traceId` берётся из безопасного `X-Request-Id` или генерируется заново и возвращается в response header; request-логи содержат `userId`, `sessionId`, `companyId`, `actorRole`, `path`, `method`, `statusCode`, `durationMs`. Authorization/cookie/CSRF и token/password-поля редактируются. **Код:** bootstrap `console.log/error` заменены на logger, `JwtAuthGuard` добавляет user-поля в request-контекст логов, production-код API больше не содержит `console.*`. Проверки: `pnpm lint` зелёный (4/4), `pnpm test` зелёный (shared 7/7 + web 7/7 + api 60/60), `pnpm test:integration` — первый полный прогон дал известный transient `407` на moderation release (109/110), повторный полный прогон зелёный (**110/110**), `pnpm build` зелёный (3/3), `pnpm format:check` clean, `git diff --check` clean, `rg "console\\." apps/api/src --glob '!**/*.test.ts' --glob '!**/*.spec.ts'` — без находок. | Codex |

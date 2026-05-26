@@ -11,6 +11,7 @@ import compression from "compression";
 import helmet from "helmet";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import { Logger as PinoNestLogger } from "nestjs-pino";
 import { AppModule } from "./app.module";
 import { csrfCookieMiddleware, CsrfGuard } from "./common/csrf.guard";
 import { GlobalExceptionFilter, registerProcessErrorHandlers } from "./common/global-exception.filter";
@@ -34,7 +35,9 @@ async function bootstrap() {
   // SIGKILL в supervisor-логе.
   registerProcessErrorHandlers();
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  const appLogger = app.get(PinoNestLogger);
+  app.useLogger(appLogger);
   app.use(
     helmet({
       contentSecurityPolicy: false,
@@ -75,13 +78,12 @@ async function bootstrap() {
     .backfillFileReferencesIfNeeded()
     .then((result) => {
       if (result.scanned > 0) {
-        // eslint-disable-next-line no-console
-        console.log(`[bootstrap] FileReference backfill: scanned ${result.scanned} entities`);
+        appLogger.log(`FileReference backfill scanned ${result.scanned} entities`, "Bootstrap");
       }
     })
     .catch((error) => {
-      // eslint-disable-next-line no-console
-      console.error("[bootstrap] FileReference backfill failed:", error);
+      const stack = error instanceof Error ? error.stack : String(error);
+      appLogger.error("FileReference backfill failed", stack, "Bootstrap");
     });
 
   await app.listen(Number(process.env.API_PORT ?? 4000));

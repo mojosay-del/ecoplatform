@@ -4,11 +4,11 @@
 
 ## Текущий этап
 
-Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11).
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL` закрыто.
 
-Волна 9 закрыта. Следующий рабочий блок — Волна 10: наблюдаемость и операции.
+Текущий рабочий блок — Волна 10: наблюдаемость и операции.
 
-Целевой следующий шаг: начать 10.1 — структурное логирование pino + `LOG_LEVEL`.
+Целевой следующий шаг: начать 10.2 — Sentry для error tracking.
 
 ## Что уже сделано
 
@@ -22,7 +22,7 @@
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
 - 110 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 7 в `apps/web`, 56 в `apps/api`.
+- Unit-тесты: 7 в `packages/shared`, 7 в `apps/web`, 60 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
@@ -77,6 +77,14 @@
 - Политика новых паролей: общий `MIN_PASSWORD_LENGTH=12`; регистрация, смена пароля и создание staff проверяют пароль через Have I Been Pwned Pwned Passwords range API по SHA-1 k-anonymity (`/range/{first5}`) без отправки plaintext.
 - Документ политики безопасности: `docs/08-architecture/security.md` фиксирует пароли, токены, CSP/CSRF/HSTS, lockout, 152-ФЗ, файлы, audit trail, операционный чек-лист и responsible disclosure.
 
+### Наблюдаемость и операции (Волна 10, начата)
+
+- Структурное логирование API через `nestjs-pino`: dev-режим печатает читабельно через `pino-pretty`, prod отдаёт JSON.
+- `LOG_LEVEL` управляет уровнем логов; defaults: dev=`debug`, prod=`info`, test=`silent`.
+- Request-логи содержат `traceId`, `path`, `method`, `statusCode`, `durationMs`, а после JWT-auth — `userId`, `sessionId`, `companyId`, `actorRole`.
+- `traceId` берётся из безопасного `X-Request-Id` или генерируется заново и возвращается в ответе как `X-Request-Id`.
+- Authorization/cookie/CSRF и token/password-поля редактируются перед записью в лог.
+
 ### Последние закрытые задачи Волны 9
 
 - **Пункт 9.6 — запрос на удаление аккаунта**:
@@ -105,7 +113,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 10** — наблюдаемость: pino structured logging + `LOG_LEVEL`, Sentry, Prometheus метрики, distributed health, прод smoke-test.
+- **Волна 10** — наблюдаемость: Sentry, Prometheus метрики, distributed health, прод smoke-test.
 - **Волна 11** — UX/дизайн-система: токены, типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»).
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
@@ -115,7 +123,7 @@
 - 3.3 — расщепление `moderation.service.ts` (940 строк). Приватные хелперы тесно переплетены, расщепление создаст cross-service зависимости. Пересмотреть при росте >1500 строк.
 - 5.2 — декомпозиция integration-тестов на доменные файлы (сейчас один файл на 110 тестов).
 - 5.3 — OpenAPI/Swagger.
-- 5.4 — pino + LOG_LEVEL (перенесено в Волну 10).
+- 5.4 — pino + LOG_LEVEL (закрыто в Волне 10.1).
 - Реальный визуальный блочный редактор CMS вместо текущего пошагового композитора блоков.
 - Реальный файловый upload-adapter для прода (сейчас S3 настроен, но в dev может быть metadata-only).
 
@@ -142,7 +150,7 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 60 unit-тестов (shared 7, web 7, api 46)
+pnpm test                                             # 74 unit-теста (shared 7, web 7, api 60)
 pnpm build                                            # tsc + next build
 pnpm test:integration                                 # 110 integration-тестов против ecoplatform_test
 pnpm format:check                                     # prettier
@@ -150,11 +158,11 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-26 (после Волны 9.7).
+Дата: 2026-05-26 (после Волны 10.1).
 
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 7/7, api 56/56.
-- `pnpm test:integration` — успешно, 110/110.
+- `pnpm test` — успешно: shared 7/7, web 7/7, api 60/60.
+- `pnpm test:integration` — успешно, 110/110 на повторном полном прогоне (первый прогон: transient `407`, 109/110).
 - `pnpm build` — успешно (3/3).
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.

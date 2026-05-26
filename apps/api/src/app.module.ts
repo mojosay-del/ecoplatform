@@ -1,6 +1,7 @@
 import { Module, type ExecutionContext } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule, seconds } from "@nestjs/throttler";
+import { LoggerModule } from "nestjs-pino";
 import { AdminCompaniesModule } from "./admin/companies/admin-companies.module";
 import { AdminJournalsModule } from "./admin/journals/admin-journals.module";
 import { PlatformSettingsModule } from "./admin/settings/platform-settings.module";
@@ -19,6 +20,7 @@ import { RedisModule } from "./redis/redis.module";
 import { RedisThrottlerStorageService } from "./redis/redis-throttler-storage.service";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { SupportModule } from "./support/support.module";
+import { createLoggerModuleOptions } from "./common/logging";
 
 const AUTH_THROTTLE_PATHS = new Set(["/api/auth/register", "/api/auth/login", "/api/auth/refresh"]);
 
@@ -31,6 +33,7 @@ function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
 
 @Module({
   imports: [
+    LoggerModule.forRoot(createLoggerModuleOptions()),
     // Глобальный rate-limit. Дополнительный жёсткий лимит для /auth/* стоит
     // отдельным named-throttler и пропускается для всех остальных маршрутов.
     // Лимиты сознательно отключаем под integration-тестами, где сценарий
