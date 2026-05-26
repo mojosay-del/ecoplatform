@@ -1,30 +1,13 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import type { PaginatedResponse } from "@ecoplatform/shared";
+import type { AdminJournalEntry, AdminJournalPayload, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
-type JournalEntry = {
-  id: string;
-  actorId: string;
-  action: string;
-  entityType: string;
-  entityId: string;
-  comment: string | null;
-  payload: unknown;
-  createdAt: string;
-  actor: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  } | null;
-};
-
-type JournalList = PaginatedResponse<JournalEntry>;
+type JournalList = PaginatedResponse<AdminJournalEntry>;
 
 type AdminJournalsViewProps = {
   embedded?: boolean;
@@ -32,7 +15,7 @@ type AdminJournalsViewProps = {
 
 export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) {
   const { token } = useAuth();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage] = useState<string | null>(null);
 
   const [action, setAction] = useState("");
   const [entityType, setEntityType] = useState("");
@@ -41,7 +24,7 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
   const [to, setTo] = useState("");
   const [filters, setFilters] = useState({ action: "", entityType: "", actorId: "", from: "", to: "" });
   const take = 25;
-  const journalsQuery = useInfiniteApiQuery<JournalEntry>(
+  const journalsQuery = useInfiniteApiQuery<AdminJournalEntry>(
     token
       ? `admin-journals:${filters.action}:${filters.entityType}:${filters.actorId}:${filters.from}:${filters.to}`
       : null,
@@ -161,10 +144,10 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
               </p>
               <p>
                 {new Date(entry.createdAt).toLocaleString("ru-RU")}
-                {entry.actor ? ` · ${entry.actor.firstName} ${entry.actor.lastName} (${entry.actor.email})` : ""}
+                {entry.actor ? ` · ${formatActor(entry.actor)}` : ""}
               </p>
               {entry.comment ? <p>«{entry.comment}»</p> : null}
-              {entry.payload ? <pre className="json-preview">{JSON.stringify(entry.payload, null, 2)}</pre> : null}
+              <PayloadView payload={entry.payload} />
             </article>
           ))}
 
@@ -185,4 +168,59 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
       <section className="page">{content}</section>
     </AppShell>
   );
+}
+
+function formatActor(actor: NonNullable<AdminJournalEntry["actor"]>) {
+  const name = [actor.firstName, actor.lastName].filter(Boolean).join(" ").trim();
+  return name ? `${name} (${actor.email})` : actor.email;
+}
+
+function PayloadView({ payload }: { payload: AdminJournalPayload | null }) {
+  if (!payload) return null;
+
+  const diff = payload.diff;
+  const hasDiff = diff && Object.keys(diff).length > 0;
+  const extra = Object.fromEntries(
+    Object.entries(payload).filter(([key]) => key !== "before" && key !== "after" && key !== "diff"),
+  );
+  const hasExtra = Object.keys(extra).length > 0;
+
+  if (!hasDiff && !hasExtra && !payload.before && !payload.after) {
+    return null;
+  }
+
+  return (
+    <div className="audit-payload">
+      {hasDiff ? (
+        <dl className="audit-diff">
+          {Object.entries(diff!).map(([key, change]) => (
+            <div className="audit-diff-row" key={key}>
+              <dt className="audit-diff-key">{key}</dt>
+              <dd className="audit-diff-values">
+                <span className="audit-diff-before">{renderValue(change.before)}</span>
+                <span className="audit-diff-arrow" aria-hidden="true">
+                  →
+                </span>
+                <span className="audit-diff-after">{renderValue(change.after)}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+
+      {!hasDiff && (payload.before || payload.after) ? (
+        <p className="page-subtitle">Изменений в полях не зафиксировано.</p>
+      ) : null}
+
+      {hasExtra ? <pre className="audit-payload-extra">{JSON.stringify(extra, null, 2)}</pre> : null}
+    </div>
+  );
+}
+
+function renderValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value || '""';
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.length ? value.map(renderValue).join(", ") : "[]";
+  return JSON.stringify(value);
 }

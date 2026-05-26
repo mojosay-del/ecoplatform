@@ -134,13 +134,15 @@ export class AdminUsersService {
     });
     await this.sessionCache.invalidateUser(id);
 
-    await this.auditLog.record({
+    await this.auditLog.recordChange({
       actorId: actor.id,
       action: "admin.user.block",
       entityType: "User",
       entityId: id,
       comment: input.comment,
-      payload: { reasonCode: input.reasonCode },
+      before: { status: user.status },
+      after: { status: UserStatus.blocked },
+      extra: { reasonCode: input.reasonCode },
     });
 
     return this.getUser(id);
@@ -157,12 +159,14 @@ export class AdminUsersService {
 
     await this.prisma.user.update({ where: { id }, data: { status: UserStatus.active } });
 
-    await this.auditLog.record({
+    await this.auditLog.recordChange({
       actorId: actor.id,
       action: "admin.user.unblock",
       entityType: "User",
       entityId: id,
       comment: input.comment,
+      before: { status: UserStatus.blocked },
+      after: { status: UserStatus.active },
     });
 
     return this.getUser(id);
@@ -235,17 +239,13 @@ export class AdminUsersService {
     }
     await this.sessionCache.invalidateUser(id);
 
-    await this.auditLog.record({
+    await this.auditLog.recordChange({
       actorId: actor.id,
       action: "admin.user.platform_roles",
       entityType: "User",
       entityId: id,
-      payload: {
-        rolesBefore: currentRoles,
-        rolesAfter: input.roles,
-        wasActive: currentlyActive,
-        isActive: input.isActive ?? currentlyActive,
-      },
+      before: { roles: currentRoles, isActive: currentlyActive },
+      after: { roles: input.roles, isActive: input.isActive ?? currentlyActive },
     });
 
     return this.getUser(id);

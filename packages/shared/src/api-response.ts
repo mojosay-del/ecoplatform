@@ -375,3 +375,37 @@ export type PendingConsentInfo = {
   requiresReConsent: boolean;
   documents: LegalDocumentSummary[];
 };
+
+// Запись журнала админ-действий. Единый формат payload для change-событий:
+// { before, after, diff } + произвольные доп. поля (reasonCode, sanctionId и т.п.).
+// Legacy-записи могут не иметь before/after — UI это учитывает.
+export type AdminJournalDiffEntry = {
+  before: unknown;
+  after: unknown;
+};
+
+export type AdminJournalPayload = {
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  diff?: Record<string, AdminJournalDiffEntry>;
+  [key: string]: unknown;
+};
+
+export type AdminJournalActor = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+};
+
+export type AdminJournalEntry = {
+  id: string;
+  actorId: string;
+  actor: AdminJournalActor | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  comment: string | null;
+  payload: AdminJournalPayload | null;
+  createdAt: IsoDateString;
+};

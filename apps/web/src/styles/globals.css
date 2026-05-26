@@ -7300,3 +7300,71 @@ li.tree-add-row + li.tree-add-row,
   color: var(--text, #1a202e);
   text-decoration: underline;
 }
+
+/* Журнал админ-действий: diff before → after. */
+.audit-payload {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.audit-diff {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.audit-diff-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.audit-diff-key {
+  font-weight: 600;
+  color: var(--text, #1a202e);
+  min-width: 140px;
+}
+
+.audit-diff-values {
+  margin: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.audit-diff-before {
+  color: var(--danger, #d73a49);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  background: rgba(215, 58, 73, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.audit-diff-arrow {
+  color: var(--text-muted, #6b7280);
+}
+
+.audit-diff-after {
+  color: #197a3f;
+  background: rgba(25, 122, 63, 0.1);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.audit-payload-extra {
+  margin: 0;
+  font-size: 12px;
+  background: var(--surface-muted, #f4f5f7);
+  padding: 8px 10px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-muted, #6b7280);
+}

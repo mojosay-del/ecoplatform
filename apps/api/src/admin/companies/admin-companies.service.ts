@@ -128,13 +128,15 @@ export class AdminCompaniesService {
     });
     await this.sessionCache.invalidateCompany(id);
 
-    await this.auditLog.record({
+    await this.auditLog.recordChange({
       actorId: actor.id,
       action: "admin.company.status",
       entityType: "Company",
       entityId: id,
       comment: input.comment,
-      payload: { from: company.status, to: nextStatus, reasonCode: input.reasonCode },
+      before: { status: company.status },
+      after: { status: nextStatus },
+      extra: { reasonCode: input.reasonCode },
     });
 
     return this.getCompany(id);

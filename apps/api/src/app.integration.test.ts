@@ -2086,6 +2086,25 @@ describe("Admin sanctions", () => {
     expect(restriction).toBeTruthy();
     expect(restriction!.expiresAt.getTime()).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
 
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: caseId, action: "moderation.admin_sanction.module_restriction" },
+    });
+    const payload = log?.payload as {
+      before: { restriction: null };
+      after: { restriction: { moduleCode: string; expiresAt: string } };
+      diff: Record<string, { before: unknown; after: unknown }>;
+      sanctionId: string;
+      moduleCode: string;
+      durationDays: number;
+    };
+    expect(payload.before.restriction).toBeNull();
+    expect(payload.after.restriction.moduleCode).toBe("comments");
+    expect(payload.diff.restriction.before).toBeNull();
+    expect(payload.diff.restriction.after).toMatchObject({ moduleCode: "comments" });
+    expect(payload.sanctionId).toBe(restriction!.sanctionId);
+    expect(payload.moduleCode).toBe("comments");
+    expect(payload.durationDays).toBe(7);
+
     const news = await createPublishedNews(adminToken, "module-block");
     const blocked = await ctx.http
       .post(`/api/news/${news.id}/comments`)

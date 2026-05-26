@@ -401,6 +401,8 @@ export class ModerationService {
             : SanctionType.module_restriction;
 
       const { targetType, targetId } = this.resolveSanctionTarget(input.type, found);
+      const auditBefore: Record<string, unknown> = input.type === "module_restriction" ? { restriction: null } : {};
+      const auditAfter: Record<string, unknown> = {};
 
       const baseParameters: Prisma.InputJsonValue = {
         reasonCode: input.reasonCode,
@@ -408,13 +410,31 @@ export class ModerationService {
       };
 
       if (input.type === "user_block") {
+        const target = await tx.user.findUnique({
+          where: { id: targetId },
+          select: { status: true },
+        });
+        if (!target) {
+          throw new NotFoundException("Пользователь не найден.");
+        }
+        auditBefore.status = target.status;
         await tx.user.update({ where: { id: targetId }, data: { status: UserStatus.blocked } });
+        auditAfter.status = UserStatus.blocked;
         await tx.session.updateMany({
           where: { userId: targetId, revokedAt: null },
           data: { revokedAt: new Date() },
         });
       } else if (input.type === "company_block") {
+        const target = await tx.company.findUnique({
+          where: { id: targetId },
+          select: { status: true },
+        });
+        if (!target) {
+          throw new NotFoundException("Компания не найдена.");
+        }
+        auditBefore.status = target.status;
         await tx.company.update({ where: { id: targetId }, data: { status: CompanyStatus.blocked } });
+        auditAfter.status = CompanyStatus.blocked;
         await tx.session.updateMany({
           where: { user: { companyId: targetId }, revokedAt: null },
           data: { revokedAt: new Date() },
@@ -441,7 +461,7 @@ export class ModerationService {
 
       if (input.type === "module_restriction") {
         const expiresAt = new Date(Date.now() + input.durationDays! * 24 * 60 * 60 * 1000);
-        await tx.userModuleRestriction.create({
+        const restriction = await tx.userModuleRestriction.create({
           data: {
             userId: found.entityAuthorId!,
             companyId: found.entityCompanyId,
@@ -453,6 +473,10 @@ export class ModerationService {
             expiresAt,
           },
         });
+        auditAfter.restriction = {
+          moduleCode: restriction.moduleCode,
+          expiresAt: restriction.expiresAt.toISOString(),
+        };
       }
 
       const updatedCase = await tx.moderationCase.update({
@@ -466,18 +490,22 @@ export class ModerationService {
         include: moderationCaseInclude,
       });
 
-      return { sanction, updatedCase };
+      return { sanction, updatedCase, auditBefore, auditAfter };
     });
 
-    await this.auditLog.record({
+    await this.auditLog.recordChange({
       actorId: user.id,
       action: `moderation.admin_sanction.${input.type}`,
       entityType: "ModerationCase",
       entityId: found.id,
       comment: input.comment,
-      payload: {
+      before: result.auditBefore,
+      after: result.auditAfter,
+      extra: {
         sanctionId: result.sanction.id,
         reasonCode: input.reasonCode,
+        targetType: result.sanction.targetType,
+        targetId: result.sanction.targetId,
         ...(input.type === "module_restriction"
           ? { moduleCode: input.moduleCode, durationDays: input.durationDays }
           : {}),

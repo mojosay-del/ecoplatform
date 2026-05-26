@@ -73,15 +73,13 @@ export class PlatformSettingsService implements OnModuleInit {
 
     this.cache.set(key, updated.value);
 
-    await this.auditLog.record({
+    await this.auditLog.recordChange({
       actorId: actor.id,
       action: "admin.setting.update",
       entityType: "PlatformSetting",
       entityId: key,
-      payload: {
-        from: before?.value ?? definition.default,
-        to: parsed.data,
-      },
+      before: { value: (before?.value ?? definition.default) as unknown },
+      after: { value: parsed.data as unknown },
     });
 
     return updated;

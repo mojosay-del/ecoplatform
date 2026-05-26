@@ -152,17 +152,13 @@ export class AdminStaffService {
     }
     await this.sessionCache.invalidateUser(id);
 
-    await this.auditLog.record({
+    await this.auditLog.recordChange({
       actorId: actor.id,
       action: "admin.staff.update",
       entityType: "User",
       entityId: id,
-      payload: {
-        rolesBefore: currentRoles,
-        rolesAfter: nextRoles,
-        wasActive: currentlyActive,
-        isActive: nextActive,
-      },
+      before: { roles: currentRoles, isActive: currentlyActive },
+      after: { roles: nextRoles, isActive: nextActive },
     });
 
     return updated;

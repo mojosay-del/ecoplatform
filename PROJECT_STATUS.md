@@ -4,11 +4,11 @@
 
 ## Текущий этап
 
-Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, лимиты файлов и политика новых паролей (Волна 9 — пункты 9.1–9.6, 9.8–9.10).
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов и политика новых паролей (Волна 9 — пункты 9.1–9.10).
 
-В работе сейчас: пункт 9.7 — audit-trail с before/after на критические admin-действия (параллельная работа Claude).
+В работе сейчас: пункт 9.11 — документ политики безопасности (`docs/08-architecture/security.md` + responsible disclosure).
 
-Целевой следующий шаг: добить остаток Волны 9 (9.7 audit-trail before/after и 9.11 документ политики безопасности), затем перейти к Волне 10 (структурное логирование pino, Sentry, метрики Prometheus, прод smoke-test).
+Целевой следующий шаг: закрыть 9.11, затем перейти к Волне 10 (структурное логирование pino, Sentry, метрики Prometheus, прод smoke-test).
 
 ## Что уже сделано
 
@@ -22,7 +22,7 @@
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
 - 110 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 7 в `apps/web`, 46 в `apps/api`.
+- Unit-тесты: 7 в `packages/shared`, 7 в `apps/web`, 56 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
@@ -73,6 +73,7 @@
 - Экспорт «моих данных» по 152-ФЗ: `POST /api/auth/me/export-data` отдаёт ZIP с 14 JSON-файлами (профиль, компания, согласия, сессии, уведомления, тикеты, прогресс, комментарии, реакции, модерация, FileAsset metadata, авторский контент, audit-log). Никаких `passwordHash`/`refreshTokenHash`/`providerToken`/`keyHash`. UI: `/account → Безопасность → Мои данные`.
 - Лимиты файлового аплоадера: throttle 20 запросов/мин, дневная квота 500 МБ на компанию (или на пользователя для платформенного staff без компании).
 - Защита cover-image: news/learning/knowledge create/update принимают только публичные изображения; content-manager — только свои, admin может ставить чужие публичные.
+- Audit-trail before/after: критические admin-действия пишут `payload.before`, `payload.after`, `payload.diff`; `/admin/journals` показывает diff как «старое → новое» с цветовым разделением.
 - Политика новых паролей: общий `MIN_PASSWORD_LENGTH=12`; регистрация, смена пароля и создание staff проверяют пароль через Have I Been Pwned Pwned Passwords range API по SHA-1 k-anonymity (`/range/{first5}`) без отправки plaintext.
 
 ### Последние закрытые задачи Волны 9
@@ -89,12 +90,16 @@
   - `MIN_PASSWORD_LENGTH` поднят до 12 в `@ecoplatform/shared`, UI регистрации/account/admin-staff берёт тот же минимум.
   - `PasswordPolicyService` проверяет новые пароли через Have I Been Pwned range API с `Add-Padding: true`, локальным SHA-1 suffix-сравнением, cache и fail-open при недоступности внешнего API.
   - Внешняя проверка отключается для integration/offline через `PWNED_PASSWORDS_CHECK_ENABLED=0`.
+- **Пункт 9.7 — audit-trail before/after**:
+  - `AdminActionLogService.recordChange()` пишет единый payload `{ before, after, diff }`.
+  - Before/after подключён к ручной активации подписки, block/unblock пользователей, platform-roles, staff update, настройкам платформы, статусам компаний и admin-санкциям модерации.
+  - `/admin/journals` показывает diff старого и нового значения цветами; legacy-payload остаётся JSON.
+  - UI проверен локально на смене `moderation.lock_duration_minutes` 15→16→15.
 
 ## Что осталось
 
-### Волна 9 (2 пункта)
+### Волна 9 (1 пункт)
 
-- 9.7 — audit-trail с before/after на критические admin-действия (сейчас `AdminActionLog` пишет только `payload`).
 - 9.11 — документ политики безопасности (security.md + responsible-disclosure).
 
 ### Дальше по плану (`audit/ROADMAP.md`)
@@ -144,16 +149,15 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-26 (после Волны 9.5 + 9.8–9.9, до коммита 9.6).
+Дата: 2026-05-26 (после Волны 9.7).
 
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 7/7, api 42/42.
-- `pnpm test:integration` — успешно, 108/108.
+- `pnpm test` — успешно: shared 7/7, web 7/7, api 56/56.
+- `pnpm test:integration` — успешно, 110/110.
 - `pnpm build` — успешно (3/3).
 - `pnpm format:check` — clean.
+- `git diff --check` — clean.
 - Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
-
-После закрытия 9.6 ожидается 110 integration-тестов (+2 новых на request-deletion / cleanup) — код тестов уже написан, прогон будет при коммите Волны 9.6.
 
 ## Целевая БД для деплоя
 
@@ -172,6 +176,7 @@ pnpm format:check                                     # prettier
 - Файлы из `/files?ids=...` фильтруются по `accessLevel: public` — приватные metadata не утекают.
 - `/files/upload` доверяет только реальному magic-number MIME (через `file-type`), declared MIME из multipart игнорируется при несовпадении; HTML/SVG/executable блокируются.
 - Cover-image нельзя поставить чужой приватный файл; content-manager — только свой, admin может ставить чужие публичные.
+- `/admin/journals` для новых change-событий показывает before/after/diff; старые audit payload остаются читаемым JSON.
 - Все unsafe-методы API требуют совпадения `csrf-token` cookie и `X-CSRF-Token` header. Исключение: `/auth/login` и `/auth/register`. Web-клиент это делает прозрачно.
 - 10 неудачных логинов за 15 минут → lockout на 15 минут (`User.lockedUntil`).
 - Distributed cron: `billing-hourly-check` и `cleanup-deleted-accounts` берут `pg_try_advisory_xact_lock`; реплика без lock пропускает tick.

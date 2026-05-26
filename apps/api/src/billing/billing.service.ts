@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { CompanyStatus, NotificationCategory, Prisma, SubscriptionStatus } from "@prisma/client";
 import type { Company, Subscription } from "@prisma/client";
 import type { AddressDto, CompanyProfileUpdateDto, ManualSubscriptionDto } from "@ecoplatform/shared";
+import { computeDiff } from "../common/admin-action-log.service";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -215,6 +216,22 @@ export class BillingService {
           },
         });
 
+        const before = {
+          status: company.status,
+          subscriptionPlan: company.subscriptionPlan,
+          subscriptionEndsAt: company.subscriptionEndsAt?.toISOString() ?? null,
+        };
+        const after = {
+          status: updatedCompany.status,
+          subscriptionPlan: updatedCompany.subscriptionPlan,
+          subscriptionEndsAt: updatedCompany.subscriptionEndsAt?.toISOString() ?? null,
+        };
+        const auditPayload: Record<string, unknown> = {
+          before,
+          after,
+          diff: computeDiff(before, after),
+          subscriptionId: subscription.id,
+        };
         await tx.adminActionLog.create({
           data: {
             actorId,
@@ -222,7 +239,7 @@ export class BillingService {
             entityType: "Company",
             entityId: input.companyId,
             comment: input.reason,
-            payload: { plan: input.plan, endsAt: input.endsAt },
+            payload: auditPayload as Prisma.InputJsonValue,
           },
         });
 
