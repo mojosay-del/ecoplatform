@@ -25,7 +25,7 @@ import type {
   NomenclatureCategoryListItem,
   PaginatedResponse,
 } from "@ecoplatform/shared";
-import { apiFetch, type FileAsset } from "./core";
+import { apiDownload, apiFetch, type FileAsset } from "./core";
 
 type PaginationInput = { limit?: number; offset?: number };
 type NewsListInput = PaginationInput & { tags?: string[] };
@@ -120,6 +120,7 @@ export const api = {
     logoutAll: () => apiFetch<{ ok: true }>("/auth/sessions/logout-all", { method: "POST" }),
     changePassword: (body: { currentPassword: string; newPassword: string }) =>
       apiFetch<{ ok: true }>("/auth/change-password", { method: "POST", body }),
+    exportData: () => apiDownload("/auth/me/export-data", { method: "POST" }),
   },
 
   // ── Уведомления ─────────────────────────────────────────────────────────

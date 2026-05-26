@@ -4,6 +4,7 @@ import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { RolesGuard } from "../common/roles.guard";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { RedisModule } from "../redis/redis.module";
+import { AuthDataExportService } from "./auth-data-export.service";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 
@@ -13,7 +14,7 @@ import { AuthService } from "./auth.service";
   // а authService инжектит NotificationsService для уведомлений безопасности.
   imports: [JwtModule.register({}), RedisModule, forwardRef(() => NotificationsModule)],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, RolesGuard],
+  providers: [AuthService, AuthDataExportService, JwtAuthGuard, RolesGuard],
   // JwtModule реэкспортируем, чтобы гварды, импортированные в другие модули,
   // могли получить JwtService через AuthModule.
   exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],

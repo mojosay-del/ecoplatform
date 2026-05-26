@@ -2,6 +2,7 @@
 // Поднимает реальное Nest-приложение, ходит через HTTP (supertest), пишет в реальную PostgreSQL (ecoplatform_test).
 // Все тесты используют один и тот же app, между тестами TRUNCATE всех таблиц.
 
+import type { IncomingMessage } from "http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hash } from "bcryptjs";
 import {
@@ -161,6 +162,15 @@ async function loginContentManager(): Promise<string> {
     .send({ email: "content-manager@test.local", password: "Content12345" });
   expect(res.status).toBe(201);
   return res.body.accessToken as string;
+}
+
+function parseBinary(res: IncomingMessage, callback: (error: Error | null, body?: Buffer) => void) {
+  const chunks: Buffer[] = [];
+  res.on("data", (chunk: Buffer | string) => {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  });
+  res.on("end", () => callback(null, Buffer.concat(chunks)));
+  res.on("error", (error) => callback(error));
 }
 
 async function createPublishedNewsWithComment(adminToken: string, authorToken: string) {
@@ -395,6 +405,60 @@ describe("Auth", () => {
   it("/auth/me без токена отвечает 401", async () => {
     const res = await ctx.http.get("/api/auth/me");
     expect(res.status).toBe(401);
+  });
+
+  it("POST /auth/me/export-data отдаёт zip-архив без секретных хэшей", async () => {
+    const { token, companyId, userId } = await registerCompany("0000005");
+    const ticket = await ctx.http.post("/api/support/tickets").set("Authorization", `Bearer ${token}`).send({
+      category: "technical",
+      subject: "Экспорт данных",
+      text: "Прошу проверить выгрузку моих данных.",
+    });
+    expect(ticket.status).toBe(201);
+
+    await ctx.prisma.fileAsset.create({
+      data: {
+        originalName: "act.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 128,
+        storageKey: "dev/export-test-act.pdf",
+        uploadedById: userId,
+      },
+    });
+
+    const res = await ctx.http
+      .post("/api/auth/me/export-data")
+      .set("Authorization", `Bearer ${token}`)
+      .buffer(true)
+      .parse(parseBinary);
+
+    expect(res.status).toBe(201);
+    expect(res.headers["content-type"]).toContain("application/zip");
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.headers["content-disposition"]).toContain("ecoplatform-data-export");
+
+    const archive = res.body as Buffer;
+    expect(archive.subarray(0, 4).toString("binary")).toBe("PK\u0003\u0004");
+
+    const raw = archive.toString("utf8");
+    expect(raw).toContain("manifest.json");
+    expect(raw).toContain("profile.json");
+    expect(raw).toContain("company.json");
+    expect(raw).toContain("support-tickets.json");
+    expect(raw).toContain("files.json");
+    expect(raw).toContain("user0000005@test.local");
+    expect(raw).toContain(companyId);
+    expect(raw).toContain("Экспорт данных");
+    expect(raw).toContain("act.pdf");
+    expect(raw).not.toContain("passwordHash");
+    expect(raw).not.toContain("refreshTokenHash");
+    expect(raw).not.toContain("providerToken");
+    expect(raw).not.toContain("keyHash");
+
+    const note = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId, eventType: "auth.data_export.ready" },
+    });
+    expect(note?.category).toBe("security");
   });
 });
 

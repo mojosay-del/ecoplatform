@@ -9,6 +9,7 @@ import {
   Bell,
   Building2,
   CreditCard,
+  Download,
   KeyRound,
   LifeBuoy,
   LogOut,
@@ -315,6 +316,8 @@ export function AccountView() {
   const [activeTab, setActiveTab] = useState<AccountTab>("profile");
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
   const [notificationBusyKey, setNotificationBusyKey] = useState<string | null>(null);
 
@@ -400,6 +403,29 @@ export function AccountView() {
       window.location.assign("/login");
     } finally {
       setSessionBusyId(null);
+    }
+  }
+
+  async function exportData() {
+    if (!token) return;
+    setExportBusy(true);
+    setExportMessage(null);
+    try {
+      const { blob, filename } = await api.auth.exportData();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename ?? "ecoplatform-data-export.zip";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setExportMessage("Архив с данными подготовлен.");
+      window.dispatchEvent(new Event("notifications:changed"));
+    } catch (error) {
+      setExportMessage(error instanceof Error ? error.message : "Не удалось подготовить экспорт.");
+    } finally {
+      setExportBusy(false);
     }
   }
 
@@ -700,6 +726,17 @@ export function AccountView() {
                 <button className="button secondary" type="button" onClick={logout}>
                   <LogOut size={16} />
                   Завершить эту сессию
+                </button>
+              </article>
+              <article className="card account-card">
+                <h2>Мои данные</h2>
+                <p className="page-subtitle">
+                  Архив включает профиль, согласия, сессии, уведомления, обращения и данные компании.
+                </p>
+                {exportMessage ? <p className="account-form-message">{exportMessage}</p> : null}
+                <button className="button secondary" type="button" onClick={exportData} disabled={exportBusy}>
+                  <Download size={16} />
+                  {exportBusy ? "Готовим..." : "Скачать архив"}
                 </button>
               </article>
             </div>

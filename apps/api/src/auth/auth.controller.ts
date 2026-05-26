@@ -7,6 +7,7 @@ import type { RequestWithCsrf } from "../common/csrf.guard";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
+import { AuthDataExportService } from "./auth-data-export.service";
 import { AuthService } from "./auth.service";
 
 // Жёсткое окно «10 запросов в минуту на IP» именно для login/register/refresh —
@@ -15,7 +16,10 @@ const AUTH_THROTTLE = { auth: { limit: 10, ttl: 60_000 } };
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly dataExport: AuthDataExportService,
+  ) {}
 
   @Get("csrf")
   csrf(@Req() request: RequestWithCsrf) {
@@ -93,6 +97,17 @@ export class AuthController {
   async changePassword(@CurrentUser() user: RequestUser, @Body() body: unknown) {
     const input = parseBody(changePasswordDtoSchema, body);
     return this.auth.changePassword(user.id, user.sessionId, input);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("me/export-data")
+  async exportMyData(@CurrentUser() user: RequestUser, @Res() response: Response) {
+    const archive = await this.dataExport.exportUserData(user.id);
+    response.setHeader("Content-Type", "application/zip");
+    response.setHeader("Cache-Control", "no-store");
+    response.setHeader("Content-Length", archive.buffer.length);
+    response.setHeader("Content-Disposition", `attachment; filename="${archive.filename}"`);
+    response.send(archive.buffer);
   }
 
   private setRefreshCookie(response: Response, refreshToken: string) {
