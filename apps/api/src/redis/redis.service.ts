@@ -16,6 +16,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client?.status === "ready";
   }
 
+  get status(): string {
+    return this.client?.status ?? "not_configured";
+  }
+
   async onModuleInit() {
     const url = process.env.REDIS_URL;
     if (!url) return;
@@ -96,6 +100,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async smembers(key: string): Promise<string[]> {
     return this.safe((client) => client.smembers(key), []);
+  }
+
+  async ping(): Promise<string | null> {
+    return this.safe((client) => client.ping(), null);
   }
 
   private async safe<T>(operation: (client: RedisClient) => Promise<T>, fallback: T): Promise<T> {

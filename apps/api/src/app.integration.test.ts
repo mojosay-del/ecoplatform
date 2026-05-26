@@ -277,7 +277,58 @@ function restoreEnv(name: string, value: string | undefined) {
   process.env[name] = value;
 }
 
+async function withEnv(updates: Record<string, string | undefined>, action: () => Promise<void>) {
+  const previous = Object.fromEntries(Object.keys(updates).map((name) => [name, process.env[name]]));
+  for (const [name, value] of Object.entries(updates)) {
+    restoreEnv(name, value);
+  }
+
+  try {
+    await action();
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      restoreEnv(name, value);
+    }
+  }
+}
+
 describe("Observability", () => {
+  it("разделяет liveness, readiness и deep health-check", async () => {
+    await withEnv(
+      {
+        REDIS_URL: undefined,
+        S3_ENDPOINT: undefined,
+        S3_REGION: undefined,
+        S3_BUCKET: undefined,
+        S3_ACCESS_KEY_ID: undefined,
+        S3_SECRET_ACCESS_KEY: undefined,
+        S3_PUBLIC_BASE_URL: undefined,
+      },
+      async () => {
+        const liveness = await ctx.rawHttp.get("/api/health");
+        expect(liveness.status).toBe(200);
+        expect(liveness.body.details.process.status).toBe("up");
+
+        const readiness = await ctx.rawHttp.get("/api/ready");
+        expect(readiness.status).toBe(200);
+        expect(readiness.body.details.database.status).toBe("up");
+        expect(readiness.body.details.redis).toMatchObject({ status: "up", configured: false });
+        expect(readiness.body.details.s3).toMatchObject({ status: "up", configured: false });
+
+        const missingAuth = await ctx.rawHttp.get("/api/health/deep");
+        expect(missingAuth.status).toBe(401);
+
+        const adminToken = await loginAdmin();
+        const deep = await ctx.rawHttp.get("/api/health/deep").set("Authorization", `Bearer ${adminToken}`);
+        expect(deep.status).toBe(200);
+        expect(deep.body.details.process.uptimeSeconds).toEqual(expect.any(Number));
+        expect(deep.body.details.database.latencyMs).toEqual(expect.any(Number));
+        expect(deep.body.details.redis).toMatchObject({ status: "up", configured: false, mode: "fallback" });
+        expect(deep.body.details.s3).toMatchObject({ status: "up", configured: false, required: false });
+      },
+    );
+  });
+
   it("отдаёт Prometheus-метрики API", async () => {
     await ctx.rawHttp.get("/api/health");
     await loginAdmin();

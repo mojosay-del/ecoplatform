@@ -91,8 +91,8 @@ docker-compose.yml   локальный Postgres 16 :5433 + Redis 7 :6379
 
 ```bash
 pnpm lint                  # tsc --noEmit во всех пакетах
-pnpm test                  # 60 unit-тестов (shared 7, web 7, api 46)
-pnpm test:integration      # 110 integration-тестов против ecoplatform_test
+pnpm test                  # 90 unit-тестов (shared 7, web 10, api 73)
+pnpm test:integration      # 113 integration-тестов против ecoplatform_test
 pnpm build                 # tsc + next build
 pnpm format:check          # prettier
 ```
@@ -112,7 +112,7 @@ Integration-тесты создают отдельную БД `ecoplatform_test`
 
 ## Что есть в проде-готовности
 
-- Health-checks `/api/health` и `/api/ready` через `@nestjs/terminus`.
+- Health-checks через `@nestjs/terminus`: `/api/health` для liveness, `/api/ready` для Postgres/Redis/S3 readiness, `/api/health/deep` для admin-диагностики.
 - Docker: multi-stage `Dockerfile` для api и web, Next.js `output: standalone`, Prisma `binaryTargets` под musl и debian.
 - Graceful shutdown (`app.enableShutdownHooks()`), `trust proxy`, CORS с `maxAge`, gzip/Brotli compression.
 - Helmet security headers + CSP report-only на web; CSRF double-submit; lockout по 10 неудачным логинам.

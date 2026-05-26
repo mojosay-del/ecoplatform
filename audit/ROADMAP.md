@@ -268,6 +268,8 @@ OpenTelemetry-spans через `@opentelemetry/sdk-node`. Экспорт в Jaeg
 - `/api/ready` — readiness: проверка БД, Redis, S3 (быстрый PING).
 - `/api/health/deep` — детальная диагностика для админов (auth required).
 
+**Решение 2026-05-26:** закрыто. `/api/health` проверяет только живой процесс, `/api/ready` проверяет Postgres `SELECT 1`, Redis `PING` при заданном `REDIS_URL` и S3 `HeadBucket` при настроенном S3, а `/api/health/deep` доступен только JWT-пользователю с ролью `admin` и показывает безопасные детали без секретов.
+
 ## 10.8. Алерты
 
 Sentry — алерт «5xx > 10/мин» в Telegram-чат (или email).

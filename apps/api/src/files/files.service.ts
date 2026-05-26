@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
 import { fromBuffer } from "file-type";
 import { randomUUID } from "crypto";
@@ -98,6 +98,11 @@ const MIME_ALIASES: Record<string, string[]> = {
   "image/jpeg": ["image/pjpeg"],
   "video/quicktime": ["video/mov"],
 };
+const S3_HEALTH_TIMEOUT_MS = 1_000;
+
+function isPlaceholderS3Value(value: string) {
+  return value.startsWith("replace-with-");
+}
 
 @Injectable()
 export class FilesService {
@@ -110,7 +115,15 @@ export class FilesService {
     const accessKeyId = process.env.S3_ACCESS_KEY_ID;
     const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
 
-    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
+    if (
+      !endpoint ||
+      !bucket ||
+      !accessKeyId ||
+      !secretAccessKey ||
+      isPlaceholderS3Value(bucket) ||
+      isPlaceholderS3Value(accessKeyId) ||
+      isPlaceholderS3Value(secretAccessKey)
+    ) {
       return null;
     }
 
@@ -136,6 +149,39 @@ export class FilesService {
     }
 
     return config;
+  }
+
+  getS3HealthConfig() {
+    const config = this.getS3Config();
+    if (!config) {
+      return { configured: false };
+    }
+    config.client.destroy();
+
+    return {
+      configured: true,
+      endpoint: process.env.S3_ENDPOINT,
+      bucket: config.bucket,
+    };
+  }
+
+  async pingS3(timeoutMs = S3_HEALTH_TIMEOUT_MS): Promise<void> {
+    const config = this.getS3Config();
+    if (!config) {
+      throw new BadRequestException("S3-хранилище не настроено.");
+    }
+
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+
+    try {
+      await config.client.send(new HeadBucketCommand({ Bucket: config.bucket }), {
+        abortSignal: abortController.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+      config.client.destroy();
+    }
   }
 
   private publicUrl(storageKey: string, accessLevel: FileAccessLevel): string | null {

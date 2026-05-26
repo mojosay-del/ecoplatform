@@ -1,31 +1,53 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, UseGuards } from "@nestjs/common";
 import { SkipThrottle } from "@nestjs/throttler";
 import { HealthCheck, HealthCheckService, type HealthCheckResult } from "@nestjs/terminus";
-import { PrismaService } from "../prisma/prisma.service";
+import { JwtAuthGuard } from "../common/jwt-auth.guard";
+import { Roles } from "../common/roles.decorator";
+import { RolesGuard } from "../common/roles.guard";
+import { HealthDependencyIndicator } from "./health-dependency.indicator";
 
 // Health-эндпоинты для Timeweb / Docker / Kubernetes probes.
 //
 // /api/health — liveness: процесс отвечает. Если 200 не пришёл,
-//   контейнер перезапускают.
+//   контейнер перезапускают. Зависимости тут не проверяем.
 //
 // /api/ready  — readiness: процесс готов принимать трафик. Проверяет
-//   ключевые зависимости (сейчас — Postgres через `SELECT 1`). Если 503,
-//   балансировщик НЕ шлёт сюда запросы.
+//   ключевые зависимости: Postgres, Redis и S3. Если 503, балансировщик
+//   НЕ шлёт сюда запросы.
 //
-// Оба эндпоинта вынесены из rate-limit: пробы стучатся
+// /api/health/deep — детальная диагностика для админов: те же проверки
+//   плюс безопасные технические детали.
+//
+// Эти эндпоинты вынесены из rate-limit: пробы стучатся
 // часто, мы не хотим, чтобы они выбили лимит.
 @Controller("health")
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
-    private readonly prisma: PrismaService,
+    private readonly dependencies: HealthDependencyIndicator,
   ) {}
 
   @Get()
   @HealthCheck()
   @SkipThrottle({ short: true, long: true, auth: true })
   liveness(): Promise<HealthCheckResult> {
-    return this.health.check([]);
+    return this.health.check([() => this.dependencies.process("process")]);
+  }
+
+  @Get("deep")
+  @HealthCheck()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
+  @SkipThrottle({ short: true, long: true, auth: true })
+  deep(): Promise<HealthCheckResult> {
+    const options = { detailed: true };
+
+    return this.health.check([
+      () => this.dependencies.process("process", options),
+      () => this.dependencies.database("database", options),
+      () => this.dependencies.redisCache("redis", options),
+      () => this.dependencies.objectStorage("s3", options),
+    ]);
   }
 }
 
@@ -33,7 +55,7 @@ export class HealthController {
 export class ReadyController {
   constructor(
     private readonly health: HealthCheckService,
-    private readonly prisma: PrismaService,
+    private readonly dependencies: HealthDependencyIndicator,
   ) {}
 
   @Get()
@@ -41,12 +63,9 @@ export class ReadyController {
   @SkipThrottle({ short: true, long: true, auth: true })
   readiness(): Promise<HealthCheckResult> {
     return this.health.check([
-      async () => {
-        // Лёгкий ping Postgres. Если соединение мертво — readiness падает,
-        // балансировщик уводит трафик до восстановления.
-        await this.prisma.$queryRaw`SELECT 1`;
-        return { database: { status: "up" } };
-      },
+      () => this.dependencies.database("database"),
+      () => this.dependencies.redisCache("redis"),
+      () => this.dependencies.objectStorage("s3"),
     ]);
   }
 }

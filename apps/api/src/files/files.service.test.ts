@@ -7,6 +7,29 @@ function serviceWithPrisma(prisma: Record<string, unknown>) {
   return new FilesService(prisma as any);
 }
 
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
+
+function withEnv<T>(updates: Record<string, string | undefined>, action: () => T): T {
+  const previous = Object.fromEntries(Object.keys(updates).map((name) => [name, process.env[name]]));
+  for (const [name, value] of Object.entries(updates)) {
+    restoreEnv(name, value);
+  }
+
+  try {
+    return action();
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      restoreEnv(name, value);
+    }
+  }
+}
+
 function referencePrisma(overrides: Record<string, unknown> = {}) {
   return {
     newsPost: { count: vi.fn().mockResolvedValue(0) },
@@ -33,6 +56,24 @@ function referencePrisma(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+describe("FilesService S3 health", () => {
+  it("считает replace-with значения из .env.example ненастроенным S3", () => {
+    const service = serviceWithPrisma(referencePrisma());
+
+    withEnv(
+      {
+        S3_ENDPOINT: "https://s3.twcstorage.ru",
+        S3_BUCKET: "replace-with-bucket-name",
+        S3_ACCESS_KEY_ID: "replace-with-access-key",
+        S3_SECRET_ACCESS_KEY: "replace-with-secret-key",
+      },
+      () => {
+        expect(service.getS3HealthConfig()).toEqual({ configured: false });
+      },
+    );
+  });
+});
 
 describe("FilesService cleanup", () => {
   it("удаляет метаданные файла, если на него нигде не ссылаются", async () => {

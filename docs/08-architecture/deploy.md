@@ -224,10 +224,13 @@ DATABASE_URL="$RESTORE_DATABASE_URL" pnpm exec prisma migrate status --schema=pr
 
 ## 6. Health-check и пробы
 
-API экспонирует два эндпоинта:
+API экспонирует три эндпоинта:
 
 - `GET /api/health` → 200 всегда, пока процесс отвечает. **liveness**.
-- `GET /api/ready` → 200 если Postgres-ping `SELECT 1` прошёл, 503 если нет. **readiness**.
+- `GET /api/ready` → 200 если Postgres, Redis и S3 готовы к работе, 503 если обязательная зависимость недоступна. **readiness**.
+- `GET /api/health/deep` → детальная диагностика для админа: uptime процесса, latency Postgres, режим Redis, S3 bucket/endpoint без секретов.
+
+Redis остаётся graceful fallback: если `REDIS_URL` не задан, readiness не падает и показывает `configured=false`. Если `REDIS_URL` задан, но `PING` не проходит, `/api/ready` возвращает 503. S3 вне production можно не задавать, но в production отсутствие S3-настроек считается ошибкой readiness.
 
 Настройки для Timeweb Cloud Container:
 
@@ -241,7 +244,7 @@ API экспонирует два эндпоинта:
 | Readiness timeout | 5 сек |
 | Initial delay | 10 сек (Prisma `$connect` укладывается) |
 
-Эти эндпоинты вынесены из rate-limit (`@Throttle({ short: { limit: 0, ttl: 0 } })`), пробы не выбьют общий лимит.
+Эти эндпоинты вынесены из rate-limit (`@SkipThrottle`), пробы не выбьют общий лимит.
 
 ---
 
