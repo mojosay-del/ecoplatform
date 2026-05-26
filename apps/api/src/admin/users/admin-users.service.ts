@@ -3,6 +3,7 @@ import { Prisma, UserStatus } from "@prisma/client";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import type { RequestUser } from "../../common/request-user";
 import { PrismaService } from "../../prisma/prisma.service";
+import { SessionCacheService } from "../../redis/session-cache.service";
 import type {
   adminUserBlockInputSchema,
   adminUserListQuerySchema,
@@ -21,6 +22,7 @@ export class AdminUsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AdminActionLogService,
+    private readonly sessionCache: SessionCacheService,
   ) {}
 
   async listUsers(query: ListQuery) {
@@ -129,6 +131,7 @@ export class AdminUsersService {
         data: { revokedAt: new Date() },
       });
     });
+    await this.sessionCache.invalidateUser(id);
 
     await this.auditLog.record({
       actorId: actor.id,
@@ -229,6 +232,7 @@ export class AdminUsersService {
         data: { revokedAt: new Date() },
       });
     }
+    await this.sessionCache.invalidateUser(id);
 
     await this.auditLog.record({
       actorId: actor.id,

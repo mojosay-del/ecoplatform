@@ -3,6 +3,7 @@ import { CompanyStatus, Prisma, SubscriptionPlan } from "@prisma/client";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import type { RequestUser } from "../../common/request-user";
 import { PrismaService } from "../../prisma/prisma.service";
+import { SessionCacheService } from "../../redis/session-cache.service";
 import type { adminCompanyListQuerySchema, adminCompanyStatusInputSchema } from "./admin-companies.schemas";
 import type { z } from "zod";
 
@@ -14,6 +15,7 @@ export class AdminCompaniesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AdminActionLogService,
+    private readonly sessionCache: SessionCacheService,
   ) {}
 
   async listCompanies(query: ListQuery) {
@@ -113,6 +115,7 @@ export class AdminCompaniesService {
         });
       }
     });
+    await this.sessionCache.invalidateCompany(id);
 
     await this.auditLog.record({
       actorId: actor.id,

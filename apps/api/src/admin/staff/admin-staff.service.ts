@@ -3,6 +3,7 @@ import { hash } from "bcryptjs";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import type { RequestUser } from "../../common/request-user";
 import { PrismaService } from "../../prisma/prisma.service";
+import { SessionCacheService } from "../../redis/session-cache.service";
 import type { adminStaffCreateInputSchema, adminStaffUpdateInputSchema } from "./admin-staff.schemas";
 import type { z } from "zod";
 
@@ -14,6 +15,7 @@ export class AdminStaffService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AdminActionLogService,
+    private readonly sessionCache: SessionCacheService,
   ) {}
 
   async listStaff() {
@@ -137,6 +139,7 @@ export class AdminStaffService {
         data: { revokedAt: new Date() },
       });
     }
+    await this.sessionCache.invalidateUser(id);
 
     await this.auditLog.record({
       actorId: actor.id,

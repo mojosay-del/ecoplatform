@@ -15,6 +15,7 @@ import { PlatformSettingsService } from "../admin/settings/platform-settings.ser
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { SessionCacheService } from "../redis/session-cache.service";
 
 type SessionTokens = {
   accessToken: string;
@@ -29,6 +30,7 @@ export class AuthService {
     private readonly settings: PlatformSettingsService,
     @Inject(forwardRef(() => NotificationsService))
     private readonly notifications: NotificationsService,
+    private readonly sessionCache: SessionCacheService,
   ) {}
 
   async register(input: RegisterDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {
@@ -164,6 +166,7 @@ export class AuthService {
         data: { revokedAt: new Date() },
       });
     });
+    await this.sessionCache.invalidateUser(userId);
 
     await this.notifications
       .createInApp({
@@ -314,6 +317,7 @@ export class AuthService {
       where: { id: session.id },
       data: { revokedAt: new Date() },
     });
+    await this.sessionCache.invalidateSession(session.id);
 
     return this.createSession(session.userId, {}, session.rememberMe);
   }
@@ -323,6 +327,7 @@ export class AuthService {
       where: { id: sessionId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    await this.sessionCache.invalidateSession(sessionId);
 
     return { ok: true };
   }
@@ -365,6 +370,7 @@ export class AuthService {
     if (result.count === 0) {
       throw new BadRequestException("Сессия уже завершена или не найдена.");
     }
+    await this.sessionCache.invalidateSession(sessionId);
 
     return { ok: true, revokedCurrent: sessionId === currentSessionId };
   }
@@ -374,6 +380,7 @@ export class AuthService {
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    await this.sessionCache.invalidateUser(userId);
 
     return { ok: true, revoked: result.count };
   }

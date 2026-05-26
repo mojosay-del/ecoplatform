@@ -15,6 +15,8 @@ import { LegalModule } from "./legal/legal.module";
 import { ModerationModule } from "./moderation/moderation.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { RedisModule } from "./redis/redis.module";
+import { RedisThrottlerStorageService } from "./redis/redis-throttler-storage.service";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { SupportModule } from "./support/support.module";
 
@@ -33,18 +35,24 @@ function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
     // отдельным named-throttler и пропускается для всех остальных маршрутов.
     // Лимиты сознательно отключаем под integration-тестами, где сценарий
     // регистрация→login→refresh за секунды выбивает любой адекватный порог.
-    ThrottlerModule.forRoot({
-      throttlers: [
-        // короткое окно (антиспам): 30 запросов / 10 сек на IP.
-        { name: "short", ttl: seconds(10), limit: 30 },
-        // длинное окно: 600 / минуту — общий потолок устойчивости.
-        { name: "long", ttl: seconds(60), limit: 600 },
-        // отдельный, очень жёсткий ключ только для auth entrypoints.
-        // Без skipIf named-throttler применился бы ко всем маршрутам и
-        // обычные страницы упирались бы в 10 запросов/минуту.
-        { name: "auth", ttl: seconds(60), limit: 10, skipIf: skipAuthThrottleOutsideAuthRoutes },
-      ],
-      skipIf: () => process.env.THROTTLER_DISABLED === "1",
+    RedisModule,
+    ThrottlerModule.forRootAsync({
+      imports: [RedisModule],
+      inject: [RedisThrottlerStorageService],
+      useFactory: (storage: RedisThrottlerStorageService) => ({
+        storage,
+        throttlers: [
+          // короткое окно (антиспам): 30 запросов / 10 сек на IP.
+          { name: "short", ttl: seconds(10), limit: 30 },
+          // длинное окно: 600 / минуту — общий потолок устойчивости.
+          { name: "long", ttl: seconds(60), limit: 600 },
+          // отдельный, очень жёсткий ключ только для auth entrypoints.
+          // Без skipIf named-throttler применился бы ко всем маршрутам и
+          // обычные страницы упирались бы в 10 запросов/минуту.
+          { name: "auth", ttl: seconds(60), limit: 10, skipIf: skipAuthThrottleOutsideAuthRoutes },
+        ],
+        skipIf: () => process.env.THROTTLER_DISABLED === "1",
+      }),
     }),
     PrismaModule,
     PlatformSettingsModule,
