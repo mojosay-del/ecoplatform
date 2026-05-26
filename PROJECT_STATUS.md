@@ -1,92 +1,174 @@
 # Ход разработки ЭкоПлатформы MVP
 
+Дата последнего обновления: 2026-05-26.
+
 ## Текущий этап
 
-Этап: MVP-каркас прошёл полную сквозную проверку — поднимается локально, проходит сценарий регистрация → demo → истечение → ручная активация, покрыт автоматическими integration-тестами.
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ и лимиты файлов (Волна 9 — пункты 9.1–9.5, 9.8–9.9).
 
-Цель следующего этапа: довести продуктовую функциональность до полноценного состояния — визуальный блочный редактор CMS, физический файловый upload, расширение покрытия и подготовка к деплою на Timeweb.
+В работе сейчас: пункт 9.6 — запрос пользователя на удаление аккаунта с 30-дневной отсрочкой (бэк, UI «Опасная зона», ночной cron для физического удаления). Код лежит в рабочей копии (uncommitted), integration-тесты по нему уже написаны.
+
+Целевой следующий шаг: добиить остаток Волны 9 (audit-trail с before/after, политика пароля с проверкой по HaveIBeenPwned, документ политики безопасности), затем перейти к Волне 10 (структурное логирование pino, Sentry, метрики Prometheus, прод smoke-test).
 
 ## Что уже сделано
 
-- Создан Turborepo + pnpm monorepo: `apps/web`, `apps/api`, `packages/shared`.
-- Реализован Next.js App Router интерфейс с основными разделами: новости, индексы, обучение, база знаний, кабинет, регистрация и вход.
-- Реализованы админ-экраны для CMS: новости, индексы, обучение, база знаний, ручная подписка и поддержка.
-- Реализован NestJS API: auth, JWT access token, HttpOnly refresh cookie, RBAC, demo-доступ, billing, CMS, индексы, обучение, база знаний, support tickets, metadata для файлов.
-- Реализована Prisma-схема PostgreSQL и первая миграция `apps/api/prisma/migrations/20260520165000_init`.
-- Shared-пакет содержит статусы, DTO, demo/access-gating, slug, расчёт индексов цен и валидацию content blocks.
-- Добавлены seed-данные: admin, demo-user, категория макулатуры, индекс гофрокартона, новости, обучение и статья базы знаний.
-- Добавлен `docker-compose.yml` для локального Postgres 16 на порту **5433** (5432 часто занят локальным Postgres разработчика).
-- Зафиксирован выбор управляемой БД для деплоя: **Timeweb PostgreSQL 18** (см. секцию «Решение по БД»).
-- Подключён `dotenv` в `apps/api/src/main.ts` и `apps/api/prisma/seed.ts` — корневой `.env` теперь читается автоматически, без ручного экспорта переменных.
-- Переведён `packages/shared` с ESM на CommonJS — собранный пакет корректно подгружается из NestJS и Next.js без strict-resolution ошибок Node.
-- Переехали с `tsx watch` на `ts-node-dev` для dev-режима API — теперь NestJS DI получает `design:paramtypes` метаданные и приложение корректно стартует.
-- Реэкспорт `JwtModule` из `AuthModule` — устранена ошибка `Nest can't resolve dependencies of the JwtAuthGuard (?, PrismaService)` в защищённых эндпоинтах.
-- Vitest сконфигурирован с `unplugin-swc` (`apps/api/vitest.config.ts`) — теперь и unit, и integration-тесты получают корректные decorator metadata.
-- Написаны integration-тесты на критические пути (`apps/api/src/app.integration.test.ts`, 10 тестов): auth (register/login/me/duplicates), demo-gating, ручная активация, CMS publish, ownership в support.
-- Тестовая БД (`ecoplatform_test`) автоматически создаётся и мигрируется через `vitest globalSetup` (`apps/api/src/test/integration-global-setup.ts`).
+### Каркас и базовые модули (Волны 1–5, май 2026)
 
-## Решение по БД для деплоя
+- Turborepo + pnpm monorepo: `apps/web`, `apps/api`, `packages/shared`.
+- Next.js App Router: лента новостей, индексы цен, обучение, база знаний, кабинет, регистрация/вход, уведомления, юр-страницы.
+- Админ-разделы CMS: новости, индексы, обучение, база знаний, поддержка, биллинг с ручной активацией, пользователи, сотрудники, компании, журналы действий, настройки платформы, модерация (жалобы, санкции, блоки).
+- NestJS API: auth + JWT access + HttpOnly refresh-cookie, RBAC (платформенные роли), demo-доступ, ручная подписка, CMS (4 типа контента), индексы цен, поддержка, файлы-метаданные, in-app уведомления, модерация, юр-документы.
+- Prisma + PostgreSQL: 26 миграций к 2026-05-26, актуальная схема в `apps/api/prisma/schema.prisma`.
+- Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
+- Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
+- 110 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
+- Unit-тесты: 7 в `packages/shared`, 7 в `apps/web`, 46 в `apps/api`.
+- GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
+- Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
+- Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
+- Health-check через `@nestjs/terminus`: `/api/health` и `/api/ready`.
+- `Dockerfile` + полный deploy-документ `docs/08-architecture/deploy.md` (env, миграции, SSL, бэкапы, CDN, чек-лист).
 
-Целевая БД: **Timeweb PostgreSQL 18**. Альтернативы из доступных в Timeweb (MySQL, MongoDB, ClickHouse, Redis, OpenSearch и др.) не подходят:
+### Юридический фундамент (Волна 6)
 
-- Prisma datasource в `apps/api/prisma/schema.prisma:6` уже зафиксирован как `postgresql`.
-- Готовая миграция и сидер написаны под PostgreSQL.
-- В продуктовой документации (`docs/08-architecture/tech-stack.md:21-25`) PostgreSQL — фиксированный выбор стека.
-- Supabase — это тоже Postgres, но с собственной авторизацией и хранилищем, что не нужно: MVP уже имеет свой JWT + RBAC.
+- Модели `LegalDocument` (с версией и `isActive`) и `ConsentRecord` (с IP и user-agent).
+- Публичные страницы `/legal/{privacy,terms,personal-data,cookies,offer}` через общий `LegalDocumentPage`.
+- Cookie-баннер `CookieConsent`: 3 кнопки, категории, флаги `window.__ANALYTICS_ENABLED__` / `__MARKETING_ENABLED__`.
+- Регистрация требует чекбоксов на обязательные документы, шлёт `acceptedDocumentIds`, пишет `ConsentRecord` с источником.
+- Re-consent: `/auth/me.requiresReConsent` динамически считается через `count` обязательных активных vs пользовательских согласий.
+- Footer с юр-ссылками в `AppShell` и `AuthShell`.
+- Seed: 5 placeholder-документов v1.0.0 (privacy/terms/personal-data — обязательные, cookies/offer — опциональные).
 
-Redis (запланирован в tech-stack как кеш) сейчас не используется в MVP — провижить отдельно не нужно до момента появления зависимости в коде.
+### Архитектурный фундамент данных (Волна 7)
 
-## Важные решения
+- Полиморфные обсуждения: `Discussion(targetType, targetId)` вместо прямой связи `Comment.newsPostId` — комментарии можно цеплять к новостям, урокам, статьям БЗ, листингам и форумам без расщепления `Comment`.
+- `Address` как самостоятельная сущность (страна/регион/город/улица/координаты/formatted/source); `Company.factualAddressId` и `structuredLegalAddressId`.
+- Расширенный профиль компании: `websiteUrl`, `corporatePhone`, `corporateEmail`, `about`, `logoFileId`, `contactPerson*`, банковские реквизиты.
+- UI «Реквизиты компании» в `/account → Компания`: 5 секций (Основное / Контакты / Фактический адрес / Юридический адрес / Банковские реквизиты), `PATCH /api/billing/company`.
+- Enums «на вырост»: `NotificationCategory` +5 (форум, магазин, отзывы, гео, цены), `NotificationChannel` +2 (telegram, push), `SupportTicketCategory` +4 (marketplace_dispute и др.).
+- Модели `PaymentMethod` (card_tinkoff / bank_invoice) и `Payment` (amount, status, purpose) — лежат под Тинькофф-Кассу, UI пока заглушен.
+- Версионирование content-блоков: каждый блок имеет ключ `v: 1` в payload; миграция `jsonb_set` идемпотентно проставляет версию старым строкам.
+- Модель `ApiKey` (companyId, name, keyHash bcrypt, scopes[], expiresAt) — фундамент под внешний API без UI.
+- `docs/08-architecture/data-model.md` переведён в статус `current` и переписан под все домены и принципы.
 
-- Demo приравнен к basic-доступу только пока `demoEndsAt` в будущем.
-- После истечения demo функциональные разделы API закрываются, но `/account`, `/billing/status` и `/support/tickets` остаются доступны после входа.
-- Frontend больше не показывает demo-контент без входа или при ответах 401/403: вместо этого показывает экран входа или закрытого доступа.
-- Ручная оплата остаётся через администратора: `POST /api/admin/billing/manual-subscriptions` с полями `companyId`, `plan`, `endsAt`, `reason`.
-- Content blocks хранятся как `type + payload Json`; новости и уроки валидируются разными схемами, чтобы специальные блоки базы знаний не попадали в неподходящие разделы. Параграф ожидает `payload.markdown` (а не `text`) — это контролирует `newsBlockSchema` / `lessonBlockSchema`.
-- Поддержка проверяет принадлежность тикета компании перед ответом пользователя; чужая компания получает 404 (не 403) при попытке ответа на чужой тикет.
-- Физический upload adapter пока не подключён: API создаёт только metadata `FileAsset` и dev `storageKey`.
-- В исходной попытке dev-режима использовались `tsx watch` + `node dist/main.js`. Оба не работали (DI и ESM-резолюция Node). Сейчас рабочий dev — `ts-node-dev`, прод — `node dist/main.js` (shared переведён на CJS).
+### Высоконагрузочная инфраструктура (Волна 8)
 
-## Незавершённые задачи
+- Redis: `RedisModule`, `SessionCacheService` кеширует `RequestUser` по `sessionId` на 60 секунд, инвалидация при logout/refresh/revoke/blockUser/staff role changes/company status changes.
+- `ThrottlerModule` на Redis-backed storage (атомарный Lua `eval`) с in-memory fallback при недоступности Redis.
+- Infinite scroll: общий `useInfiniteApiQuery` (IntersectionObserver) на `/news`, уведомлениях, support, всех admin-листингах.
+- Prisma connection pooling: `PrismaService` добавляет `connection_limit=20` к `DATABASE_URL` если не задан, deploy-док фиксирует расчёт под N реплик.
+- CDN/cache headers: `next.config.ts` отдаёт `/brand/*` и `/avatars/*` с `Cache-Control: public, max-age=31536000, immutable`.
+- gzip/Brotli compression на API через middleware `compression`.
+- Distributed cron: `pg_try_advisory_xact_lock` на hourly billing-check и daily account-cleanup — несколько реплик API не выполняют cron одновременно.
+- `/api/news/tags` и AND-фильтр `/news?tags[]=...`.
+- WebP/AVIF варианты для cover-изображений через `sharp.clone()`; metadata в `FileAsset.variants`.
+- Lighthouse baseline зафиксирован в `audit/lighthouse-baseline.md`: `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
 
-- Поднять реальный визуальный блочный редактор CMS вместо JSON-форм.
-- Подключить реальный файловый upload adapter (S3-совместимое хранилище) вместо metadata-only MVP.
-- Развернуть приложение на Timeweb (DNS, env-переменные, миграции против Timeweb Postgres).
-- Расширить integration-тесты на CRUD CMS (индексы, обучение, база знаний), фронт-E2E через Playwright.
-- Подключить Redis по мере появления потребности (кеш, очереди).
+### Безопасность и 152-ФЗ (Волна 9, частично)
+
+- HTTP security headers: Helmet на API (без CSP, чтобы Rutube-iframe не сломать), глобальные web-заголовки (X-Frame-Options DENY, X-Content-Type-Options nosniff, Permissions-Policy, HSTS, CSP report-only).
+- CSRF double-submit: `csrf-token` cookie (`SameSite=Strict`, не HttpOnly) + `X-CSRF-Token` header; `GET /api/auth/csrf`; защита на `/auth/refresh` и всех POST/PATCH/DELETE кроме login/register.
+- Email-enumeration timing fix: `AuthService.login()` всегда выполняет bcrypt compare против реального хэша или dummy hash для неизвестного email.
+- Lockout: 10 ошибок логина за 15 минут → блок на 15 минут (`User.failedLoginAttempts`, `lockedUntil`); успешный вход после истечения сбрасывает счётчик.
+- Экспорт «моих данных» по 152-ФЗ: `POST /api/auth/me/export-data` отдаёт ZIP с 14 JSON-файлами (профиль, компания, согласия, сессии, уведомления, тикеты, прогресс, комментарии, реакции, модерация, FileAsset metadata, авторский контент, audit-log). Никаких `passwordHash`/`refreshTokenHash`/`providerToken`/`keyHash`. UI: `/account → Безопасность → Мои данные`.
+- Лимиты файлового аплоадера: throttle 20 запросов/мин, дневная квота 500 МБ на компанию (или на пользователя для платформенного staff без компании).
+- Защита cover-image: news/learning/knowledge create/update принимают только публичные изображения; content-manager — только свои, admin может ставить чужие публичные.
+
+### В работе сейчас (uncommitted)
+
+- **Пункт 9.6 — запрос на удаление аккаунта**:
+  - Миграция `20260526150000_account_deletion_request`: `User.deletionRequestedAt`, `Company.statusBeforeDeletion`, новый статус `CompanyStatus.pending_deletion`, индекс по `deletionRequestedAt`.
+  - `POST /api/auth/me/request-deletion`: ставит `deletionRequestedAt`, переводит компанию в `pending_deletion` с сохранением прежнего статуса, отзывает все сессии кроме текущей, шлёт security-уведомление.
+  - `POST /api/auth/me/cancel-deletion`: снимает запрос, возвращает компанию в прежний статус если других «уходящих» пользователей нет.
+  - Ночной cron `cleanup-deleted-accounts` (03:00, advisory-lock): удаляет пользователей с `deletionRequestedAt < now - 30 дней`, чистит orphan-`FileAsset` без `FileReference`, удаляет компании без оставшихся пользователей.
+  - UI: блок «Опасная зона» в `/account → Безопасность` с двумя сценариями («Запросить удаление» / «Передумал»).
+  - `AuthMeUser` расширен `deletionRequestedAt` и `deletionScheduledFor`; `companyStatuses` в shared включает `pending_deletion`.
+  - 2 integration-теста: полный сценарий request → cancel и cleanup через 30 дней.
+
+## Что осталось
+
+### Волна 9 (5 пунктов)
+
+- 9.6 — запрос на удаление аккаунта (в работе сейчас, см. выше).
+- 9.7 — audit-trail с before/after на критические admin-действия (сейчас `AdminActionLog` пишет только `payload`).
+- 9.10 — политика пароля: длина 12 + проверка через HaveIBeenPwned pwned-passwords API.
+- 9.11 — документ политики безопасности (security.md + responsible-disclosure).
+
+### Дальше по плану (`audit/EXECUTION-PLAN.md`)
+
+- **Волна 10** — наблюдаемость: pino structured logging + `LOG_LEVEL`, Sentry, Prometheus метрики, distributed health, прод smoke-test.
+- **Волна 11** — UX/дизайн-система: токены, типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»).
+- **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
+- **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
+
+### Тех-долг, осознанно отложенный
+
+- 3.3 — расщепление `moderation.service.ts` (940 строк). Приватные хелперы тесно переплетены, расщепление создаст cross-service зависимости. Пересмотреть при росте >1500 строк.
+- 5.2 — декомпозиция integration-тестов на доменные файлы (сейчас один файл на 110 тестов).
+- 5.3 — OpenAPI/Swagger.
+- 5.4 — pino + LOG_LEVEL (перенесено в Волну 10).
+- Реальный визуальный блочный редактор CMS вместо текущего пошагового композитора блоков.
+- Реальный файловый upload-adapter для прода (сейчас S3 настроен, но в dev может быть metadata-only).
 
 ## Локальный запуск
 
 ```bash
 pnpm install
 cp .env.example .env
-docker compose up -d postgres                         # Postgres 16 на :5433
+docker compose up -d                                  # Postgres :5433 + Redis :6379
 pnpm --filter @ecoplatform/api prisma:generate
 pnpm --filter @ecoplatform/api prisma:migrate         # migrate deploy
 pnpm --filter @ecoplatform/api seed
 pnpm dev                                              # api на :4000, web на :3000
 ```
 
-Учётки после сида: `admin@ecoplatform.local / Admin12345`, `demo@ecoplatform.local / Demo12345`.
+Учётки после сида:
+
+- Админ: `admin@ecoplatform.local` / `Admin123456`
+- Demo-пользователь: `demo@ecoplatform.local` / `Demo123456`
+
+Пользовательская админ-учётка для ручных проверок: `mojosay@icloud.com` (см. `.env.example::PLATFORM_OWNER_EMAIL`) — этого аккаунта нельзя ни деактивировать, ни снять с него роль admin через админ-UI.
 
 ## Проверки
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 10 unit-тестов (shared 6, api 2, web 2)
+pnpm test                                             # 60 unit-тестов (shared 7, web 7, api 46)
 pnpm build                                            # tsc + next build
-pnpm --filter @ecoplatform/api test:integration       # 10 integration-тестов против ecoplatform_test
+pnpm test:integration                                 # 110 integration-тестов против ecoplatform_test
+pnpm format:check                                     # prettier
 ```
 
-## Последняя проверка
+## Последняя зелёная проверка
 
-Дата: 2026-05-20.
+Дата: 2026-05-26 (после Волны 9.5 + 9.8–9.9, до коммита 9.6).
 
-Результат:
-
-- `pnpm lint` — успешно (4/4 пакета).
-- `pnpm test` — успешно, 10 unit-тестов.
+- `pnpm lint` — успешно (4/4).
+- `pnpm test` — успешно: shared 7/7, web 7/7, api 42/42.
+- `pnpm test:integration` — успешно, 108/108.
 - `pnpm build` — успешно (3/3).
-- `pnpm --filter @ecoplatform/api test:integration` — успешно, 10 integration-тестов; тестовая БД `ecoplatform_test` создаётся автоматически.
-- Сквозной сценарий через curl: регистрация → demo (200 на /news) → истечение demo (403 на /news, 200 на /billing/status) → ручная активация (admin POST `/admin/billing/manual-subscriptions`) → восстановленный доступ (200 на /news) → CMS draft+publish → support ownership — все шаги прошли.
-- Web (`pnpm --filter @ecoplatform/web dev`) поднимается на :3000, все 15 маршрутов отдают 200.
+- `pnpm format:check` — clean.
+- Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
+
+После закрытия 9.6 ожидается 110 integration-тестов (+2 новых на request-deletion / cleanup) — код тестов уже написан, прогон будет при коммите Волны 9.6.
+
+## Целевая БД для деплоя
+
+**Timeweb PostgreSQL 18.** Альтернативы (MySQL, MongoDB, ClickHouse) не подходят: Prisma datasource зафиксирован на `postgresql`, миграции и сидер написаны под PG. Redis вынесен на отдельный сервис.
+
+Подробности по env-переменным, SSL, бэкапам, CDN и чек-листу первого деплоя — в `docs/08-architecture/deploy.md`.
+
+## Важные решения, которые легко забыть
+
+- Demo приравнен к basic-доступу только пока `demoEndsAt` в будущем.
+- После истечения demo функциональные разделы API закрываются, но `/account`, `/billing/status`, `/support/tickets`, `/notifications` остаются.
+- В статусе `pending_deletion` функциональные разделы тоже закрыты (через `access.ts`), доступ к `/account` сохраняется до фактического удаления через 30 дней.
+- Ручная оплата остаётся через админа: `POST /api/admin/billing/manual-subscriptions` с `Idempotency-Key`.
+- Content-блоки хранятся как `type + payload Json`, в каждом payload теперь есть `v: 1` — это задел под параллельные парсеры v1/v2 без массовой миграции.
+- Поддержка проверяет принадлежность тикета компании; ответ на чужой тикет — 404, не 403.
+- Файлы из `/files?ids=...` фильтруются по `accessLevel: public` — приватные metadata не утекают.
+- `/files/upload` доверяет только реальному magic-number MIME (через `file-type`), declared MIME из multipart игнорируется при несовпадении; HTML/SVG/executable блокируются.
+- Cover-image нельзя поставить чужой приватный файл; content-manager — только свой, admin может ставить чужие публичные.
+- Все unsafe-методы API требуют совпадения `csrf-token` cookie и `X-CSRF-Token` header. Исключение: `/auth/login` и `/auth/register`. Web-клиент это делает прозрачно.
+- 10 неудачных логинов за 15 минут → lockout на 15 минут (`User.lockedUntil`).
+- Distributed cron: `billing-hourly-check` и `cleanup-deleted-accounts` берут `pg_try_advisory_xact_lock`; реплика без lock пропускает tick.
