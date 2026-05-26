@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CookieConsent } from "../src/components/CookieConsent";
 import { AuthProvider } from "../src/lib/auth";
+import "../src/styles/tokens.css";
 import "../src/styles/globals.css";
 
 export const metadata: Metadata = {

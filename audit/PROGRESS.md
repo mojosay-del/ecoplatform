@@ -5,9 +5,9 @@
 ## Текущая точка
 
 - **Текущая волна:** 11 — UX, дизайн-система и сайдбар.
-- **Открытые задачи:** 11.1.
-- **Следующая задача:** 11.1 — дизайн-токены (`tokens.css`).
-- **Закрытые волны:** 1–10 целиком (волны 3, 5 и 10 — с осознанно отложенными подпунктами 3.3, 5.2, 5.3, 10.4).
+- **Открытые задачи:** 11.2–11.14.
+- **Следующая задача:** 11.2 — типографическая иерархия.
+- **Закрытые волны:** 1–10 целиком (волны 3, 5 и 10 — с осознанно отложенными подпунктами 3.3, 5.2, 5.3, 10.4); в Волне 11 закрыта 11.1.
 - **Последнее обновление журнала:** 2026-05-27.
 
 ## Легенда статусов
@@ -169,6 +169,25 @@
 
 ---
 
+## Волна 11 — UX, дизайн-система и сайдбар
+
+| #     | Задача                                                                                      | Файл плана                                                                 | Статус |
+| ----- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------ |
+| 11.1  | Дизайн-токены (`tokens.css`) + перевод `globals.css` с прямых цветов на CSS-переменные      | [ROADMAP.md#111-дизайн-токены-tokenscss](ROADMAP.md#111-дизайн-токены-tokenscss) | ✅      |
+| 11.2  | Типографическая иерархия: h1, заголовки публичных страниц, выравнивание по левому краю       | [ROADMAP.md#112-типографическая-иерархия](ROADMAP.md#112-типографическая-иерархия) | ⬜      |
+| 11.3  | Цветовая семантика pill'ов через `StatusPill`                                                | [ROADMAP.md#113-цветовая-семантика-pillов](ROADMAP.md#113-цветовая-семантика-pillов) | ⬜      |
+| 11.4  | Состояния hover/focus/active/disabled для базовых кнопок и полей                             | [ROADMAP.md#114-состояния-hoverfocusactivedisabled](ROADMAP.md#114-состояния-hoverfocusactivedisabled) | ⬜      |
+| 11.5  | Сайдбар: визуальная докрутка disabled-пунктов                                                | [ROADMAP.md#115-сайдбар-докрутка-disabled-пунктов](ROADMAP.md#115-сайдбар-докрутка-disabled-пунктов) | ⬜      |
+| 11.6  | Регистрация в 2 шага                                                                         | [ROADMAP.md#116-регистрация-в-2-шага](ROADMAP.md#116-регистрация-в-2-шага) | ⬜      |
+| 11.7  | Демо-баннер sticky                                                                           | [ROADMAP.md#117-демо-баннер-sticky](ROADMAP.md#117-демо-баннер-sticky)     | ⬜      |
+| 11.8  | Onboarding-card для нового пользователя                                                      | [ROADMAP.md#118-onboarding-card-для-нового-пользователя](ROADMAP.md#118-onboarding-card-для-нового-пользователя) | ⬜      |
+| 11.9  | Сводная таблица движений индексов                                                           | [ROADMAP.md#119-сводная-таблица-движений-индексов](ROADMAP.md#119-сводная-таблица-движений-индексов) | ⬜      |
+| 11.10 | Сетка `auto-fit, minmax(...)` для индексов                                                   | [ROADMAP.md#1110-сетка-auto-fit-minmax-для-индексов](ROADMAP.md#1110-сетка-auto-fit-minmax-для-индексов) | ⬜      |
+| 11.11 | `/news` — chip-row тегов + фильтрация                                                       | [ROADMAP.md#1111-news--chip-row-тегов--фильтрация](ROADMAP.md#1111-news--chip-row-тегов--фильтрация) | ⬜      |
+| 11.12 | Микро-копирайтинг                                                                            | [ROADMAP.md#1112-микро-копирайтинг-по-списку-из-improvement-plan-a10](ROADMAP.md#1112-микро-копирайтинг-по-списку-из-improvement-plan-a10) | ⬜      |
+| 11.13 | `/forgot-password` и `/404` — layout без пустой правой колонки                               | [ROADMAP.md#1113-forgot-password-и-404--починить-layout](ROADMAP.md#1113-forgot-password-и-404--починить-layout) | ⬜      |
+| 11.14 | Доступность: navigation role, skip-link, aria-label, checkbox focus-visible, контраст текста | [ROADMAP.md#1114-доступность](ROADMAP.md#1114-доступность)                 | ⬜      |
+
 ---
 
 ## Журнал работы
@@ -203,3 +222,4 @@
 | 2026-05-26 | Волна 10, задача 10.6 (prod/staging smoke-test через Playwright) закрыта. **Web/CI:** добавлен `@playwright/test`, `apps/web/playwright.config.ts` с обязательным `PLAYWRIGHT_TEST_BASE_URL`, один Chromium smoke-сценарий `apps/web/tests/smoke.spec.ts`: регистрация уникального пользователя через настоящую форму и обязательные согласия, logout, повторный login, проверка ленты `/news`, графиков `/indices` и финальный logout. В root/web package scripts добавлен `test:smoke`, в `turbo.json` — task без cache, в GitHub Actions — отдельный `staging-smoke` job на `deployment_status: success` для environment `staging`, URL стенда берётся из `deployment_status.environment_url` с fallback на `target_url`, Playwright-артефакты добавлены в `.gitignore`, а `apps/web/vitest.config.ts` исключает smoke-файл из unit-тестов. **Проверки:** локальный Playwright smoke против `http://localhost:3000` прошёл зелёным (`1 passed`); `PLAYWRIGHT_TEST_BASE_URL=http://localhost:3000 pnpm --filter @ecoplatform/web exec playwright test --config=playwright.config.ts --list` видит 1 smoke-тест; `pnpm lint`, `pnpm test` (shared 7/7 + web 10/10 + api 66/66), `pnpm test:integration` (API integration 112/112), `pnpm build`, `pnpm format:check`, `git diff --check` зелёные. | Codex |
 | 2026-05-26 | Волна 10, задача 10.7 (Health-check расширенный) закрыта. **API:** `/api/health` теперь чистый liveness процесса без проверки зависимостей; `/api/ready` проверяет Postgres `SELECT 1`, Redis `PING` при заданном `REDIS_URL` и S3 `HeadBucket` при настроенном S3; S3 `replace-with-*` из `.env.example` считается ненастроенным, чтобы не ходить во внешнее хранилище с заглушками. `/api/health/deep` закрыт JWT + ролью `admin` и отдаёт детальную диагностику без секретов. **Docs/audit:** обновлены `audit/PROGRESS.md`, `audit/README.md`, `audit/ROADMAP.md`, `PROJECT_STATUS.md`, `README.md`, `docs/08-architecture/deploy.md`. Проверки: `pnpm lint` зелёный (4/4), `pnpm test` зелёный (shared 7/7 + web 10/10 + api 73/73), `pnpm test:integration` зелёный (API integration **113/113**), `pnpm build` зелёный (3/3), `pnpm format:check` clean, `git diff --check` clean. | Codex |
 | 2026-05-27 | Волна 10, задача 10.8 (алерты) закрыта. **API:** `/api/metrics` теперь отдаёт `db_connections{state="used|max"}` по безопасному `pg_stat_activity`/`current_setting('max_connections')`, чтобы Prometheus мог считать занятость Postgres-соединений. **Ops:** добавлены `ops/monitoring/ecoplatform-alerts.yml` с правилами `EcoplatformApiHigh5xxRate`, `EcoplatformApiHighP95Latency`, `EcoplatformAuthCacheHitRateLow`, `EcoplatformDatabaseConnectionsHigh` и `ops/monitoring/alertmanager.example.yml` с Telegram/email route без секретов в git; реальный `ops/monitoring/alertmanager.yml` добавлен в `.gitignore`. **Docs/audit:** deploy-док фиксирует Sentry alert «5xx > 10/мин», web render-errors, Prometheus/Alertmanager подключение и smoke-команды; Волна 10 закрыта, следующий шаг — 11.1. Проверки: `pnpm lint` зелёный (4/4), `pnpm test` зелёный (shared 7/7 + web 10/10 + api 73/73), `pnpm test:integration` зелёный (API integration **113/113**), `pnpm build` зелёный (3/3), `pnpm format:check` clean, `pnpm exec prettier --check ops/monitoring/ecoplatform-alerts.yml ops/monitoring/alertmanager.example.yml` clean, `git diff --check` clean. | Codex |
+| 2026-05-27 | Волна 11, задача 11.1 (дизайн-токены) закрыта. **Web:** добавлен `apps/web/src/styles/tokens.css` с палитрой, типографикой, радиусами, тенями, focus-ring и совместимыми alias-переменными для старого CSS; `apps/web/app/layout.tsx` подключает токены перед `globals.css`; `apps/web/src/styles/globals.css` больше не держит `:root` и не содержит прямых `#...`, `rgba(...)` или нетокенизированных `rgb(...)` цветов. **Проверка CSS:** скрипт сверил, что все `var(--...)` имеют определения. **UI-проверка:** `http://localhost:3000/login` открылся без горизонтального overflow, без console warning/error; computed styles подтвердили `--brand: #f5773e`, primary-кнопка `rgb(245, 119, 62)`, скриншот сохранён в `/private/tmp/ecoplatform-11-1-login.png`. Проверки: `pnpm exec prettier --check apps/web/src/styles/tokens.css apps/web/src/styles/globals.css apps/web/app/layout.tsx`, `pnpm lint` зелёный (4/4), `pnpm test` зелёный (shared 7/7 + web 10/10 + api 73/73), `pnpm test:integration` зелёный (API integration **113/113**), `pnpm build` зелёный (3/3), `pnpm format:check` clean, `git diff --check` clean. | Codex |

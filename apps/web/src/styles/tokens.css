@@ -1,0 +1,137 @@
+:root {
+  /* Палитра */
+  --brand: #f5773e;
+  --brand-hover: #e8682e;
+  --brand-active: #d35922;
+  --brand-soft: #fee9dc;
+  --brand-soft-strong: #fcd3b9;
+  --brand-muted: #f5d2bb;
+  --brand-muted-border: #d99463;
+  --brand-rgb: 245 119 62;
+  --brand-shadow-rgb: 119 38 0;
+  --brand-ember-rgb: 123 35 0;
+  --brand-ink-rgb: 95 26 0;
+
+  --success: #2da44e;
+  --success-soft: #e3f0db;
+  --success-text: #1f7a36;
+  --success-text-strong: #197a3f;
+  --success-rgb: 45 164 78;
+  --success-text-rgb: 25 122 63;
+
+  --warning: #d97706;
+  --warning-soft: #fff5da;
+  --warning-border: #ffe4a3;
+  --warning-text: #9a5b00;
+  --warning-strong: #d78a00;
+  --warning-strong-rgb: 215 138 0;
+
+  --danger: #d73a49;
+  --danger-soft: #fff1ef;
+  --danger-border: #ffd4cf;
+  --danger-text: #c0392b;
+  --danger-text-strong: #a40e1c;
+  --danger-rgb: 215 58 73;
+  --danger-strong-rgb: 207 34 46;
+
+  --neutral: #6b7280;
+  --neutral-soft: #d8dde6;
+  --neutral-border: #aab2c0;
+
+  --info: #4d73d8;
+  --info-rgb: 77 115 216;
+
+  --surface: #fdf9f4;
+  --surface-muted: #f5f6f8;
+  --surface-muted-alt: #f4f5f7;
+  --surface-muted-strong: #edf0f5;
+  --surface-muted-hover: #e9edf3;
+  --surface-soft: #fafbfc;
+  --surface-auth: #faf7f3;
+  --surface-elevated: #ffffff;
+
+  --text: #1a202e;
+  --text-strong: #1e293b;
+  --text-muted: #6b7280;
+  --text-subtle: #a1a6b0;
+  --text-disabled: #c0c4cc;
+  --text-tertiary: #697180;
+  --text-secondary: #4b5363;
+  --text-secondary-soft: #5a606e;
+  --text-secondary-strong: #3e4653;
+  --text-inverse: #ffffff;
+  --text-inverse-muted: #d1d5db;
+  --text-rgb: 26 32 46;
+
+  --border: #e5e7eb;
+  --border-subtle: #e7eaef;
+  --border-strong: #d6dae2;
+
+  --white: #ffffff;
+  --white-rgb: 255 255 255;
+  --black-rgb: 0 0 0;
+  --shadow-rgb: 15 23 42;
+  --shadow-deep-rgb: 15 22 36;
+
+  --highlight: #ffe785;
+  --logo-green: #2f9f5e;
+  --avatar-gradient-start: #f6b58d;
+  --avatar-gradient-end: #6d84cb;
+  --education-gradient-start: #dcefe2;
+  --education-gradient-mid: #8ebc95;
+  --education-gradient-end: #4b7f57;
+  --knowledge-gradient-start: #f6c89e;
+  --knowledge-gradient-end: #b9743b;
+  --lesson-upgrade-text: #6e5742;
+  --auth-gradient-start: #ffad36;
+  --auth-gradient-end: #d94b12;
+  --auth-glow-rgb: 255 229 153;
+  --flag-ru-blue: #2455d6;
+  --flag-ru-red: #d52b1e;
+
+  /* Типография */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 34px;
+
+  /* Радиусы */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-chip: 999px;
+
+  /* Тени */
+  --shadow-sm: 0 1px 2px rgb(var(--black-rgb) / 0.05);
+  --shadow-md: 0 4px 12px rgb(var(--black-rgb) / 0.08);
+  --shadow-lg: 0 12px 32px rgb(var(--black-rgb) / 0.12);
+  --shadow-card: 0 2px 10px rgb(var(--shadow-rgb) / 0.05);
+  --shadow-card-hover: 0 8px 24px rgb(var(--shadow-rgb) / 0.09);
+  --shadow-soft: 0 6px 22px rgb(var(--shadow-rgb) / 0.07);
+
+  /* Состояния */
+  --focus-ring: 0 0 0 3px rgb(var(--brand-rgb) / 0.25);
+  --focus-ring-warning: 0 0 0 3px rgb(var(--warning-strong-rgb) / 0.22);
+
+  /* Совместимость со старым globals.css до полной разборки компонентов. */
+  --bg: var(--surface-muted);
+  --panel: var(--surface-elevated);
+  --panel-soft: var(--surface-soft);
+  --line: var(--border-subtle);
+  --line-strong: var(--border-strong);
+  --muted: var(--text-muted);
+  --primary: var(--brand);
+  --primary-hover: var(--brand-hover);
+  --primary-soft: var(--brand-soft);
+  --primary-soft-strong: var(--brand-soft-strong);
+  --green: var(--success);
+  --green-soft: var(--success-soft);
+  --blue: var(--info);
+  --red: var(--danger);
+  --yellow: var(--warning);
+  --radius-card: 14px;
+  --radius-button: var(--radius-md);
+}

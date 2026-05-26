@@ -8,7 +8,9 @@
 
 Текущий рабочий блок — Волна 11: UX, дизайн-система и сайдбар.
 
-Целевой следующий шаг: Волна 11.1 — дизайн-токены (`tokens.css`).
+Волна 11.1 закрыта: дизайн-токены вынесены в `apps/web/src/styles/tokens.css`, а `globals.css` переведён с прямых цветов на CSS-переменные.
+
+Целевой следующий шаг: Волна 11.2 — типографическая иерархия.
 
 ## Что уже сделано
 
@@ -123,7 +125,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 11** — UX/дизайн-система: токены, типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»).
+- **Волна 11** — UX/дизайн-система: типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»). Дизайн-токены закрыты в 11.1.
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
@@ -168,14 +170,16 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 10.8).
+Дата: 2026-05-27 (после Волны 11.1).
 
 - `pnpm lint` — успешно (4/4).
 - `pnpm test` — успешно: shared 7/7, web 10/10, api 73/73.
 - `pnpm test:integration` — успешно: API integration 113/113.
 - `pnpm build` — успешно (3/3).
+- Browser UI-check — `/login` на `http://localhost:3000` открылся без console warning/error и без горизонтального overflow; скриншот: `/private/tmp/ecoplatform-11-1-login.png`.
 - Playwright smoke — не перезапускался в 10.8 (ops/API-metrics изменение); последний зелёный прогон после 10.6: Chromium 1/1.
 - `pnpm format:check` — clean.
+- CSS token sanity — все `var(--...)` в `tokens.css`/`globals.css` имеют определения; прямых `#...`, `rgba(...)`, нетокенизированных `rgb(...)` в `globals.css` нет.
 - `pnpm exec prettier --check ops/monitoring/ecoplatform-alerts.yml ops/monitoring/alertmanager.example.yml` — clean.
 - `git diff --check` — clean.
 - Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
