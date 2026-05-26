@@ -1,7 +1,7 @@
 ---
 title: Документация ЭкоПлатформы
 status: draft
-updated: 2026-04-23
+updated: 2026-05-26
 source: —
 ---
 
@@ -81,6 +81,7 @@ source: —
 - [maps-provider.md](./08-architecture/maps-provider.md) — картографический провайдер
 - [geo-logic.md](./08-architecture/geo-logic.md) — геологика
 - [data-model.md](./08-architecture/data-model.md) — модель данных
+- [security.md](./08-architecture/security.md) — политика безопасности и responsible disclosure
 
 ### 09-forum/ — форум
 - [README.md](./09-forum/README.md) — общая спецификация

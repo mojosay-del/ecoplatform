@@ -4,11 +4,11 @@
 
 ## Текущий этап
 
-Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов и политика новых паролей (Волна 9 — пункты 9.1–9.10).
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11).
 
-В работе сейчас: пункт 9.11 — документ политики безопасности (`docs/08-architecture/security.md` + responsible disclosure).
+Волна 9 закрыта. Следующий рабочий блок — Волна 10: наблюдаемость и операции.
 
-Целевой следующий шаг: закрыть 9.11, затем перейти к Волне 10 (структурное логирование pino, Sentry, метрики Prometheus, прод smoke-test).
+Целевой следующий шаг: начать 10.1 — структурное логирование pino + `LOG_LEVEL`.
 
 ## Что уже сделано
 
@@ -64,7 +64,7 @@
 - WebP/AVIF варианты для cover-изображений через `sharp.clone()`; metadata в `FileAsset.variants`.
 - Lighthouse baseline зафиксирован в `audit/lighthouse-baseline.md`: `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
 
-### Безопасность и 152-ФЗ (Волна 9, частично)
+### Безопасность и 152-ФЗ (Волна 9)
 
 - HTTP security headers: Helmet на API (без CSP, чтобы Rutube-iframe не сломать), глобальные web-заголовки (X-Frame-Options DENY, X-Content-Type-Options nosniff, Permissions-Policy, HSTS, CSP report-only).
 - CSRF double-submit: `csrf-token` cookie (`SameSite=Strict`, не HttpOnly) + `X-CSRF-Token` header; `GET /api/auth/csrf`; защита на `/auth/refresh` и всех POST/PATCH/DELETE кроме login/register.
@@ -75,6 +75,7 @@
 - Защита cover-image: news/learning/knowledge create/update принимают только публичные изображения; content-manager — только свои, admin может ставить чужие публичные.
 - Audit-trail before/after: критические admin-действия пишут `payload.before`, `payload.after`, `payload.diff`; `/admin/journals` показывает diff как «старое → новое» с цветовым разделением.
 - Политика новых паролей: общий `MIN_PASSWORD_LENGTH=12`; регистрация, смена пароля и создание staff проверяют пароль через Have I Been Pwned Pwned Passwords range API по SHA-1 k-anonymity (`/range/{first5}`) без отправки plaintext.
+- Документ политики безопасности: `docs/08-architecture/security.md` фиксирует пароли, токены, CSP/CSRF/HSTS, lockout, 152-ФЗ, файлы, audit trail, операционный чек-лист и responsible disclosure.
 
 ### Последние закрытые задачи Волны 9
 
@@ -95,12 +96,12 @@
   - Before/after подключён к ручной активации подписки, block/unblock пользователей, platform-roles, staff update, настройкам платформы, статусам компаний и admin-санкциям модерации.
   - `/admin/journals` показывает diff старого и нового значения цветами; legacy-payload остаётся JSON.
   - UI проверен локально на смене `moderation.lock_duration_minutes` 15→16→15.
+- **Пункт 9.11 — документ политики безопасности**:
+  - Добавлен `docs/08-architecture/security.md` со статусом `current`.
+  - В `docs/README.md` добавлена ссылка на security-документ.
+  - Responsible disclosure фиксирует канал `security@eco-platform.ru`, состав отчёта, правила безопасного исследования, сроки реакции и порядок публикации.
 
 ## Что осталось
-
-### Волна 9 (1 пункт)
-
-- 9.11 — документ политики безопасности (security.md + responsible-disclosure).
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
