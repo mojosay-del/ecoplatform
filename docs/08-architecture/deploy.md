@@ -1,7 +1,7 @@
 ---
 title: Деплой на Timeweb Cloud
 status: draft
-updated: 2026-05-26
+updated: 2026-05-27
 ---
 
 # Деплой ЭкоПлатформы на Timeweb
@@ -248,7 +248,61 @@ Redis остаётся graceful fallback: если `REDIS_URL` не задан, 
 
 ---
 
-## 7. Scheduler / cron
+## 7. Алерты
+
+Цель MVP: не ждать ручной проверки логов. Прод должен сам сообщать о всплеске 5xx, высокой задержке API, проблемах с session-cache и приближении к лимиту соединений Postgres.
+
+### Sentry
+
+В Sentry настройте alert rule для API-проекта:
+
+- Условие: больше 10 error events за 1 минуту.
+- Фильтр: production environment. API уже отправляет в Sentry только 5xx и process-level сбои, поэтому 4xx не шумят.
+- Канал: Telegram-чат команды или email `alerts@...`.
+- Повтор: не чаще 1 раза в 30 минут, авто-resolve при исчезновении события.
+
+Для web-проекта включите отдельный rule на render errors: больше 5 событий за 5 минут, канал тот же, severity `warning`. Это не блокирует деплой, но помогает быстро увидеть сломанную клиентскую страницу.
+
+### Prometheus + Alertmanager
+
+Правила лежат в [ops/monitoring/ecoplatform-alerts.yml](../../ops/monitoring/ecoplatform-alerts.yml):
+
+- `EcoplatformApiHigh5xxRate` — 5xx больше 10 в минуту.
+- `EcoplatformApiHighP95Latency` — p95 latency выше 1 секунды 5 минут.
+- `EcoplatformAuthCacheHitRateLow` — hit rate session-cache ниже 50% 10 минут.
+- `EcoplatformDatabaseConnectionsHigh` — занято больше 80% Postgres-соединений 5 минут.
+
+`/api/metrics` должен скрапиться Prometheus с Basic Auth из `METRICS_BASIC_USER` / `METRICS_BASIC_PASSWORD`. В Prometheus добавьте rules-файл:
+
+```yaml
+rule_files:
+  - /etc/prometheus/rules/ecoplatform-alerts.yml
+```
+
+Проверка правил перед деплоем:
+
+```bash
+promtool check rules /etc/prometheus/rules/ecoplatform-alerts.yml
+```
+
+Пример Alertmanager-конфига лежит в [ops/monitoring/alertmanager.example.yml](../../ops/monitoring/alertmanager.example.yml). Реальный `ops/monitoring/alertmanager.yml` не коммитим: он в `.gitignore`, а SMTP-пароль, Telegram bot token и chat id читаются из secret-файлов `/run/secrets/...`.
+
+Проверка Alertmanager-конфига перед стартом:
+
+```bash
+amtool check-config /etc/alertmanager/alertmanager.yml
+```
+
+Smoke после подключения:
+
+```bash
+curl -fsS -u "$METRICS_BASIC_USER:$METRICS_BASIC_PASSWORD" \
+  https://api.eco-platform.ru/api/metrics | rg "http_request_duration_seconds|auth_cache_hit_total|db_connections"
+```
+
+---
+
+## 8. Scheduler / cron
 
 `apps/api/src/scheduler/scheduler.service.ts` — `@Cron(EVERY_HOUR)` для билинг-проверок.
 
@@ -258,7 +312,7 @@ Redis остаётся graceful fallback: если `REDIS_URL` не задан, 
 
 ---
 
-## 8. CDN и cache headers
+## 9. CDN и cache headers
 
 Перед web-контейнером ставим CDN:
 
@@ -276,7 +330,7 @@ Redis остаётся graceful fallback: если `REDIS_URL` не задан, 
 
 ---
 
-## 9. Сжатие ответов
+## 10. Сжатие ответов
 
 API включает Express middleware `compression()` в `apps/api/src/main.ts`. Он сжимает compressible-ответы при наличии `Accept-Encoding` у клиента: `br` для Brotli на поддерживаемых Node.js-версиях, `gzip`/`deflate` как fallback. Маленькие ответы ниже порога middleware могут уходить без `Content-Encoding`, это нормально.
 
@@ -293,7 +347,7 @@ curl -I -H 'Accept-Encoding: br,gzip' https://app.eco-platform.ru/
 
 ---
 
-## 10. CORS и cookie
+## 11. CORS и cookie
 
 - `WEB_ORIGIN` должен указывать на ПУБЛИЧНЫЙ URL фронта.
 - На прод-домене (HTTPS) refresh-cookie получает флаги `HttpOnly + Secure + SameSite=lax + Path=/api/auth`.
@@ -303,7 +357,7 @@ curl -I -H 'Accept-Encoding: br,gzip' https://app.eco-platform.ru/
 
 ---
 
-## 11. Чек-лист перед первым деплоем
+## 12. Чек-лист перед первым деплоем
 
 - [ ] Прогнали `pnpm --filter @ecoplatform/api test:integration` против postgres:18 локально.
 - [ ] Сгенерили новые `JWT_ACCESS_SECRET` и `JWT_REFRESH_SECRET` (НЕ переиспользуем dev-значения).
@@ -315,6 +369,8 @@ curl -I -H 'Accept-Encoding: br,gzip' https://app.eco-platform.ru/
 - [ ] API отдаёт `Content-Encoding: br` или `gzip` для больших JSON/HTML-ответов с `Accept-Encoding: br,gzip`.
 - [ ] `/brand/logo.webp` и `/avatars/*` отдают `Cache-Control: public, max-age=31536000, immutable`.
 - [ ] Health-пробы настроены на `/api/health` и `/api/ready`.
+- [ ] Sentry alerts включены для API 5xx и web render errors.
+- [ ] Prometheus загружает `ops/monitoring/ecoplatform-alerts.yml`, Alertmanager отправляет critical-alerts в Telegram/email.
 - [ ] DNS и SSL-сертификаты Timeweb выпустил.
 - [ ] Timeweb physical backups включены: daily, 30 копий/дней или максимум тарифа.
 - [ ] Daily `pg_dump` уходит в приватный S3 bucket, lifecycle удаляет `prod-postgres/` через 90 дней.

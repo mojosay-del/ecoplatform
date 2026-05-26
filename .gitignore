@@ -12,3 +12,4 @@ blob-report
 *.tsbuildinfo
 .pnpm-store
 apps/api/generated
+ops/monitoring/alertmanager.yml

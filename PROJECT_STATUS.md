@@ -1,14 +1,14 @@
 # Ход разработки ЭкоПлатформы MVP
 
-Дата последнего обновления: 2026-05-26.
+Дата последнего обновления: 2026-05-27.
 
 ## Текущий этап
 
-Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL`, Sentry error tracking, Prometheus metrics, backup/runbook, Playwright smoke-test и расширенные health-checks закрыты; distributed tracing осознанно отложен как опциональный post-MVP пункт.
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 закрыта: структурное логирование pino + `LOG_LEVEL`, Sentry error tracking, Prometheus metrics, backup/runbook, Playwright smoke-test, расширенные health-checks и алерты; distributed tracing осознанно отложен как опциональный post-MVP пункт.
 
-Текущий рабочий блок — Волна 10: наблюдаемость и операции.
+Текущий рабочий блок — Волна 11: UX, дизайн-система и сайдбар.
 
-Целевой следующий шаг: Волна 10.8 — алерты.
+Целевой следующий шаг: Волна 11.1 — дизайн-токены (`tokens.css`).
 
 ## Что уже сделано
 
@@ -77,7 +77,7 @@
 - Политика новых паролей: общий `MIN_PASSWORD_LENGTH=12`; регистрация, смена пароля и создание staff проверяют пароль через Have I Been Pwned Pwned Passwords range API по SHA-1 k-anonymity (`/range/{first5}`) без отправки plaintext.
 - Документ политики безопасности: `docs/08-architecture/security.md` фиксирует пароли, токены, CSP/CSRF/HSTS, lockout, 152-ФЗ, файлы, audit trail, операционный чек-лист и responsible disclosure.
 
-### Наблюдаемость и операции (Волна 10, начата)
+### Наблюдаемость и операции (Волна 10)
 
 - Структурное логирование API через `nestjs-pino`: dev-режим печатает читабельно через `pino-pretty`, prod отдаёт JSON.
 - `LOG_LEVEL` управляет уровнем логов; defaults: dev=`debug`, prod=`info`, test=`silent`.
@@ -88,10 +88,12 @@
 - Sentry `beforeSend` на обеих сторонах вычищает Authorization/cookie/CSRF, token/password/session, email/phone/address/bank-поля и оставляет только безопасный `user.id`.
 - Sentry build-plugin и sourcemap upload включаются только при заданных CI-переменных `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + project, runtime-capture работает и без них при наличии DSN.
 - Prometheus endpoint `/api/metrics` на API отдаёт text format через `prom-client`: default Node.js/process metrics, HTTP histogram, Prisma query histogram, auth cache hit/miss counters и бизнес-метрики регистраций, активных подписок и уведомлений.
+- `/api/metrics` также отдаёт `db_connections{state="used|max"}` для контроля занятости Postgres-соединений.
 - В production `/api/metrics` закрыт Basic Auth через `METRICS_BASIC_USER`/`METRICS_BASIC_PASSWORD`; если credentials не заданы, endpoint не раскрывает метрики.
 - Backup/runbook для Timeweb: daily physical backups PostgreSQL с retention 30 копий/дней, daily `pg_dump -x --no-owner` в приватный Timeweb S3 с lifecycle 90 дней, pre-migration dump, monthly restore-smoke на dev/staging и безопасный rollback-runbook для Prisma-миграций без ручной правки `_prisma_migrations`.
 - Playwright smoke-test: `apps/web/tests/smoke.spec.ts` регистрирует уникального пользователя, проверяет logout/login, `/news` и `/indices`; `pnpm test:smoke` запускает smoke через web/root scripts, а GitHub Actions `staging-smoke` стартует после успешного staging deployment.
 - Расширенные health-checks: `/api/health` проверяет только живой процесс, `/api/ready` проверяет Postgres `SELECT 1`, Redis `PING` при заданном `REDIS_URL` и S3 `HeadBucket` при настроенном S3, `/api/health/deep` закрыт JWT + ролью admin и показывает безопасные детали.
+- Алерты: Sentry rule для API 5xx > 10/мин и web render-errors; Prometheus rules в `ops/monitoring/ecoplatform-alerts.yml` для 5xx, p95 latency, session-cache hit rate и Postgres-соединений; Alertmanager example в `ops/monitoring/alertmanager.example.yml` без секретов в git.
 
 ### Последние закрытые задачи Волны 9
 
@@ -121,7 +123,6 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 10** — наблюдаемость: остался пункт 10.8 — алерты.
 - **Волна 11** — UX/дизайн-система: токены, типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»).
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
@@ -167,14 +168,15 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-26 (после Волны 10.7).
+Дата: 2026-05-27 (после Волны 10.8).
 
 - `pnpm lint` — успешно (4/4).
 - `pnpm test` — успешно: shared 7/7, web 10/10, api 73/73.
 - `pnpm test:integration` — успешно: API integration 113/113.
 - `pnpm build` — успешно (3/3).
-- Playwright smoke — не перезапускался в 10.7 (API-only изменение); последний зелёный прогон после 10.6: Chromium 1/1.
+- Playwright smoke — не перезапускался в 10.8 (ops/API-metrics изменение); последний зелёный прогон после 10.6: Chromium 1/1.
 - `pnpm format:check` — clean.
+- `pnpm exec prettier --check ops/monitoring/ecoplatform-alerts.yml ops/monitoring/alertmanager.example.yml` — clean.
 - `git diff --check` — clean.
 - Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
 

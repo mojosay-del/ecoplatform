@@ -1,0 +1,66 @@
+groups:
+  - name: ecoplatform-api
+    rules:
+      - alert: EcoplatformApiHigh5xxRate
+        expr: sum(rate(http_request_duration_seconds_count{service="ecoplatform_api",status=~"5.."}[1m])) * 60 > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: ecoplatform_api
+        annotations:
+          summary: "API returns more than 10 server errors per minute"
+          description: '5xx rate is {{ printf "%.0f" $value }} responses/minute for more than 2 minutes.'
+
+      - alert: EcoplatformApiHighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, route) (
+              rate(http_request_duration_seconds_bucket{service="ecoplatform_api"}[5m])
+            )
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: ecoplatform_api
+        annotations:
+          summary: "API p95 latency is above 1s"
+          description: 'Route {{ $labels.route }} has p95 latency {{ printf "%.2f" $value }}s for 5 minutes.'
+
+      - alert: EcoplatformAuthCacheHitRateLow
+        expr: |
+          (
+            sum(rate(auth_cache_hit_total{service="ecoplatform_api"}[10m]))
+            /
+            (
+              sum(rate(auth_cache_hit_total{service="ecoplatform_api"}[10m]))
+              + sum(rate(auth_cache_miss_total{service="ecoplatform_api"}[10m]))
+            )
+          ) < 0.5
+          and
+          (
+            sum(rate(auth_cache_hit_total{service="ecoplatform_api"}[10m]))
+            + sum(rate(auth_cache_miss_total{service="ecoplatform_api"}[10m]))
+          ) > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: ecoplatform_api
+        annotations:
+          summary: "Auth session cache hit rate is below 50%"
+          description: 'JwtAuthGuard cache hit rate is {{ printf "%.2f" $value }} for 10 minutes.'
+
+      - alert: EcoplatformDatabaseConnectionsHigh
+        expr: |
+          (
+            db_connections{service="ecoplatform_api",state="used"}
+            / ignoring(state)
+            db_connections{service="ecoplatform_api",state="max"}
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: critical
+          service: ecoplatform_api
+        annotations:
+          summary: "PostgreSQL connection usage is above 80%"
+          description: 'PostgreSQL connection usage ratio is {{ printf "%.2f" $value }} for 5 minutes.'

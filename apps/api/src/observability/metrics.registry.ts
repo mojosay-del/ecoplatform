@@ -6,6 +6,12 @@ metricsRegistry.setDefaultLabels({ service: "ecoplatform_api" });
 collectDefaultMetrics({ register: metricsRegistry });
 
 let subscriptionsActiveCollector: (() => Promise<number>) | null = null;
+let databaseConnectionSnapshotCollector: (() => Promise<DatabaseConnectionSnapshot>) | null = null;
+
+export type DatabaseConnectionSnapshot = {
+  usedConnections: number;
+  maxConnections: number;
+};
 
 const metricsCollectionErrorsTotal = new Counter<"collector">({
   name: "metrics_collection_errors_total",
@@ -69,8 +75,31 @@ new Gauge({
   },
 });
 
+new Gauge<"state">({
+  name: "db_connections",
+  help: "Current PostgreSQL connections for the active database and server limit.",
+  labelNames: ["state"],
+  registers: [metricsRegistry],
+  async collect(this: Gauge<"state">) {
+    if (!databaseConnectionSnapshotCollector) return;
+    try {
+      const snapshot = await databaseConnectionSnapshotCollector();
+      this.set({ state: "used" }, snapshot.usedConnections);
+      this.set({ state: "max" }, snapshot.maxConnections);
+    } catch {
+      metricsCollectionErrorsTotal.inc({ collector: "db_connections" });
+    }
+  },
+});
+
 export function setSubscriptionsActiveCollector(collector: (() => Promise<number>) | null): void {
   subscriptionsActiveCollector = collector;
+}
+
+export function setDatabaseConnectionSnapshotCollector(
+  collector: (() => Promise<DatabaseConnectionSnapshot>) | null,
+): void {
+  databaseConnectionSnapshotCollector = collector;
 }
 
 export function observeHttpRequest(

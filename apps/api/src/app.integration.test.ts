@@ -343,6 +343,9 @@ describe("Observability", () => {
     expect(res.text).toContain("# HELP users_registered_total");
     expect(res.text).toContain("# HELP notifications_sent_total");
     expect(res.text).toContain("# HELP subscriptions_active");
+    expect(res.text).toContain("# HELP db_connections");
+    expect(res.text).toContain('state="used"');
+    expect(res.text).toContain('state="max"');
   });
 
   it("в production закрывает /api/metrics через Basic Auth", async () => {

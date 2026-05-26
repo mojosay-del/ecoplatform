@@ -279,12 +279,15 @@ Prometheus + AlertManager (если развернём Grafana) — alerts:
 - cache hit rate < 50% на 10 мин — investigate.
 - DB connection pool > 80% — critical.
 
+**Решение 2026-05-27:** закрыто. Sentry alert настраивается в Sentry-проекте API как «больше 10 error events за 1 минуту» (API уже отправляет туда только 5xx), отдельный web-rule ловит render errors. Для Prometheus добавлен rules-файл `ops/monitoring/ecoplatform-alerts.yml`: 5xx-rate, p95 latency, низкий auth session-cache hit rate и высокая занятость Postgres-соединений. API расширил `/api/metrics` метрикой `db_connections{state="used|max"}`; Alertmanager example лежит в `ops/monitoring/alertmanager.example.yml`, реальные Telegram/email секреты хранятся вне git.
+
 ## Проверки Волны 10
 
 - [x] Логи в проде — JSON с полями userId/traceId.
 - [x] Sentry получает 5xx ошибки.
 - [x] /api/metrics возвращает prometheus-формат.
 - [x] Smoke-test проходит локально и подключён к staging deployment_status.
+- [x] Prometheus alert rules для 5xx/latency/cache/DB готовы к подключению, Alertmanager example не содержит секретов.
 - [ ] Runbook откатывает миграцию на dev-стенде.
 
 
