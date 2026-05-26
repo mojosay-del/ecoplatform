@@ -209,6 +209,7 @@ export class BillingService {
           where: { id: input.companyId },
           data: {
             status: CompanyStatus.active,
+            statusBeforeDeletion: null,
             subscriptionPlan: input.plan,
             subscriptionEndsAt: new Date(input.endsAt),
           },

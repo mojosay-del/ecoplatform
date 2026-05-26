@@ -36,6 +36,12 @@ export type LikeResult = {
   likesCount: number;
 };
 
+export type AccountDeletionStatus = {
+  ok: true;
+  deletionRequestedAt: string | null;
+  deletionScheduledFor: string | null;
+};
+
 function enc(value: string): string {
   // encodeURIComponent для всех динамических сегментов URL: пользовательский
   // slug / id могут содержать спецсимволы. Раньше эта обёртка использовалась
@@ -121,6 +127,8 @@ export const api = {
     changePassword: (body: { currentPassword: string; newPassword: string }) =>
       apiFetch<{ ok: true }>("/auth/change-password", { method: "POST", body }),
     exportData: () => apiDownload("/auth/me/export-data", { method: "POST" }),
+    requestDeletion: () => apiFetch<AccountDeletionStatus>("/auth/me/request-deletion", { method: "POST" }),
+    cancelDeletion: () => apiFetch<AccountDeletionStatus>("/auth/me/cancel-deletion", { method: "POST" }),
   },
 
   // ── Уведомления ─────────────────────────────────────────────────────────

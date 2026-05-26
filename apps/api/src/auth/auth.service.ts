@@ -28,12 +28,19 @@ const LOGIN_DUMMY_PASSWORD_HASH = "$2a$12$abcdefghijklmnopqrstuv.WkOaBPyDV7c9o6X
 const LOGIN_LOCKOUT_THRESHOLD = 10;
 const LOGIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+const ACCOUNT_DELETION_GRACE_DAYS = 30;
 
 type LoginLockoutState = {
   id: string;
   failedLoginAttempts: number;
   failedLoginWindowStartedAt: Date | null;
   lockedUntil: Date | null;
+};
+
+type AccountDeletionResponse = {
+  ok: true;
+  deletionRequestedAt: string | null;
+  deletionScheduledFor: string | null;
 };
 
 @Injectable()
@@ -255,6 +262,134 @@ export class AuthService {
       .catch(swallowAndLog("auth.password.changed.notify", { userId }));
 
     return { ok: true };
+  }
+
+  async requestAccountDeletion(userId: string, sessionId: string): Promise<AccountDeletionResponse> {
+    const now = new Date();
+    const result = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        include: {
+          company: {
+            select: { id: true, status: true, statusBeforeDeletion: true },
+          },
+        },
+      });
+      if (!user) {
+        throw new UnauthorizedException("Пользователь не найден.");
+      }
+
+      const deletionRequestedAt = user.deletionRequestedAt ?? now;
+      if (!user.deletionRequestedAt) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { deletionRequestedAt },
+        });
+      }
+
+      if (user.company && user.company.status !== CompanyStatus.pending_deletion) {
+        await tx.company.update({
+          where: { id: user.company.id },
+          data: {
+            status: CompanyStatus.pending_deletion,
+            statusBeforeDeletion: user.company.status,
+          },
+        });
+      }
+
+      await tx.session.updateMany({
+        where: { userId, revokedAt: null, NOT: { id: sessionId } },
+        data: { revokedAt: now },
+      });
+
+      return {
+        companyId: user.companyId,
+        deletionRequestedAt,
+      };
+    });
+
+    await this.sessionCache.invalidateUser(userId);
+    await this.notifications
+      .createInApp({
+        userId,
+        eventType: "auth.data_deletion.requested",
+        sourceId: `${userId}:${result.deletionRequestedAt.toISOString()}`,
+        category: NotificationCategory.security,
+        title: "Удаление аккаунта запланировано",
+        body: `Аккаунт будет удалён ${accountDeletionScheduledFor(result.deletionRequestedAt).toLocaleDateString(
+          "ru-RU",
+        )}. Если передумаете, отмените запрос в личном кабинете.`,
+        link: "/account",
+        payload: {
+          companyId: result.companyId,
+          deletionRequestedAt: result.deletionRequestedAt.toISOString(),
+          deletionScheduledFor: accountDeletionScheduledFor(result.deletionRequestedAt).toISOString(),
+        },
+      })
+      .catch(swallowAndLog("auth.data_deletion.requested.notify", { userId }));
+
+    return serializeAccountDeletion(result.deletionRequestedAt);
+  }
+
+  async cancelAccountDeletion(userId: string): Promise<AccountDeletionResponse> {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        include: {
+          company: {
+            select: { id: true, status: true, statusBeforeDeletion: true },
+          },
+        },
+      });
+      if (!user) {
+        throw new UnauthorizedException("Пользователь не найден.");
+      }
+
+      await tx.user.update({
+        where: { id: userId },
+        data: { deletionRequestedAt: null },
+      });
+
+      if (user.company?.status === CompanyStatus.pending_deletion) {
+        const otherPendingUsers = await tx.user.count({
+          where: {
+            companyId: user.company.id,
+            id: { not: userId },
+            deletionRequestedAt: { not: null },
+          },
+        });
+
+        if (otherPendingUsers === 0) {
+          await tx.company.update({
+            where: { id: user.company.id },
+            data: {
+              status: user.company.statusBeforeDeletion ?? CompanyStatus.demo,
+              statusBeforeDeletion: null,
+            },
+          });
+        }
+      }
+
+      return { hadDeletionRequest: Boolean(user.deletionRequestedAt), companyId: user.companyId };
+    });
+
+    await this.sessionCache.invalidateUser(userId);
+    if (result.hadDeletionRequest) {
+      await this.notifications
+        .createInApp({
+          userId,
+          eventType: "auth.data_deletion.cancelled",
+          sourceId: `${userId}:${Date.now()}`,
+          category: NotificationCategory.security,
+          title: "Удаление аккаунта отменено",
+          body: "Запрос на удаление аккаунта отменён. Доступ к кабинету восстановлен.",
+          link: "/account",
+          payload: { companyId: result.companyId },
+        })
+        .catch(swallowAndLog("auth.data_deletion.cancelled.notify", { userId }));
+    }
+
+    return serializeAccountDeletion(null);
   }
 
   // Сворачиваем User-Agent к стабильной паре «браузер/ОС». Нужно, чтобы
@@ -503,6 +638,10 @@ export class AuthService {
         : null,
       platformRoles,
       requiresReConsent: await this.hasPendingRequiredConsent(userId),
+      deletionRequestedAt: user.deletionRequestedAt?.toISOString() ?? null,
+      deletionScheduledFor: user.deletionRequestedAt
+        ? accountDeletionScheduledFor(user.deletionRequestedAt).toISOString()
+        : null,
     };
   }
 
@@ -589,3 +728,15 @@ const avatarSuffixByGender: Record<string, string> = {
   male: "man",
   female: "woman",
 };
+
+function accountDeletionScheduledFor(requestedAt: Date): Date {
+  return new Date(requestedAt.getTime() + ACCOUNT_DELETION_GRACE_DAYS * 24 * 60 * 60 * 1000);
+}
+
+function serializeAccountDeletion(requestedAt: Date | null): AccountDeletionResponse {
+  return {
+    ok: true,
+    deletionRequestedAt: requestedAt?.toISOString() ?? null,
+    deletionScheduledFor: requestedAt ? accountDeletionScheduledFor(requestedAt).toISOString() : null,
+  };
+}

@@ -55,7 +55,7 @@ type AdminCompanyDetail = {
   }>;
 };
 
-const companyStatuses = ["demo", "active", "past_due", "suspended", "blocked", "archived"] as const;
+const companyStatuses = ["demo", "active", "past_due", "suspended", "pending_deletion", "blocked", "archived"] as const;
 const subscriptionPlans = ["basic", "extended"] as const;
 const statusReasons: ReadonlyArray<readonly [string, string]> = [
   ["policy_violation", "Нарушение правил"],

@@ -6465,6 +6465,11 @@ li.tree-add-row + li.tree-add-row,
   font-weight: 700;
 }
 
+.account-danger-zone {
+  border-color: rgba(207, 34, 46, 0.24);
+  background: linear-gradient(180deg, rgba(207, 34, 46, 0.04), rgba(255, 255, 255, 0.92));
+}
+
 .account-card-primary {
   margin: 0;
   font-size: 15px;

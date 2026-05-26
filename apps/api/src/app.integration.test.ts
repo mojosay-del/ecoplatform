@@ -17,6 +17,7 @@ import {
   UserStatus,
 } from "@prisma/client";
 import { BillingNotificationsService } from "./billing/billing-notifications.service";
+import { SchedulerService } from "./scheduler/scheduler.service";
 import { createTestApp, resetDb, TestApp } from "./test/test-app";
 
 let ctx: TestApp;
@@ -473,6 +474,95 @@ describe("Auth", () => {
       where: { userId, eventType: "auth.data_export.ready" },
     });
     expect(note?.category).toBe("security");
+  });
+
+  it("POST /auth/me/request-deletion планирует удаление и cancel возвращает компанию в прежний статус", async () => {
+    const { token, companyId, userId } = await registerCompany("0000006");
+    const secondLogin = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "user0000006@test.local", password: "User123456" });
+    expect(secondLogin.status).toBe(201);
+
+    const requestDeletion = await ctx.http
+      .post("/api/auth/me/request-deletion")
+      .set("Authorization", `Bearer ${token}`);
+    expect(requestDeletion.status).toBe(201);
+    expect(requestDeletion.body.deletionRequestedAt).toEqual(expect.any(String));
+    expect(requestDeletion.body.deletionScheduledFor).toEqual(expect.any(String));
+
+    const userAfterRequest = await ctx.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const companyAfterRequest = await ctx.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    expect(userAfterRequest.deletionRequestedAt).toBeInstanceOf(Date);
+    expect(companyAfterRequest.status).toBe(CompanyStatus.pending_deletion);
+    expect(companyAfterRequest.statusBeforeDeletion).toBe(CompanyStatus.demo);
+
+    const meAfterRequest = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(meAfterRequest.status).toBe(200);
+    expect(meAfterRequest.body.company.status).toBe("pending_deletion");
+    expect(meAfterRequest.body.deletionRequestedAt).toEqual(expect.any(String));
+
+    const revokedSecondSession = await ctx.http
+      .get("/api/auth/me")
+      .set("Authorization", `Bearer ${secondLogin.body.accessToken}`);
+    expect(revokedSecondSession.status).toBe(401);
+
+    const note = await ctx.prisma.inAppNotification.findFirst({
+      where: { userId, eventType: "auth.data_deletion.requested" },
+    });
+    expect(note?.category).toBe("security");
+
+    const cancelDeletion = await ctx.http.post("/api/auth/me/cancel-deletion").set("Authorization", `Bearer ${token}`);
+    expect(cancelDeletion.status).toBe(201);
+    expect(cancelDeletion.body.deletionRequestedAt).toBeNull();
+
+    const userAfterCancel = await ctx.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const companyAfterCancel = await ctx.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    expect(userAfterCancel.deletionRequestedAt).toBeNull();
+    expect(companyAfterCancel.status).toBe(CompanyStatus.demo);
+    expect(companyAfterCancel.statusBeforeDeletion).toBeNull();
+  });
+
+  it("cleanup-deleted-accounts удаляет заявки старше 30 дней", async () => {
+    const { token, companyId, userId } = await registerCompany("0000007");
+    const requestDeletion = await ctx.http
+      .post("/api/auth/me/request-deletion")
+      .set("Authorization", `Bearer ${token}`);
+    expect(requestDeletion.status).toBe(201);
+
+    const requestedAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    const address = await ctx.prisma.address.create({
+      data: {
+        city: "Москва",
+        formatted: "Москва, тестовый адрес удаления",
+        source: "manual",
+      },
+    });
+    await ctx.prisma.company.update({
+      where: { id: companyId },
+      data: { factualAddressId: address.id },
+    });
+    await ctx.prisma.user.update({
+      where: { id: userId },
+      data: { deletionRequestedAt: requestedAt },
+    });
+    await ctx.prisma.fileAsset.create({
+      data: {
+        originalName: "delete-me.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 42,
+        storageKey: "dev/delete-me.pdf",
+        uploadedById: userId,
+      },
+    });
+
+    const scheduler = ctx.app.get(SchedulerService);
+    const result = await scheduler.cleanupDeletedAccounts(new Date());
+    expect(result).toEqual({ deletedUsers: 1, deletedCompanies: 1 });
+
+    await expect(ctx.prisma.user.findUnique({ where: { id: userId } })).resolves.toBeNull();
+    await expect(ctx.prisma.company.findUnique({ where: { id: companyId } })).resolves.toBeNull();
+    await expect(ctx.prisma.address.findUnique({ where: { id: address.id } })).resolves.toBeNull();
+    await expect(ctx.prisma.fileAsset.findFirst({ where: { uploadedById: userId } })).resolves.toBeNull();
   });
 });
 

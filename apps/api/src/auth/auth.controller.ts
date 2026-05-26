@@ -110,6 +110,18 @@ export class AuthController {
     response.send(archive.buffer);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post("me/request-deletion")
+  async requestDeletion(@CurrentUser() user: RequestUser) {
+    return this.auth.requestAccountDeletion(user.id, user.sessionId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("me/cancel-deletion")
+  async cancelDeletion(@CurrentUser() user: RequestUser) {
+    return this.auth.cancelAccountDeletion(user.id);
+  }
+
   private setRefreshCookie(response: Response, refreshToken: string) {
     response.cookie("refreshToken", refreshToken, {
       httpOnly: true,

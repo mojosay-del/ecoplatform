@@ -1,4 +1,12 @@
-export const companyStatuses = ["demo", "active", "past_due", "suspended", "blocked", "archived"] as const;
+export const companyStatuses = [
+  "demo",
+  "active",
+  "past_due",
+  "suspended",
+  "pending_deletion",
+  "blocked",
+  "archived",
+] as const;
 
 export type CompanyStatus = (typeof companyStatuses)[number];
 

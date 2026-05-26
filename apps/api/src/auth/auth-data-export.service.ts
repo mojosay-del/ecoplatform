@@ -34,6 +34,7 @@ export class AuthDataExportService {
         failedLoginAttempts: true,
         failedLoginWindowStartedAt: true,
         lockedUntil: true,
+        deletionRequestedAt: true,
         createdAt: true,
         updatedAt: true,
         platformStaff: { select: { roles: true, isActive: true, createdAt: true, updatedAt: true } },

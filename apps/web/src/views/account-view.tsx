@@ -13,8 +13,10 @@ import {
   KeyRound,
   LifeBuoy,
   LogOut,
+  RotateCcw,
   ShieldCheck,
   Smartphone,
+  Trash2,
   UserRound,
   X,
   type LucideIcon,
@@ -43,6 +45,7 @@ const COMPANY_STATUS_LABELS: Record<string, string> = {
   active: "Активна",
   past_due: "Подписка просрочена",
   suspended: "Приостановлена",
+  pending_deletion: "Удаление запланировано",
   blocked: "Заблокирована",
   archived: "В архиве",
 };
@@ -97,6 +100,8 @@ function describeSubscription(
   if (billing.status === "past_due")
     return { tariff: "Подписка просрочена", note: "Свяжитесь с поддержкой для продления." };
   if (billing.status === "suspended") return { tariff: "Приостановлена", note: "Доступ к разделам временно закрыт." };
+  if (billing.status === "pending_deletion")
+    return { tariff: "Удаление запланировано", note: "Доступ к функциональным разделам закрыт до отмены запроса." };
   if (billing.status === "blocked") return { tariff: "Заблокирована", note: "Компания заблокирована." };
   return { tariff: "не активирован", note: "Подписка не активна" };
 }
@@ -287,7 +292,7 @@ function getAccountModuleCards(companyType?: string | null, status?: string | nu
 }
 
 export function AccountView() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, refreshMe } = useAuth();
   const isPlatformStaff = (user?.platformRoles?.length ?? 0) > 0;
   const { data: billing, setData: setBilling } = useApiQuery<BillingStatus | null>(
     isPlatformStaff ? null : "billing-status",
@@ -318,6 +323,8 @@ export function AccountView() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [deletionBusy, setDeletionBusy] = useState(false);
+  const [deletionMessage, setDeletionMessage] = useState<string | null>(null);
   const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
   const [notificationBusyKey, setNotificationBusyKey] = useState<string | null>(null);
 
@@ -342,6 +349,11 @@ export function AccountView() {
   const company = billing;
   const latestSubscription = billing?.subscriptions?.[0] ?? null;
   const supportPreview = supportTickets.items.slice(0, 4);
+  const showBillingStateBanner =
+    company?.status === "demo" ||
+    company?.status === "past_due" ||
+    company?.status === "suspended" ||
+    company?.status === "pending_deletion";
 
   function openSupport() {
     window.dispatchEvent(new Event("support:open"));
@@ -426,6 +438,44 @@ export function AccountView() {
       setExportMessage(error instanceof Error ? error.message : "Не удалось подготовить экспорт.");
     } finally {
       setExportBusy(false);
+    }
+  }
+
+  async function requestDeletion() {
+    if (!token) return;
+    const ok = window.confirm(
+      "Запланировать удаление аккаунта через 30 дней? Функциональные разделы будут закрыты до отмены запроса.",
+    );
+    if (!ok) return;
+    setDeletionBusy(true);
+    setDeletionMessage(null);
+    try {
+      const result = await api.auth.requestDeletion();
+      await refreshMe();
+      setDeletionMessage(
+        `Удаление запланировано на ${formatAccountDate(result.deletionScheduledFor)}. Можно отменить до этой даты.`,
+      );
+      window.dispatchEvent(new Event("notifications:changed"));
+    } catch (error) {
+      setDeletionMessage(error instanceof Error ? error.message : "Не удалось запланировать удаление.");
+    } finally {
+      setDeletionBusy(false);
+    }
+  }
+
+  async function cancelDeletion() {
+    if (!token) return;
+    setDeletionBusy(true);
+    setDeletionMessage(null);
+    try {
+      await api.auth.cancelDeletion();
+      await refreshMe();
+      setDeletionMessage("Запрос на удаление отменён.");
+      window.dispatchEvent(new Event("notifications:changed"));
+    } catch (error) {
+      setDeletionMessage(error instanceof Error ? error.message : "Не удалось отменить удаление.");
+    } finally {
+      setDeletionBusy(false);
     }
   }
 
@@ -571,7 +621,7 @@ export function AccountView() {
 
         {activeTab === "billing" && !isPlatformStaff ? (
           <div className="account-panel-stack">
-            {company?.status === "demo" || company?.status === "past_due" || company?.status === "suspended" ? (
+            {showBillingStateBanner ? (
               <div className={`account-state-banner status-${company.status}`}>
                 <strong>{subscription.tariff}</strong>
                 <span>{subscription.note}</span>
@@ -738,6 +788,36 @@ export function AccountView() {
                   <Download size={16} />
                   {exportBusy ? "Готовим..." : "Скачать архив"}
                 </button>
+              </article>
+              <article className="card account-card account-danger-zone">
+                <h2>Опасная зона</h2>
+                {user?.deletionRequestedAt ? (
+                  <p className="page-subtitle">
+                    Удаление аккаунта запланировано на {formatAccountDate(user.deletionScheduledFor)}. До этой даты
+                    запрос можно отменить.
+                  </p>
+                ) : (
+                  <p className="page-subtitle">
+                    Запрос ставит аккаунт в очередь удаления на 30 дней и закрывает функциональные разделы компании.
+                  </p>
+                )}
+                {deletionMessage ? <p className="account-form-message">{deletionMessage}</p> : null}
+                {user?.deletionRequestedAt ? (
+                  <button className="button secondary" type="button" onClick={cancelDeletion} disabled={deletionBusy}>
+                    <RotateCcw size={16} />
+                    {deletionBusy ? "Отменяем..." : "Передумал"}
+                  </button>
+                ) : (
+                  <button
+                    className="button secondary danger"
+                    type="button"
+                    onClick={requestDeletion}
+                    disabled={deletionBusy}
+                  >
+                    <Trash2 size={16} />
+                    {deletionBusy ? "Планируем..." : "Запросить удаление"}
+                  </button>
+                )}
               </article>
             </div>
             <article className="card account-card">

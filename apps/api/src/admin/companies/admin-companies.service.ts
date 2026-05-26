@@ -96,7 +96,10 @@ export class AdminCompaniesService {
   }
 
   async changeStatus(id: string, input: StatusInput, actor: RequestUser) {
-    const company = await this.prisma.company.findUnique({ where: { id }, select: { id: true, status: true } });
+    const company = await this.prisma.company.findUnique({
+      where: { id },
+      select: { id: true, status: true, statusBeforeDeletion: true },
+    });
     if (!company) {
       throw new NotFoundException("Компания не найдена.");
     }
@@ -107,7 +110,14 @@ export class AdminCompaniesService {
     const nextStatus = input.status as CompanyStatus;
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.company.update({ where: { id }, data: { status: nextStatus } });
+      await tx.company.update({
+        where: { id },
+        data: {
+          status: nextStatus,
+          statusBeforeDeletion:
+            nextStatus === CompanyStatus.pending_deletion ? (company.statusBeforeDeletion ?? company.status) : null,
+        },
+      });
 
       if (nextStatus === CompanyStatus.blocked || nextStatus === CompanyStatus.archived) {
         await tx.session.updateMany({

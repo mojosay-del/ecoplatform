@@ -67,7 +67,12 @@ export function canAccessLearningLevel(
   const plan = effectivePlan(company, now);
 
   if (accessLevel === "one_time") {
-    return hasOneTimePurchase && company.status !== "blocked" && company.status !== "archived";
+    return (
+      hasOneTimePurchase &&
+      company.status !== "pending_deletion" &&
+      company.status !== "blocked" &&
+      company.status !== "archived"
+    );
   }
 
   if (accessLevel === "basic") {

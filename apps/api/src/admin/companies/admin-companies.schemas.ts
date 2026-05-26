@@ -1,7 +1,15 @@
 import { z } from "zod";
 import { resolvePagination } from "../../common/pagination";
 
-export const companyStatusValues = ["demo", "active", "past_due", "suspended", "blocked", "archived"] as const;
+export const companyStatusValues = [
+  "demo",
+  "active",
+  "past_due",
+  "suspended",
+  "pending_deletion",
+  "blocked",
+  "archived",
+] as const;
 export const subscriptionPlanValues = ["basic", "extended"] as const;
 
 export const adminCompanyListQuerySchema = z

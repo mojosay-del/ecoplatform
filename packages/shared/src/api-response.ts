@@ -324,6 +324,8 @@ export type AuthMeUser = {
   company: AuthMeCompany | null;
   platformRoles: PlatformRole[];
   requiresReConsent: boolean;
+  deletionRequestedAt: IsoDateString | null;
+  deletionScheduledFor: IsoDateString | null;
 };
 
 export type AuthMeCompany = {
