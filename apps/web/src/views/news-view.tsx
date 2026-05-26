@@ -36,7 +36,8 @@ import { ContentBlocks } from "./content-blocks";
 const NEWS_PAGE_SIZE = 20;
 
 export function NewsView() {
-  const feed = useInfiniteApiQuery("news-feed", NEWS_PAGE_SIZE, ({ limit, offset }) =>
+  const { ready, token } = useAuth();
+  const feed = useInfiniteApiQuery(ready && token ? "news-feed" : null, NEWS_PAGE_SIZE, ({ limit, offset }) =>
     api.news.list({ limit, offset }),
   );
   const { items, setItems, state, errorMessage, hasMore, isLoadingMore, sentinelRef } = feed;
