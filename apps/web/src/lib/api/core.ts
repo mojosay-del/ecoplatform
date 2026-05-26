@@ -13,10 +13,25 @@ export type FileAsset = {
   mimeType: string;
   sizeBytes: number;
   storageKey: string;
+  variants: Partial<
+    Record<
+      "webp" | "avif",
+      {
+        storageKey: string;
+        mimeType: string;
+        sizeBytes: number;
+        publicUrl: string | null;
+      }
+    >
+  > | null;
   accessLevel: "public" | "authenticated" | "platform_private" | "conversation_private";
   publicUrl: string | null;
   createdAt: string;
 };
+
+export function preferredFileAssetImageUrl(asset: FileAsset | null | undefined): string | null {
+  return asset?.variants?.avif?.publicUrl ?? asset?.variants?.webp?.publicUrl ?? asset?.publicUrl ?? null;
+}
 
 export class ApiError extends Error {
   constructor(

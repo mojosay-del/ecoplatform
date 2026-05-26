@@ -488,6 +488,7 @@ model FileAsset {
   mimeType     String
   sizeBytes    Int
   storageKey   String
+  variants     Json?
   accessLevel  FileAccessLevel @default(authenticated)
   uploadedById String?
   createdAt    DateTime        @default(now())

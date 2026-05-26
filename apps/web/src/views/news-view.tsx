@@ -12,7 +12,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Flag, MessageCircle, Send, ThumbsUp, X } from "lucide-react";
 import type { NewsCommentDecorated, NewsListItem, NewsPostDetail } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
-import { ApiError, api, type FileAsset } from "../lib/api";
+import { ApiError, api, preferredFileAssetImageUrl, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -94,7 +94,8 @@ export function NewsView() {
           <div className="news-masonry">
             {items.map((post) => {
               const cover = post.coverImageId ? covers.get(post.coverImageId) : null;
-              const hasCover = Boolean(cover?.publicUrl);
+              const coverUrl = preferredFileAssetImageUrl(cover);
+              const hasCover = Boolean(coverUrl);
               const publishedDate = post.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
               return (
                 // Раньше тут был <button>, что:
@@ -120,7 +121,7 @@ export function NewsView() {
                           `sizes` подсказывает next/image, какой preset запросить под viewport. */}
                       <Image
                         alt={cover?.originalName ?? post.title}
-                        src={cover!.publicUrl!}
+                        src={coverUrl!}
                         fill
                         sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                         style={{ objectFit: "cover" }}
@@ -365,6 +366,7 @@ function NewsArticleContent({
 }: NewsArticleProps) {
   const { token } = useAuth();
   const [cover, setCover] = useState<FileAsset | null>(null);
+  const coverUrl = preferredFileAssetImageUrl(cover);
   const publishedDate = post.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
   useEffect(() => {
     if (!token || !post?.coverImageId) {
@@ -379,11 +381,11 @@ function NewsArticleContent({
 
   return (
     <div className="news-article">
-      {cover?.publicUrl ? (
+      {coverUrl ? (
         <div className="news-article-cover">
           <Image
-            alt={cover.originalName ?? post.title}
-            src={cover.publicUrl}
+            alt={cover?.originalName ?? post.title}
+            src={coverUrl}
             fill
             sizes="(max-width: 1024px) 100vw, 1024px"
             style={{ objectFit: "cover" }}

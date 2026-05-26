@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { FileAccessLevel } from "@prisma/client";
+import sharp from "sharp";
 import { FilesService } from "./files.service";
 
 function serviceWithPrisma(prisma: Record<string, unknown>) {
@@ -35,6 +36,36 @@ describe("FilesService cleanup", () => {
 
     await service.deleteIfUnreferenced(["file-1"]);
 
+    expect(prisma.fileAsset.delete).toHaveBeenCalledWith({ where: { id: "file-1" } });
+  });
+
+  it("удаляет S3-объекты всех вариантов, если файл не используется", async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "file-1",
+          storageKey: "uploads/2026-05-22/file.webp",
+          variants: {
+            webp: { storageKey: "uploads/2026-05-22/file.webp", mimeType: "image/webp", sizeBytes: 100 },
+            avif: { storageKey: "uploads/2026-05-22/file.avif", mimeType: "image/avif", sizeBytes: 80 },
+          },
+        }),
+        delete: vi.fn().mockResolvedValue({}),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+    (service as unknown as { getS3Config: () => unknown }).getS3Config = () => ({
+      client: { send },
+      bucket: "bucket",
+    });
+
+    await service.deleteIfUnreferenced(["file-1"]);
+
+    expect(send.mock.calls.map(([command]) => command.input.Key).sort()).toEqual([
+      "uploads/2026-05-22/file.avif",
+      "uploads/2026-05-22/file.webp",
+    ]);
     expect(prisma.fileAsset.delete).toHaveBeenCalledWith({ where: { id: "file-1" } });
   });
 
@@ -185,5 +216,71 @@ describe("FilesService upload validation", () => {
       }),
     });
     expect(result.mimeType).toBe("application/pdf");
+  });
+
+  it("для cover-upload сохраняет WebP и AVIF варианты в S3 и метаданных", async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const source = await sharp({
+      create: {
+        width: 1400,
+        height: 700,
+        channels: 3,
+        background: "#5f7a8d",
+      },
+    })
+      .png()
+      .toBuffer();
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        create: vi.fn().mockImplementation(({ data }) =>
+          Promise.resolve({
+            id: "file-cover",
+            createdAt: new Date("2026-05-25T00:00:00.000Z"),
+            variants: data.variants ?? null,
+            ...data,
+          }),
+        ),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+    (service as unknown as { getClient: () => unknown }).getClient = () => ({
+      client: { send },
+      bucket: "bucket",
+    });
+
+    const result = await service.upload(
+      {
+        originalname: "cover.png",
+        mimetype: "image/png",
+        size: source.length,
+        buffer: source,
+      },
+      { imagePreset: "cover", accessLevel: FileAccessLevel.public },
+      "user-1",
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls.map(([command]) => command.input.ContentType).sort()).toEqual(["image/avif", "image/webp"]);
+    expect(prisma.fileAsset.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        originalName: "cover.png",
+        mimeType: "image/webp",
+        accessLevel: FileAccessLevel.public,
+        variants: {
+          webp: expect.objectContaining({
+            mimeType: "image/webp",
+            storageKey: expect.stringMatching(/\.webp$/),
+          }),
+          avif: expect.objectContaining({
+            mimeType: "image/avif",
+            storageKey: expect.stringMatching(/\.avif$/),
+          }),
+        },
+      }),
+    });
+    expect(result.mimeType).toBe("image/webp");
+    expect(result.variants?.avif?.storageKey).toMatch(/\.avif$/);
   });
 });

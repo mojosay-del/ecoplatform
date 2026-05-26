@@ -9,7 +9,7 @@ import Image from "next/image";
 import { useMemo } from "react";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
-import { api } from "../lib/api";
+import { api, preferredFileAssetImageUrl } from "../lib/api";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./_shared";
 import { ContentBlocks } from "./content-blocks";
@@ -80,6 +80,7 @@ function KnowledgeBaseLayout({
   const coverItems = useMemo(() => (active ? [active, ...((active.children ?? []) as KnowledgeNode[])] : []), [active]);
   const covers = useCoverAssets(coverItems);
   const activeCover = active?.coverImageId ? covers.get(active.coverImageId) : null;
+  const activeCoverUrl = preferredFileAssetImageUrl(activeCover);
 
   return (
     <AppShell>
@@ -128,11 +129,11 @@ function KnowledgeBaseLayout({
                   </div>
                 </div>
 
-                {activeCover?.publicUrl ? (
+                {activeCoverUrl ? (
                   <figure className="knowledge-cover">
                     <Image
-                      alt={activeCover.originalName ?? active.title}
-                      src={activeCover.publicUrl}
+                      alt={activeCover?.originalName ?? active.title}
+                      src={activeCoverUrl}
                       fill
                       sizes="(max-width: 1024px) 100vw, 800px"
                       style={{ objectFit: "cover" }}
@@ -154,17 +155,18 @@ function KnowledgeBaseLayout({
                     <div className="knowledge-child-grid">
                       {activeChildren.map((child: KnowledgeNode) => {
                         const childCover = child.coverImageId ? covers.get(child.coverImageId) : null;
+                        const childCoverUrl = preferredFileAssetImageUrl(childCover);
                         return (
                           <Link
-                            className={`knowledge-child-card${childCover?.publicUrl ? " has-cover" : ""}`}
+                            className={`knowledge-child-card${childCoverUrl ? " has-cover" : ""}`}
                             href={`/knowledge-base/${child.slug}`}
                             key={child.id}
                           >
-                            {childCover?.publicUrl ? (
+                            {childCoverUrl ? (
                               <div className="knowledge-child-card-cover">
                                 <Image
                                   alt=""
-                                  src={childCover.publicUrl}
+                                  src={childCoverUrl}
                                   fill
                                   sizes="(max-width: 768px) 100vw, 280px"
                                   style={{ objectFit: "cover" }}

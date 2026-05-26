@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Upload, X } from "lucide-react";
-import { apiDeleteFile, apiFetch, apiUploadFile, type FileAsset } from "../lib/api";
+import { apiDeleteFile, apiFetch, apiUploadFile, preferredFileAssetImageUrl, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 // Показываем миниатюру для image-MIME и для любого file, у которого
@@ -104,6 +104,7 @@ export function FileUploadField({
   }
 
   const imageMode = isImageAsset(uploaded);
+  const uploadedImageUrl = preferredFileAssetImageUrl(uploaded);
   const hasFile = Boolean(uploaded);
 
   if (tile) {
@@ -118,9 +119,9 @@ export function FileUploadField({
           type="file"
         />
         {hasFile ? (
-          imageMode && uploaded?.publicUrl ? (
+          imageMode && uploadedImageUrl ? (
             <div className="file-upload-tile-preview">
-              <img alt={uploaded.originalName} src={uploaded.publicUrl} />
+              <img alt={uploaded?.originalName ?? "Файл"} src={uploadedImageUrl} />
               <div className="file-upload-tile-actions">
                 <button onClick={() => inputRef.current?.click()} type="button" aria-label="Заменить файл">
                   <Upload size={15} />
@@ -165,9 +166,9 @@ export function FileUploadField({
         type="file"
       />
       {hasFile ? (
-        imageMode && uploaded?.publicUrl ? (
+        imageMode && uploadedImageUrl ? (
           <div className="file-upload-preview">
-            <img alt={uploaded.originalName} src={uploaded.publicUrl} />
+            <img alt={uploaded?.originalName ?? "Файл"} src={uploadedImageUrl} />
             <div className="file-upload-preview-actions">
               <button className="button secondary" onClick={() => inputRef.current?.click()} type="button">
                 <Upload size={16} />

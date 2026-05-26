@@ -23,5 +23,9 @@ describe("processCoverImage", () => {
     expect(metadata.format).toBe("webp");
     expect(metadata.width).toBeLessThanOrEqual(1200);
     expect(metadata.height).toBeLessThanOrEqual(1200);
+    expect(result.variants).toHaveLength(1);
+    expect(result.variants[0]).toMatchObject({ format: "avif", extension: ".avif", mimeType: "image/avif" });
+    const avifMetadata = await sharp(result.variants[0].buffer).metadata();
+    expect(["avif", "heif"]).toContain(avifMetadata.format);
   });
 });

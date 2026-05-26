@@ -9,7 +9,7 @@ import { Block, BlocksEditor, NEWS_BLOCK_KINDS } from "./BlocksEditor";
 import { ContentBlocks } from "../views/content-blocks";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
-import { ApiError, api, apiFetch } from "../lib/api";
+import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -270,7 +270,7 @@ export function AdminNewsView() {
   }
 
   const isEditingNew = draft.id === null;
-  const draftCoverUrl = draft.coverImageId ? (covers.get(draft.coverImageId)?.publicUrl ?? null) : null;
+  const draftCoverUrl = preferredFileAssetImageUrl(draft.coverImageId ? covers.get(draft.coverImageId) : null);
   const canPreview = draft.title.trim().length > 0 || draft.lead.trim().length > 0 || draft.blocks.length > 0;
 
   return (
@@ -302,7 +302,7 @@ export function AdminNewsView() {
             ) : null}
             <div className="news-list">
               {items.map((item) => {
-                const coverUrl = item.coverImageId ? covers.get(item.coverImageId)?.publicUrl : null;
+                const coverUrl = preferredFileAssetImageUrl(item.coverImageId ? covers.get(item.coverImageId) : null);
                 const actions: ActionItem[] = [
                   {
                     label: item.status === "published" ? "Снять с публикации" : "Опубликовать",

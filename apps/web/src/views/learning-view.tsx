@@ -28,7 +28,7 @@ import type {
   PaginatedResponse,
 } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
-import { ApiError, api, type FileAsset } from "../lib/api";
+import { ApiError, api, preferredFileAssetImageUrl, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import {
@@ -80,7 +80,7 @@ export function EducationView() {
               ) ?? 0;
             const isInDevelopment = Boolean(module.isInDevelopment);
             const cover = module.coverImageId ? covers.get(module.coverImageId) : null;
-            const coverUrl = cover?.publicUrl;
+            const coverUrl = preferredFileAssetImageUrl(cover);
             return (
               <article className="education-card" key={module.id}>
                 <Link className="education-card-link" href={`/education/${module.id}`}>
@@ -152,7 +152,7 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
 
   const isInDevelopment = Boolean(data.isInDevelopment);
   const hasAccess = !isInDevelopment && Boolean(data.hasAccess);
-  const coverUrl = data.coverImageId ? covers.get(data.coverImageId)?.publicUrl : null;
+  const coverUrl = preferredFileAssetImageUrl(data.coverImageId ? covers.get(data.coverImageId) : null);
   const totalLessons = (data.chapters ?? []).reduce(
     (sum: number, chapter: LearningChapterDetail) => sum + (chapter.lessons?.length ?? 0),
     0,

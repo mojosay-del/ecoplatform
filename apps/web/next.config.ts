@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
   // `**` в hostname работает только в pathname-pattern; для wildcard-доменов
   // нужно отдельно прописать каждый поддомен.
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       { protocol: "https", hostname: "s3.twcstorage.ru", pathname: "/**" },
       // Кастомный CDN или прямой бакет-домен на Timeweb.

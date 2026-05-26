@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { FileAccessLevel, type FileAsset } from "@prisma/client";
+import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
 import { fromBuffer } from "file-type";
 import { randomUUID } from "crypto";
 import { extname } from "path";
 import { PrismaService } from "../prisma/prisma.service";
-import { processCoverImage } from "./image-presets";
+import { processCoverImage, type ProcessedImageVariant } from "./image-presets";
 
 export type UploadedMemoryFile = {
   originalname: string;
@@ -14,16 +14,28 @@ export type UploadedMemoryFile = {
   buffer: Buffer;
 };
 
-export type FileAssetResponse = FileAsset & {
+type FileReferenceBlock = { payload: unknown };
+type ImageVariantFormat = "webp" | "avif";
+type StoredImageVariant = {
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+type FileAssetImageVariant = StoredImageVariant & {
   publicUrl: string | null;
 };
+type FileAssetImageVariants = Partial<Record<ImageVariantFormat, FileAssetImageVariant>>;
+export type FileAssetResponse = Omit<FileAsset, "variants"> & {
+  publicUrl: string | null;
+  variants: FileAssetImageVariants | null;
+};
 
-type FileReferenceBlock = { payload: unknown };
 type ValidatedUpload = {
   buffer: Buffer;
   extension?: string;
   mimeType: string;
   contentDisposition?: string;
+  variants?: ProcessedImageVariant[];
 };
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
@@ -131,10 +143,50 @@ export class FilesService {
     return `${baseUrl.replace(/\/$/, "")}/${bucket}/${storageKey}`;
   }
 
+  private parseImageVariants(raw: Prisma.JsonValue | null | undefined): Record<string, StoredImageVariant> {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return {};
+    }
+
+    const variants: Record<string, StoredImageVariant> = {};
+    for (const [format, value] of Object.entries(raw)) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        continue;
+      }
+      const candidate = value as Record<string, unknown>;
+      if (
+        typeof candidate.storageKey !== "string" ||
+        typeof candidate.mimeType !== "string" ||
+        typeof candidate.sizeBytes !== "number"
+      ) {
+        continue;
+      }
+      variants[format] = {
+        storageKey: candidate.storageKey,
+        mimeType: candidate.mimeType,
+        sizeBytes: candidate.sizeBytes,
+      };
+    }
+    return variants;
+  }
+
+  private variantResponse(asset: FileAsset): FileAssetImageVariants | null {
+    const parsed = this.parseImageVariants(asset.variants);
+    const entries = Object.entries(parsed).map(([format, variant]) => [
+      format,
+      {
+        ...variant,
+        publicUrl: this.publicUrl(variant.storageKey, asset.accessLevel),
+      },
+    ]);
+    return entries.length > 0 ? (Object.fromEntries(entries) as FileAssetImageVariants) : null;
+  }
+
   private toResponse(asset: FileAsset): FileAssetResponse {
     return {
       ...asset,
       publicUrl: this.publicUrl(asset.storageKey, asset.accessLevel),
+      variants: this.variantResponse(asset),
     };
   }
 
@@ -368,6 +420,16 @@ export class FilesService {
     return `uploads/${date}/${randomUUID()}-${safeBaseName}${extension}`;
   }
 
+  private storageKeyWithExtension(storageKey: string, extension: string): string {
+    const currentExtension = extname(storageKey);
+    return `${storageKey.slice(0, Math.max(0, storageKey.length - currentExtension.length))}${extension}`;
+  }
+
+  private fileStorageKeys(asset: FileAsset): string[] {
+    const variants = Object.values(this.parseImageVariants(asset.variants)).map((variant) => variant.storageKey);
+    return Array.from(new Set([asset.storageKey, ...variants]));
+  }
+
   async createMetadata(
     input: { originalName: string; mimeType: string; sizeBytes: number; accessLevel?: FileAccessLevel },
     userId: string,
@@ -408,17 +470,55 @@ export class FilesService {
     const { client, bucket } = this.getClient();
     const accessLevel = input.accessLevel ?? FileAccessLevel.public;
     const storageKey = this.storageKey(file.originalname, upload.extension);
+    const variantUploads = (upload.variants ?? []).map((variant) => ({
+      ...variant,
+      storageKey: this.storageKeyWithExtension(storageKey, variant.extension),
+    }));
 
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: storageKey,
-        Body: upload.buffer,
-        ContentType: upload.mimeType,
-        ContentDisposition: upload.contentDisposition,
-        ContentLength: upload.buffer.length,
-      }),
-    );
+    await Promise.all([
+      client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: storageKey,
+          Body: upload.buffer,
+          ContentType: upload.mimeType,
+          ContentDisposition: upload.contentDisposition,
+          ContentLength: upload.buffer.length,
+        }),
+      ),
+      ...variantUploads.map((variant) =>
+        client.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: variant.storageKey,
+            Body: variant.buffer,
+            ContentType: variant.mimeType,
+            ContentLength: variant.buffer.length,
+          }),
+        ),
+      ),
+    ]);
+
+    const variants =
+      variantUploads.length > 0
+        ? ({
+            webp: {
+              storageKey,
+              mimeType: upload.mimeType,
+              sizeBytes: upload.buffer.length,
+            },
+            ...Object.fromEntries(
+              variantUploads.map((variant) => [
+                variant.format,
+                {
+                  storageKey: variant.storageKey,
+                  mimeType: variant.mimeType,
+                  sizeBytes: variant.buffer.length,
+                },
+              ]),
+            ),
+          } satisfies Prisma.InputJsonObject)
+        : undefined;
 
     const asset = await this.prisma.fileAsset.create({
       data: {
@@ -427,6 +527,7 @@ export class FilesService {
         sizeBytes: upload.buffer.length,
         accessLevel,
         storageKey,
+        variants,
         uploadedById: userId,
       },
     });
@@ -487,11 +588,15 @@ export class FilesService {
 
       const config = this.getS3Config();
       if (config) {
-        await config.client.send(
-          new DeleteObjectCommand({
-            Bucket: config.bucket,
-            Key: asset.storageKey,
-          }),
+        await Promise.all(
+          this.fileStorageKeys(asset).map((key) =>
+            config.client.send(
+              new DeleteObjectCommand({
+                Bucket: config.bucket,
+                Key: key,
+              }),
+            ),
+          ),
         );
       }
 
