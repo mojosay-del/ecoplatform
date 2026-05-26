@@ -6,15 +6,17 @@ on:
   push:
     branches: [main]
   pull_request:
+  deployment_status:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref || github.event.deployment.id || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   static-checks:
     name: lint + format-check + unit-tests + build
     runs-on: ubuntu-latest
+    if: github.event_name != 'deployment_status'
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +50,7 @@ jobs:
   integration-tests:
     name: integration tests (Postgres)
     runs-on: ubuntu-latest
+    if: github.event_name != 'deployment_status'
     services:
       postgres:
         image: postgres:18-alpine
@@ -94,3 +97,35 @@ jobs:
 
       - name: Integration tests
         run: pnpm --filter @ecoplatform/api test:integration
+
+  staging-smoke:
+    name: staging smoke (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: >-
+      github.event_name == 'deployment_status' &&
+      github.event.deployment_status.state == 'success' &&
+      (github.event.deployment_status.environment == 'staging' ||
+      github.event.deployment.environment == 'staging')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @ecoplatform/web exec playwright install --with-deps chromium
+
+      - name: Run staging smoke test
+        run: pnpm --filter @ecoplatform/web test:smoke
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}

@@ -19,6 +19,9 @@
       "dependsOn": ["^build"],
       "cache": false
     },
+    "test:smoke": {
+      "cache": false
+    },
     "typecheck": {
       "dependsOn": ["^build"]
     }

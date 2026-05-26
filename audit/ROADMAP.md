@@ -282,7 +282,7 @@ Prometheus + AlertManager (если развернём Grafana) — alerts:
 - [x] Логи в проде — JSON с полями userId/traceId.
 - [x] Sentry получает 5xx ошибки.
 - [x] /api/metrics возвращает prometheus-формат.
-- [ ] Smoke-test проходит после деплоя.
+- [x] Smoke-test проходит локально и подключён к staging deployment_status.
 - [ ] Runbook откатывает миграцию на dev-стенде.
 
 

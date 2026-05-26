@@ -4,11 +4,11 @@
 
 ## Текущий этап
 
-Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL`, Sentry error tracking, Prometheus metrics и backup/runbook закрыты; distributed tracing осознанно отложен как опциональный post-MVP пункт.
+Закрыт большой блок «фундамента под рост»: юридические документы и согласия (Волна 6), полиморфные обсуждения и расширенная модель компании (Волна 7), Redis + infinite scroll + CDN/cache + distributed cron + Lighthouse baseline (Волна 8), HTTP-заголовки безопасности, CSRF, защита от перебора логина, экспорт данных по 152-ФЗ, запрос удаления аккаунта, audit-trail before/after, лимиты файлов, политика новых паролей и документ политики безопасности (Волна 9 — 11/11). Волна 10 начата: структурное логирование pino + `LOG_LEVEL`, Sentry error tracking, Prometheus metrics, backup/runbook и Playwright smoke-test закрыты; distributed tracing осознанно отложен как опциональный post-MVP пункт.
 
 Текущий рабочий блок — Волна 10: наблюдаемость и операции.
 
-Целевой следующий шаг: 10.6 — Smoke-test на проде через Playwright.
+Целевой следующий шаг: сверить следующий пункт по `audit/ROADMAP.md` и подтвердить старт новой итерации.
 
 ## Что уже сделано
 
@@ -90,6 +90,7 @@
 - Prometheus endpoint `/api/metrics` на API отдаёт text format через `prom-client`: default Node.js/process metrics, HTTP histogram, Prisma query histogram, auth cache hit/miss counters и бизнес-метрики регистраций, активных подписок и уведомлений.
 - В production `/api/metrics` закрыт Basic Auth через `METRICS_BASIC_USER`/`METRICS_BASIC_PASSWORD`; если credentials не заданы, endpoint не раскрывает метрики.
 - Backup/runbook для Timeweb: daily physical backups PostgreSQL с retention 30 копий/дней, daily `pg_dump -x --no-owner` в приватный Timeweb S3 с lifecycle 90 дней, pre-migration dump, monthly restore-smoke на dev/staging и безопасный rollback-runbook для Prisma-миграций без ручной правки `_prisma_migrations`.
+- Playwright smoke-test: `apps/web/tests/smoke.spec.ts` регистрирует уникального пользователя, проверяет logout/login, `/news` и `/indices`; `pnpm test:smoke` запускает smoke через web/root scripts, а GitHub Actions `staging-smoke` стартует после успешного staging deployment.
 
 ### Последние закрытые задачи Волны 9
 
@@ -119,7 +120,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 10** — наблюдаемость: distributed tracing осознанно отложен, дальше prod smoke-test через Playwright.
+- **Волна 10** — наблюдаемость: distributed tracing осознанно отложен, Playwright smoke-test добавлен; следующий старт сверять с актуальным `audit/ROADMAP.md`.
 - **Волна 11** — UX/дизайн-система: токены, типографика, цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»).
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
@@ -156,20 +157,22 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 74 unit-теста (shared 7, web 7, api 60)
+pnpm test                                             # 83 unit-теста (shared 7, web 10, api 66)
 pnpm build                                            # tsc + next build
-pnpm test:integration                                 # 110 integration-тестов против ecoplatform_test
+pnpm test:integration                                 # 112 integration-тестов против ecoplatform_test
+pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
 pnpm format:check                                     # prettier
 ```
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-26 (после Волны 10.3).
+Дата: 2026-05-26 (после Волны 10.6).
 
 - `pnpm lint` — успешно (4/4).
 - `pnpm test` — успешно: shared 7/7, web 10/10, api 66/66.
 - `pnpm test:integration` — успешно: API integration 112/112.
 - `pnpm build` — успешно (3/3).
+- `PLAYWRIGHT_TEST_BASE_URL=http://localhost:3000 pnpm --filter @ecoplatform/web test:smoke` — успешно: Chromium smoke 1/1.
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.
 - Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.

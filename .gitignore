@@ -3,10 +3,12 @@ node_modules
 .next
 dist
 coverage
+playwright-report
+test-results
+blob-report
 .env
 .env.local
 .DS_Store
 *.tsbuildinfo
 .pnpm-store
 apps/api/generated
-
