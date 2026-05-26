@@ -4,6 +4,7 @@ import { canAccessLearningLevel, lessonBlockSchema, validateContentBlocks } from
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { ModuleAccessService } from "../../common/module-access.service";
+import { paginatedResponse, resolvePagination, type PaginationInput } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import type { z } from "zod";
 import type {
@@ -71,25 +72,34 @@ export class LearningService {
     }
   }
 
-  async listLearningModules(user: RequestUser) {
+  async listLearningModules(user: RequestUser, paginationInput: PaginationInput = {}) {
     this.common.assertFunctionalAccess(user);
-    const modules = await this.prisma.learningModule.findMany({
-      where: { status: ContentStatus.published },
-      orderBy: [{ position: "asc" }, { createdAt: "desc" }],
-      include: {
-        chapters: {
-          include: {
-            lessons: { where: { status: ContentStatus.published }, orderBy: { position: "asc" } },
+    const pagination = resolvePagination(paginationInput, { defaultLimit: 20, maxLimit: 100 });
+    const where = { status: ContentStatus.published };
+    const [total, modules] = await this.prisma.$transaction([
+      this.prisma.learningModule.count({ where }),
+      this.prisma.learningModule.findMany({
+        where,
+        orderBy: [{ position: "asc" }, { createdAt: "desc" }],
+        take: pagination.limit,
+        skip: pagination.offset,
+        include: {
+          chapters: {
+            include: {
+              lessons: { where: { status: ContentStatus.published }, orderBy: { position: "asc" } },
+            },
+            orderBy: { position: "asc" },
           },
-          orderBy: { position: "asc" },
         },
-      },
-    });
+      }),
+    ]);
 
-    return modules.map((module) => ({
+    const items = modules.map((module) => ({
       ...module,
       hasAccess: this.canAccessPublishedLearningModule(user, module),
     }));
+
+    return paginatedResponse(items, total, pagination);
   }
 
   async getLearningModule(id: string, user: RequestUser) {
@@ -149,25 +159,33 @@ export class LearningService {
     };
   }
 
-  async adminListLearningModules() {
-    return this.prisma.learningModule.findMany({
-      orderBy: [{ position: "asc" }, { updatedAt: "desc" }],
-      include: {
-        preview: true,
-        chapters: {
-          orderBy: { position: "asc" },
-          include: {
-            lessons: {
-              orderBy: { position: "asc" },
-              include: {
-                blocks: { orderBy: { position: "asc" } },
-                attachments: { orderBy: { position: "asc" } },
+  async adminListLearningModules(paginationInput: PaginationInput = {}) {
+    const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 200 });
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.learningModule.count(),
+      this.prisma.learningModule.findMany({
+        orderBy: [{ position: "asc" }, { updatedAt: "desc" }],
+        take: pagination.limit,
+        skip: pagination.offset,
+        include: {
+          preview: true,
+          chapters: {
+            orderBy: { position: "asc" },
+            include: {
+              lessons: {
+                orderBy: { position: "asc" },
+                include: {
+                  blocks: { orderBy: { position: "asc" } },
+                  attachments: { orderBy: { position: "asc" } },
+                },
               },
             },
           },
         },
-      },
-    });
+      }),
+    ]);
+
+    return paginatedResponse(items, total, pagination);
   }
 
   async createLearningModule(input: LearningModuleInput, user: RequestUser) {

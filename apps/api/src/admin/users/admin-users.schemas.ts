@@ -1,14 +1,22 @@
 import { z } from "zod";
+import { resolvePagination } from "../../common/pagination";
 
 export const userStatusFilter = z.enum(["active", "blocked"]).optional();
 
-export const adminUserListQuerySchema = z.object({
-  status: userStatusFilter,
-  companyId: z.string().min(1).optional(),
-  search: z.string().trim().min(1).max(120).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  take: z.coerce.number().int().min(1).max(100).default(20),
-});
+export const adminUserListQuerySchema = z
+  .object({
+    status: userStatusFilter,
+    companyId: z.string().min(1).optional(),
+    search: z.string().trim().min(1).max(120).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    take: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .transform(({ page, take, ...input }) => ({
+    ...input,
+    ...resolvePagination({ ...input, page, take }, { defaultLimit: 20, maxLimit: 100 }),
+  }));
 
 export const blockReasonCodes = [
   "policy_violation",

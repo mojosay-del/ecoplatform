@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronRight, FileText, FolderOpen, Paperclip, Plus, Trash2 } from "lucide-react";
+import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { Block, BlocksEditor, LESSON_BLOCK_KINDS, type BlockInsertExtraOption } from "./BlocksEditor";
@@ -78,8 +79,8 @@ export function AdminEducationView() {
     setState("loading");
     setMessage(null);
     try {
-      const data = await apiFetch<LearningModule[]>("/admin/content/education", { token });
-      setModules(data);
+      const data = await apiFetch<PaginatedResponse<LearningModule>>("/admin/content/education?limit=200", { token });
+      setModules(data.items);
       setState("ready");
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {

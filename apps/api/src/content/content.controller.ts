@@ -81,15 +81,27 @@ export class ContentController {
   // ── Публичные: индексы цен ─────────────────────────────────────────────
 
   @Get("indices")
-  async indicesList(@CurrentUser() user: RequestUser) {
-    return this.indices.listIndices(user);
+  async indicesList(
+    @CurrentUser() user: RequestUser,
+    @Query("limit") limitRaw?: string,
+    @Query("offset") offsetRaw?: string,
+  ) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.indices.listIndices(user, { limit, offset });
   }
 
   // ── Публичные: обучение ────────────────────────────────────────────────
 
   @Get("education/modules")
-  async learningModules(@CurrentUser() user: RequestUser) {
-    return this.learning.listLearningModules(user);
+  async learningModules(
+    @CurrentUser() user: RequestUser,
+    @Query("limit") limitRaw?: string,
+    @Query("offset") offsetRaw?: string,
+  ) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.learning.listLearningModules(user, { limit, offset });
   }
 
   @Get("education/modules/:id")
@@ -105,8 +117,14 @@ export class ContentController {
   // ── Публичные: база знаний ─────────────────────────────────────────────
 
   @Get("knowledge-base")
-  async knowledgeTree(@CurrentUser() user: RequestUser) {
-    return this.knowledgeBase.knowledgeTree(user);
+  async knowledgeTree(
+    @CurrentUser() user: RequestUser,
+    @Query("limit") limitRaw?: string,
+    @Query("depth") depthRaw?: string,
+  ) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const depth = depthRaw !== undefined ? Number(depthRaw) : undefined;
+    return this.knowledgeBase.knowledgeTree(user, { limit, depth });
   }
 
   @Get("knowledge-base/search")
@@ -195,8 +213,10 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/indices")
-  async adminIndices() {
-    return this.indices.adminListIndices();
+  async adminIndices(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.indices.adminListIndices({ limit, offset });
   }
 
   @UseGuards(RolesGuard)
@@ -304,8 +324,10 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/education")
-  async adminEducation() {
-    return this.learning.adminListLearningModules();
+  async adminEducation(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.learning.adminListLearningModules({ limit, offset });
   }
 
   @UseGuards(RolesGuard)
@@ -424,8 +446,10 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/knowledge-base")
-  async adminKnowledge() {
-    return this.knowledgeBase.adminListKnowledge();
+  async adminKnowledge(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.knowledgeBase.adminListKnowledge({ limit, offset });
   }
 
   @UseGuards(RolesGuard)

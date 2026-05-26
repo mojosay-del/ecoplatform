@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
+import { paginatedResponse } from "../../common/pagination";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { adminJournalsQuerySchema } from "./admin-journals.schemas";
 import type { z } from "zod";
@@ -26,8 +27,8 @@ export class AdminJournalsService {
       this.prisma.adminActionLog.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        skip: (query.page - 1) * query.take,
-        take: query.take,
+        skip: query.offset,
+        take: query.limit,
       }),
     ]);
 
@@ -40,14 +41,11 @@ export class AdminJournalsService {
       : [];
     const actorMap = new Map(actors.map((actor) => [actor.id, actor]));
 
-    return {
-      total,
-      page: query.page,
-      take: query.take,
-      items: entries.map((entry) => ({
-        ...entry,
-        actor: actorMap.get(entry.actorId) ?? null,
-      })),
-    };
+    const items = entries.map((entry) => ({
+      ...entry,
+      actor: actorMap.get(entry.actorId) ?? null,
+    }));
+
+    return paginatedResponse(items, total, query);
   }
 }

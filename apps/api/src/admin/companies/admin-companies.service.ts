@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { CompanyStatus, Prisma, SubscriptionPlan } from "@prisma/client";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
+import { paginatedResponse } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SessionCacheService } from "../../redis/session-cache.service";
@@ -36,8 +37,8 @@ export class AdminCompaniesService {
       this.prisma.company.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        skip: (query.page - 1) * query.take,
-        take: query.take,
+        skip: query.offset,
+        take: query.limit,
         select: {
           id: true,
           organizationName: true,
@@ -51,7 +52,7 @@ export class AdminCompaniesService {
       }),
     ]);
 
-    return { total, page: query.page, take: query.take, items };
+    return paginatedResponse(items, total, query);
   }
 
   async getCompany(id: string) {

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ChevronRight, FolderOpen, Package, Plus, Trash2 } from "lucide-react";
+import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { RowKebab, type ActionItem } from "./RowKebab";
@@ -53,7 +54,8 @@ export function AdminIndicesView() {
   async function loadAll() {
     if (!token) return;
     try {
-      setCategories(await apiFetch<Category[]>("/admin/content/indices", { token }));
+      const data = await apiFetch<PaginatedResponse<Category>>("/admin/content/indices?limit=200", { token });
+      setCategories(data.items);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось загрузить индексы");
     }

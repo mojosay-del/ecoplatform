@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
 import { apiFetch } from "../lib/api";
@@ -18,12 +19,7 @@ type AdminCompanyListItem = {
   _count: { users: number; subscriptions: number; supportTickets: number };
 };
 
-type AdminCompanyList = {
-  total: number;
-  page: number;
-  take: number;
-  items: AdminCompanyListItem[];
-};
+type AdminCompanyList = PaginatedResponse<AdminCompanyListItem>;
 
 type AdminCompanyDetail = {
   id: string;
@@ -85,13 +81,12 @@ export function AdminCompaniesView() {
     take,
     async ({ limit, offset }) => {
       const params = new URLSearchParams();
-      params.set("take", String(limit));
-      params.set("page", String(Math.floor(offset / limit) + 1));
+      params.set("limit", String(limit));
+      params.set("offset", String(offset));
       if (filters.search) params.set("search", filters.search);
       if (filters.status) params.set("status", filters.status);
       if (filters.plan) params.set("plan", filters.plan);
-      const data = await apiFetch<AdminCompanyList>(`/admin/companies?${params.toString()}`, { token });
-      return { items: data.items, total: data.total, hasMore: data.page * data.take < data.total };
+      return apiFetch<AdminCompanyList>(`/admin/companies?${params.toString()}`, { token });
     },
   );
 

@@ -228,6 +228,12 @@ async function createPublishedKnowledgeArticle(adminToken: string, suffix: strin
   return publish.body as { id: string; slug: string; title: string };
 }
 
+function expectPaginatedEnvelope(body: { items?: unknown; total?: unknown; hasMore?: unknown }) {
+  expect(Array.isArray(body.items)).toBe(true);
+  expect(typeof body.total).toBe("number");
+  expect(typeof body.hasMore).toBe("boolean");
+}
+
 describe("Auth", () => {
   it("регистрация создаёт компанию в demo-статусе и возвращает access-токен", async () => {
     const { token, companyId } = await registerCompany("0000001");
@@ -510,6 +516,38 @@ describe("Content publish", () => {
   });
 });
 
+describe("Wave 8.4 pagination contracts", () => {
+  it("возвращает PaginatedResponse на API-листингах, а knowledge-base tree ограничивает ширину", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0300001");
+
+    const endpoints = [
+      [reader.token, "/api/education/modules?limit=1&offset=0"],
+      [reader.token, "/api/indices?limit=1&offset=0"],
+      [adminToken, "/api/admin/content/education?limit=1&offset=0"],
+      [adminToken, "/api/admin/content/indices?limit=1&offset=0"],
+      [adminToken, "/api/admin/content/knowledge-base?limit=1&offset=0"],
+      [adminToken, "/api/admin/users?limit=1&offset=0"],
+      [adminToken, "/api/admin/companies?limit=1&offset=0"],
+      [adminToken, "/api/admin/journals?limit=1&offset=0"],
+      [adminToken, "/api/admin/moderation/cases?limit=1&offset=0"],
+    ] as const;
+
+    for (const [token, path] of endpoints) {
+      const response = await ctx.http.get(path).set("Authorization", `Bearer ${token}`);
+      expect(response.status).toBe(200);
+      expectPaginatedEnvelope(response.body);
+    }
+
+    const tree = await ctx.http
+      .get("/api/knowledge-base?limit=1&depth=1")
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(tree.status).toBe(200);
+    expect(Array.isArray(tree.body)).toBe(true);
+    expect(tree.body.length).toBeLessThanOrEqual(1);
+  });
+});
+
 describe("Support ownership", () => {
   it("пользователь видит свой тикет и не видит чужой; чужая компания получает 404 при попытке ответа", async () => {
     const adminToken = await loginAdmin();
@@ -607,8 +645,8 @@ describe("Moderation", () => {
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
     expect(list.status).toBe(200);
-    expect(list.body).toHaveLength(1);
-    const caseId = list.body[0].id as string;
+    expect(list.body.items).toHaveLength(1);
+    const caseId = list.body.items[0].id as string;
 
     const lock = await ctx.http
       .post(`/api/admin/moderation/cases/${caseId}/lock`)
@@ -638,7 +676,7 @@ describe("Moderation", () => {
       .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "illegal_content" });
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
-    const caseId = list.body[0].id as string;
+    const caseId = list.body.items[0].id as string;
     await ctx.http.post(`/api/admin/moderation/cases/${caseId}/lock`).set("Authorization", `Bearer ${moderatorToken}`);
 
     const decision = await ctx.http
@@ -669,7 +707,7 @@ describe("Moderation", () => {
       .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "false_information" });
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${adminToken}`);
-    const caseId = list.body[0].id as string;
+    const caseId = list.body.items[0].id as string;
     const decision = await ctx.http
       .post(`/api/admin/moderation/cases/${caseId}/decisions`)
       .set("Authorization", `Bearer ${adminToken}`)
@@ -694,7 +732,7 @@ describe("Moderation", () => {
       .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "contact_data" });
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${adminToken}`);
-    const caseId = list.body[0].id as string;
+    const caseId = list.body.items[0].id as string;
     const decision = await ctx.http
       .post(`/api/admin/moderation/cases/${caseId}/decisions`)
       .set("Authorization", `Bearer ${adminToken}`)
@@ -737,9 +775,9 @@ describe("Moderation", () => {
     expect(complaint.status).toBe(201);
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
-    expect(list.body).toHaveLength(1);
-    expect(list.body[0].entity).toMatchObject({ type: "news_post", title: news.title, slug: news.slug });
-    const caseId = list.body[0].id as string;
+    expect(list.body.items).toHaveLength(1);
+    expect(list.body.items[0].entity).toMatchObject({ type: "news_post", title: news.title, slug: news.slug });
+    const caseId = list.body.items[0].id as string;
 
     await ctx.http.post(`/api/admin/moderation/cases/${caseId}/lock`).set("Authorization", `Bearer ${moderatorToken}`);
     const decision = await ctx.http
@@ -778,9 +816,13 @@ describe("Moderation", () => {
     expect(complaint.status).toBe(201);
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
-    expect(list.body).toHaveLength(1);
-    expect(list.body[0].entity).toMatchObject({ type: "knowledge_article", title: article.title, slug: article.slug });
-    const caseId = list.body[0].id as string;
+    expect(list.body.items).toHaveLength(1);
+    expect(list.body.items[0].entity).toMatchObject({
+      type: "knowledge_article",
+      title: article.title,
+      slug: article.slug,
+    });
+    const caseId = list.body.items[0].id as string;
 
     await ctx.http.post(`/api/admin/moderation/cases/${caseId}/lock`).set("Authorization", `Bearer ${moderatorToken}`);
     const decision = await ctx.http
@@ -823,7 +865,7 @@ describe("Moderation", () => {
       .send({ entityType: "news_post", entityId: news.id, reasonCode: "spam" });
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${adminToken}`);
-    const caseId = list.body[0].id as string;
+    const caseId = list.body.items[0].id as string;
     const decision = await ctx.http
       .post(`/api/admin/moderation/cases/${caseId}/decisions`)
       .set("Authorization", `Bearer ${adminToken}`)
@@ -1074,7 +1116,7 @@ describe("Email channel queue (задел)", () => {
       .set("Authorization", `Bearer ${reporter.token}`)
       .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "spam" });
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${adminToken}`);
-    const caseId = list.body[0].id as string;
+    const caseId = list.body.items[0].id as string;
     await ctx.http
       .post(`/api/admin/moderation/cases/${caseId}/decisions`)
       .set("Authorization", `Bearer ${adminToken}`)
@@ -1450,7 +1492,7 @@ describe("Platform settings", () => {
       .send({ value: 45 });
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
-    const caseId = list.body[0].id as string;
+    const caseId = list.body.items[0].id as string;
 
     const lockedAt = Date.now();
     const lock = await ctx.http
@@ -1619,7 +1661,7 @@ describe("Admin sanctions", () => {
       .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "illegal_content" });
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
-    const caseId = list.body[0].id as string;
+    const caseId = list.body.items[0].id as string;
     await ctx.http.post(`/api/admin/moderation/cases/${caseId}/lock`).set("Authorization", `Bearer ${moderatorToken}`);
     const escalation = await ctx.http
       .post(`/api/admin/moderation/cases/${caseId}/decisions`)
@@ -1731,7 +1773,7 @@ describe("Admin sanctions", () => {
       .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "spam" });
 
     const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${adminToken}`);
-    const caseId = list.body[0].id as string;
+    const caseId = list.body.items[0].id as string;
 
     const res = await ctx.http
       .post(`/api/admin/moderation/cases/${caseId}/admin-sanctions`)
@@ -1967,7 +2009,7 @@ describe("Content lifecycle: learning modules", () => {
     const { moduleId } = await createLearningModuleWithLesson(adminToken, "lifecycle");
 
     const beforePublish = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
-    expect(beforePublish.body.find((item: { id: string }) => item.id === moduleId)).toBeUndefined();
+    expect(beforePublish.body.items.find((item: { id: string }) => item.id === moduleId)).toBeUndefined();
 
     const publish = await ctx.http
       .post(`/api/admin/content/education/modules/${moduleId}/publish`)
@@ -1975,7 +2017,7 @@ describe("Content lifecycle: learning modules", () => {
     expect(publish.status).toBe(201);
 
     const afterPublish = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
-    expect(afterPublish.body.find((item: { id: string }) => item.id === moduleId)).toBeTruthy();
+    expect(afterPublish.body.items.find((item: { id: string }) => item.id === moduleId)).toBeTruthy();
 
     const unpublish = await ctx.http
       .post(`/api/admin/content/education/modules/${moduleId}/unpublish`)
@@ -1984,7 +2026,7 @@ describe("Content lifecycle: learning modules", () => {
     expect(unpublish.status).toBe(201);
 
     const afterUnpublish = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
-    expect(afterUnpublish.body.find((item: { id: string }) => item.id === moduleId)).toBeUndefined();
+    expect(afterUnpublish.body.items.find((item: { id: string }) => item.id === moduleId)).toBeUndefined();
 
     const del = await ctx.http
       .delete(`/api/admin/content/education/modules/${moduleId}`)
@@ -2014,7 +2056,7 @@ describe("Content lifecycle: learning modules", () => {
     expect(markDevelopment.body.isInDevelopment).toBe(true);
 
     const list = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
-    const item = list.body.find((module: { id: string }) => module.id === moduleId);
+    const item = list.body.items.find((module: { id: string }) => module.id === moduleId);
     expect(item).toMatchObject({ isInDevelopment: true, hasAccess: false });
 
     const detail = await ctx.http
@@ -2260,7 +2302,7 @@ describe("Content lifecycle: price indices", () => {
     const beforePublish = await ctx.http.get("/api/indices").set("Authorization", `Bearer ${reader.token}`);
     const findIndex = (body: Array<{ nomenclatures: Array<{ id: string }> }>) =>
       body.some((cat) => cat.nomenclatures.some((nom) => nom.id === nomenclatureId));
-    expect(findIndex(beforePublish.body)).toBe(false);
+    expect(findIndex(beforePublish.body.items)).toBe(false);
 
     const publish = await ctx.http
       .post(`/api/admin/content/indices/${indexId}/publish`)
@@ -2268,7 +2310,7 @@ describe("Content lifecycle: price indices", () => {
     expect(publish.status).toBe(201);
 
     const afterPublish = await ctx.http.get("/api/indices").set("Authorization", `Bearer ${reader.token}`);
-    expect(findIndex(afterPublish.body)).toBe(true);
+    expect(findIndex(afterPublish.body.items)).toBe(true);
 
     const unpublish = await ctx.http
       .post(`/api/admin/content/indices/${indexId}/unpublish`)
@@ -2277,7 +2319,7 @@ describe("Content lifecycle: price indices", () => {
     expect(unpublish.status).toBe(201);
 
     const afterUnpublish = await ctx.http.get("/api/indices").set("Authorization", `Bearer ${reader.token}`);
-    expect(findIndex(afterUnpublish.body)).toBe(false);
+    expect(findIndex(afterUnpublish.body.items)).toBe(false);
 
     const del = await ctx.http
       .delete(`/api/admin/content/indices/${indexId}`)

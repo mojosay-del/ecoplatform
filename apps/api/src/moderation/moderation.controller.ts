@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
@@ -26,8 +26,10 @@ export class ModerationController {
   @UseGuards(RolesGuard)
   @Roles("admin", "moderator")
   @Get("admin/moderation/cases")
-  async listCases() {
-    return this.moderation.listCases();
+  async listCases(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.moderation.listCases({ limit, offset });
   }
 
   @UseGuards(RolesGuard)

@@ -3,6 +3,7 @@ import { ContentStatus, Prisma } from "@prisma/client";
 import { lessonBlockSchema, validateContentBlocks } from "@ecoplatform/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
+import { paginatedResponse, resolvePagination, type PaginationInput } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import type { z } from "zod";
 import type { knowledgeArticleInputSchema } from "../content.schemas";
@@ -21,21 +22,56 @@ export class KnowledgeBaseService {
     private readonly common: ContentCommonService,
   ) {}
 
-  async knowledgeTree(user: RequestUser) {
+  async knowledgeTree(user: RequestUser, options: { limit?: number; depth?: number } = {}) {
     this.common.assertFunctionalAccess(user);
+    const width = resolvePagination({ limit: options.limit }, { defaultLimit: 100, maxLimit: 200 }).limit;
+    const rawDepth = Number.isFinite(options.depth) ? Math.trunc(options.depth!) : 3;
+    const depth = Math.min(Math.max(rawDepth, 1), 3);
+
+    if (depth === 1) {
+      return this.prisma.knowledgeBaseArticle.findMany({
+        where: { parentId: null, status: ContentStatus.published },
+        orderBy: { position: "asc" },
+        take: width,
+        include: {
+          blocks: { orderBy: { position: "asc" } },
+        },
+      });
+    }
+
+    if (depth === 2) {
+      return this.prisma.knowledgeBaseArticle.findMany({
+        where: { parentId: null, status: ContentStatus.published },
+        orderBy: { position: "asc" },
+        take: width,
+        include: {
+          blocks: { orderBy: { position: "asc" } },
+          children: {
+            where: { status: ContentStatus.published },
+            orderBy: { position: "asc" },
+            take: width,
+            include: { blocks: { orderBy: { position: "asc" } } },
+          },
+        },
+      });
+    }
+
     return this.prisma.knowledgeBaseArticle.findMany({
       where: { parentId: null, status: ContentStatus.published },
       orderBy: { position: "asc" },
+      take: width,
       include: {
         blocks: { orderBy: { position: "asc" } },
         children: {
           where: { status: ContentStatus.published },
           orderBy: { position: "asc" },
+          take: width,
           include: {
             blocks: { orderBy: { position: "asc" } },
             children: {
               where: { status: ContentStatus.published },
               orderBy: { position: "asc" },
+              take: width,
               include: { blocks: { orderBy: { position: "asc" } } },
             },
           },
@@ -78,11 +114,19 @@ export class KnowledgeBaseService {
     });
   }
 
-  async adminListKnowledge() {
-    return this.prisma.knowledgeBaseArticle.findMany({
-      orderBy: [{ parentId: "asc" }, { position: "asc" }],
-      include: { blocks: { orderBy: { position: "asc" } } },
-    });
+  async adminListKnowledge(paginationInput: PaginationInput = {}) {
+    const pagination = resolvePagination(paginationInput, { defaultLimit: 100, maxLimit: 200 });
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.knowledgeBaseArticle.count(),
+      this.prisma.knowledgeBaseArticle.findMany({
+        orderBy: [{ parentId: "asc" }, { position: "asc" }],
+        take: pagination.limit,
+        skip: pagination.offset,
+        include: { blocks: { orderBy: { position: "asc" } } },
+      }),
+    ]);
+
+    return paginatedResponse(items, total, pagination);
   }
 
   async createKnowledgeArticle(input: KnowledgeArticleInput, user: RequestUser) {

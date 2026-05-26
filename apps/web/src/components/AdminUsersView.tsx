@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
 import { apiFetch } from "../lib/api";
@@ -19,12 +20,7 @@ type AdminUserListItem = {
   platformStaff: { roles: string[]; isActive: boolean } | null;
 };
 
-type AdminUserList = {
-  total: number;
-  page: number;
-  take: number;
-  items: AdminUserListItem[];
-};
+type AdminUserList = PaginatedResponse<AdminUserListItem>;
 
 type AdminUserDetail = AdminUserListItem & {
   updatedAt: string;
@@ -78,12 +74,11 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
     take,
     async ({ limit, offset }) => {
       const params = new URLSearchParams();
-      params.set("take", String(limit));
-      params.set("page", String(Math.floor(offset / limit) + 1));
+      params.set("limit", String(limit));
+      params.set("offset", String(offset));
       if (filters.search) params.set("search", filters.search);
       if (filters.status) params.set("status", filters.status);
-      const data = await apiFetch<AdminUserList>(`/admin/users?${params.toString()}`, { token });
-      return { items: data.items, total: data.total, hasMore: data.page * data.take < data.total };
+      return apiFetch<AdminUserList>(`/admin/users?${params.toString()}`, { token });
     },
   );
 

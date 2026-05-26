@@ -5,7 +5,7 @@
 // поэтому он жил в монолите только из-за лени.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { NomenclatureCategoryListItem, NomenclatureListItem } from "@ecoplatform/shared";
+import type { NomenclatureCategoryListItem, NomenclatureListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { api } from "../lib/api";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./_shared";
@@ -23,11 +23,16 @@ const INDEX_PERIOD_LABELS: Record<IndexPeriod, string> = {
 };
 
 export function IndicesView() {
-  const { data, state, errorMessage } = useApiQuery(
-    "indices",
-    () => api.indices.list(),
-    [] as NomenclatureCategoryListItem[],
-  );
+  const {
+    data: page,
+    state,
+    errorMessage,
+  } = useApiQuery("indices", () => api.indices.list({ limit: 100 }), {
+    items: [],
+    total: 0,
+    hasMore: false,
+  } as PaginatedResponse<NomenclatureCategoryListItem>);
+  const data = page.items;
   const [activeSlug, setActiveSlug] = useState<string | undefined>(undefined);
   const active = data.find((category) => category.slug === activeSlug) ?? data[0];
 

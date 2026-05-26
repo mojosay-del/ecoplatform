@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -23,12 +24,7 @@ type JournalEntry = {
   } | null;
 };
 
-type JournalList = {
-  total: number;
-  page: number;
-  take: number;
-  items: JournalEntry[];
-};
+type JournalList = PaginatedResponse<JournalEntry>;
 
 type AdminJournalsViewProps = {
   embedded?: boolean;
@@ -52,15 +48,14 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
     take,
     async ({ limit, offset }) => {
       const params = new URLSearchParams();
-      params.set("take", String(limit));
-      params.set("page", String(Math.floor(offset / limit) + 1));
+      params.set("limit", String(limit));
+      params.set("offset", String(offset));
       if (filters.action) params.set("action", filters.action);
       if (filters.entityType) params.set("entityType", filters.entityType);
       if (filters.actorId) params.set("actorId", filters.actorId);
       if (filters.from) params.set("from", new Date(filters.from).toISOString());
       if (filters.to) params.set("to", new Date(filters.to).toISOString());
-      const data = await apiFetch<JournalList>(`/admin/journals?${params.toString()}`, { token });
-      return { items: data.items, total: data.total, hasMore: data.page * data.take < data.total };
+      return apiFetch<JournalList>(`/admin/journals?${params.toString()}`, { token });
     },
   );
 

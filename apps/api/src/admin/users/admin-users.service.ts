@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, UserStatus } from "@prisma/client";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
+import { paginatedResponse } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SessionCacheService } from "../../redis/session-cache.service";
@@ -48,8 +49,8 @@ export class AdminUsersService {
       this.prisma.user.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        skip: (query.page - 1) * query.take,
-        take: query.take,
+        skip: query.offset,
+        take: query.limit,
         select: {
           id: true,
           email: true,
@@ -64,7 +65,7 @@ export class AdminUsersService {
       }),
     ]);
 
-    return { total, page: query.page, take: query.take, items };
+    return paginatedResponse(items, total, query);
   }
 
   async getUser(id: string) {

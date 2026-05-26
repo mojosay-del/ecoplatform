@@ -25,6 +25,7 @@ import type {
   LearningModuleDetail,
   LearningModuleListItem,
   LessonDetail,
+  PaginatedResponse,
 } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { ApiError, api, type FileAsset } from "../lib/api";
@@ -42,11 +43,16 @@ import {
 import { ContentBlocks } from "./content-blocks";
 
 export function EducationView() {
-  const { data, state, errorMessage } = useApiQuery(
-    "learning-modules",
-    () => api.learning.listModules(),
-    [] as LearningModuleListItem[],
-  );
+  const {
+    data: page,
+    state,
+    errorMessage,
+  } = useApiQuery("learning-modules", () => api.learning.listModules({ limit: 100 }), {
+    items: [],
+    total: 0,
+    hasMore: false,
+  } as PaginatedResponse<LearningModuleListItem>);
+  const data = page.items;
   const covers = useCoverAssets(data);
 
   if (state === "unauthenticated") {

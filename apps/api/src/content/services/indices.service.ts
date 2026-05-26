@@ -4,6 +4,7 @@ import { filterPriceIndexPoints, slugify, summarizePriceIndex } from "@ecoplatfo
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { PlatformSettingsService } from "../../admin/settings/platform-settings.service";
+import { paginatedResponse, resolvePagination, type PaginationInput } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import type { z } from "zod";
 import type {
@@ -34,24 +35,31 @@ export class IndicesService {
     private readonly common: ContentCommonService,
   ) {}
 
-  async listIndices(user: RequestUser) {
+  async listIndices(user: RequestUser, paginationInput: PaginationInput = {}) {
     this.common.assertFunctionalAccess(user);
 
     const stagnationThreshold = await this.settings.getValue("indices.stagnation_threshold_percent");
+    const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 100 });
+    const where = { isActive: true };
 
-    const categories = await this.prisma.nomenclatureCategory.findMany({
-      where: { isActive: true },
-      orderBy: { position: "asc" },
-      include: {
-        nomenclatures: {
-          where: { isActive: true, priceIndex: { is: { status: ContentStatus.published } } },
-          include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } },
-          orderBy: { name: "asc" },
+    const [total, categories] = await this.prisma.$transaction([
+      this.prisma.nomenclatureCategory.count({ where }),
+      this.prisma.nomenclatureCategory.findMany({
+        where,
+        orderBy: { position: "asc" },
+        take: pagination.limit,
+        skip: pagination.offset,
+        include: {
+          nomenclatures: {
+            where: { isActive: true, priceIndex: { is: { status: ContentStatus.published } } },
+            include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } },
+            orderBy: { name: "asc" },
+          },
         },
-      },
-    });
+      }),
+    ]);
 
-    return categories.map((category) => ({
+    const items = categories.map((category) => ({
       ...category,
       nomenclatures: category.nomenclatures
         .map((item) => {
@@ -77,15 +85,25 @@ export class IndicesService {
         })
         .filter(Boolean),
     }));
+
+    return paginatedResponse(items, total, pagination);
   }
 
-  async adminListIndices() {
-    return this.prisma.nomenclatureCategory.findMany({
-      orderBy: { position: "asc" },
-      include: {
-        nomenclatures: { include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } } },
-      },
-    });
+  async adminListIndices(paginationInput: PaginationInput = {}) {
+    const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 200 });
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.nomenclatureCategory.count(),
+      this.prisma.nomenclatureCategory.findMany({
+        orderBy: { position: "asc" },
+        take: pagination.limit,
+        skip: pagination.offset,
+        include: {
+          nomenclatures: { include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } } },
+        },
+      }),
+    ]);
+
+    return paginatedResponse(items, total, pagination);
   }
 
   async createCategory(input: CategoryInput, user: RequestUser) {

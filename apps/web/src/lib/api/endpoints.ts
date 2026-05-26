@@ -63,12 +63,14 @@ export const api = {
 
   // ── Индексы цен ─────────────────────────────────────────────────────────
   indices: {
-    list: () => apiFetch<NomenclatureCategoryListItem[]>("/indices"),
+    list: (pagination: PaginationInput = {}) =>
+      apiFetch<PaginatedResponse<NomenclatureCategoryListItem>>(`/indices${paginationSuffix(pagination)}`),
   },
 
   // ── Обучение ────────────────────────────────────────────────────────────
   learning: {
-    listModules: () => apiFetch<LearningModuleListItem[]>("/education/modules"),
+    listModules: (pagination: PaginationInput = {}) =>
+      apiFetch<PaginatedResponse<LearningModuleListItem>>(`/education/modules${paginationSuffix(pagination)}`),
     getModule: (id: string) => apiFetch<LearningModuleDetail>(`/education/modules/${enc(id)}`),
     completeLesson: (lessonId: string) =>
       apiFetch<{ ok: true }>(`/education/lessons/${enc(lessonId)}/complete`, { method: "POST" }),

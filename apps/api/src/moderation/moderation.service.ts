@@ -21,6 +21,7 @@ import {
 import { canOpenFunctionalSections } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { AdminActionLogService } from "../common/admin-action-log.service";
+import { paginatedResponse, resolvePagination, type PaginationInput } from "../common/pagination";
 import type { RequestUser } from "../common/request-user";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -150,14 +151,19 @@ export class ModerationService {
     return { complaint, duplicate: false };
   }
 
-  async listCases() {
-    const cases = await this.prisma.moderationCase.findMany({
-      orderBy: { createdAt: "asc" },
-      include: moderationCaseInclude,
-      take: 100,
-    });
+  async listCases(paginationInput: PaginationInput = {}) {
+    const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 100 });
+    const [total, cases] = await this.prisma.$transaction([
+      this.prisma.moderationCase.count(),
+      this.prisma.moderationCase.findMany({
+        orderBy: { createdAt: "asc" },
+        include: moderationCaseInclude,
+        take: pagination.limit,
+        skip: pagination.offset,
+      }),
+    ]);
 
-    return this.enrichCases(cases);
+    return paginatedResponse(await this.enrichCases(cases), total, pagination);
   }
 
   async getCase(id: string) {

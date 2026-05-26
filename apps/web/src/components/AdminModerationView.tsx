@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -52,9 +53,9 @@ export function AdminModerationView() {
     setState("loading");
     setErrorMessage(null);
     try {
-      const data = await apiFetch<any[]>("/admin/moderation/cases", { token });
-      setCases(data);
-      const selected = data.find((item) => item.id === nextSelectedId) ?? data[0] ?? null;
+      const data = await apiFetch<PaginatedResponse<any>>("/admin/moderation/cases?limit=100", { token });
+      setCases(data.items);
+      const selected = data.items.find((item) => item.id === nextSelectedId) ?? data.items[0] ?? null;
       setSelectedCase(selected);
       setState("ready");
     } catch (error) {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resolvePagination } from "../../common/pagination";
 
 export const adminJournalsQuerySchema = z
   .object({
@@ -7,8 +8,10 @@ export const adminJournalsQuerySchema = z
     actorId: z.string().trim().min(1).max(80).optional(),
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
-    page: z.coerce.number().int().min(1).default(1),
-    take: z.coerce.number().int().min(1).max(100).default(20),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    take: z.coerce.number().int().min(1).max(100).optional(),
   })
   .superRefine((input, ctx) => {
     if (input.from && input.to && input.from > input.to) {
@@ -18,4 +21,8 @@ export const adminJournalsQuerySchema = z
         message: "from должно быть не позже to.",
       });
     }
-  });
+  })
+  .transform(({ page, take, ...input }) => ({
+    ...input,
+    ...resolvePagination({ ...input, page, take }, { defaultLimit: 20, maxLimit: 100 }),
+  }));

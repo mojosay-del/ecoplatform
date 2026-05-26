@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronRight, FileText, FolderOpen, Plus } from "lucide-react";
+import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { ALL_BLOCK_KINDS, Block, BlocksEditor } from "./BlocksEditor";
@@ -135,8 +136,8 @@ export function AdminKnowledgeView() {
     setState("loading");
     setMessage(null);
     try {
-      const data = await apiFetch<Article[]>("/admin/content/knowledge-base", { token });
-      setItems(data);
+      const data = await apiFetch<PaginatedResponse<Article>>("/admin/content/knowledge-base?limit=200", { token });
+      setItems(data.items);
       setState("ready");
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
