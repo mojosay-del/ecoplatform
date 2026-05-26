@@ -242,6 +242,8 @@ recordChange(actorId, entityType, entityId, action, before, after) {
 
 OpenTelemetry-spans через `@opentelemetry/sdk-node`. Экспорт в Jaeger или Tempo. На MVP можно отложить, добавить когда станет интересно «почему запрос медленный».
 
+**Решение 2026-05-26:** отложено. После 10.1–10.3 у MVP уже есть единый `X-Request-Id` в ответах, API-логах, Sentry-контексте и HTTP-метриках. Полноценный OpenTelemetry с Jaeger/Tempo добавим после появления реальной multi-service/multi-replica диагностики, чтобы не вводить лишнюю инфраструктуру перед MVP.
+
 ## 10.5. Backup и runbook
 
 В `docs/08-architecture/deploy.md` — секция «Резервное копирование»:
