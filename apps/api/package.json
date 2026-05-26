@@ -32,6 +32,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "file-type": "^16.5.4",
+    "helmet": "^8.2.0",
     "ioredis": "^5.4.0",
     "isomorphic-dompurify": "^3.14.0",
     "reflect-metadata": "^0.2.2",
