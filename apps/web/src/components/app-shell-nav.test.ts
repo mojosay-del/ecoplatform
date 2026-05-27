@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { appNavSections, COMING_SOON_BADGE, futureNavItems } from "./app-shell-nav";
 
 describe("AppShell future navigation teasers", () => {
+  it("keeps the future-item badge compact for the sidebar", () => {
+    expect(COMING_SOON_BADGE).toBe("Скоро");
+  });
+
   it("keeps every disabled sidebar item documented as a roadmap teaser", () => {
     const items = futureNavItems();
 

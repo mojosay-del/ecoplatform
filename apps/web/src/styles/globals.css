@@ -208,28 +208,33 @@ input[type="checkbox"]:focus-visible {
 }
 
 .nav-label-disabled {
-  display: grid;
-  gap: 4px;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 5px;
   align-items: center;
   line-height: 1.15;
 }
 
 .nav-label-text {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nav-disabled-badge {
   display: inline-flex;
+  flex-shrink: 0;
   width: fit-content;
   max-width: 100%;
   align-items: center;
-  min-height: 18px;
-  padding: 2px 7px;
+  min-height: 16px;
+  padding: 2px 5px;
   border: 1px solid var(--warning-border);
   border-radius: var(--radius-chip);
   background: var(--warning-soft);
   color: var(--warning-text);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
@@ -260,11 +265,15 @@ input[type="checkbox"]:focus-visible {
 }
 
 .nav-link.disabled {
-  min-height: 48px;
+  gap: 8px;
+  min-height: 36px;
+  padding-right: 8px;
+  padding-left: 8px;
   border: 1px solid var(--border-subtle);
   background: var(--surface-soft);
   color: var(--text-secondary);
   cursor: not-allowed;
+  font-size: 13px;
 }
 
 .nav-link.disabled svg {

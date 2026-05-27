@@ -30,7 +30,7 @@ export type NavSection = {
   items: NavItem[];
 };
 
-export const COMING_SOON_BADGE = "Скоро · Q3 2026";
+export const COMING_SOON_BADGE = "Скоро";
 
 const futureItem = (label: string, icon: LucideIcon, disabledHint: string): NavItem => ({
   label,
