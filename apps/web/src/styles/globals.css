@@ -36,6 +36,13 @@ select {
   font: inherit;
 }
 
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled {
+  cursor: not-allowed;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
@@ -1325,83 +1332,153 @@ body.news-modal-open .app-shell {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--radius-button);
   padding: 11px 18px;
-  background: var(--primary);
-  color: var(--white);
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
   transition:
     background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease,
     transform 80ms ease;
 }
 
 .button:hover:not(:disabled) {
-  background: var(--primary-hover);
+  background: var(--button-primary-bg-hover);
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .button:active:not(:disabled) {
+  background: var(--button-primary-bg-active);
   transform: translateY(1px);
 }
 
-.button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .button.secondary {
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--line);
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border-color: var(--button-secondary-border);
 }
 
 .button.secondary:hover:not(:disabled) {
-  background: var(--panel-soft);
-  border-color: var(--line-strong);
+  background: var(--button-secondary-bg-hover);
+  border-color: var(--button-secondary-border-hover);
+}
+
+.button.secondary:active:not(:disabled) {
+  background: var(--button-secondary-bg-active);
 }
 
 .button.danger {
-  color: var(--red);
+  color: var(--button-danger-text);
+}
+
+.button.danger:not(.secondary):not(.ghost) {
+  background: var(--button-danger-bg);
+  color: var(--button-primary-text);
 }
 
 .button.danger:hover:not(:disabled) {
-  border-color: var(--red);
-  background: rgb(var(--danger-rgb) / 0.08);
+  border-color: var(--danger);
+  background: var(--button-danger-soft-bg-hover);
+}
+
+.button.danger:not(.secondary):not(.ghost):hover:not(:disabled) {
+  background: var(--button-danger-bg-hover);
+}
+
+.button.danger:active:not(:disabled) {
+  background: var(--button-danger-soft-bg-active);
+}
+
+.button.danger:not(.secondary):not(.ghost):active:not(:disabled) {
+  background: var(--button-danger-bg-active);
 }
 
 .button.ghost {
   background: transparent;
-  color: var(--text);
+  color: var(--button-secondary-text);
   padding: 8px 12px;
 }
 
 .button.ghost:hover:not(:disabled) {
-  background: var(--panel-soft);
+  background: var(--button-secondary-bg-hover);
+}
+
+.button.ghost:active:not(:disabled) {
+  background: var(--button-secondary-bg-active);
+}
+
+.button:disabled,
+.button[aria-disabled="true"],
+.button[aria-disabled="true"]:hover,
+.button[aria-disabled="true"]:active {
+  background: var(--button-disabled-bg);
+  border-color: var(--button-disabled-border);
+  color: var(--button-disabled-text);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+  transform: none;
 }
 
 .input,
 .textarea,
 .select {
   width: 100%;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius-button);
-  background: var(--panel);
+  background: var(--field-bg);
   padding: 11px 14px;
   font-size: 14px;
-  color: var(--text);
+  color: var(--field-text);
   transition:
+    background 120ms ease,
     border-color 120ms ease,
     box-shadow 120ms ease;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--field-placeholder);
+}
+
+.input:hover:not(:disabled),
+.textarea:hover:not(:disabled),
+.select:hover:not(:disabled) {
+  border-color: var(--field-border-hover);
+  background: var(--field-bg-hover);
 }
 
 .input:focus,
 .textarea:focus,
 .select:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
+  border-color: var(--field-border-focus);
+  background: var(--field-bg);
+}
+
+.input:focus-visible,
+.textarea:focus-visible,
+.select:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.input:disabled,
+.textarea:disabled,
+.select:disabled {
+  border-color: var(--field-border);
+  background: var(--field-bg-disabled);
+  color: var(--text-disabled);
+  box-shadow: none;
 }
 
 .textarea {

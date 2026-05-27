@@ -14,7 +14,9 @@
 
 Волна 11.3 закрыта: статусы переведены на общий `StatusPill` с вариантами `success/warning/danger/neutral/brand`; обучение, компании, поддержка, пользователи, подписки, модерация и сервисные сообщения больше не используют случайный зелёный pill по умолчанию.
 
-Целевой следующий шаг: Волна 11.4 — состояния hover/focus/active/disabled.
+Волна 11.4 закрыта: базовые `.button`, `.input`, `.textarea`, `.select` получили единые hover/focus/active/disabled состояния через state-токены в `tokens.css`; keyboard-focus видим через `--focus-ring`, а disabled-кнопки и поля теперь выглядят явно выключенными без полупрозрачной каши.
+
+Целевой следующий шаг: Волна 11.5 — сайдбар: визуальная докрутка disabled-пунктов.
 
 ## Что уже сделано
 
@@ -174,14 +176,14 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 11.3).
+Дата: 2026-05-27 (после Волны 11.4).
 
 - `pnpm typecheck` — успешно (4/4).
 - `pnpm lint` — успешно (4/4).
 - `pnpm test` — успешно: shared 7/7, web 12/12, api 73/73.
 - `pnpm test:integration` — успешно: API integration 113/113.
 - `pnpm build` — успешно (3/3).
-- Browser UI-check — admin-login → `/education`, `/account`, `/admin/companies`: `StatusPill` показывает `В разработке` как warning, `Доступен` как success, платформенные роли как brand, компании `demo` как warning; скриншоты: `/private/tmp/ecoplatform-11-3-education.png`, `/private/tmp/ecoplatform-11-3-admin-companies.png`.
+- Browser UI-check — `/login`: hover primary-кнопки уходит в `rgb(232, 104, 46)`, keyboard-focus у кнопки и поля даёт `--focus-ring`; admin-login → `/account`: disabled-кнопка «Сменить email» показывает muted background/text, `cursor: not-allowed`, `opacity: 1`. Скриншоты: `/private/tmp/ecoplatform-11-4-login.png`, `/private/tmp/ecoplatform-11-4-login-button-focus.png`, `/private/tmp/ecoplatform-11-4-account-disabled.png`.
 - Playwright smoke — не перезапускался в 10.8 (ops/API-metrics изменение); последний зелёный прогон после 10.6: Chromium 1/1.
 - `pnpm format:check` — clean.
 - CSS token sanity — все `var(--...)` в `tokens.css`/`globals.css` имеют определения; прямых `#...`, `rgba(...)`, нетокенизированных `rgb(...)` в `globals.css` нет.

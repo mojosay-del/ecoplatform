@@ -115,6 +115,34 @@
   /* Состояния */
   --focus-ring: 0 0 0 3px rgb(var(--brand-rgb) / 0.25);
   --focus-ring-warning: 0 0 0 3px rgb(var(--warning-strong-rgb) / 0.22);
+  --button-primary-bg: var(--brand);
+  --button-primary-bg-hover: var(--brand-hover);
+  --button-primary-bg-active: var(--brand-active);
+  --button-primary-text: var(--text-inverse);
+  --button-secondary-bg: var(--surface-elevated);
+  --button-secondary-bg-hover: var(--surface-soft);
+  --button-secondary-bg-active: var(--surface-muted-hover);
+  --button-secondary-border: var(--border-subtle);
+  --button-secondary-border-hover: var(--border-strong);
+  --button-secondary-text: var(--text);
+  --button-danger-bg: var(--danger);
+  --button-danger-bg-hover: var(--danger-text-strong);
+  --button-danger-bg-active: var(--danger-text-strong);
+  --button-danger-soft-bg: var(--danger-soft);
+  --button-danger-soft-bg-hover: rgb(var(--danger-rgb) / 0.08);
+  --button-danger-soft-bg-active: rgb(var(--danger-rgb) / 0.14);
+  --button-danger-text: var(--danger-text-strong);
+  --button-disabled-bg: var(--surface-muted-strong);
+  --button-disabled-border: var(--border-subtle);
+  --button-disabled-text: var(--text-disabled);
+  --field-bg: var(--surface-elevated);
+  --field-bg-hover: var(--surface-soft);
+  --field-bg-disabled: var(--surface-muted-strong);
+  --field-border: var(--border-subtle);
+  --field-border-hover: var(--border-strong);
+  --field-border-focus: var(--brand);
+  --field-text: var(--text);
+  --field-placeholder: var(--text-subtle);
 
   /* Совместимость со старым globals.css до полной разборки компонентов. */
   --bg: var(--surface-muted);
