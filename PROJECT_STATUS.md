@@ -18,7 +18,9 @@
 
 Волна 11.5 закрыта: disabled-разделы сайдбара стали «премиум-тизером» будущих фич — с badge `Скоро · Q3 2026`, описанием в tooltip, `aria-disabled`, `cursor: not-allowed` и приглушёнными иконками.
 
-Целевой следующий шаг: Волна 11.6 — регистрация в 2 шага.
+Волна 11.6 закрыта: регистрация стала двухшаговой — сначала компания, тип и ИНН, затем личные данные, доступ и согласия; кнопка «Назад» сохраняет данные обоих шагов, а ИНН валидируется на web/API и сохраняется в `Company.billingInn`.
+
+Целевой следующий шаг: Волна 11.7 — демо-баннер sticky.
 
 ## Что уже сделано
 
@@ -31,8 +33,8 @@
 - Prisma + PostgreSQL: 26 миграций к 2026-05-26, актуальная схема в `apps/api/prisma/schema.prisma`.
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
-- 113 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 12 в `apps/web`, 73 в `apps/api`.
+- 114 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
+- Unit-тесты: 7 в `packages/shared`, 13 в `apps/web`, 73 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
@@ -133,7 +135,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 11** — UX/дизайн-система: регистрация в 2 шага, демо-баннер, onboarding, индексы, фильтры новостей, микрокопирайтинг и доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов и докрутка disabled-пунктов сайдбара закрыты в 11.1–11.5.
+- **Волна 11** — UX/дизайн-система: демо-баннер, onboarding, индексы, фильтры новостей, микрокопирайтинг и доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов, докрутка disabled-пунктов сайдбара и регистрация в 2 шага закрыты в 11.1–11.6.
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
@@ -178,15 +180,15 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 11.5).
+Дата: 2026-05-27 (после Волны 11.6).
 
 - `pnpm typecheck` — успешно (4/4).
 - `pnpm lint` — успешно (4/4).
 - `pnpm test` — успешно: shared 7/7, web 13/13, api 73/73.
-- `pnpm test:integration` — успешно: API integration 113/113.
+- `pnpm test:integration` — успешно: API integration 114/114.
 - `pnpm build` — успешно (3/3).
-- Browser UI-check — demo-login → `/news`: disabled-пункты сайдбара показывают badge `Скоро · Q3 2026`; hover на «Торговая площадка» даёт tooltip, `aria-disabled=true`, `cursor: not-allowed`, icon opacity `0.5`; в свёрнутом сайдбаре tooltip тоже виден, горизонтального overflow нет. Скриншоты: `/private/tmp/ecoplatform-11-5-sidebar.png`, `/private/tmp/ecoplatform-11-5-sidebar-collapsed-tooltip.png`.
-- Playwright smoke — не перезапускался в 10.8 (ops/API-metrics изменение); последний зелёный прогон после 10.6: Chromium 1/1.
+- Browser UI-check — `/register`: шаг 1 показывает компанию/тип/ИНН и progress `Шаг 1 из 2`; шаг 2 показывает личные данные, email/пароль и consent-чекбоксы; сценарий `Далее → Назад → Далее` сохраняет данные обоих шагов, тестовая регистрация уходит на `/news`, горизонтального overflow и console errors нет. Скриншот: `/private/tmp/ecoplatform-11-6-register-step2.png`.
+- Playwright smoke — `PLAYWRIGHT_TEST_BASE_URL=http://localhost:3000 pnpm test:smoke` успешно: Chromium 1/1.
 - `pnpm format:check` — clean.
 - CSS token sanity — все `var(--...)` в `tokens.css`/`globals.css` имеют определения; прямых `#...`, `rgba(...)`, нетокенизированных `rgb(...)` в `globals.css` нет.
 - `git diff --check` — clean.

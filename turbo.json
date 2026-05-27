@@ -20,7 +20,8 @@
       "cache": false
     },
     "test:smoke": {
-      "cache": false
+      "cache": false,
+      "env": ["PLAYWRIGHT_TEST_BASE_URL", "SMOKE_TEST_EMAIL_DOMAIN"]
     },
     "typecheck": {
       "dependsOn": ["^build"]

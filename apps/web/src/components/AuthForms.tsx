@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Eye, EyeOff, Factory, Forklift, Package, RussianRuble, Truck } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
 import { api, ApiError } from "../lib/api";
@@ -73,13 +73,38 @@ const AUTH_ICONS: AuthIcon[] = [
 ];
 
 type AuthMode = "login" | "register";
+type RegisterStep = "company" | "person";
+
+type RegisterFormValues = {
+  organizationName: string;
+  companyType: string;
+  billingInn: string;
+  lastName: string;
+  firstName: string;
+  gender: string;
+  phoneDigits: string;
+  email: string;
+  password: string;
+};
 
 const PHONE_MAX_DIGITS = 10;
+const INN_MAX_DIGITS = 12;
 const ORGANIZATION_NAME_EXAMPLES = ["ИП Иванов И.И.", "ООО Экология"];
 const ORGANIZATION_TYPE_DELAY = 150;
 const ORGANIZATION_ERASE_DELAY = 90;
 const ORGANIZATION_HOLD_DELAY = 1800;
 const ORGANIZATION_EMPTY_DELAY = 600;
+const INITIAL_REGISTER_VALUES: RegisterFormValues = {
+  organizationName: "",
+  companyType: "collector",
+  billingInn: "",
+  lastName: "",
+  firstName: "",
+  gender: "male",
+  phoneDigits: "",
+  email: "",
+  password: "",
+};
 
 function normalizeRussianPhoneDigits(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -110,6 +135,10 @@ function formatRussianPhoneFull(digits: string) {
 
 function normalizeEmailValue(value: string) {
   return value.trim().toLowerCase();
+}
+
+function normalizeInnValue(value: string) {
+  return value.replace(/\D/g, "").slice(0, INN_MAX_DIGITS);
 }
 
 function AuthVisual({ mode }: { mode: AuthMode }) {
@@ -189,7 +218,17 @@ function AuthField({ label, hint, children }: { label: string; hint?: string; ch
   );
 }
 
-function EmailInput({ name, autoComplete }: { name: string; autoComplete: "email" | "username" }) {
+function EmailInput({
+  name,
+  autoComplete,
+  value,
+  onValueChange,
+}: {
+  name: string;
+  autoComplete: "email" | "username";
+  value?: string;
+  onValueChange?: (value: string) => void;
+}) {
   return (
     <input
       className="input"
@@ -201,14 +240,18 @@ function EmailInput({ name, autoComplete }: { name: string; autoComplete: "email
       spellCheck={false}
       placeholder="name@example.ru"
       required
+      value={value}
+      onChange={onValueChange ? (event) => onValueChange(event.currentTarget.value) : undefined}
       onBlur={(event) => {
-        event.currentTarget.value = normalizeEmailValue(event.currentTarget.value);
+        const normalized = normalizeEmailValue(event.currentTarget.value);
+        event.currentTarget.value = normalized;
+        onValueChange?.(normalized);
       }}
     />
   );
 }
 
-function OrganizationNameInput() {
+function OrganizationNameInput({ value, onValueChange }: { value?: string; onValueChange?: (value: string) => void }) {
   const [placeholder, setPlaceholder] = useState("");
   const [exampleIndex, setExampleIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
@@ -267,12 +310,27 @@ function OrganizationNameInput() {
   }, [charIndex, exampleIndex, phase]);
 
   return (
-    <input className="input" name="organizationName" placeholder={placeholder} autoComplete="organization" required />
+    <input
+      className="input"
+      name="organizationName"
+      placeholder={placeholder}
+      autoComplete="organization"
+      required
+      value={value}
+      onChange={onValueChange ? (event) => onValueChange(event.currentTarget.value) : undefined}
+    />
   );
 }
 
-function RussianPhoneInput({ name }: { name: string }) {
-  const [digits, setDigits] = useState("");
+function RussianPhoneInput({
+  name,
+  digits,
+  onDigitsChange,
+}: {
+  name: string;
+  digits: string;
+  onDigitsChange: (digits: string) => void;
+}) {
   const displayValue = formatRussianPhoneLocal(digits);
   const fullValue = formatRussianPhoneFull(digits);
 
@@ -286,7 +344,7 @@ function RussianPhoneInput({ name }: { name: string }) {
 
   function onChange(event: ChangeEvent<HTMLInputElement>) {
     const nextDigits = normalizeRussianPhoneDigits(event.currentTarget.value);
-    setDigits(nextDigits);
+    onDigitsChange(nextDigits);
     setPhoneValidity(event.currentTarget, nextDigits);
   }
 
@@ -322,10 +380,14 @@ function PasswordInput({
   name,
   autoComplete,
   minLength,
+  value,
+  onValueChange,
 }: {
   name: string;
   autoComplete: "current-password" | "new-password";
   minLength?: number;
+  value?: string;
+  onValueChange?: (value: string) => void;
 }) {
   const [visible, setVisible] = useState(false);
   const Icon = visible ? EyeOff : Eye;
@@ -339,6 +401,8 @@ function PasswordInput({
         autoComplete={autoComplete}
         required
         minLength={minLength}
+        value={value}
+        onChange={onValueChange ? (event) => onValueChange(event.currentTarget.value) : undefined}
       />
       <button
         className="password-toggle"
@@ -424,6 +488,9 @@ export function LoginForm() {
 export function RegisterForm() {
   const router = useRouter();
   const { register } = useAuth();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [step, setStep] = useState<RegisterStep>("company");
+  const [values, setValues] = useState<RegisterFormValues>(INITIAL_REGISTER_VALUES);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -458,6 +525,12 @@ export function RegisterForm() {
   // все обязательные. Так пользователь не сможет «прокликать» регистрацию,
   // а бэк имеет двойную защиту (см. auth.service.register).
   const canSubmit = legalDocs.length > 0 && requiredAccepted;
+  const currentStepNumber = step === "company" ? 1 : 2;
+  const progressWidth = `${currentStepNumber * 50}%`;
+
+  function setField<K extends keyof RegisterFormValues>(field: K, value: RegisterFormValues[K]) {
+    setValues((prev) => ({ ...prev, [field]: value }));
+  }
 
   function toggleAccepted(id: string) {
     setAcceptedIds((prev) => {
@@ -468,21 +541,39 @@ export function RegisterForm() {
     });
   }
 
+  function goToPersonStep() {
+    setError("");
+    if (formRef.current?.reportValidity()) {
+      setStep("person");
+    }
+  }
+
+  function goBackToCompanyStep() {
+    setError("");
+    setStep("company");
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+
+    if (step === "company") {
+      goToPersonStep();
+      return;
+    }
+
     setSubmitting(true);
     setError("");
     try {
       await register({
-        organizationName: String(form.get("organizationName")),
-        companyType: String(form.get("companyType")),
-        lastName: String(form.get("lastName")),
-        firstName: String(form.get("firstName")),
-        gender: String(form.get("gender")),
-        phone: String(form.get("phone")),
-        email: normalizeEmailValue(String(form.get("email"))),
-        password: String(form.get("password")),
+        organizationName: values.organizationName.trim(),
+        companyType: values.companyType,
+        billingInn: values.billingInn,
+        lastName: values.lastName.trim(),
+        firstName: values.firstName.trim(),
+        gender: values.gender,
+        phone: formatRussianPhoneFull(values.phoneDigits),
+        email: normalizeEmailValue(values.email),
+        password: values.password,
         acceptedDocumentIds: Array.from(acceptedIds),
       });
       router.push("/news");
@@ -499,7 +590,7 @@ export function RegisterForm() {
 
   return (
     <AuthShell mode="register">
-      <form className="auth-card form auth-card-wide" onSubmit={onSubmit}>
+      <form ref={formRef} className="auth-card form auth-card-wide" onSubmit={onSubmit}>
         <header className="auth-card-head">
           <h1 className="auth-card-title">Создать аккаунт</h1>
           <p className="auth-card-sub">
@@ -507,100 +598,180 @@ export function RegisterForm() {
           </p>
         </header>
 
-        {/* Секция «О компании» — два первых поля логично связаны темой. */}
-        <fieldset className="auth-section">
-          <legend className="auth-section-title">О компании</legend>
-          <AuthField label="Наименование организации">
-            <OrganizationNameInput />
-          </AuthField>
-          <AuthField label="Тип компании">
-            <select className="select" name="companyType" defaultValue="collector" required>
-              {companyTypeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </AuthField>
-        </fieldset>
-
-        {/* Секция «О вас» — личные данные в одну группу, парные поля в строку. */}
-        <fieldset className="auth-section">
-          <legend className="auth-section-title">О вас</legend>
-          <div className="auth-grid-2">
-            <AuthField label="Фамилия">
-              <input className="input" name="lastName" required />
-            </AuthField>
-            <AuthField label="Имя">
-              <input className="input" name="firstName" required />
-            </AuthField>
+        <div className="auth-progress" aria-label={`Шаг ${currentStepNumber} из 2`}>
+          <div className="auth-progress-row">
+            <span>Шаг {currentStepNumber} из 2</span>
+            <span>{step === "company" ? "О компании" : "О вас"}</span>
           </div>
-          <div className="auth-grid-2">
-            <AuthField label="Пол">
-              <select className="select" name="gender" defaultValue="male" required>
-                {genderOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </AuthField>
-            <AuthField label="Телефон">
-              <RussianPhoneInput name="phone" />
-            </AuthField>
+          <div className="auth-progress-track" aria-hidden="true">
+            <span style={{ width: progressWidth }} />
           </div>
-        </fieldset>
+        </div>
 
-        {/* Секция «Доступ» — email и пароль, всё что нужно для входа. */}
-        <fieldset className="auth-section">
-          <legend className="auth-section-title">Доступ</legend>
-          <div className="auth-grid-2">
-            <AuthField label="Email">
-              <EmailInput name="email" autoComplete="email" />
+        {step === "company" ? (
+          <fieldset className="auth-section">
+            <legend className="auth-section-title">О компании</legend>
+            <AuthField label="Наименование компании">
+              <OrganizationNameInput
+                value={values.organizationName}
+                onValueChange={(value) => setField("organizationName", value)}
+              />
             </AuthField>
-            <AuthField
-              label="Пароль"
-              hint={`Не короче ${MIN_PASSWORD_LENGTH} символов, минимум одна буква и одна цифра.`}
-            >
-              <PasswordInput name="password" autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} />
-            </AuthField>
-          </div>
-        </fieldset>
-
-        <fieldset className="auth-section">
-          <legend className="auth-section-title">Согласия</legend>
-          {legalLoadError ? (
-            <p className="auth-error">Не удалось загрузить юридические документы. Обновите страницу.</p>
-          ) : legalDocs.length === 0 ? (
-            <p className="auth-card-sub">Загружаем актуальные документы…</p>
-          ) : (
-            <div className="consent-list">
-              {requiredDocs.map((doc) => (
-                <ConsentRow
-                  key={doc.id}
-                  document={doc}
-                  checked={acceptedIds.has(doc.id)}
-                  onChange={() => toggleAccepted(doc.id)}
+            <div className="auth-grid-2">
+              <AuthField label="Тип компании">
+                <select
+                  className="select"
+                  name="companyType"
+                  value={values.companyType}
+                  onChange={(event) => setField("companyType", event.currentTarget.value)}
+                  required
+                >
+                  {companyTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </AuthField>
+              <AuthField label="ИНН" hint="10 цифр для компании или 12 для ИП.">
+                <input
+                  className="input"
+                  name="billingInn"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  pattern="\d{10}|\d{12}"
+                  title="Введите 10 или 12 цифр ИНН."
+                  maxLength={INN_MAX_DIGITS}
+                  value={values.billingInn}
+                  onChange={(event) => setField("billingInn", normalizeInnValue(event.currentTarget.value))}
                   required
                 />
-              ))}
-              {optionalDocs.map((doc) => (
-                <ConsentRow
-                  key={doc.id}
-                  document={doc}
-                  checked={acceptedIds.has(doc.id)}
-                  onChange={() => toggleAccepted(doc.id)}
-                />
-              ))}
+              </AuthField>
             </div>
-          )}
-        </fieldset>
+          </fieldset>
+        ) : (
+          <>
+            <fieldset className="auth-section">
+              <legend className="auth-section-title">О вас</legend>
+              <div className="auth-grid-2">
+                <AuthField label="Фамилия">
+                  <input
+                    className="input"
+                    name="lastName"
+                    value={values.lastName}
+                    onChange={(event) => setField("lastName", event.currentTarget.value)}
+                    required
+                  />
+                </AuthField>
+                <AuthField label="Имя">
+                  <input
+                    className="input"
+                    name="firstName"
+                    value={values.firstName}
+                    onChange={(event) => setField("firstName", event.currentTarget.value)}
+                    required
+                  />
+                </AuthField>
+              </div>
+              <div className="auth-grid-2">
+                <AuthField label="Пол">
+                  <select
+                    className="select"
+                    name="gender"
+                    value={values.gender}
+                    onChange={(event) => setField("gender", event.currentTarget.value)}
+                    required
+                  >
+                    {genderOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </AuthField>
+                <AuthField label="Телефон">
+                  <RussianPhoneInput
+                    name="phone"
+                    digits={values.phoneDigits}
+                    onDigitsChange={(digits) => setField("phoneDigits", digits)}
+                  />
+                </AuthField>
+              </div>
+            </fieldset>
+
+            <fieldset className="auth-section">
+              <legend className="auth-section-title">Доступ</legend>
+              <div className="auth-grid-2">
+                <AuthField label="Email">
+                  <EmailInput
+                    name="email"
+                    autoComplete="email"
+                    value={values.email}
+                    onValueChange={(value) => setField("email", value)}
+                  />
+                </AuthField>
+                <AuthField
+                  label="Пароль"
+                  hint={`Не короче ${MIN_PASSWORD_LENGTH} символов, минимум одна буква и одна цифра.`}
+                >
+                  <PasswordInput
+                    name="password"
+                    autoComplete="new-password"
+                    minLength={MIN_PASSWORD_LENGTH}
+                    value={values.password}
+                    onValueChange={(value) => setField("password", value)}
+                  />
+                </AuthField>
+              </div>
+            </fieldset>
+
+            <fieldset className="auth-section">
+              <legend className="auth-section-title">Согласия</legend>
+              {legalLoadError ? (
+                <p className="auth-error">Не удалось загрузить юридические документы. Обновите страницу.</p>
+              ) : legalDocs.length === 0 ? (
+                <p className="auth-card-sub">Загружаем актуальные документы…</p>
+              ) : (
+                <div className="consent-list">
+                  {requiredDocs.map((doc) => (
+                    <ConsentRow
+                      key={doc.id}
+                      document={doc}
+                      checked={acceptedIds.has(doc.id)}
+                      onChange={() => toggleAccepted(doc.id)}
+                      required
+                    />
+                  ))}
+                  {optionalDocs.map((doc) => (
+                    <ConsentRow
+                      key={doc.id}
+                      document={doc}
+                      checked={acceptedIds.has(doc.id)}
+                      onChange={() => toggleAccepted(doc.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </fieldset>
+          </>
+        )}
 
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <button className="button auth-submit" type="submit" disabled={submitting || !canSubmit}>
-          {submitting ? "Создаём аккаунт…" : "Создать аккаунт"}
-        </button>
+        {step === "company" ? (
+          <button className="button auth-submit" type="button" onClick={goToPersonStep}>
+            Далее
+          </button>
+        ) : (
+          <div className="auth-step-actions">
+            <button className="button secondary" type="button" onClick={goBackToCompanyStep} disabled={submitting}>
+              Назад
+            </button>
+            <button className="button auth-submit" type="submit" disabled={submitting || !canSubmit}>
+              {submitting ? "Создаём аккаунт…" : "Создать аккаунт"}
+            </button>
+          </div>
+        )}
       </form>
     </AuthShell>
   );

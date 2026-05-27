@@ -107,6 +107,7 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
   const res = await ctx.http.post("/api/auth/register").send({
     organizationName: `ООО Тест ${suffix}`,
     companyType: "collector",
+    billingInn: "7707083893",
     firstName: "Иван",
     lastName: "Тестов",
     gender: "male",
@@ -124,6 +125,8 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
   expect(me.body.companyId).toBe(me.body.company.id);
   expect(me.body.company.organizationName).toBe(`ООО Тест ${suffix}`);
   expect(me.body.company.billingInn).toBeUndefined();
+  const company = await ctx.prisma.company.findUniqueOrThrow({ where: { id: me.body.company.id } });
+  expect(company.billingInn).toBe("7707083893");
   expect(me.body.requiresReConsent).toBe(false);
   return { token, companyId: me.body.company.id, userId: me.body.id };
 }
@@ -437,6 +440,7 @@ describe("Auth", () => {
     const res = await ctx.http.post("/api/auth/register").send({
       organizationName: "ООО Трейд Жен",
       companyType: "trader",
+      billingInn: "7707083893",
       firstName: "Анна",
       lastName: "Тестова",
       gender: "female",
@@ -460,14 +464,34 @@ describe("Auth", () => {
     const dup = await ctx.http.post("/api/auth/register").send({
       organizationName: "ООО Дубль",
       companyType: "collector",
+      billingInn: "7707083893",
       firstName: "А",
       lastName: "Б",
       gender: "male",
       phone: "+71111111111",
       email: "user0000002@test.local",
       password: "User12345678",
+      acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
     });
     expect(dup.status).toBe(409);
+  });
+
+  it("регистрация с некорректным ИНН отбивается 400", async () => {
+    const res = await ctx.http.post("/api/auth/register").send({
+      organizationName: "ООО Ошибка ИНН",
+      companyType: "collector",
+      billingInn: "12345",
+      firstName: "Иван",
+      lastName: "Тестов",
+      gender: "male",
+      phone: "+71111111113",
+      email: "bad-inn@test.local",
+      password: "User12345678",
+      acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("ИНН");
   });
 
   it("login с неверным паролем возвращает 401", async () => {
@@ -3052,6 +3076,7 @@ describe("Legal documents & consents", () => {
     const res = await ctx.http.post("/api/auth/register").send({
       organizationName: "ООО Без согласий",
       companyType: "collector",
+      billingInn: "7707083893",
       firstName: "Иван",
       lastName: "Тестов",
       gender: "male",

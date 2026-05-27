@@ -4,6 +4,7 @@ const EMAIL_DOMAIN = process.env.SMOKE_TEST_EMAIL_DOMAIN ?? "example.com";
 
 type SmokeUser = {
   organizationName: string;
+  billingInn: string;
   firstName: string;
   lastName: string;
   phone: string;
@@ -32,6 +33,15 @@ async function registerSmokeUser(page: Page, user: SmokeUser) {
   const form = page.locator("form.auth-card");
   await form.locator("input[name='organizationName']").fill(user.organizationName);
   await form.locator("select[name='companyType']").selectOption("collector");
+  await form.locator("input[name='billingInn']").fill(user.billingInn);
+  await page.getByRole("button", { name: "Далее" }).click();
+  await expect(page.getByText("Шаг 2 из 2")).toBeVisible();
+  await page.getByRole("button", { name: "Назад" }).click();
+  await expect(page.getByText("Шаг 1 из 2")).toBeVisible();
+  await expect(form.locator("input[name='organizationName']")).toHaveValue(user.organizationName);
+  await expect(form.locator("input[name='billingInn']")).toHaveValue(user.billingInn);
+  await page.getByRole("button", { name: "Далее" }).click();
+  await expect(page.getByText("Шаг 2 из 2")).toBeVisible();
   await form.locator("input[name='lastName']").fill(user.lastName);
   await form.locator("input[name='firstName']").fill(user.firstName);
   await form.locator("select[name='gender']").selectOption("male");
@@ -67,7 +77,7 @@ async function expectNewsFeed(page: Page, options: { navigate?: boolean } = {}) 
   if (options.navigate !== false) {
     await page.goto("/news");
   }
-  await expect(page.getByRole("heading", { name: "Последние обновления" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Новости рынка" })).toBeVisible();
   await expectAtLeastOne(page.locator(".news-tile"));
 }
 
@@ -105,6 +115,7 @@ function createSmokeUser(): SmokeUser {
 
   return {
     organizationName: `Smoke Test ${runId}`,
+    billingInn: "7707083893",
     firstName: "Smoke",
     lastName: "Tester",
     phone: `9${phoneSuffix}`,
