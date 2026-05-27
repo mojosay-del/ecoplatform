@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
-import { StatusPill, userStatusPillVariant } from "./StatusPill";
+import { StatusPill, companyStatusPillVariant, userStatusPillVariant } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
@@ -55,6 +55,16 @@ const allRoles = ["admin", "moderator", "content_manager"] as const;
 const statusLabel: Record<AdminUserListItem["status"], string> = {
   active: "Активен",
   blocked: "Заблокирован",
+};
+
+const companyStatusLabel: Record<string, string> = {
+  demo: "Демо",
+  active: "Активна",
+  past_due: "Просрочена",
+  suspended: "Приостановлена",
+  pending_deletion: "Удаление запланировано",
+  blocked: "Заблокирована",
+  archived: "В архиве",
 };
 
 type AdminUsersViewProps = {
@@ -287,7 +297,10 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                   <h3>Компания</h3>
                   {selected.company ? (
                     <p>
-                      {selected.company.organizationName} · статус {selected.company.status}
+                      {selected.company.organizationName} ·{" "}
+                      <StatusPill variant={companyStatusPillVariant(selected.company.status)}>
+                        {companyStatusLabel[selected.company.status] ?? selected.company.status}
+                      </StatusPill>
                     </p>
                   ) : (
                     <p className="page-subtitle">Не привязан к компании.</p>

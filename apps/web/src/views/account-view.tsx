@@ -69,6 +69,9 @@ const GENDER_LABELS: Record<string, string> = {
   female: "Женский",
 };
 
+const PROFILE_PHOTO_HINT =
+  "Фото профиля подбирается автоматически по типу компании. Загрузка своего фото появится в следующих обновлениях.";
+
 // Какую CTA «обновления тарифа» показывать сверху урока:
 // — нет компании (стафф) или extended-подписка → ничего;
 // — basic-подписка → предложить Расширенный доступ;
@@ -538,7 +541,7 @@ export function AccountView() {
             Раньше аватар был 40px и терялся среди карточек. */}
         <header className="account-hero">
           <div className="account-hero-profile">
-            <div className="account-hero-avatar" aria-hidden={!user?.avatarUrl}>
+            <div className="account-hero-avatar" aria-hidden={!user?.avatarUrl} title={PROFILE_PHOTO_HINT}>
               {user?.avatarUrl ? (
                 <Image alt="" src={user.avatarUrl} width={128} height={128} />
               ) : (
@@ -564,11 +567,12 @@ export function AccountView() {
               {companyStatusLabel && !isPlatformStaff ? (
                 <StatusPill variant={companyStatusPillVariant(billing?.status)}>{companyStatusLabel}</StatusPill>
               ) : null}
+              {billing?.status === "demo" && !isPlatformStaff ? (
+                <button className="account-hero-cta" onClick={() => setActiveTab("billing")} type="button">
+                  Активировать подписку
+                </button>
+              ) : null}
             </div>
-            <p className="account-hero-hint">
-              Фото профиля подбирается автоматически по типу компании. Возможность загрузить своё появится в следующих
-              обновлениях.
-            </p>
           </div>
         </header>
 

@@ -9,7 +9,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ChevronDown, Flag, MessageCircle, Send, ThumbsUp, X } from "lucide-react";
+import { ChevronDown, Flag, MessageCircle, MessageCircleOff, Send, ThumbsUp, X } from "lucide-react";
 import type { NewsCommentDecorated, NewsListItem, NewsPostDetail, NewsTagSummary } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { NewsOnboardingCard } from "../components/NewsOnboardingCard";
@@ -730,7 +730,10 @@ function CommentsSection({
 
       <div className="comment-list">
         {comments.length === 0 ? (
-          <div className="comments-empty">Пока никто не написал комментарий.</div>
+          <div className="comments-empty">
+            <MessageCircleOff aria-hidden="true" size={20} />
+            <span>Пока никто не написал комментарий.</span>
+          </div>
         ) : (
           comments.map((comment) => (
             <CommentCard

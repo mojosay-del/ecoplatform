@@ -27,9 +27,31 @@ type CompanyItem = {
 type ViewState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
 const plans = [
-  { value: "basic", label: "basic" },
-  { value: "extended", label: "extended" },
+  { value: "basic", label: "Базовый" },
+  { value: "extended", label: "Расширенный" },
 ] as const;
+
+const COMPANY_STATUS_LABELS: Record<string, string> = {
+  demo: "Демо",
+  active: "Активна",
+  past_due: "Просрочена",
+  suspended: "Приостановлена",
+  pending_deletion: "Удаление запланировано",
+  blocked: "Заблокирована",
+  archived: "В архиве",
+};
+
+const SUBSCRIPTION_PLAN_LABELS: Record<string, string> = {
+  basic: "Базовый",
+  extended: "Расширенный",
+};
+
+const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  active: "Активна",
+  past_due: "Просрочена",
+  cancelled: "Отменена",
+  expired: "Истекла",
+};
 
 export function AdminBillingView() {
   const { token } = useAuth();
@@ -164,7 +186,7 @@ export function AdminBillingView() {
               <option value="">Выберите компанию…</option>
               {companies.map((company) => (
                 <option key={company.id} value={company.id}>
-                  {company.organizationName} · {company.status}
+                  {company.organizationName} · {COMPANY_STATUS_LABELS[company.status] ?? company.status}
                 </option>
               ))}
             </select>
@@ -222,17 +244,23 @@ export function AdminBillingView() {
             <article className="checklist-block" key={company.id}>
               <strong>{company.organizationName}</strong>
               <p>
-                <StatusPill variant={companyStatusPillVariant(company.status)}>{company.status}</StatusPill> · Тариф:{" "}
-                {company.subscriptionPlan ?? "—"}
+                <StatusPill variant={companyStatusPillVariant(company.status)}>
+                  {COMPANY_STATUS_LABELS[company.status] ?? company.status}
+                </StatusPill>{" "}
+                · Тариф:{" "}
+                {company.subscriptionPlan
+                  ? (SUBSCRIPTION_PLAN_LABELS[company.subscriptionPlan] ?? company.subscriptionPlan)
+                  : "—"}
                 {company.subscriptionEndsAt
                   ? ` (до ${new Date(company.subscriptionEndsAt).toLocaleDateString("ru-RU")})`
                   : ""}
               </p>
               {company.subscriptions[0] ? (
                 <p className="page-subtitle">
-                  Последняя подписка: {company.subscriptions[0].plan} ·{" "}
+                  Последняя подписка:{" "}
+                  {SUBSCRIPTION_PLAN_LABELS[company.subscriptions[0].plan] ?? company.subscriptions[0].plan} ·{" "}
                   <StatusPill variant={subscriptionStatusPillVariant(company.subscriptions[0].status)}>
-                    {company.subscriptions[0].status}
+                    {SUBSCRIPTION_STATUS_LABELS[company.subscriptions[0].status] ?? company.subscriptions[0].status}
                   </StatusPill>{" "}
                   · до {new Date(company.subscriptions[0].endsAt).toLocaleDateString("ru-RU")}
                 </p>

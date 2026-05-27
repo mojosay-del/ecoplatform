@@ -2416,6 +2416,53 @@ body.news-modal-open .app-shell {
   font-weight: 600;
 }
 
+.forgot-support-contact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--panel-soft);
+}
+
+.forgot-support-contact > span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.forgot-support-contact a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.forgot-support-copy {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.auth-copy-status {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 520px) {
+  .forgot-support-contact {
+    grid-template-columns: 1fr;
+  }
+
+  .forgot-support-copy {
+    width: 100%;
+  }
+}
+
 .auth-progress {
   display: flex;
   flex-direction: column;
@@ -3973,14 +4020,22 @@ body.news-modal-open .app-shell {
 }
 
 .comments-empty {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 86px;
   border: 1px dashed var(--line-strong);
   border-radius: 12px;
   background: var(--panel);
   color: var(--muted);
   font-size: 14px;
+  text-align: center;
+}
+
+.comments-empty svg {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
 }
 
 .comment-card {
@@ -7328,18 +7383,36 @@ li.tree-add-row + li.tree-add-row,
   margin-top: 8px;
 }
 
-.account-hero-hint {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: var(--muted);
-  opacity: 0.85;
-  line-height: 1.5;
-}
-
 .account-hero-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.account-hero-cta {
+  border: 1px solid rgb(var(--brand-rgb) / 0.2);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgb(var(--brand-rgb) / 0.1);
+  color: var(--brand-active);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.account-hero-cta:hover {
+  border-color: rgb(var(--brand-rgb) / 0.35);
+  background: rgb(var(--brand-rgb) / 0.16);
+}
+
+.account-hero-cta:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .account-grid {

@@ -4,7 +4,13 @@ import { FormEvent, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
-import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "./StatusPill";
+import {
+  StatusPill,
+  companyStatusPillVariant,
+  subscriptionStatusPillVariant,
+  supportStatusPillVariant,
+  userStatusPillVariant,
+} from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -58,6 +64,44 @@ type AdminCompanyDetail = {
 
 const companyStatuses = ["demo", "active", "past_due", "suspended", "pending_deletion", "blocked", "archived"] as const;
 const subscriptionPlans = ["basic", "extended"] as const;
+const COMPANY_STATUS_LABELS: Record<string, string> = {
+  demo: "Демо",
+  active: "Активна",
+  past_due: "Просрочена",
+  suspended: "Приостановлена",
+  pending_deletion: "Удаление запланировано",
+  blocked: "Заблокирована",
+  archived: "В архиве",
+};
+const SUBSCRIPTION_PLAN_LABELS: Record<string, string> = {
+  basic: "Базовый",
+  extended: "Расширенный",
+};
+const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  active: "Активна",
+  past_due: "Просрочена",
+  cancelled: "Отменена",
+  expired: "Истекла",
+};
+const USER_STATUS_LABELS: Record<string, string> = {
+  active: "Активен",
+  blocked: "Заблокирован",
+};
+const SUPPORT_STATUS_LABELS: Record<string, string> = {
+  open: "Открыт",
+  in_progress: "В работе",
+  awaiting_user: "Ждёт ответа",
+  resolved: "Решён",
+  closed: "Закрыт",
+};
+const SUPPORT_CATEGORY_LABELS: Record<string, string> = {
+  billing: "Биллинг",
+  moderation_review: "Модерация",
+  company_management: "Компания",
+  technical: "Технический вопрос",
+  data_deletion: "Удаление данных",
+  other: "Другое",
+};
 const statusReasons: ReadonlyArray<readonly [string, string]> = [
   ["policy_violation", "Нарушение правил"],
   ["billing_issue", "Биллинг"],
@@ -176,7 +220,7 @@ export function AdminCompaniesView() {
               <option value="">Все статусы</option>
               {companyStatuses.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {COMPANY_STATUS_LABELS[status] ?? status}
                 </option>
               ))}
             </select>
@@ -184,7 +228,7 @@ export function AdminCompaniesView() {
               <option value="">Все тарифы</option>
               {subscriptionPlans.map((plan) => (
                 <option key={plan} value={plan}>
-                  {plan}
+                  {SUBSCRIPTION_PLAN_LABELS[plan] ?? plan}
                 </option>
               ))}
             </select>
@@ -214,10 +258,15 @@ export function AdminCompaniesView() {
                   onClick={() => openCompany(item.id)}
                   type="button"
                 >
-                  <StatusPill variant={companyStatusPillVariant(item.status)}>{item.status}</StatusPill>
+                  <StatusPill variant={companyStatusPillVariant(item.status)}>
+                    {COMPANY_STATUS_LABELS[item.status] ?? item.status}
+                  </StatusPill>
                   <strong>{item.organizationName}</strong>
                   <span>
-                    {item.subscriptionPlan ?? "без тарифа"} · {item._count.users} польз.
+                    {item.subscriptionPlan
+                      ? (SUBSCRIPTION_PLAN_LABELS[item.subscriptionPlan] ?? item.subscriptionPlan)
+                      : "без тарифа"}{" "}
+                    · {item._count.users} польз.
                   </span>
                   <small>
                     Тикетов: {item._count.supportTickets} · Подписок: {item._count.subscriptions}
@@ -240,7 +289,7 @@ export function AdminCompaniesView() {
                   <div className="list-row">
                     <div>
                       <StatusPill as="p" variant={companyStatusPillVariant(selected.status)}>
-                        {selected.status}
+                        {COMPANY_STATUS_LABELS[selected.status] ?? selected.status}
                       </StatusPill>
                       <h2>{selected.organizationName}</h2>
                       <p className="page-subtitle">
@@ -261,7 +310,10 @@ export function AdminCompaniesView() {
                             {user.firstName} {user.lastName}
                           </strong>
                           <p>
-                            {user.email} · {user.status}
+                            {user.email} ·{" "}
+                            <StatusPill variant={userStatusPillVariant(user.status)}>
+                              {USER_STATUS_LABELS[user.status] ?? user.status}
+                            </StatusPill>
                           </p>
                         </article>
                       ))}
@@ -277,9 +329,9 @@ export function AdminCompaniesView() {
                         {selected.subscriptions.map((subscription) => (
                           <article className="checklist-block" key={subscription.id}>
                             <strong>
-                              {subscription.plan} ·{" "}
+                              {SUBSCRIPTION_PLAN_LABELS[subscription.plan] ?? subscription.plan} ·{" "}
                               <StatusPill variant={subscriptionStatusPillVariant(subscription.status)}>
-                                {subscription.status}
+                                {SUBSCRIPTION_STATUS_LABELS[subscription.status] ?? subscription.status}
                               </StatusPill>
                             </strong>
                             <p>
@@ -303,7 +355,10 @@ export function AdminCompaniesView() {
                           <article className="checklist-block" key={ticket.id}>
                             <strong>{ticket.subject}</strong>
                             <p>
-                              {ticket.category} · {ticket.status}
+                              {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
+                              <StatusPill variant={supportStatusPillVariant(ticket.status)}>
+                                {SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}
+                              </StatusPill>
                             </p>
                           </article>
                         ))}
@@ -320,7 +375,7 @@ export function AdminCompaniesView() {
                     >
                       {companyStatuses.map((status) => (
                         <option key={status} value={status}>
-                          {status}
+                          {COMPANY_STATUS_LABELS[status] ?? status}
                         </option>
                       ))}
                     </select>
