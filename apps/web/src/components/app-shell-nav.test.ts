@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { appNavSections, COMING_SOON_BADGE, futureNavItems, getBreadcrumbTrail } from "./app-shell-nav";
+import { appNavSections, futureNavItems, getBreadcrumbTrail } from "./app-shell-nav";
 
 describe("AppShell future navigation teasers", () => {
-  it("keeps the future-item badge compact for the sidebar", () => {
-    expect(COMING_SOON_BADGE).toBe("Скоро");
-  });
-
   it("keeps every disabled sidebar item documented as a roadmap teaser", () => {
     const items = futureNavItems();
 
@@ -19,7 +15,6 @@ describe("AppShell future navigation teasers", () => {
     ]);
 
     for (const item of items) {
-      expect(item.disabledBadge).toBe(COMING_SOON_BADGE);
       expect(item.disabledHint).toContain("—");
       expect(item.href).toBeUndefined();
     }

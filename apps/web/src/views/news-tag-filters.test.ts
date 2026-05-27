@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addNewsTagSelection,
   buildNewsUrl,
-  getVisibleNewsTagNames,
+  filterNewsTagOptions,
   normaliseNewsTagSelection,
   toggleNewsTagSelection,
 } from "./news-tag-filters";
@@ -19,16 +19,16 @@ describe("news tag filters", () => {
     expect(toggleNewsTagSelection(["рынок"], "экология")).toEqual(["рынок", "экология"]);
   });
 
-  it("keeps selected direct URL tags visible before top tags", () => {
-    const topTags = ["рынок", "пластик", "экология", "логистика"];
+  it("filters dropdown tag options by partial text", () => {
+    const tags = [
+      { id: "1", name: "рынок", usageCount: 7 },
+      { id: "2", name: "Пластик", usageCount: 2 },
+      { id: "3", name: "Макулатура", usageCount: 1 },
+    ];
 
-    expect(getVisibleNewsTagNames(topTags, ["срочно", "рынок"])).toEqual([
-      "срочно",
-      "рынок",
-      "пластик",
-      "экология",
-      "логистика",
-    ]);
+    expect(filterNewsTagOptions(tags, "лас").map((tag) => tag.name)).toEqual(["Пластик"]);
+    expect(filterNewsTagOptions(tags, " РЫН ").map((tag) => tag.name)).toEqual(["рынок"]);
+    expect(filterNewsTagOptions(tags, "").map((tag) => tag.name)).toEqual(["рынок", "Пластик", "Макулатура"]);
   });
 
   it("builds /news URLs while preserving unrelated query params and clearing post when filter changes", () => {

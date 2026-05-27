@@ -9,7 +9,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ChevronDown, Flag, MessageCircle, MessageCircleOff, Send, ThumbsUp, X } from "lucide-react";
+import { ChevronDown, Flag, MessageCircle, MessageCircleOff, Search, Send, ThumbsUp, X } from "lucide-react";
 import type { NewsCommentDecorated, NewsListItem, NewsPostDetail, NewsTagSummary } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { NewsOnboardingCard } from "../components/NewsOnboardingCard";
@@ -38,10 +38,9 @@ import {
 import { ContentBlocks } from "./content-blocks";
 import {
   NEWS_ALL_TAG_LIMIT,
-  NEWS_VISIBLE_TAG_LIMIT,
   addNewsTagSelection,
   buildNewsUrl,
-  getVisibleNewsTagNames,
+  filterNewsTagOptions,
   normaliseNewsTagSelection,
   toggleNewsTagSelection,
 } from "./news-tag-filters";
@@ -83,14 +82,6 @@ export function NewsView() {
   const { items, setItems, state, errorMessage, hasMore, isLoadingMore, sentinelRef } = feed;
   const covers = useCoverAssets(items);
   const openedSlug = searchParams.get("post");
-  const visibleTagNames = useMemo(
-    () =>
-      getVisibleNewsTagNames(
-        tagOptions.map((tag) => tag.name),
-        selectedTags,
-      ),
-    [selectedTags, tagOptions],
-  );
   const showOnboarding =
     user && onboardingDismissed === false ? shouldShowNewsOnboarding(user, onboardingDismissed) : false;
 
@@ -177,7 +168,6 @@ export function NewsView() {
           onToggleTag={toggleTag}
           selectedTags={selectedTags}
           tagOptions={tagOptions}
-          visibleTagNames={visibleTagNames}
         />
 
         {state === "loading" ? (
@@ -273,7 +263,6 @@ function NewsTagFilters({
   onToggleTag,
   selectedTags,
   tagOptions,
-  visibleTagNames,
 }: {
   isAllTagsOpen: boolean;
   isLoading: boolean;
@@ -282,31 +271,24 @@ function NewsTagFilters({
   onToggleTag: (tag: string) => void;
   selectedTags: string[];
   tagOptions: NewsTagSummary[];
-  visibleTagNames: string[];
 }) {
-  if (!isLoading && visibleTagNames.length === 0) return null;
+  const [tagSearch, setTagSearch] = useState("");
+
+  useEffect(() => {
+    if (!isAllTagsOpen) {
+      setTagSearch("");
+    }
+  }, [isAllTagsOpen]);
 
   const hasDropdown = tagOptions.length > 0;
+  const filteredTagOptions = useMemo(() => filterNewsTagOptions(tagOptions, tagSearch), [tagOptions, tagSearch]);
+  const selectedCount = selectedTags.length;
+
+  if (!isLoading && tagOptions.length === 0 && selectedCount === 0) return null;
 
   return (
     <nav className="news-tags" aria-label="Фильтр новостей по тегам">
-      <div className="news-tags-row">
-        {visibleTagNames.map((tag) => {
-          const isActive = selectedTags.includes(tag);
-          return (
-            <button
-              aria-pressed={isActive}
-              className={`news-tag-chip ${isActive ? "is-active" : ""}`}
-              key={tag}
-              onClick={() => onToggleTag(tag)}
-              type="button"
-            >
-              {tag}
-            </button>
-          );
-        })}
-        {isLoading ? <span className="news-tags-loading">Теги загружаются…</span> : null}
-      </div>
+      {isLoading ? <span className="news-tags-loading">Теги загружаются…</span> : null}
 
       <div className="news-tags-actions">
         {selectedTags.length > 0 ? (
@@ -318,6 +300,7 @@ function NewsTagFilters({
         {hasDropdown ? (
           <button aria-expanded={isAllTagsOpen} className="news-tags-more" onClick={onToggleDropdown} type="button">
             Все теги
+            {selectedCount > 0 ? <span className="news-tags-count">{selectedCount}</span> : null}
             <ChevronDown aria-hidden="true" className={isAllTagsOpen ? "is-open" : ""} size={15} />
           </button>
         ) : null}
@@ -325,21 +308,38 @@ function NewsTagFilters({
 
       {hasDropdown && isAllTagsOpen ? (
         <div className="news-tags-dropdown">
-          {tagOptions.map((tag) => {
-            const isActive = selectedTags.includes(tag.name);
-            return (
-              <button
-                aria-pressed={isActive}
-                className={`news-tag-dropdown-item ${isActive ? "is-active" : ""}`}
-                key={tag.id}
-                onClick={() => onToggleTag(tag.name)}
-                type="button"
-              >
-                <span>{tag.name}</span>
-                <strong>{tag.usageCount}</strong>
-              </button>
-            );
-          })}
+          <label className="news-tags-search">
+            <Search aria-hidden="true" size={16} />
+            <input
+              autoComplete="off"
+              inputMode="search"
+              onChange={(event) => setTagSearch(event.target.value)}
+              placeholder="Найти тег"
+              type="search"
+              value={tagSearch}
+            />
+          </label>
+          <div className="news-tags-dropdown-list">
+            {filteredTagOptions.length > 0 ? (
+              filteredTagOptions.map((tag) => {
+                const isActive = selectedTags.includes(tag.name);
+                return (
+                  <button
+                    aria-pressed={isActive}
+                    className={`news-tag-dropdown-item ${isActive ? "is-active" : ""}`}
+                    key={tag.id}
+                    onClick={() => onToggleTag(tag.name)}
+                    type="button"
+                  >
+                    <span>{tag.name}</span>
+                    <strong>{tag.usageCount}</strong>
+                  </button>
+                );
+              })
+            ) : (
+              <p className="news-tags-empty">Такого тега пока нет.</p>
+            )}
+          </div>
         </div>
       ) : null}
     </nav>

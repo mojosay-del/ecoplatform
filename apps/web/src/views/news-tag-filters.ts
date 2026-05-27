@@ -1,4 +1,3 @@
-export const NEWS_VISIBLE_TAG_LIMIT = 10;
 export const NEWS_ALL_TAG_LIMIT = 100;
 
 export function normaliseNewsTagSelection(values: readonly string[]) {
@@ -28,8 +27,12 @@ export function toggleNewsTagSelection(current: readonly string[], tag: string) 
     : addNewsTagSelection(current, cleanTag);
 }
 
-export function getVisibleNewsTagNames(allTagNames: readonly string[], selectedTags: readonly string[]) {
-  return normaliseNewsTagSelection([...selectedTags, ...allTagNames.slice(0, NEWS_VISIBLE_TAG_LIMIT)]);
+export function filterNewsTagOptions<T extends { name: string }>(tags: readonly T[], query: string): T[] {
+  const cleanQuery = query.trim().toLocaleLowerCase("ru-RU");
+
+  if (!cleanQuery) return [...tags];
+
+  return tags.filter((tag) => tag.name.toLocaleLowerCase("ru-RU").includes(cleanQuery));
 }
 
 export function buildNewsUrl(currentSearch: string, selectedTags: readonly string[], postSlug?: string | null) {

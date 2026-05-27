@@ -19,7 +19,6 @@ export type NavItem = {
   icon: LucideIcon;
   activePathPrefixes?: string[];
   disabled?: boolean;
-  disabledBadge?: string;
   disabledHint?: string;
   roles?: string[];
   children?: NavItem[];
@@ -36,13 +35,10 @@ export type BreadcrumbItem = {
   icon?: LucideIcon;
 };
 
-export const COMING_SOON_BADGE = "Скоро";
-
 const futureItem = (label: string, icon: LucideIcon, disabledHint: string): NavItem => ({
   label,
   icon,
   disabled: true,
-  disabledBadge: COMING_SOON_BADGE,
   disabledHint,
 });
 

@@ -8,7 +8,6 @@ import { ChevronsLeft, ChevronsRight, HelpCircle, Menu, Settings, X } from "luci
 import { useAuth } from "../lib/auth";
 import {
   appNavSections,
-  COMING_SOON_BADGE,
   getBreadcrumbTrail,
   isNavItemActive,
   type BreadcrumbItem,
@@ -176,8 +175,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ) : null}
           {children}
         </div>
-        <AppShellFooter />
       </main>
+      <AppShellFooter />
       {/* Drawer поддержки рендерим один раз на уровне AppShell — компонент
           сам проверяет проп `open` и ничего не рисует, пока он false. */}
       {isAdminUser ? null : <UserSupportDrawer open={supportOpen} onClose={() => setSupportOpen(false)} />}
@@ -191,7 +190,6 @@ function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: 
   const active = isNavItemActive(item, pathname);
   const className = `nav-link ${child ? "nav-link-child" : ""} ${active ? "active" : ""} ${item.disabled ? "disabled" : ""}`;
   const iconSize = child ? 16 : 19;
-  const badge = item.disabledBadge ?? COMING_SOON_BADGE;
 
   return (
     <div className="nav-entry">
@@ -212,7 +210,6 @@ function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: 
           <Icon size={iconSize} />
           <span className={`nav-label ${item.disabled ? "nav-label-disabled" : ""}`}>
             <span className="nav-label-text">{item.label}</span>
-            {item.disabled ? <span className="nav-disabled-badge">{badge}</span> : null}
           </span>
           {item.disabledHint ? (
             <span className="nav-tooltip" id={tooltipId} role="tooltip">
@@ -292,23 +289,19 @@ function filterVisibleItems(items: NavItem[], roles: string[]): NavItem[] {
 function AppShellFooter() {
   return (
     <footer className="app-shell-footer">
-      <div className="app-shell-footer-column">
-        <strong>ЭкоПлатформа</strong>
-        <span>SaaS для рынка вторсырья</span>
-      </div>
-      <div className="app-shell-footer-column">
-        <span className="app-shell-footer-title">Правовое</span>
+      <strong>ЭкоПлатформа</strong>
+      <span>SaaS для рынка вторсырья</span>
+      <span className="app-shell-footer-separator" aria-hidden="true" />
+      <nav className="app-shell-footer-links" aria-label="Правовая информация">
         <Link href="/legal/privacy">Политика конфиденциальности</Link>
         <Link href="/legal/terms">Пользовательское соглашение</Link>
-        <Link href="/legal/personal-data">152-ФЗ: согласие на обработку ПДн</Link>
-        <Link href="/legal/cookies">Политика cookies</Link>
-        <Link href="/legal/offer">Публичная оферта</Link>
-      </div>
-      <div className="app-shell-footer-column">
-        <span className="app-shell-footer-title">Контакты</span>
-        <a href="mailto:support@ecoplatform.local">support@ecoplatform.local</a>
-        <span className="app-shell-footer-copyright">© 2026 ЭкоПлатформа</span>
-      </div>
+        <Link href="/legal/personal-data">Согласие на обработку ПДн</Link>
+        <Link href="/legal/cookies">Cookies</Link>
+        <Link href="/legal/offer">Оферта</Link>
+      </nav>
+      <span className="app-shell-footer-separator" aria-hidden="true" />
+      <a href="mailto:support@ecoplatform.local">support@ecoplatform.local</a>
+      <span className="app-shell-footer-copyright">© 2026</span>
     </footer>
   );
 }
