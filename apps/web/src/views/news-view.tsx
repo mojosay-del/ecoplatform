@@ -910,7 +910,7 @@ const complaintReasons = [
   ["other", "Иное"],
 ] as const;
 
-export function NewsPostView({ slug }: { slug: string }) {
+export function NewsPostView({ slug, preview = false }: { slug: string; preview?: boolean }) {
   const { token } = useAuth();
   const [post, setPost] = useState<NewsPostDetail | null>(null);
   const [state, setState] = useState<ApiState>("unauthenticated");
@@ -933,7 +933,7 @@ export function NewsPostView({ slug }: { slug: string }) {
     setState("loading");
     setErrorMessage(null);
     try {
-      const data = await api.news.get(slug);
+      const data = await api.news.get(slug, { preview });
       setPost(data);
       setState("ready");
     } catch (error) {
@@ -949,7 +949,7 @@ export function NewsPostView({ slug }: { slug: string }) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, token]);
+  }, [slug, token, preview]);
 
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1021,6 +1021,11 @@ export function NewsPostView({ slug }: { slug: string }) {
         <Link className="button secondary page-back" href="/news">
           ← Назад к новостям
         </Link>
+        {preview ? (
+          <StatusPill as="p" className="cms-preview-banner" variant="warning">
+            Предпросмотр новости: комментарии и реакции отключены.
+          </StatusPill>
+        ) : null}
         {state === "loading" || !post ? (
           <p className="page-subtitle">Загрузка…</p>
         ) : (
@@ -1035,27 +1040,35 @@ export function NewsPostView({ slug }: { slug: string }) {
             <div className="news-article-meta news-article-meta-page">
               {publishedDate ? (
                 <time dateTime={publishedDate.toISOString()}>{formatNewsDate(publishedDate)}</time>
+              ) : preview ? (
+                <span>Черновик ещё не опубликован</span>
               ) : null}
-              <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
-              <NewsLikeButton post={post} pending={likePending} onToggle={togglePostLike} />
+              {!preview ? (
+                <>
+                  <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
+                  <NewsLikeButton post={post} pending={likePending} onToggle={togglePostLike} />
+                </>
+              ) : null}
             </div>
-            <CommentsSection
-              comments={post.comments ?? []}
-              commentsCount={post._count?.comments ?? 0}
-              commentText={commentText}
-              onCommentTextChange={setCommentText}
-              onSubmitComment={submitComment}
-              resultMessage={resultMessage}
-              reportingCommentId={reportingCommentId}
-              setReportingCommentId={setReportingCommentId}
-              reportReason={reportReason}
-              setReportReason={setReportReason}
-              reportComment={reportComment}
-              setReportComment={setReportComment}
-              onSubmitComplaint={submitComplaint}
-              onToggleCommentLike={toggleCommentLike}
-              commentLikePendingId={commentLikePendingId}
-            />
+            {!preview ? (
+              <CommentsSection
+                comments={post.comments ?? []}
+                commentsCount={post._count?.comments ?? 0}
+                commentText={commentText}
+                onCommentTextChange={setCommentText}
+                onSubmitComment={submitComment}
+                resultMessage={resultMessage}
+                reportingCommentId={reportingCommentId}
+                setReportingCommentId={setReportingCommentId}
+                reportReason={reportReason}
+                setReportReason={setReportReason}
+                reportComment={reportComment}
+                setReportComment={setReportComment}
+                onSubmitComplaint={submitComplaint}
+                onToggleCommentLike={toggleCommentLike}
+                commentLikePendingId={commentLikePendingId}
+              />
+            ) : null}
           </>
         )}
       </section>

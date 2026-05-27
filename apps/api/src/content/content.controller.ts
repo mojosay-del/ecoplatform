@@ -32,6 +32,10 @@ function parseStringArrayQuery(...values: Array<string | string[] | undefined>):
   return values.flatMap((value) => (Array.isArray(value) ? value : value !== undefined ? [value] : []));
 }
 
+function isPreviewQuery(value?: string) {
+  return value === "1" || value === "true";
+}
+
 // Контроллер контент-домена. Инжектит 4 доменных сервиса (по результатам
 // Волны 3.2 split). Маршруты сгруппированы по доменам — секции News /
 // Indices / Learning / KnowledgeBase. Внутри каждой — сперва публичные,
@@ -70,8 +74,8 @@ export class ContentController {
   }
 
   @Get("news/:slug")
-  async newsPost(@Param("slug") slug: string, @CurrentUser() user: RequestUser) {
-    return this.news.getNews(slug, user);
+  async newsPost(@Param("slug") slug: string, @CurrentUser() user: RequestUser, @Query("preview") preview?: string) {
+    return this.news.getNews(slug, user, { preview: isPreviewQuery(preview) });
   }
 
   @Post("news/:id/like")
@@ -117,8 +121,8 @@ export class ContentController {
   }
 
   @Get("education/modules/:id")
-  async learningModule(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.learning.getLearningModule(id, user);
+  async learningModule(@Param("id") id: string, @CurrentUser() user: RequestUser, @Query("preview") preview?: string) {
+    return this.learning.getLearningModule(id, user, { preview: isPreviewQuery(preview) });
   }
 
   @Post("education/lessons/:id/complete")

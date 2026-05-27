@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { BookOpen, ChevronRight, FileText, FolderOpen, Paperclip, Plus, Trash2 } from "lucide-react";
+import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Paperclip, Plus, Trash2 } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { Block, BlocksEditor, LESSON_BLOCK_KINDS, type BlockInsertExtraOption } from "./BlocksEditor";
@@ -636,7 +636,16 @@ function DetailPanel({
   }
   const lesson = findLesson(modules, selection.id);
   if (!lesson) return <p className="page-subtitle">Урок не найден.</p>;
-  return <LessonForm key={lesson.id} lesson={lesson} onMutate={onMutate} onSelect={onSelect} />;
+  const chapter = findChapter(modules, lesson.chapterId);
+  return (
+    <LessonForm
+      key={lesson.id}
+      lesson={lesson}
+      moduleId={chapter?.moduleId ?? null}
+      onMutate={onMutate}
+      onSelect={onSelect}
+    />
+  );
 }
 
 function ModuleForm({
@@ -891,10 +900,12 @@ function ChapterForm({
 
 function LessonForm({
   lesson,
+  moduleId,
   onMutate,
   onSelect,
 }: {
   lesson: Lesson;
+  moduleId: string | null;
   onMutate: (path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) => Promise<boolean>;
   onSelect: (s: Selection) => void;
 }) {
@@ -1076,6 +1087,28 @@ function LessonForm({
           <button className="button secondary" type="button" onClick={publishToggle}>
             {lesson.status === "published" ? "Снять с публикации" : "Опубликовать"}
           </button>
+          {moduleId && !hasChanges ? (
+            <a
+              className="button secondary"
+              href={`/education/${encodeURIComponent(moduleId)}/${encodeURIComponent(lesson.id)}?preview=1`}
+              target="_blank"
+              rel="noreferrer"
+              title="Открыть публичный предпросмотр"
+            >
+              <ExternalLink size={14} />
+              Предпросмотр
+            </a>
+          ) : (
+            <button
+              className="button secondary"
+              type="button"
+              disabled
+              title={!moduleId ? "Модуль не найден" : "Сначала сохраните урок, чтобы открыть публичный предпросмотр"}
+            >
+              <ExternalLink size={14} />
+              Предпросмотр
+            </button>
+          )}
           <button className="button" type="submit" disabled={saving || !hasChanges}>
             {saving ? "Сохраняю…" : "Сохранить"}
           </button>

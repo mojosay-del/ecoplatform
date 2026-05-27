@@ -23,6 +23,13 @@ type ChapterInput = z.infer<typeof chapterInputSchema>;
 type ChapterUpdateInput = z.infer<typeof chapterUpdateInputSchema>;
 type LessonInput = z.infer<typeof lessonInputSchema>;
 type LessonUpdateInput = z.infer<typeof lessonUpdateInputSchema>;
+type LearningReadOptions = { preview?: boolean };
+
+function canPreviewAuthoredContent(user: RequestUser, createdById: string | null | undefined) {
+  return (
+    user.id === createdById || user.platformRoles.includes("admin") || user.platformRoles.includes("content_manager")
+  );
+}
 
 // Раздел «Обучение»: модули, главы, уроки, контент-блоки, доступ по подписке.
 // Вынесен из ContentService — содержит весь учебный домен и приватные хелперы
@@ -102,7 +109,7 @@ export class LearningService {
     return paginatedResponse(items, total, pagination);
   }
 
-  async getLearningModule(id: string, user: RequestUser) {
+  async getLearningModule(id: string, user: RequestUser, options: LearningReadOptions = {}) {
     this.common.assertFunctionalAccess(user);
     const module = await this.prisma.learningModule.findUnique({
       where: { id },
@@ -112,7 +119,6 @@ export class LearningService {
           orderBy: { position: "asc" },
           include: {
             lessons: {
-              where: { status: ContentStatus.published },
               orderBy: { position: "asc" },
               include: {
                 blocks: { orderBy: { position: "asc" } },
@@ -125,14 +131,24 @@ export class LearningService {
       },
     });
 
-    if (!module || module.status !== ContentStatus.published) {
+    if (!module) {
+      throw new NotFoundException("Модуль не найден.");
+    }
+    const canPreview = options.preview && canPreviewAuthoredContent(user, module.createdById);
+    if (module.status !== ContentStatus.published && !canPreview) {
       throw new NotFoundException("Модуль не найден.");
     }
 
-    const hasAccess = this.canAccessPublishedLearningModule(user, module);
+    const visibleChapters = module.chapters.map((chapter) => ({
+      ...chapter,
+      lessons: canPreview
+        ? chapter.lessons
+        : chapter.lessons.filter((lesson) => lesson.status === ContentStatus.published),
+    }));
+    const hasAccess = canPreview || this.canAccessPublishedLearningModule(user, module);
     let completedLessons = 0;
-    const totalLessons = module.chapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0);
-    const chapters = module.chapters.map((chapter) => ({
+    const totalLessons = visibleChapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0);
+    const chapters = visibleChapters.map((chapter) => ({
       ...chapter,
       lessons: chapter.lessons.map((lesson) => {
         const { progress, ...lessonWithoutProgress } = lesson;

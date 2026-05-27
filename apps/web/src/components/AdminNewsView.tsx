@@ -1,11 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { Eye, ImageIcon, Plus, X } from "lucide-react";
+import { ExternalLink, ImageIcon, Plus, X } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { Block, BlocksEditor, NEWS_BLOCK_KINDS } from "./BlocksEditor";
-import { ContentBlocks } from "../views/content-blocks";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../lib/api";
@@ -13,6 +11,7 @@ import { useAuth } from "../lib/auth";
 import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
+import { formatNewsDate } from "../views/_shared";
 
 type NewsTag = {
   id: string;
@@ -31,6 +30,7 @@ type NewsItem = {
   status: "draft" | "published";
   coverImageId: string | null;
   tags: Array<{ newsTagId: string; newsTag: NewsTag }>;
+  firstPublishedAt: string | null;
   createdAt: string;
   updatedAt: string;
   _count?: { blocks: number; comments: number; likes: number };
@@ -71,7 +71,6 @@ export function AdminNewsView() {
   const [message, setMessage] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const newsQuery = useInfiniteApiQuery<NewsItem>(
     token ? "admin-news" : null,
     NEWS_LIST_PAGE_SIZE,
@@ -242,6 +241,14 @@ export function AdminNewsView() {
     }
   }
 
+  function previewHref(item: Pick<NewsItem, "slug">) {
+    return `/news/${encodeURIComponent(item.slug)}?preview=1`;
+  }
+
+  function openSavedPreview(item: Pick<NewsItem, "slug">) {
+    window.open(previewHref(item), "_blank", "noopener,noreferrer");
+  }
+
   useEffect(() => {
     void loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -270,8 +277,7 @@ export function AdminNewsView() {
   }
 
   const isEditingNew = draft.id === null;
-  const draftCoverUrl = preferredFileAssetImageUrl(draft.coverImageId ? covers.get(draft.coverImageId) : null);
-  const canPreview = draft.title.trim().length > 0 || draft.lead.trim().length > 0 || draft.blocks.length > 0;
+  const canOpenSavedPreview = Boolean(original && !hasChanges);
 
   return (
     <AppShell>
@@ -302,7 +308,13 @@ export function AdminNewsView() {
             <div className="news-list">
               {items.map((item) => {
                 const coverUrl = preferredFileAssetImageUrl(item.coverImageId ? covers.get(item.coverImageId) : null);
+                const publishedDate = item.firstPublishedAt ? new Date(item.firstPublishedAt) : null;
+                const updatedDate = new Date(item.updatedAt);
                 const actions: ActionItem[] = [
+                  {
+                    label: "Открыть предпросмотр",
+                    onClick: () => openSavedPreview(item),
+                  },
                   {
                     label: item.status === "published" ? "Снять с публикации" : "Опубликовать",
                     onClick: () => publishToggle(item),
@@ -323,12 +335,22 @@ export function AdminNewsView() {
                         )}
                       </div>
                       <div className="news-row-info">
+                        <div className="news-row-meta">
+                          <span className={`news-row-status${item.status === "published" ? " is-published" : ""}`}>
+                            <span className="news-row-dot" aria-hidden />
+                            {CONTENT_STATUS_LABELS[item.status]}
+                          </span>
+                          {publishedDate ? (
+                            <time className="news-row-date" dateTime={publishedDate.toISOString()}>
+                              Опубликовано {formatNewsDate(publishedDate)}
+                            </time>
+                          ) : (
+                            <time className="news-row-date" dateTime={updatedDate.toISOString()}>
+                              Не опубликована · обновлено {formatNewsDate(updatedDate)}
+                            </time>
+                          )}
+                        </div>
                         <div className="news-row-line">
-                          <span
-                            className={`news-row-dot${item.status === "published" ? " is-published" : ""}`}
-                            title={CONTENT_STATUS_LABELS[item.status]}
-                            aria-hidden
-                          />
                           <strong className="news-row-title">{item.title}</strong>
                         </div>
                         {item.lead ? <p className="news-row-lead">{item.lead}</p> : null}
@@ -478,15 +500,28 @@ export function AdminNewsView() {
                       Удалить полностью
                     </button>
                   ) : null}
-                  <button
-                    className="button secondary"
-                    type="button"
-                    onClick={() => setPreviewOpen(true)}
-                    disabled={!canPreview}
-                  >
-                    <Eye size={14} />
-                    Предпросмотр
-                  </button>
+                  {canOpenSavedPreview && original ? (
+                    <a
+                      className="button secondary"
+                      href={previewHref(original)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Открыть публичный предпросмотр"
+                    >
+                      <ExternalLink size={14} />
+                      Предпросмотр
+                    </a>
+                  ) : (
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled
+                      title="Сначала сохраните новость, чтобы открыть публичный предпросмотр"
+                    >
+                      <ExternalLink size={14} />
+                      Предпросмотр
+                    </button>
+                  )}
                   <button className="button" type="submit" disabled={submitting || !hasChanges}>
                     {submitting ? "Сохраняю…" : isEditingNew ? "Создать черновик" : "Сохранить"}
                   </button>
@@ -495,95 +530,7 @@ export function AdminNewsView() {
             </form>
           </div>
         </div>
-        {previewOpen ? (
-          <NewsPreviewModal
-            title={draft.title}
-            lead={draft.lead}
-            coverUrl={draftCoverUrl}
-            blocks={draft.blocks}
-            tags={draft.tags}
-            onClose={() => setPreviewOpen(false)}
-          />
-        ) : null}
       </section>
     </AppShell>
-  );
-}
-
-// Предпросмотр новости: рисует то же, что увидит читатель в модалке
-// /news?post=... — общий рендерер ContentBlocks, обложка сверху, заголовок,
-// описание и блоки контента. Без комментариев, лайков и других интерактивов.
-function NewsPreviewModal({
-  title,
-  lead,
-  coverUrl,
-  blocks,
-  tags,
-  onClose,
-}: {
-  title: string;
-  lead: string;
-  coverUrl: string | null;
-  blocks: Block[];
-  tags: string[];
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.body.classList.add("news-modal-open");
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-      document.body.classList.remove("news-modal-open");
-    };
-  }, [onClose]);
-
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      className="news-modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="news-modal">
-        <button className="news-modal-close" onClick={onClose} type="button" aria-label="Закрыть предпросмотр">
-          <X size={20} />
-        </button>
-        <div className="news-article">
-          {coverUrl ? (
-            <div className="news-article-cover">
-              <img alt={title || "Превью"} src={coverUrl} />
-            </div>
-          ) : null}
-          <div className="news-article-body">
-            <span className="news-tile-category">Предпросмотр · Новости</span>
-            <h1 className="news-article-title">{title || "Без заголовка"}</h1>
-            {lead ? <p className="news-article-lead">{lead}</p> : null}
-            <div className="content-blocks">
-              <ContentBlocks blocks={blocks as Parameters<typeof ContentBlocks>[0]["blocks"]} />
-            </div>
-            {tags.length > 0 ? (
-              <div className="news-row-tags" style={{ marginTop: 16 }}>
-                {tags.map((tag) => (
-                  <span className="tag-chip is-static" key={tag}>
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }

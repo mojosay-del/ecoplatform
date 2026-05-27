@@ -124,10 +124,10 @@ export function EducationView() {
   );
 }
 
-export function LearningModuleView({ moduleId }: { moduleId: string }) {
+export function LearningModuleView({ moduleId, preview = false }: { moduleId: string; preview?: boolean }) {
   const { data, state, errorMessage } = useApiQuery<LearningModuleDetail | null>(
-    `learning-module:${moduleId}`,
-    () => api.learning.getModule(moduleId),
+    `learning-module:${moduleId}:${preview ? "preview" : "public"}`,
+    () => api.learning.getModule(moduleId, { preview }),
     null,
   );
   // Используем тот же хук, что и каталог модулей, чтобы подтянуть URL обложки.
@@ -152,8 +152,8 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
     );
   }
 
-  const isInDevelopment = Boolean(data.isInDevelopment);
-  const hasAccess = !isInDevelopment && Boolean(data.hasAccess);
+  const isInDevelopment = !preview && Boolean(data.isInDevelopment);
+  const hasAccess = preview || (!isInDevelopment && Boolean(data.hasAccess));
   const coverUrl = preferredFileAssetImageUrl(data.coverImageId ? covers.get(data.coverImageId) : null);
   const totalLessons = (data.chapters ?? []).reduce(
     (sum: number, chapter: LearningChapterDetail) => sum + (chapter.lessons?.length ?? 0),
@@ -162,7 +162,7 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
   const firstLessonHref = (() => {
     for (const chapter of data.chapters ?? []) {
       const first = chapter.lessons?.[0];
-      if (first) return `/education/${moduleId}/${first.id}`;
+      if (first) return `/education/${moduleId}/${first.id}${preview ? "?preview=1" : ""}`;
     }
     return null;
   })();
@@ -177,6 +177,11 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
   return (
     <AppShell>
       <section className="page module-page">
+        {preview ? (
+          <StatusPill as="p" className="cms-preview-banner" variant="warning">
+            Предпросмотр курса: виден только авторизованным сотрудникам CMS.
+          </StatusPill>
+        ) : null}
         <header className={`module-hero${coverUrl ? "" : " no-cover"}`}>
           <div className="module-hero-cover">
             {coverUrl ? (
@@ -285,12 +290,20 @@ export function LearningModuleView({ moduleId }: { moduleId: string }) {
   );
 }
 
-export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId: string }) {
+export function LessonView({
+  moduleId,
+  lessonId,
+  preview = false,
+}: {
+  moduleId: string;
+  lessonId: string;
+  preview?: boolean;
+}) {
   const router = useRouter();
   const { token, user } = useAuth();
   const { data, state, errorMessage } = useApiQuery<LearningModuleDetail | null>(
-    `learning-module:${moduleId}`,
-    () => api.learning.getModule(moduleId),
+    `learning-module:${moduleId}:${preview ? "preview" : "public"}`,
+    () => api.learning.getModule(moduleId, { preview }),
     null,
   );
   const [completed, setCompleted] = useState(false);
@@ -310,7 +323,9 @@ export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId:
   );
   const currentLessonIndex = lessonSequence.findIndex((item) => item.lesson.id === lessonId);
   const nextLessonEntry = currentLessonIndex >= 0 ? (lessonSequence[currentLessonIndex + 1] ?? null) : null;
-  const nextLessonHref = nextLessonEntry ? `/education/${moduleId}/${nextLessonEntry.lesson.id}` : null;
+  const previewSuffix = preview ? "?preview=1" : "";
+  const moduleHref = `/education/${moduleId}${previewSuffix}`;
+  const nextLessonHref = nextLessonEntry ? `/education/${moduleId}/${nextLessonEntry.lesson.id}${previewSuffix}` : null;
   const nextLessonLabel = nextLessonEntry
     ? nextLessonEntry.chapter.id !== chapter?.id
       ? `Следующая глава: урок ${nextLessonEntry.lessonIndex + 1}`
@@ -347,11 +362,11 @@ export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId:
     return <ErrorState title="Урок" message="Урок не найден или не опубликован." />;
   }
 
-  if (data.isInDevelopment) {
+  if (!preview && data.isInDevelopment) {
     return <AccessClosed title="В разработке" />;
   }
 
-  if (!data.hasAccess) {
+  if (!preview && !data.hasAccess) {
     return <AccessClosed title={lesson.title} />;
   }
 
@@ -405,19 +420,24 @@ export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId:
   );
   const progressPercent = totalLessons === 0 ? 0 : Math.round((completedLessons / totalLessons) * 100);
 
-  const upgradeCta = resolveUpgradeCta(user);
+  const upgradeCta = preview ? null : resolveUpgradeCta(user);
   const lessonTasks = extractLessonTasks(lesson.blocks ?? []);
   const lessonContentBlocks = (lesson.blocks ?? []).filter((block) => block.type !== "lesson_tasks");
 
   return (
     <AppShell>
       <section className="page lesson-page">
+        {preview ? (
+          <StatusPill as="p" className="cms-preview-banner" variant="warning">
+            Предпросмотр урока: прогресс и отметка прохождения отключены.
+          </StatusPill>
+        ) : null}
         <nav className="lesson-breadcrumb">
           <Link href="/education">Главная</Link>
           <span>/</span>
           <Link href="/education">Курсы</Link>
           <span>/</span>
-          <Link href={`/education/${moduleId}`}>{data.title}</Link>
+          <Link href={moduleHref}>{data.title}</Link>
           <span>/</span>
           <span className="lesson-breadcrumb-current">{lesson.title}</span>
         </nav>
@@ -440,58 +460,68 @@ export function LessonView({ moduleId, lessonId }: { moduleId: string; lessonId:
             <div className="content-blocks lesson-blocks">
               <ContentBlocks blocks={lessonContentBlocks} />
             </div>
-            <div className="auth-actions lesson-actions" style={{ marginTop: 24 }}>
-              {nextLessonHref && nextLessonLabel ? (
-                <button
-                  className="button lesson-next-button"
-                  type="button"
-                  onClick={goToNextLesson}
-                  disabled={advancing || completing}
-                >
-                  {advancing ? "Сохраняю…" : nextLessonLabel}
-                </button>
-              ) : (
-                <button
-                  className="button"
-                  type="button"
-                  onClick={markCompleted}
-                  disabled={lessonAlreadyCompleted || completing}
-                >
-                  {lessonAlreadyCompleted ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
-                </button>
-              )}
-              {nextLessonHref ? (
-                <button
-                  className="button secondary"
-                  type="button"
-                  onClick={markCompleted}
-                  disabled={lessonAlreadyCompleted || completing || advancing}
-                >
-                  {lessonAlreadyCompleted ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
-                </button>
-              ) : null}
-              <Link className="button secondary" href={`/education/${moduleId}`}>
-                ← К модулю
-              </Link>
-            </div>
-            {completionError ? <p className="lesson-action-error">{completionError}</p> : null}
+            {!preview ? (
+              <div className="auth-actions lesson-actions" style={{ marginTop: 24 }}>
+                {nextLessonHref && nextLessonLabel ? (
+                  <button
+                    className="button lesson-next-button"
+                    type="button"
+                    onClick={goToNextLesson}
+                    disabled={advancing || completing}
+                  >
+                    {advancing ? "Сохраняю…" : nextLessonLabel}
+                  </button>
+                ) : (
+                  <button
+                    className="button"
+                    type="button"
+                    onClick={markCompleted}
+                    disabled={lessonAlreadyCompleted || completing}
+                  >
+                    {lessonAlreadyCompleted ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
+                  </button>
+                )}
+                {nextLessonHref ? (
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={markCompleted}
+                    disabled={lessonAlreadyCompleted || completing || advancing}
+                  >
+                    {lessonAlreadyCompleted ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
+                  </button>
+                ) : null}
+                <Link className="button secondary" href={moduleHref}>
+                  ← К модулю
+                </Link>
+              </div>
+            ) : (
+              <div className="auth-actions lesson-actions" style={{ marginTop: 24 }}>
+                <Link className="button secondary" href={moduleHref}>
+                  ← К модулю
+                </Link>
+              </div>
+            )}
+            {completionError && !preview ? <p className="lesson-action-error">{completionError}</p> : null}
           </article>
 
           <aside className="lesson-sidebar">
-            <div className="lesson-side-card">
-              <div className="lesson-side-card-header">Прогресс курса</div>
-              <div className="lesson-progress">
-                <div className="lesson-progress-ring" style={{ ["--progress" as any]: progressPercent }}>
-                  <span>{progressPercent}%</span>
-                </div>
-                <div className="lesson-progress-meta">
-                  <strong>{data.title}</strong>
-                  <span>
-                    Уроки завершены: {completedLessons} из {totalLessons}
-                  </span>
+            {!preview ? (
+              <div className="lesson-side-card">
+                <div className="lesson-side-card-header">Прогресс курса</div>
+                <div className="lesson-progress">
+                  <div className="lesson-progress-ring" style={{ ["--progress" as any]: progressPercent }}>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <div className="lesson-progress-meta">
+                    <strong>{data.title}</strong>
+                    <span>
+                      Уроки завершены: {completedLessons} из {totalLessons}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
 
             {lessonTasks.length > 0 ? (
               <div className="lesson-side-card">

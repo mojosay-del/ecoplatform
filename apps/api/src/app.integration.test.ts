@@ -847,6 +847,89 @@ describe("Content publish", () => {
     expect(after.body.items.find((n: { slug: string }) => n.slug === slug)).toBeTruthy();
   });
 
+  it("CMS-предпросмотр открывает черновик новости только сотруднику CMS", async () => {
+    const adminToken = await loginAdmin();
+    const { token: userToken } = await registerCompany("0000020");
+
+    const draft = await ctx.http
+      .post("/api/admin/content/news")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Черновик для предпросмотра",
+        lead: "Лид черновика",
+        blocks: [{ type: "paragraph", payload: { html: "<p>Тело черновика.</p>" } }],
+        tags: ["preview"],
+      });
+    expect(draft.status).toBe(201);
+
+    const publicDraft = await ctx.http.get(`/api/news/${draft.body.slug}`).set("Authorization", `Bearer ${adminToken}`);
+    expect(publicDraft.status).toBe(404);
+
+    const preview = await ctx.http
+      .get(`/api/news/${draft.body.slug}?preview=1`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(preview.status).toBe(200);
+    expect(preview.body.status).toBe(ContentStatus.draft);
+    expect(preview.body.blocks).toHaveLength(1);
+
+    const forbiddenPreview = await ctx.http
+      .get(`/api/news/${draft.body.slug}?preview=1`)
+      .set("Authorization", `Bearer ${userToken}`);
+    expect(forbiddenPreview.status).toBe(404);
+  });
+
+  it("CMS-предпросмотр открывает черновой урок только сотруднику CMS", async () => {
+    const adminToken = await loginAdmin();
+    const { token: userToken } = await registerCompany("0000022");
+
+    const draft = await ctx.http
+      .post("/api/admin/content/education/modules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Курс для предпросмотра",
+        summary: "Кратко",
+        description: "Описание курса",
+        accessLevel: "basic",
+        isInDevelopment: true,
+        preview: { promotionalDescription: "Что внутри", whatYouWillLearn: ["Пункт"] },
+        chapters: [
+          {
+            title: "Глава",
+            lessons: [{ title: "Черновой урок", blocks: [{ type: "paragraph", payload: { html: "<p>Урок.</p>" } }] }],
+          },
+        ],
+      });
+    expect(draft.status).toBe(201);
+    const chapter = await ctx.prisma.chapter.findFirstOrThrow({
+      where: { moduleId: draft.body.id },
+      include: { lessons: true },
+    });
+    const lessonId = chapter.lessons[0]?.id;
+    expect(lessonId).toBeTruthy();
+
+    const publicModule = await ctx.http
+      .get(`/api/education/modules/${draft.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publicModule.status).toBe(404);
+
+    const preview = await ctx.http
+      .get(`/api/education/modules/${draft.body.id}?preview=1`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(preview.status).toBe(200);
+    expect(preview.body.status).toBe(ContentStatus.draft);
+    expect(preview.body.chapters[0].lessons[0]).toMatchObject({
+      id: lessonId,
+      status: ContentStatus.draft,
+      title: "Черновой урок",
+    });
+    expect(preview.body.chapters[0].lessons[0].blocks).toHaveLength(1);
+
+    const forbiddenPreview = await ctx.http
+      .get(`/api/education/modules/${draft.body.id}?preview=1`)
+      .set("Authorization", `Bearer ${userToken}`);
+    expect(forbiddenPreview.status).toBe(404);
+  });
+
   it("новость с некорректным блоком (paragraph без html) отбивается 400", async () => {
     const adminToken = await loginAdmin();
     const res = await ctx.http

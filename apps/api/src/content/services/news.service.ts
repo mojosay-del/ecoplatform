@@ -11,6 +11,7 @@ import type { newsInputSchema } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
 
 type NewsInput = z.infer<typeof newsInputSchema>;
+type NewsReadOptions = { preview?: boolean };
 
 const commentAuthorSelect = {
   id: true,
@@ -67,6 +68,12 @@ function resolveProfileAvatarUrl(platformRoles: string[], companyType: string | 
 
 function normaliseTagFilters(tagNames: string[] = []): string[] {
   return Array.from(new Set(tagNames.map((name) => name.trim()).filter(Boolean)));
+}
+
+function canPreviewAuthoredContent(user: RequestUser, createdById: string) {
+  return (
+    user.id === createdById || user.platformRoles.includes("admin") || user.platformRoles.includes("content_manager")
+  );
 }
 
 // Раздел «Новости»: чтение, CRUD, теги, лайки, комментарии. Вынесен из
@@ -169,7 +176,7 @@ export class NewsService {
     return new Map(discussions.map((d) => [d.targetId, countByDiscussion.get(d.id) ?? 0]));
   }
 
-  async getNews(slug: string, user: RequestUser) {
+  async getNews(slug: string, user: RequestUser, options: NewsReadOptions = {}) {
     this.common.assertFunctionalAccess(user);
 
     const post = await this.prisma.newsPost.findUnique({
@@ -182,7 +189,11 @@ export class NewsService {
       },
     });
 
-    if (!post || post.status !== ContentStatus.published) {
+    if (!post) {
+      throw new NotFoundException("Новость не найдена.");
+    }
+    const canPreview = options.preview && canPreviewAuthoredContent(user, post.createdById);
+    if (post.status !== ContentStatus.published && !canPreview) {
       throw new NotFoundException("Новость не найдена.");
     }
 

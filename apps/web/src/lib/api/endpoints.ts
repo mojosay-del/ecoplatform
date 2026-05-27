@@ -30,6 +30,7 @@ import { apiDownload, apiFetch, type FileAsset } from "./core";
 type PaginationInput = { limit?: number; offset?: number };
 type NewsListInput = PaginationInput & { tags?: string[] };
 type ApiRequestOptions = { token?: string | null };
+type PreviewRequestOptions = ApiRequestOptions & { preview?: boolean };
 
 // Лайки и комментарии возвращают одинаковую полезную нагрузку — выносим.
 export type LikeResult = {
@@ -65,6 +66,10 @@ function newsListSuffix(input: NewsListInput = {}) {
   return query.toString() ? `?${query.toString()}` : "";
 }
 
+function previewSuffix(options: { preview?: boolean } = {}) {
+  return options.preview ? "?preview=1" : "";
+}
+
 export const api = {
   // ── Новости ─────────────────────────────────────────────────────────────
   news: {
@@ -74,7 +79,8 @@ export const api = {
       apiFetch<NewsTagSummary[]>(`/news/tags${options.limit !== undefined ? `?limit=${options.limit}` : ""}`, {
         token: requestOptions.token,
       }),
-    get: (slug: string) => apiFetch<NewsPostDetail>(`/news/${enc(slug)}`),
+    get: (slug: string, options: PreviewRequestOptions = {}) =>
+      apiFetch<NewsPostDetail>(`/news/${enc(slug)}${previewSuffix(options)}`, { token: options.token }),
     like: (id: string) => apiFetch<LikeResult>(`/news/${enc(id)}/like`, { method: "POST" }),
     addComment: (postId: string, body: { text: string; parentCommentId?: string }) =>
       apiFetch<{ id: string }>(`/news/${enc(postId)}/comments`, { method: "POST", body }),
@@ -92,7 +98,10 @@ export const api = {
   learning: {
     listModules: (pagination: PaginationInput = {}) =>
       apiFetch<PaginatedResponse<LearningModuleListItem>>(`/education/modules${paginationSuffix(pagination)}`),
-    getModule: (id: string) => apiFetch<LearningModuleDetail>(`/education/modules/${enc(id)}`),
+    getModule: (id: string, options: PreviewRequestOptions = {}) =>
+      apiFetch<LearningModuleDetail>(`/education/modules/${enc(id)}${previewSuffix(options)}`, {
+        token: options.token,
+      }),
     completeLesson: (lessonId: string) =>
       apiFetch<{ ok: true }>(`/education/lessons/${enc(lessonId)}/complete`, { method: "POST" }),
   },

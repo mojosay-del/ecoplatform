@@ -1,6 +1,13 @@
 import { LessonView } from "../../../../src/views/learning-view";
 
-export default async function LessonPage({ params }: { params: Promise<{ moduleId: string; lessonId: string }> }) {
+export default async function LessonPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ moduleId: string; lessonId: string }>;
+  searchParams: Promise<{ preview?: string }>;
+}) {
   const { moduleId, lessonId } = await params;
-  return <LessonView moduleId={moduleId} lessonId={lessonId} />;
+  const { preview } = await searchParams;
+  return <LessonView moduleId={moduleId} lessonId={lessonId} preview={preview === "1" || preview === "true"} />;
 }
