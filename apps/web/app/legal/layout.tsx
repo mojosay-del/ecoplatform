@@ -6,12 +6,12 @@ import type { ReactNode } from "react";
 // может попасть сюда из cookie-banner, чекбоксов регистрации или футера.
 export default function LegalLayout({ children }: { children: ReactNode }) {
   return (
-    <main className="legal-shell">
+    <main className="legal-shell" id="main-content" tabIndex={-1}>
       <header className="legal-shell-head">
         <Link href="/" className="legal-shell-brand">
           ЭкоПлатформа
         </Link>
-        <nav className="legal-shell-nav">
+        <nav className="legal-shell-nav" aria-label="Навигация юридических страниц">
           <Link href="/login">Войти</Link>
           <Link href="/register">Регистрация</Link>
         </nav>

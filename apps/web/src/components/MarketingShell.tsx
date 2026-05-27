@@ -11,7 +11,7 @@ const LEGAL_LINKS = [
 
 export function MarketingShell({ children }: { children: ReactNode }) {
   return (
-    <main className="marketing-page">
+    <main className="marketing-page" id="main-content" tabIndex={-1}>
       <header className="marketing-header">
         <Link className="marketing-wordmark" href="/login">
           ЭкоПлатформа

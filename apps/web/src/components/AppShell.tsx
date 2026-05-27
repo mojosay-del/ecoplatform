@@ -80,7 +80,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-shell" data-collapsed={collapsed ? "true" : "false"}>
-      <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
+      <aside
+        className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}
+        role="navigation"
+        aria-label="Основная навигация"
+      >
         <div className="sidebar-head">
           <Link className="brand" href="/news">
             <span className="brand-mark">
@@ -118,7 +122,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {mobileNavOpen ? (
         <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
       ) : null}
-      <main className="main">
+      <main className="main" id="main-content" tabIndex={-1}>
         <header className="topbar">
           <button
             className="icon-button mobile-menu-button"
@@ -142,13 +146,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <HelpCircle size={20} />
             </button>
           )}
-          <Link className="icon-button" href="/account" title="Настройки">
+          <Link className="icon-button" href="/account" title="Настройки" aria-label="Открыть настройки">
             <Settings size={20} />
           </Link>
           <Link
             className={`avatar ${user?.avatarUrl ? "avatar-with-image" : ""}`}
             title={user ? `${user.firstName} ${user.lastName}` : "Войти"}
             href={user ? "/account" : "/login"}
+            aria-label={user ? `Открыть профиль: ${user.firstName} ${user.lastName}` : "Войти"}
           >
             {user?.avatarUrl ? <Image alt="" src={user.avatarUrl} width={40} height={40} /> : null}
           </Link>

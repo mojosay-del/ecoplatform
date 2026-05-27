@@ -36,11 +36,54 @@ select {
   font: inherit;
 }
 
+#main-content:focus {
+  outline: none;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: 12px;
+  left: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-12px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.skip-link:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  outline: none;
+  box-shadow: var(--focus-ring), var(--shadow-md);
+}
+
 button:disabled,
 input:disabled,
 textarea:disabled,
 select:disabled {
   cursor: not-allowed;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--brand);
+}
+
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
 }
 
 .app-shell {
@@ -2769,7 +2812,7 @@ body.news-modal-open .app-shell {
 
 .auth-check-input:focus-visible + .auth-check-box {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
+  box-shadow: var(--focus-ring);
 }
 
 .auth-row-link {

@@ -20,7 +20,7 @@ export function PageSkeleton({
   variant?: SkeletonVariant;
 }) {
   return (
-    <main className="page-skeleton" aria-busy="true" aria-live="polite">
+    <main className="page-skeleton" id="main-content" tabIndex={-1} aria-busy="true" aria-live="polite">
       <header className="page-skeleton-header">
         <h1>{title}</h1>
         {subtitle ? <p>{subtitle}</p> : null}

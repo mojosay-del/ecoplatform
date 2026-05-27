@@ -362,6 +362,7 @@ function InsertButton({
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={size === "lg" ? undefined : label}
       >
         <Plus size={size === "lg" ? 16 : 14} />
         {size === "lg" ? <span>{label}</span> : null}

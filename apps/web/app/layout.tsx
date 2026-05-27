@@ -13,6 +13,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru">
       <body>
+        <a className="skip-link" href="#main-content">
+          К содержимому
+        </a>
         <AuthProvider>
           {children}
           <CookieConsent />

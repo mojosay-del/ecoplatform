@@ -86,7 +86,7 @@ function KnowledgeBaseLayout({
     <AppShell>
       <section className="page knowledge-page">
         <div className="knowledge-workspace">
-          <aside className="knowledge-nav-panel" aria-label="Навигация по базе знаний">
+          <aside className="knowledge-nav-panel" role="navigation" aria-label="Навигация по базе знаний">
             <div className="knowledge-nav-heading">
               <span className="knowledge-nav-kicker">База знаний</span>
               <h2>Навигация по сырью</h2>
