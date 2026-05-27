@@ -12,6 +12,7 @@ import type {
   CompanyProfileUpdateDto,
   ConsentRecordItem,
   ConsentSource,
+  AdminDashboardSummary,
   KnowledgeArticleDetail,
   KnowledgeNode,
   LearningModuleDetail,
@@ -202,6 +203,8 @@ export const api = {
   // редактирования пока вызываются напрямую через apiFetch — у них много вариаций
   // (status, reason, payload-схемы), и они туго переплетены с CMS-UI.
   admin: {
+    dashboard: (options: ApiRequestOptions = {}) =>
+      apiFetch<AdminDashboardSummary>("/admin/dashboard", { token: options.token }),
     news: {
       // Возвращает paginated envelope БЕЗ blocks (для таблицы).
       // Получение detail для редактора — `admin.news.get(id)`.

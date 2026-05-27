@@ -22,11 +22,11 @@ apps/
       legal/         публичные документы и согласия пользователей
       support/       тикеты пользователей и админский UI
       files/         upload в S3 + WebP/AVIF варианты + FileReference
-      admin/         users, companies, staff, journals, settings
+      admin/         dashboard, users, companies, staff, journals, settings
       redis/         session cache, throttler storage
       scheduler/     hourly billing-check + nightly cleanup-deleted-accounts (advisory-lock)
       common/        CSRF guard, JwtAuthGuard, pagination, sanitize, simple-zip
-      app.integration.test.ts  110 сквозных тестов
+      app.integration.test.ts  116 сквозных тестов
   web/               Next.js App Router, Tiptap-редактор, dnd-kit
     app/             публичные и админ-маршруты
       (login,register,forgot-password,news,indices,education,
@@ -91,8 +91,8 @@ docker-compose.yml   локальный Postgres 16 :5433 + Redis 7 :6379
 
 ```bash
 pnpm lint                  # tsc --noEmit во всех пакетах
-pnpm test                  # 100 unit-тестов (shared 7, web 20, api 73)
-pnpm test:integration      # 114 integration-тестов против ecoplatform_test
+pnpm test                  # 133 unit-теста (shared 7, web 50, api 76)
+pnpm test:integration      # 116 integration-тестов против ecoplatform_test
 pnpm build                 # tsc + next build
 pnpm format:check          # prettier
 ```

@@ -417,3 +417,27 @@ export type AdminJournalEntry = {
   payload: AdminJournalPayload | null;
   createdAt: IsoDateString;
 };
+
+export type AdminDashboardSummary = {
+  generatedAt: IsoDateString;
+  kpis: {
+    activeUsersToday: number;
+    registrationsToday: number;
+    activeSubscriptions: number;
+    openModerationCases: number;
+    activeSupportTickets: number;
+  };
+  registrationSeries: Array<{
+    date: IsoDateString;
+    count: number;
+  }>;
+  recentAuditEvents: Array<{
+    id: string;
+    action: string;
+    actor: AdminJournalActor | null;
+    entityType: string;
+    entityLabel: string;
+    comment: string | null;
+    createdAt: IsoDateString;
+  }>;
+};
