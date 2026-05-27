@@ -1038,7 +1038,7 @@ select:disabled {
 
 .indices-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: 24px;
   align-items: start;
 }
@@ -1178,6 +1178,9 @@ select:disabled {
 .index-card {
   display: grid;
   gap: 18px;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
@@ -1192,26 +1195,37 @@ select:disabled {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .index-period-tabs {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 2px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
   background: var(--panel-soft);
   border: 1px solid var(--line);
   border-radius: var(--radius-chip);
   padding: 3px;
+  white-space: nowrap;
 }
 
 .index-period-tab {
+  flex: 0 0 auto;
   border: 0;
   background: transparent;
   color: var(--muted);
-  padding: 6px 14px;
+  padding: 6px 10px;
   border-radius: var(--radius-chip);
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background 120ms ease,
@@ -1230,6 +1244,7 @@ select:disabled {
 .index-current-price {
   text-align: right;
   display: grid;
+  flex: 0 0 auto;
   gap: 2px;
 }
 
@@ -1248,6 +1263,7 @@ select:disabled {
 .index-card-body {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .index-card-title {
@@ -1256,12 +1272,14 @@ select:disabled {
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .index-card-subtitle {
   margin: 0;
   font-size: 13px;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .index-change-positive {
@@ -1275,8 +1293,10 @@ select:disabled {
 }
 
 .index-chart-wrap {
+  min-width: 0;
   width: 100%;
   margin: 4px 0 0;
+  overflow: hidden;
 }
 
 .index-chart {
@@ -1293,12 +1313,6 @@ select:disabled {
   text-align: center;
   color: var(--muted);
   font-size: 14px;
-}
-
-@media (max-width: 1180px) {
-  .indices-grid {
-    grid-template-columns: minmax(0, 720px);
-  }
 }
 
 @media (max-width: 720px) {
