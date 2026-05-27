@@ -12,7 +12,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Flag, MessageCircle, Send, ThumbsUp, X } from "lucide-react";
 import type { NewsCommentDecorated, NewsListItem, NewsPostDetail } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
+import { NewsOnboardingCard } from "../components/NewsOnboardingCard";
 import { StatusPill } from "../components/StatusPill";
+import { NEWS_ONBOARDING_STORAGE_KEY, shouldShowNewsOnboarding } from "../components/news-onboarding-state";
 import { ApiError, api, preferredFileAssetImageUrl, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCoverAssets } from "../lib/use-cover-assets";
@@ -37,7 +39,8 @@ import { ContentBlocks } from "./content-blocks";
 const NEWS_PAGE_SIZE = 20;
 
 export function NewsView() {
-  const { ready, token } = useAuth();
+  const { ready, token, user } = useAuth();
+  const [onboardingDismissed, setOnboardingDismissed] = useState<boolean | null>(null);
   const feed = useInfiniteApiQuery(ready && token ? "news-feed" : null, NEWS_PAGE_SIZE, ({ limit, offset }) =>
     api.news.list({ limit, offset }),
   );
@@ -46,6 +49,16 @@ export function NewsView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const openedSlug = searchParams.get("post");
+  const showOnboarding =
+    user && onboardingDismissed === false ? shouldShowNewsOnboarding(user, onboardingDismissed) : false;
+
+  useEffect(() => {
+    try {
+      setOnboardingDismissed(localStorage.getItem(NEWS_ONBOARDING_STORAGE_KEY) === "1");
+    } catch {
+      setOnboardingDismissed(false);
+    }
+  }, []);
 
   // Модалка открывается через query ?post=slug — это даёт shareable URL,
   // back/forward в браузере и закрытие по Esc через router.replace('/news').
@@ -63,6 +76,15 @@ export function NewsView() {
     setItems((current) =>
       current.map((post) => (post.id === updatedPost.id ? { ...post, ...getNewsFeedSnapshot(updatedPost) } : post)),
     );
+  }
+
+  function dismissOnboarding() {
+    setOnboardingDismissed(true);
+    try {
+      localStorage.setItem(NEWS_ONBOARDING_STORAGE_KEY, "1");
+    } catch {
+      // ignore (private mode)
+    }
   }
 
   if (state === "unauthenticated") {
@@ -83,6 +105,7 @@ export function NewsView() {
         <header className="news-feed-header">
           <h1>Новости рынка</h1>
         </header>
+        {showOnboarding && user ? <NewsOnboardingCard user={user} onDismiss={dismissOnboarding} /> : null}
 
         {state === "loading" ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
