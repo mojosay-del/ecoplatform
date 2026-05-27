@@ -333,31 +333,89 @@ input[type="checkbox"]:focus-visible {
 }
 
 .demo-banner {
-  position: sticky;
-  top: 0;
-  z-index: 18;
-  display: flex;
+  position: relative;
+  z-index: 20;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  justify-content: center;
+  gap: 8px;
   box-sizing: border-box;
   height: 36px;
-  min-height: 36px;
-  margin-left: 16px;
-  padding: 3px 12px 3px 18px;
-  border-top-left-radius: 18px;
-  background: var(--warning-soft);
+  min-width: 0;
+  padding: 4px 4px 4px 12px;
   border: 1px solid var(--warning-border);
-  border-right: 0;
+  border-radius: 999px;
+  background: var(--warning-soft);
   color: var(--warning-text);
   box-shadow: var(--shadow-sm);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
-.demo-banner > span {
+.demo-banner-time {
   min-width: 0;
-  line-height: 1.15;
+  max-width: 104px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.demo-banner-currency {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.demo-banner::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--text);
+  color: var(--white);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  visibility: hidden;
+}
+
+.demo-banner:hover,
+.demo-banner:focus-visible {
+  border-color: var(--brand-muted-border);
+  box-shadow: var(--focus-ring);
+  transform: translateY(-1px);
+}
+
+.demo-banner:hover::after,
+.demo-banner:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.demo-banner:focus-visible {
+  outline: none;
 }
 
 .demo-banner-critical {
@@ -366,14 +424,8 @@ input[type="checkbox"]:focus-visible {
   color: var(--danger-text-strong);
 }
 
-.demo-banner .demo-banner-action {
-  flex-shrink: 0;
-  min-height: 28px;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  line-height: 1;
-  white-space: nowrap;
+.demo-banner-critical .demo-banner-currency {
+  background: var(--danger);
 }
 
 .page-surface {
@@ -812,6 +864,10 @@ input[type="checkbox"]:focus-visible {
 /* Masonry-плитки новостей: разная высота карточек, 4 колонки на широком
    экране, чтобы получался ритм как в дизайнерском макете. */
 .news-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   text-align: left;
   margin: 0 0 32px;
   padding: 8px 0 24px;
@@ -819,6 +875,7 @@ input[type="checkbox"]:focus-visible {
 }
 
 .news-feed-header h1 {
+  flex: 0 1 auto;
   margin: 0;
   font-size: var(--text-2xl);
   line-height: 1.2;
@@ -835,7 +892,7 @@ input[type="checkbox"]:focus-visible {
   align-items: flex-start;
   justify-content: flex-end;
   gap: 10px;
-  margin: -12px 0 24px;
+  margin: 0;
   min-width: 0;
 }
 
@@ -1030,12 +1087,21 @@ input[type="checkbox"]:focus-visible {
 }
 
 @media (max-width: 640px) {
+  .news-feed-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
   .news-tags {
     display: flex;
-    margin: -8px 0 20px;
+    width: 100%;
+    margin: 0;
   }
 
   .news-tags-actions {
+    width: 100%;
     justify-content: flex-end;
   }
 
@@ -5315,18 +5381,21 @@ body.news-modal-open .app-shell {
   }
 
   .demo-banner {
-    margin: -12px -18px 18px;
-    border-right: 1px solid var(--warning-border);
-    border-radius: 0;
+    height: 34px;
+    padding: 3px 3px 3px 10px;
+  }
+
+  .demo-banner-time {
+    max-width: 82px;
   }
 
   .demo-banner-critical {
     border-color: var(--danger-border);
   }
 
-  .demo-banner .demo-banner-action {
-    padding: 6px 10px;
-    font-size: 12px;
+  .demo-banner-currency {
+    width: 26px;
+    height: 26px;
   }
 
   .card-grid {
@@ -8224,6 +8293,36 @@ li.tree-add-row + li.tree-add-row,
   color: var(--text);
   font-size: 14px;
   overflow-wrap: anywhere;
+}
+
+.account-editable-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.account-editable-value > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.account-inline-edit {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
+
+.account-inline-edit:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
 }
 
 .account-muted {

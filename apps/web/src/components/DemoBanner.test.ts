@@ -43,11 +43,11 @@ describe("DemoBanner", () => {
 
     expect(getDemoBannerState("2026-05-27T14:31:00.000Z", now)).toEqual({
       mode: "normal",
-      text: "Демо-доступ закончится через 5 ч 31 мин.",
+      text: "5 ч 31 мин",
     });
     expect(getDemoBannerState("2026-05-27T10:05:00.000Z", now)).toEqual({
       mode: "critical",
-      text: "Демо закончится через 65 мин.",
+      text: "65 мин",
     });
   });
 

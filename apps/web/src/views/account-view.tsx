@@ -5,7 +5,7 @@
 // жил в DataViews.tsx, теперь изолирован.
 
 import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
-import { Download, KeyRound, LifeBuoy, LogOut, RotateCcw, Smartphone, Trash2 } from "lucide-react";
+import { Download, KeyRound, LifeBuoy, LogOut, Pencil, RotateCcw, Smartphone, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -195,6 +195,23 @@ function AccountDetailList({ rows }: { rows: Array<{ label: string; value: React
         </div>
       ))}
     </dl>
+  );
+}
+
+function AccountEditableValue({ value, label }: { value?: string | null; label: string }) {
+  return (
+    <span className="account-editable-value">
+      <span>{accountDash(value)}</span>
+      <button
+        aria-label={`Редактирование поля ${label} появится позже`}
+        className="account-inline-edit"
+        disabled
+        title={`Редактирование поля ${label} появится позже`}
+        type="button"
+      >
+        <Pencil aria-hidden="true" size={14} />
+      </button>
+    </span>
   );
 }
 
@@ -473,15 +490,11 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                 <span className="account-hero-initials">{initials || "?"}</span>
               )}
             </div>
-            <button className="button secondary" onClick={logout}>
-              Выйти
-            </button>
           </div>
           <div className="account-hero-info">
             <h1 className="account-hero-name">{fullName}</h1>
             {user?.email ? <p className="account-hero-email">{user.email}</p> : null}
             <div className="account-hero-meta">
-              {user?.gender ? <StatusPill>{USER_GENDER_LABELS[user.gender] ?? user.gender}</StatusPill> : null}
               {isPlatformStaff
                 ? user?.platformRoles?.map((role) => (
                     <StatusPill key={role} variant="brand">
@@ -508,25 +521,11 @@ export function AccountView({ section }: { section: AccountSectionId }) {
               <AccountDetailList
                 rows={[
                   { label: "Имя", value: fullName },
-                  { label: "Email", value: user?.email },
-                  { label: "Телефон", value: user?.phone },
-                  { label: "Статус", value: <StatusPill variant="success">Активен</StatusPill> },
+                  { label: "Пол", value: user?.gender ? (USER_GENDER_LABELS[user.gender] ?? user.gender) : null },
+                  { label: "Email", value: <AccountEditableValue value={user?.email} label="Email" /> },
+                  { label: "Телефон", value: <AccountEditableValue value={user?.phone} label="Телефон" /> },
                 ]}
               />
-            </article>
-            <article className="card account-card">
-              <h2>Контакты</h2>
-              <p className="page-subtitle">
-                Email используется для безопасности, биллинга и уведомлений. Телефон нужен для SMS-кодов.
-              </p>
-              <div className="account-action-list">
-                <button className="button secondary" type="button" disabled>
-                  Сменить email
-                </button>
-                <button className="button secondary" type="button" disabled>
-                  Сменить телефон
-                </button>
-              </div>
             </article>
             {isPlatformStaff ? (
               <article className="card account-card">

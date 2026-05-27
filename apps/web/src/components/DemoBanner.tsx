@@ -22,12 +22,25 @@ export function DemoBanner({ user, pathname }: { user: AuthMeUser | null; pathna
 
   if (!state) return null;
 
+  const accessibleText =
+    state.mode === "critical"
+      ? `Демо закончится через ${state.text}. Активировать подписку`
+      : `Демо-доступ закончится через ${state.text}. Активировать подписку`;
+
   return (
-    <div className={`demo-banner demo-banner-${state.mode}`} role="status" aria-live="polite">
-      <span>{state.text}</span>
-      <Link className="button demo-banner-action" href="/account/billing">
-        Активировать подписку
-      </Link>
-    </div>
+    <Link
+      aria-label={accessibleText}
+      className={`demo-banner demo-banner-${state.mode}`}
+      data-tooltip="Активировать подписку"
+      href="/account/billing"
+      title="Активировать подписку"
+    >
+      <span className="demo-banner-time" aria-live="polite">
+        {state.text}
+      </span>
+      <span className="demo-banner-currency" aria-hidden="true">
+        ₽
+      </span>
+    </Link>
   );
 }

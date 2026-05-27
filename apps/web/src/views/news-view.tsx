@@ -158,17 +158,17 @@ export function NewsView() {
       <section className="page">
         <header className="news-feed-header">
           <h1>Новости рынка</h1>
+          <NewsTagFilters
+            isAllTagsOpen={isAllTagsOpen}
+            isLoading={tagState === "loading"}
+            onClear={clearTags}
+            onToggleDropdown={() => setIsAllTagsOpen((value) => !value)}
+            onToggleTag={toggleTag}
+            selectedTags={selectedTags}
+            tagOptions={tagOptions}
+          />
         </header>
         {showOnboarding && user ? <NewsOnboardingCard user={user} onDismiss={dismissOnboarding} /> : null}
-        <NewsTagFilters
-          isAllTagsOpen={isAllTagsOpen}
-          isLoading={tagState === "loading"}
-          onClear={clearTags}
-          onToggleDropdown={() => setIsAllTagsOpen((value) => !value)}
-          onToggleTag={toggleTag}
-          selectedTags={selectedTags}
-          tagOptions={tagOptions}
-        />
 
         {state === "loading" ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>

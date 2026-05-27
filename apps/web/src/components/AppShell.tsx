@@ -147,6 +147,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <Breadcrumb nav={visibleNav} pathname={pathname} />
           <div className="topbar-spacer" />
+          <DemoBanner user={user} pathname={pathname} />
           <NotificationBell />
           {isAdminUser ? null : (
             <button
@@ -161,7 +162,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
           <AccountMenu includeBusiness={!isAdminUser} onLogout={logout} pathname={pathname} user={user} />
         </header>
-        <DemoBanner user={user} pathname={pathname} />
         <div className="page-surface">
           {showAdminPanelBackLink ? (
             <Link className="button ghost admin-panel-back-link" href="/admin">

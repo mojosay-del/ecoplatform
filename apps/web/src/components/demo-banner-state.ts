@@ -27,7 +27,7 @@ export function getDemoBannerState(demoEndsAt: string, now = new Date()): DemoBa
   if (remainingMs <= CRITICAL_DEMO_MS) {
     return {
       mode: "critical",
-      text: `Демо закончится через ${Math.max(1, Math.ceil(remainingMs / MINUTE_MS))} мин.`,
+      text: `${Math.max(1, Math.ceil(remainingMs / MINUTE_MS))} мин`,
     };
   }
 
@@ -37,6 +37,6 @@ export function getDemoBannerState(demoEndsAt: string, now = new Date()): DemoBa
 
   return {
     mode: "normal",
-    text: `Демо-доступ закончится через ${hours} ч ${minutes} мин.`,
+    text: `${hours} ч ${minutes} мин`,
   };
 }
