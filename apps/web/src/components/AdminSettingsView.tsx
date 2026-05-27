@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import { StatusPill } from "./StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -177,7 +176,6 @@ export function AdminSettingsView() {
             Параметры, которые раньше были жёстко прописаны в коде. Сохранение действует моментально.
           </p>
         </header>
-        <CmsTabs />
 
         {errorMessage ? (
           <StatusPill as="p" variant="danger">

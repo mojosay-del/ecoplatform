@@ -6,7 +6,6 @@ import { RotateCcw, Search } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, platformRoles } from "@ecoplatform/shared";
 import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import { StatusPill } from "./StatusPill";
 import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
@@ -176,7 +175,6 @@ export function AdminStaffView() {
           <h1 className="page-title">Сотрудники</h1>
           <p className="page-subtitle">Платформенные роли: админ, модератор, контент-менеджер.</p>
         </header>
-        <CmsTabs />
 
         {errorMessage || staffQuery.errorMessage ? (
           <StatusPill as="p" variant="danger">

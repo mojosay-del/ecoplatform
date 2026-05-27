@@ -5,7 +5,6 @@ import { RotateCcw } from "lucide-react";
 import type { AdminJournalEntry, AdminJournalPayload, PaginatedResponse } from "@ecoplatform/shared";
 import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import { StatusPill } from "./StatusPill";
 import { getJournalEntityDisplay } from "./admin-entity-display";
 import { sortItems, type SortState } from "./admin-table-utils";
@@ -121,7 +120,6 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
         <h1 className="page-title">Журнал действий администраторов</h1>
         <p className="page-subtitle">Все изменения в админке фиксируются и доступны для аудита.</p>
       </header>
-      <CmsTabs />
 
       <form className="admin-filter-bar" onSubmit={submit}>
         <input

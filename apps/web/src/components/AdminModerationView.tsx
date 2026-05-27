@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import { StatusPill, moderationStatusPillVariant } from "./StatusPill";
 import { formatModerationCaseTitle, formatModerationEntityPreview } from "./admin-entity-display";
 import { ApiError, apiFetch } from "../lib/api";
@@ -127,7 +126,6 @@ export function AdminModerationView() {
           <h1 className="page-title">Модерация</h1>
           <p className="page-subtitle">Очередь жалоб на пользовательский контент.</p>
         </header>
-        <CmsTabs />
         {state === "error" ? (
           <StatusPill as="p" variant="danger">
             {errorMessage}

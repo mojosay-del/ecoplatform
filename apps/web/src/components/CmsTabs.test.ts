@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isAdminPanelTabActive, visibleAdminPanelTabs } from "./admin-panel-tabs";
+import { isCmsTabActive, visibleAdminHomeGroups, visibleCmsTabs } from "./admin-panel-tabs";
 
 describe("admin panel tabs", () => {
   it("keeps content managers inside CMS tabs only", () => {
-    expect(visibleAdminPanelTabs(["content_manager"]).map((tab) => tab.label)).toEqual([
+    expect(visibleCmsTabs(["content_manager"]).map((tab) => tab.label)).toEqual([
       "Новости",
       "Индексы цен",
       "Обучение",
@@ -11,8 +11,19 @@ describe("admin panel tabs", () => {
     ]);
   });
 
-  it("shows admin operations and settings groups in the shared panel bar", () => {
-    expect(visibleAdminPanelTabs(["admin"]).map((tab) => tab.label)).toEqual([
+  it("keeps admin CMS tabs focused on content sections", () => {
+    expect(visibleCmsTabs(["admin"]).map((tab) => tab.label)).toEqual([
+      "Новости",
+      "Индексы цен",
+      "Обучение",
+      "База знаний",
+    ]);
+  });
+
+  it("moves admin operations and settings to the panel home groups", () => {
+    const labels = visibleAdminHomeGroups(["admin"]).flatMap((group) => group.items.map((item) => item.label));
+
+    expect(labels).toEqual([
       "Новости",
       "Индексы цен",
       "Обучение",
@@ -24,18 +35,24 @@ describe("admin panel tabs", () => {
       "Подписки",
       "Очередь модерации",
       "Модерация",
+      "Журнал",
       "Демо-доступ",
       "Индексы",
       "Прочее",
-      "Журнал",
     ]);
   });
 
-  it("marks hash-backed settings tabs active without making settings a nested menu", () => {
-    const [moderation, demo] = visibleAdminPanelTabs(["admin"]).filter((tab) => tab.pathname === "/admin/settings");
+  it("limits moderator home navigation to moderation work", () => {
+    expect(visibleAdminHomeGroups(["moderator"]).flatMap((group) => group.items.map((item) => item.label))).toEqual([
+      "Очередь модерации",
+    ]);
+  });
 
-    expect(isAdminPanelTabActive(moderation!, "/admin/settings", "")).toBe(true);
-    expect(isAdminPanelTabActive(moderation!, "/admin/settings", "demo")).toBe(false);
-    expect(isAdminPanelTabActive(demo!, "/admin/settings", "demo")).toBe(true);
+  it("marks CMS routes active without settings hash logic", () => {
+    const [news, indices] = visibleCmsTabs(["admin"]);
+
+    expect(isCmsTabActive(news!, "/admin/content/news", "")).toBe(true);
+    expect(isCmsTabActive(news!, "/admin/content/news/edit-id", "")).toBe(true);
+    expect(isCmsTabActive(indices!, "/admin/content/news", "")).toBe(false);
   });
 });

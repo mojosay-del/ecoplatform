@@ -1213,7 +1213,7 @@ input[type="checkbox"]:focus-visible {
   font-size: var(--text-xs);
 }
 
-/* Верхняя навигация панели управления: CMS, люди, поддержка, настройки и журнал. */
+/* CMS-навигация остаётся только на страницах контента. */
 .cms-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1245,6 +1245,157 @@ input[type="checkbox"]:focus-visible {
 .cms-tab.active {
   background: var(--text);
   color: var(--white);
+}
+
+.cms-tabs-mobile {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 22px;
+  max-width: 100%;
+}
+
+.cms-tabs-mobile-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cms-tabs-mobile-select {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.admin-home {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-home-groups {
+  display: grid;
+  gap: 26px;
+}
+
+.admin-home-section {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-home-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.admin-home-section-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-lg);
+  line-height: 1.25;
+}
+
+.admin-home-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.admin-home-link {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+  color: var(--text);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.admin-home-link:hover {
+  border-color: var(--brand-muted-border);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.admin-home-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring), var(--shadow-card-hover);
+}
+
+.admin-home-link-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--brand-soft);
+  color: var(--brand-active);
+}
+
+.admin-home-link-text {
+  min-width: 0;
+}
+
+.admin-home-link-title,
+.admin-home-link-description {
+  display: block;
+}
+
+.admin-home-link-title {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.admin-home-link-description {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.admin-home-link-arrow {
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .cms-tabs {
+    display: none;
+  }
+
+  .cms-tabs-mobile {
+    display: flex;
+  }
+
+  .admin-home-groups {
+    gap: 22px;
+  }
+
+  .admin-home-links {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-home-link {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    min-height: 66px;
+    padding: 12px;
+  }
+
+  .admin-home-link-icon {
+    width: 34px;
+    height: 34px;
+  }
 }
 
 /* Кликабельная плитка — это <a> без подчёркивания, чтобы сохранялись
@@ -4327,7 +4478,13 @@ body.news-modal-open .app-shell {
 }
 
 .cms-vertical-layout {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cms-vertical-layout > .education-tree,
+.cms-vertical-layout > .moderation-detail {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .moderation-layout > .stack-list {
@@ -6381,7 +6538,7 @@ li.tree-add-row + li.tree-add-row,
 
 .block-row {
   display: grid;
-  grid-template-columns: 28px 1fr;
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: 4px;
   align-items: flex-start;
   padding: 4px 0;
@@ -6433,6 +6590,8 @@ li.tree-add-row + li.tree-add-row,
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
@@ -7008,6 +7167,7 @@ li.tree-add-row + li.tree-add-row,
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   flex-shrink: 0;
 }
 
@@ -7015,8 +7175,28 @@ li.tree-add-row + li.tree-add-row,
   white-space: nowrap;
 }
 
+@media (max-width: 640px) {
+  .lesson-save-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .lesson-save-bar-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .lesson-save-bar-actions .button {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+}
+
 /* --- Rich text editor (TipTap) --- */
 .rich-text-editor {
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   background: var(--panel);
@@ -7027,6 +7207,7 @@ li.tree-add-row + li.tree-add-row,
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  min-width: 0;
   gap: 4px;
   padding: 8px 10px;
   background: var(--panel-soft);
@@ -7126,9 +7307,11 @@ li.tree-add-row + li.tree-add-row,
 }
 
 .rich-text-surface {
+  min-width: 0;
   padding: 14px 16px;
   min-height: 160px;
   max-height: 600px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 

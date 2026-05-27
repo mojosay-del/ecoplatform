@@ -5,7 +5,6 @@ import { RotateCcw, Search } from "lucide-react";
 import { platformRoles, type PaginatedResponse } from "@ecoplatform/shared";
 import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import { StatusPill, companyStatusPillVariant, userStatusPillVariant } from "./StatusPill";
 import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
@@ -215,7 +214,6 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
         <h1 className="page-title">Пользователи</h1>
         <p className="page-subtitle">Управление учётными записями платформы.</p>
       </header>
-      <CmsTabs />
 
       <form
         className="admin-filter-bar"

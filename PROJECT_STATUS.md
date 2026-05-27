@@ -36,13 +36,15 @@
 
 Волна 11.14 закрыта: добавлен skip-link «К содержимому», shell-страницы получили `#main-content`, основной сайдбар и навигация базы знаний стали navigation landmarks, icon-only controls получили `aria-label`, чекбоксы — видимый `focus-visible`, а muted/subtle/disabled-текст поднят до AA-контраста.
 
-Волна 12.1 закрыта: админские листинги компаний, пользователей, сотрудников и журнала переведены в компактные таблицы с сортировкой и фильтр-барами; список обращений поддержки уплотнён и получил сортировку. Админские разделы собраны в одну «Панель управления»: в сайдбаре остался один служебный пункт, а верхние вкладки теперь ведут в CMS, пользователей, компании, сотрудников, поддержку, подписки, очередь модерации, настройки и журнал.
+Волна 12.1 закрыта: админские листинги компаний, пользователей, сотрудников и журнала переведены в компактные таблицы с сортировкой и фильтр-барами; список обращений поддержки уплотнён и получил сортировку. Админские разделы собраны в одну «Панель управления»: в сайдбаре остался один служебный пункт.
 
 Волна 12.2 закрыта: `/admin/journals` и `/admin/moderation` больше не показывают технические cuid как основной текст. Журнал получает человекочитаемый `entity` summary от API, а ID остаётся мелкой audit-строкой; модерация показывает заголовки жалоб по автору и времени комментария, ID кейса/сущности вынесены в угол.
 
 Волна 12.3 закрыта: enum-статусы и служебные коды больше не размазаны по UI локальными словарями. Общий web-helper `display-labels` даёт русские подписи для компаний, пользователей, ролей, подписок, поддержки, уведомлений, CMS, обучения, модерации, платежей, юридических документов, согласий, комментариев и файлов; `/admin/journals` локализует diff-поля, before/after и legacy payload.
 
 Волна 12.4 закрыта: topbar breadcrumbs теперь показывают вложенный путь внутри единой админ-панели. CMS-страницы получают цепочку «Панель управления / CMS / раздел», операционные экраны — «Панель управления / Компании|Журнал|Поддержка|…»; текущий пункт помечен `aria-current="page"`, а длинные подписи не создают горизонтальный overflow в topbar.
+
+Навигационный фундамент под будущий `/admin`-дашборд 12.9 готов: `/admin` больше не редиректит в CMS, а показывает главную панель с группами быстрых переходов; CMS-страницы показывают только вкладки «Новости», «Индексы цен», «Обучение», «База знаний», а операционные разделы доступны через главную панель и breadcrumbs. Сам KPI-дашборд 12.9 пока не реализован.
 
 Целевой следующий шаг: Волна 12.5 — CMS preview новостей в админке.
 
@@ -160,7 +162,7 @@
 ### Дальше по плану (`audit/ROADMAP.md`)
 
 - **Волна 11** — UX/дизайн-система закрыта полностью: токены, типографика, цветовая семантика, состояния контролов, сайдбар, регистрация, demo-баннер, onboarding, индексы, фильтры новостей, микро-копирайтинг, публичные fallback-layouts и доступность.
-- **Волна 12** — CMS-полишинг и админ-таблицы: 12.1 закрыта (компактные админ-таблицы и единая панель управления), 12.2 закрыта (скрытие cuid в модерации и журнале), 12.3 закрыта (локализация enum-значений), 12.4 закрыта (breadcrumbs в админке); дальше — CMS preview, drag-and-drop, auto-save, preview «как видит пользователь», admin dashboard.
+- **Волна 12** — CMS-полишинг и админ-таблицы: 12.1 закрыта (компактные админ-таблицы и единая панель управления), 12.2 закрыта (скрытие cuid в модерации и журнале), 12.3 закрыта (локализация enum-значений), 12.4 закрыта (breadcrumbs в админке); навигационный фундамент `/admin` под 12.9 готов без KPI-блоков; дальше — CMS preview, drag-and-drop, auto-save, preview «как видит пользователь», admin dashboard.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
 ### Тех-долг, осознанно отложенный
@@ -204,16 +206,16 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 12.4).
+Дата: 2026-05-27 (после правки админ-навигации под будущую задачу 12.9).
 
-- `pnpm typecheck` — успешно (4/4).
-- `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 41/41, api 75/75.
-- `pnpm test:integration` — успешно: API integration 114/114.
-- `pnpm build` — успешно (3/3).
-- Browser UI-check — `/admin/content/news`: `Панель управления/CMS/Новости`, `/admin/companies`: `Панель управления/Компании`, console errors = 0, desktop overflow = 0. Mobile 390px: `/admin/companies` и `/admin/journals` без горизонтального overflow; screenshots в `/private/tmp/ecoplatform-12-4-admin-news-breadcrumbs.png`, `/private/tmp/ecoplatform-12-4-admin-companies-breadcrumbs.png`, `/private/tmp/ecoplatform-12-4-admin-companies-mobile.png`, `/private/tmp/ecoplatform-12-4-admin-journals-mobile.png`.
-- `pnpm format:check` — clean.
+- `pnpm --filter @ecoplatform/web typecheck` — успешно.
+- `pnpm --filter @ecoplatform/web lint` — успешно.
+- `pnpm --filter @ecoplatform/web test` — успешно: web 44/44.
+- Browser UI-check — `/admin/content/news`: только CMS-вкладки `Новости`, `Индексы цен`, `Обучение`, `База знаний`, breadcrumbs `Панель управления/CMS/Новости`, console errors = 0, desktop overflow = 0. `/admin`: главная панель с группами CMS/операции/контроль/настройки, без KPI-графиков, overflow = 0. `/admin/companies`: breadcrumbs `Панель управления/Компании`, без CMS-навигации, overflow = 0. Mobile 390px `/admin/content/news`: `Раздел: Новости`, desktop-вкладки скрыты, `documentOverflowX=0`, `bodyOverflowX=0`.
+- Скриншоты: `/private/tmp/ecoplatform-admin-nav-news-desktop.png`, `/private/tmp/ecoplatform-admin-nav-home-desktop.png`, `/private/tmp/ecoplatform-admin-nav-companies-desktop.png`, `/private/tmp/ecoplatform-admin-nav-news-mobile.png`.
+- `pnpm exec prettier --check` по изменённым web/status-файлам — clean.
 - `git diff --check` — clean.
+- Последний полный root bundle до этой web-only правки: 2026-05-27 после Волны 12.4 (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm test:integration`, `pnpm build`, `pnpm format:check`, `git diff --check`).
 - Lighthouse desktop baseline (commit `b8e3101`, без перезапуска в 12.4): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
 
 ## Целевая БД для деплоя

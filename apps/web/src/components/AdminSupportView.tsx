@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw, Search } from "lucide-react";
 import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
@@ -158,7 +157,6 @@ export function AdminSupportView() {
           <h1 className="page-title">Поддержка администратора</h1>
           <p className="page-subtitle">Очередь обращений компаний. Слева — список, справа — переписка.</p>
         </header>
-        <CmsTabs />
 
         {result ? (
           <StatusPill as="p" variant="danger">

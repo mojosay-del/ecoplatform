@@ -47,6 +47,12 @@ describe("AppShell future navigation teasers", () => {
     expect(trail?.[2]?.href).toBe("/admin/content/knowledge-base");
   });
 
+  it("treats /admin as the panel home instead of a CMS route", () => {
+    const trail = getBreadcrumbTrail(appNavSections, "/admin");
+
+    expect(trail?.map((item) => item.label)).toEqual(["Панель управления"]);
+  });
+
   it("keeps admin child routes under their parent breadcrumb", () => {
     const trail = getBreadcrumbTrail(appNavSections, "/admin/support/tickets/case-id");
 

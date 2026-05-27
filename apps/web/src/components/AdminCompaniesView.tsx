@@ -5,7 +5,6 @@ import { RotateCcw, Search } from "lucide-react";
 import { companyStatuses, subscriptionPlans, type PaginatedResponse } from "@ecoplatform/shared";
 import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import {
   StatusPill,
   companyStatusPillVariant,
@@ -196,7 +195,6 @@ export function AdminCompaniesView() {
           <h1 className="page-title">Компании</h1>
           <p className="page-subtitle">Управление компаниями и их подписками.</p>
         </header>
-        <CmsTabs />
 
         <form
           className="admin-filter-bar"
