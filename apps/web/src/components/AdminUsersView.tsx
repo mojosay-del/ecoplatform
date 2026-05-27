@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
+import { StatusPill, userStatusPillVariant } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
@@ -216,7 +217,9 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       </form>
 
       {errorMessage || usersQuery.errorMessage ? (
-        <p className="status-pill">{errorMessage ?? usersQuery.errorMessage}</p>
+        <StatusPill as="p" variant="danger">
+          {errorMessage ?? usersQuery.errorMessage}
+        </StatusPill>
       ) : null}
       {usersQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
@@ -233,7 +236,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                 onClick={() => openUser(item.id)}
                 type="button"
               >
-                <span className="status-pill">{statusLabel[item.status]}</span>
+                <StatusPill variant={userStatusPillVariant(item.status)}>{statusLabel[item.status]}</StatusPill>
                 <strong>
                   {item.firstName} {item.lastName}
                 </strong>
@@ -261,7 +264,9 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
               <>
                 <div className="list-row">
                   <div>
-                    <p className="status-pill">{statusLabel[selected.status]}</p>
+                    <StatusPill as="p" variant={userStatusPillVariant(selected.status)}>
+                      {statusLabel[selected.status]}
+                    </StatusPill>
                     <h2>
                       {selected.firstName} {selected.lastName}
                     </h2>

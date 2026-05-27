@@ -12,6 +12,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Flag, MessageCircle, Send, ThumbsUp, X } from "lucide-react";
 import type { NewsCommentDecorated, NewsListItem, NewsPostDetail } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
+import { StatusPill } from "../components/StatusPill";
 import { ApiError, api, preferredFileAssetImageUrl, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCoverAssets } from "../lib/use-cover-assets";
@@ -510,7 +511,11 @@ function CommentsSection({
         <span className="comments-counter">{formatCommentCount(commentsCount)}</span>
       </div>
 
-      {resultMessage ? <p className="status-pill comments-status">{resultMessage}</p> : null}
+      {resultMessage ? (
+        <StatusPill as="p" className="comments-status" variant="success">
+          {resultMessage}
+        </StatusPill>
+      ) : null}
 
       <div className="comment-list">
         {comments.length === 0 ? (

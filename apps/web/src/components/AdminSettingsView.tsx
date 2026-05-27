@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { AdminJournalsView } from "./AdminJournalsView";
 import { AdminUsersView } from "./AdminUsersView";
+import { StatusPill } from "./StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -209,7 +210,11 @@ export function AdminSettingsView() {
           </p>
         </header>
 
-        {errorMessage ? <p className="status-pill">{errorMessage}</p> : null}
+        {errorMessage ? (
+          <StatusPill as="p" variant="danger">
+            {errorMessage}
+          </StatusPill>
+        ) : null}
         {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
 
         <div className="settings-layout">

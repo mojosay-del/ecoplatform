@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
+import { StatusPill } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -117,7 +118,9 @@ export function AdminStaffView() {
         <AdminPeopleTabs />
 
         {errorMessage || staffQuery.errorMessage ? (
-          <p className="status-pill">{errorMessage ?? staffQuery.errorMessage}</p>
+          <StatusPill as="p" variant="danger">
+            {errorMessage ?? staffQuery.errorMessage}
+          </StatusPill>
         ) : null}
         {staffQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
@@ -228,8 +231,10 @@ export function AdminStaffView() {
                 </div>
               </div>
               <p>
-                <span className="status-pill">{staff.isActive ? "Активен" : "Деактивирован"}</span> Роли:{" "}
-                {staff.roles.join(", ") || "—"}
+                <StatusPill variant={staff.isActive ? "success" : "danger"}>
+                  {staff.isActive ? "Активен" : "Деактивирован"}
+                </StatusPill>{" "}
+                Роли: {staff.roles.join(", ") || "—"}
               </p>
               <div className="auth-actions">
                 {allRoles.map((role) => {

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { ChevronLeft, MessageSquare, Plus, X } from "lucide-react";
+import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { api, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -198,9 +199,9 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                       >
                         <div className="support-drawer-ticket-head">
                           <strong>{ticket.subject}</strong>
-                          <span className={`status-pill status-${ticket.status}`}>
+                          <StatusPill variant={supportStatusPillVariant(ticket.status)}>
                             {STATUS_LABELS[ticket.status] ?? ticket.status}
-                          </span>
+                          </StatusPill>
                         </div>
                         <span className="support-drawer-ticket-meta">
                           {CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
@@ -288,7 +289,9 @@ function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => 
         <strong>{ticket.subject}</strong>
         <span className="page-subtitle">
           {CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
-          <span className={`status-pill status-${ticket.status}`}>{STATUS_LABELS[ticket.status] ?? ticket.status}</span>
+          <StatusPill variant={supportStatusPillVariant(ticket.status)}>
+            {STATUS_LABELS[ticket.status] ?? ticket.status}
+          </StatusPill>
         </span>
       </header>
       <div className="support-drawer-messages">

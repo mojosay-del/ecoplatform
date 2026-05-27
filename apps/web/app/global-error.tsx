@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import { StatusPill } from "../src/components/StatusPill";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
@@ -19,9 +20,9 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                 <p className="auth-card-sub">Приложение не смогло отрисоваться.</p>
                 <p className="page-subtitle">Мы уже знаем о проблеме. Попробуйте обновить страницу.</p>
                 {error.digest ? (
-                  <p className="status-pill" style={{ marginTop: "12px" }}>
+                  <StatusPill as="p" style={{ marginTop: "12px" }}>
                     Код инцидента: {error.digest}
-                  </p>
+                  </StatusPill>
                 ) : null}
                 <div className="auth-actions" style={{ marginTop: "24px" }}>
                   <button className="button" type="button" onClick={reset}>

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
+import { StatusPill, moderationStatusPillVariant } from "./StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -133,7 +134,11 @@ export function AdminModerationView() {
           <h1 className="page-title">Модерация</h1>
           <p className="page-subtitle">Очередь жалоб на пользовательский контент.</p>
         </header>
-        {state === "error" ? <p className="status-pill">{errorMessage}</p> : null}
+        {state === "error" ? (
+          <StatusPill as="p" variant="danger">
+            {errorMessage}
+          </StatusPill>
+        ) : null}
         {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
         {state === "ready" ? (
           <div className="moderation-layout">
@@ -146,7 +151,9 @@ export function AdminModerationView() {
                   onClick={() => openCase(item.id)}
                   type="button"
                 >
-                  <span className="status-pill">{caseStatusLabels[item.status] ?? item.status}</span>
+                  <StatusPill variant={moderationStatusPillVariant(item.status)}>
+                    {caseStatusLabels[item.status] ?? item.status}
+                  </StatusPill>
                   <strong>{item.entity?.newsPost?.title ?? "Комментарий"}</strong>
                   <span>{item.entity?.text ?? item.entityId}</span>
                   <small>Жалоб: {item.complaints.length}</small>
@@ -160,7 +167,9 @@ export function AdminModerationView() {
                 <>
                   <div className="list-row">
                     <div>
-                      <p className="status-pill">{caseStatusLabels[selectedCase.status] ?? selectedCase.status}</p>
+                      <StatusPill as="p" variant={moderationStatusPillVariant(selectedCase.status)}>
+                        {caseStatusLabels[selectedCase.status] ?? selectedCase.status}
+                      </StatusPill>
                       <h2>{selectedCase.entity?.newsPost?.title ?? "Кейс модерации"}</h2>
                     </div>
                     <div className="auth-actions">

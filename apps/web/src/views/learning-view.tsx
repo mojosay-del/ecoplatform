@@ -28,6 +28,7 @@ import type {
   PaginatedResponse,
 } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
+import { StatusPill } from "../components/StatusPill";
 import { ApiError, api, preferredFileAssetImageUrl, type FileAsset } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCoverAssets } from "../lib/use-cover-assets";
@@ -101,11 +102,12 @@ export function EducationView() {
                       <span className="education-card-lessons-badge">Уроков: {lessonsCount}</span>
                     </div>
                   </div>
-                  <span
-                    className={`education-card-status ${module.hasAccess ? "" : "locked"}${isInDevelopment ? " in-development" : ""}`}
+                  <StatusPill
+                    className="education-card-status"
+                    variant={isInDevelopment ? "warning" : module.hasAccess ? "success" : "brand"}
                   >
                     {isInDevelopment ? "В разработке" : module.hasAccess ? "Доступен" : "Нужна подписка"}
-                  </span>
+                  </StatusPill>
                   <div className="education-card-panel">
                     <p>{module.summary}</p>
                   </div>

@@ -12,7 +12,9 @@
 
 Волна 11.2 закрыта: `h1` приведены к токенам типографики, публичные заголовки выровнены по левому краю, `/news` теперь открывается с заголовком «Новости рынка».
 
-Целевой следующий шаг: Волна 11.3 — цветовая семантика pill'ов через `StatusPill`.
+Волна 11.3 закрыта: статусы переведены на общий `StatusPill` с вариантами `success/warning/danger/neutral/brand`; обучение, компании, поддержка, пользователи, подписки, модерация и сервисные сообщения больше не используют случайный зелёный pill по умолчанию.
+
+Целевой следующий шаг: Волна 11.4 — состояния hover/focus/active/disabled.
 
 ## Что уже сделано
 
@@ -26,7 +28,7 @@
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
 - 113 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 10 в `apps/web`, 73 в `apps/api`.
+- Unit-тесты: 7 в `packages/shared`, 12 в `apps/web`, 73 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
@@ -127,7 +129,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 11** — UX/дизайн-система: цвет, состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»). Дизайн-токены и типографическая иерархия закрыты в 11.1–11.2.
+- **Волна 11** — UX/дизайн-система: состояния, регистрация в 2 шага, докрутка disabled-пунктов в сайдбаре (badge «Скоро · Q3 2026»). Дизайн-токены, типографическая иерархия и цветовая семантика pill'ов закрыты в 11.1–11.3.
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
@@ -163,7 +165,7 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 90 unit-тестов (shared 7, web 10, api 73)
+pnpm test                                             # 92 unit-теста (shared 7, web 12, api 73)
 pnpm build                                            # tsc + next build
 pnpm test:integration                                 # 113 integration-тестов против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
@@ -172,14 +174,14 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 11.2).
+Дата: 2026-05-27 (после Волны 11.3).
 
 - `pnpm typecheck` — успешно (4/4).
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 10/10, api 73/73.
+- `pnpm test` — успешно: shared 7/7, web 12/12, api 73/73.
 - `pnpm test:integration` — успешно: API integration 113/113.
 - `pnpm build` — успешно (3/3).
-- Browser UI-check — `/news` на `http://localhost:3000` после demo-login показывает «Новости рынка» слева, `h1` 28px, карточки новостей не перекрывают страницу; скриншот: `/private/tmp/ecoplatform-11-2-news-final.png`.
+- Browser UI-check — admin-login → `/education`, `/account`, `/admin/companies`: `StatusPill` показывает `В разработке` как warning, `Доступен` как success, платформенные роли как brand, компании `demo` как warning; скриншоты: `/private/tmp/ecoplatform-11-3-education.png`, `/private/tmp/ecoplatform-11-3-admin-companies.png`.
 - Playwright smoke — не перезапускался в 10.8 (ops/API-metrics изменение); последний зелёный прогон после 10.6: Chromium 1/1.
 - `pnpm format:check` — clean.
 - CSS token sanity — все `var(--...)` в `tokens.css`/`globals.css` имеют определения; прямых `#...`, `rgba(...)`, нетокенизированных `rgb(...)` в `globals.css` нет.

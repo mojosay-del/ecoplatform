@@ -8,6 +8,7 @@ import { CmsTabs } from "./CmsTabs";
 import { Block, BlocksEditor, LESSON_BLOCK_KINDS, type BlockInsertExtraOption } from "./BlocksEditor";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
+import { StatusPill } from "./StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -155,7 +156,11 @@ export function AdminEducationView() {
           <p className="page-subtitle">Модули, главы и уроки. Структура справа — детали слева.</p>
         </header>
         <CmsTabs />
-        {message ? <p className="status-pill">{message}</p> : null}
+        {message ? (
+          <StatusPill as="p" variant="danger">
+            {message}
+          </StatusPill>
+        ) : null}
 
         <div className="moderation-layout cms-vertical-layout">
           <div className="education-tree">

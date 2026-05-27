@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CreditCard, HelpCircle, type LucideIcon, MessageSquare, Settings, Shield, ShoppingBag } from "lucide-react";
 import { AppShell } from "./AppShell";
+import { StatusPill } from "./StatusPill";
 import { api, apiFetch } from "../lib/api";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
@@ -192,7 +193,9 @@ export function NotificationsView() {
           <p className="page-subtitle">Все системные сообщения по вашему аккаунту.</p>
         </header>
         {(errorMessage || notifications.errorMessage) && state !== "loading" && !notifications.isInitialLoading ? (
-          <p className="status-pill">{errorMessage ?? notifications.errorMessage}</p>
+          <StatusPill as="p" variant="danger">
+            {errorMessage ?? notifications.errorMessage}
+          </StatusPill>
         ) : null}
         {state === "loading" || notifications.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
         {state === "ready" && notifications.state !== "error" ? (
@@ -211,10 +214,10 @@ export function NotificationsView() {
                   return (
                     <article className={`notification-card ${item.readAt ? "" : "unread"}`} key={item.id}>
                       <div className="notification-head">
-                        <span className="status-pill">
+                        <StatusPill>
                           <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
                           {categoryLabels[item.category] ?? item.category}
-                        </span>
+                        </StatusPill>
                         <time>{new Date(item.createdAt).toLocaleString("ru-RU")}</time>
                       </div>
                       <h2>{item.title}</h2>
@@ -288,7 +291,7 @@ export function NotificationsView() {
                         <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
                         {categoryLabels[category]}
                       </span>
-                      <span className="status-pill">Всегда включено</span>
+                      <StatusPill variant="success">Всегда включено</StatusPill>
                     </div>
                   );
                 })}

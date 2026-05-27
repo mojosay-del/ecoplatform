@@ -31,6 +31,12 @@ import type {
 } from "@ecoplatform/shared";
 import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
+import {
+  StatusPill,
+  companyStatusPillVariant,
+  subscriptionStatusPillVariant,
+  supportStatusPillVariant,
+} from "../components/StatusPill";
 import { api, clearAccessToken } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { AuthRequired, ErrorState, useApiQuery, resolveUpgradeCta } from "./_shared";
@@ -537,16 +543,16 @@ export function AccountView() {
             <h1 className="account-hero-name">{fullName}</h1>
             {user?.email ? <p className="account-hero-email">{user.email}</p> : null}
             <div className="account-hero-meta">
-              {user?.gender ? <span className="status-pill">{GENDER_LABELS[user.gender] ?? user.gender}</span> : null}
+              {user?.gender ? <StatusPill>{GENDER_LABELS[user.gender] ?? user.gender}</StatusPill> : null}
               {isPlatformStaff
                 ? user?.platformRoles?.map((role) => (
-                    <span className="status-pill primary" key={role}>
+                    <StatusPill key={role} variant="brand">
                       {ROLE_LABELS[role] ?? role}
-                    </span>
+                    </StatusPill>
                   ))
                 : null}
               {companyStatusLabel && !isPlatformStaff ? (
-                <span className="status-pill">{companyStatusLabel}</span>
+                <StatusPill variant={companyStatusPillVariant(billing?.status)}>{companyStatusLabel}</StatusPill>
               ) : null}
             </div>
             <p className="account-hero-hint">
@@ -582,7 +588,7 @@ export function AccountView() {
                   { label: "Имя", value: fullName },
                   { label: "Email", value: user?.email },
                   { label: "Телефон", value: user?.phone },
-                  { label: "Статус", value: <span className="status-pill">Активен</span> },
+                  { label: "Статус", value: <StatusPill variant="success">Активен</StatusPill> },
                 ]}
               />
             </article>
@@ -606,9 +612,9 @@ export function AccountView() {
                 <p className="page-subtitle">Этот аккаунт не привязан к клиентской компании.</p>
                 <div className="account-pill-row">
                   {user?.platformRoles?.map((role) => (
-                    <span className="status-pill primary" key={role}>
+                    <StatusPill key={role} variant="brand">
                       {ROLE_LABELS[role] ?? role}
-                    </span>
+                    </StatusPill>
                   ))}
                 </div>
               </article>
@@ -683,7 +689,7 @@ export function AccountView() {
                           {formatAccountDate(item.startsAt)} — {formatAccountDate(item.endsAt)}
                         </span>
                       </div>
-                      <span className="status-pill">{item.status}</span>
+                      <StatusPill variant={subscriptionStatusPillVariant(item.status)}>{item.status}</StatusPill>
                     </div>
                   ))}
                 </div>
@@ -843,7 +849,12 @@ export function AccountView() {
                     <div>
                       <strong>
                         {describeSessionDevice(session.userAgent)}
-                        {session.current ? <span className="status-pill primary">Текущая</span> : null}
+                        {session.current ? (
+                          <>
+                            {" "}
+                            <StatusPill variant="brand">Текущая</StatusPill>
+                          </>
+                        ) : null}
                       </strong>
                       <span>
                         IP {session.ipAddress ?? "—"} · последний раз {formatAccountDateTime(session.updatedAt)} · до{" "}
@@ -940,7 +951,9 @@ export function AccountView() {
                           {formatAccountDateTime(ticket.updatedAt)}
                         </span>
                       </div>
-                      <span className="status-pill">{SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}</span>
+                      <StatusPill variant={supportStatusPillVariant(ticket.status)}>
+                        {SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}
+                      </StatusPill>
                     </button>
                   ))}
                 </div>
@@ -1135,7 +1148,9 @@ function CompanyProfileForm({
               {
                 label: "Статус",
                 value: billing.status ? (
-                  <span className="status-pill">{COMPANY_STATUS_LABELS[billing.status] ?? billing.status}</span>
+                  <StatusPill variant={companyStatusPillVariant(billing.status)}>
+                    {COMPANY_STATUS_LABELS[billing.status] ?? billing.status}
+                  </StatusPill>
                 ) : null,
               },
             ]}

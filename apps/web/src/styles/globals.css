@@ -1942,13 +1942,53 @@ body.news-modal-open .app-shell {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  width: fit-content;
   border-radius: var(--radius-chip);
+  border: 1px solid transparent;
   padding: 4px 10px;
-  background: var(--green-soft);
-  color: var(--success-text);
+  background: var(--surface-muted-strong);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.status-pill-success {
+  border-color: rgb(var(--success-rgb) / 0.2);
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.status-pill-warning {
+  border-color: var(--warning-border);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.status-pill-danger {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger-text-strong);
+}
+
+.status-pill-brand {
+  border-color: var(--brand-soft-strong);
+  background: var(--brand-soft);
+  color: var(--brand-active);
+}
+
+.status-pill-neutral {
+  border-color: var(--neutral-border);
+  background: var(--surface-muted-strong);
+  color: var(--text-secondary);
+}
+
+.education-card-status.status-pill {
+  position: absolute;
+  padding: 6px 12px;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgb(var(--shadow-rgb) / 0.12);
 }
 
 .tabs {
@@ -6528,12 +6568,6 @@ li.tree-add-row + li.tree-add-row,
 .account-form-message-error {
   background: rgb(var(--danger-strong-rgb) / 0.1);
   color: var(--danger-text-strong);
-}
-
-.status-pill.primary {
-  background: var(--text);
-  color: var(--white);
-  border-color: transparent;
 }
 
 /* Popover уведомлений у колокольчика в шапке. Заменяет старую страницу,

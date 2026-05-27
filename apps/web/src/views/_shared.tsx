@@ -9,6 +9,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { type LucideIcon } from "lucide-react";
 import { AppShell } from "../components/AppShell";
+import { StatusPill } from "../components/StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -368,7 +369,11 @@ export function ErrorState({ title, message }: { title: string; message: string 
           <h1 className="page-title">{title}</h1>
           <p className="page-subtitle">Не удалось загрузить данные. Попробуйте обновить страницу позже.</p>
         </header>
-        {message ? <p className="status-pill">{message}</p> : null}
+        {message ? (
+          <StatusPill as="p" variant="danger">
+            {message}
+          </StatusPill>
+        ) : null}
       </section>
     </AppShell>
   );

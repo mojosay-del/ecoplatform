@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import type { AdminJournalEntry, AdminJournalPayload, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
+import { StatusPill } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -127,7 +128,9 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
       </form>
 
       {errorMessage || journalsQuery.errorMessage ? (
-        <p className="status-pill">{errorMessage ?? journalsQuery.errorMessage}</p>
+        <StatusPill as="p" variant="danger">
+          {errorMessage ?? journalsQuery.errorMessage}
+        </StatusPill>
       ) : null}
       {journalsQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 

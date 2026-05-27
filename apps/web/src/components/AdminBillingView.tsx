@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState, type SetStateAction } from "react";
 import { AppShell } from "./AppShell";
+import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -139,9 +140,15 @@ export function AdminBillingView() {
             Используется, пока нет автоматического платёжного шлюза. Действие фиксируется в журнале админов.
           </p>
         </header>
-        {successMessage ? <p className="status-pill">{successMessage}</p> : null}
+        {successMessage ? (
+          <StatusPill as="p" variant="success">
+            {successMessage}
+          </StatusPill>
+        ) : null}
         {errorMessage || companiesQuery.errorMessage ? (
-          <p className="status-pill">{errorMessage ?? companiesQuery.errorMessage}</p>
+          <StatusPill as="p" variant="danger">
+            {errorMessage ?? companiesQuery.errorMessage}
+          </StatusPill>
         ) : null}
         {state === "loading" || companiesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
@@ -215,15 +222,19 @@ export function AdminBillingView() {
             <article className="checklist-block" key={company.id}>
               <strong>{company.organizationName}</strong>
               <p>
-                <span className="status-pill">{company.status}</span> · Тариф: {company.subscriptionPlan ?? "—"}
+                <StatusPill variant={companyStatusPillVariant(company.status)}>{company.status}</StatusPill> · Тариф:{" "}
+                {company.subscriptionPlan ?? "—"}
                 {company.subscriptionEndsAt
                   ? ` (до ${new Date(company.subscriptionEndsAt).toLocaleDateString("ru-RU")})`
                   : ""}
               </p>
               {company.subscriptions[0] ? (
                 <p className="page-subtitle">
-                  Последняя подписка: {company.subscriptions[0].plan} · {company.subscriptions[0].status} · до{" "}
-                  {new Date(company.subscriptions[0].endsAt).toLocaleDateString("ru-RU")}
+                  Последняя подписка: {company.subscriptions[0].plan} ·{" "}
+                  <StatusPill variant={subscriptionStatusPillVariant(company.subscriptions[0].status)}>
+                    {company.subscriptions[0].status}
+                  </StatusPill>{" "}
+                  · до {new Date(company.subscriptions[0].endsAt).toLocaleDateString("ru-RU")}
                 </p>
               ) : null}
             </article>

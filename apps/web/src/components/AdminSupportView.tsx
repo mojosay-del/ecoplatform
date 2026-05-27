@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { AppShell } from "./AppShell";
+import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
@@ -155,7 +156,11 @@ export function AdminSupportView() {
           <p className="page-subtitle">Очередь обращений компаний. Слева — список, справа — переписка.</p>
         </header>
 
-        {result ? <p className="status-pill">{result}</p> : null}
+        {result ? (
+          <StatusPill as="p" variant="danger">
+            {result}
+          </StatusPill>
+        ) : null}
 
         <div className="support-inbox">
           {/* Левая колонка: фильтры по статусам, поиск, список тикетов. */}
@@ -196,9 +201,9 @@ export function AdminSupportView() {
                     >
                       <div className="support-inbox-item-head">
                         <strong>{ticket.subject}</strong>
-                        <span className={`status-pill status-${ticket.status}`}>
+                        <StatusPill variant={supportStatusPillVariant(ticket.status)}>
                           {STATUS_LABELS[ticket.status] ?? ticket.status}
-                        </span>
+                        </StatusPill>
                       </div>
                       <span className="support-inbox-item-company">{ticket.company?.organizationName ?? "—"}</span>
                       {preview ? <span className="support-inbox-item-preview">{preview}</span> : null}
@@ -234,12 +239,10 @@ export function AdminSupportView() {
                     </p>
                   </div>
                   <div className="support-inbox-meta">
-                    <span className={`status-pill status-${selectedTicket.status}`}>
+                    <StatusPill variant={supportStatusPillVariant(selectedTicket.status)}>
                       {STATUS_LABELS[selectedTicket.status] ?? selectedTicket.status}
-                    </span>
-                    <span className="status-pill">
-                      {CATEGORY_LABELS[selectedTicket.category] ?? selectedTicket.category}
-                    </span>
+                    </StatusPill>
+                    <StatusPill>{CATEGORY_LABELS[selectedTicket.category] ?? selectedTicket.category}</StatusPill>
                   </div>
                 </header>
 

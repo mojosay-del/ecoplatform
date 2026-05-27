@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AdminPeopleTabs } from "./AdminPeopleTabs";
 import { AppShell } from "./AppShell";
+import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -194,7 +195,9 @@ export function AdminCompaniesView() {
         </form>
 
         {errorMessage || companiesQuery.errorMessage ? (
-          <p className="status-pill">{errorMessage ?? companiesQuery.errorMessage}</p>
+          <StatusPill as="p" variant="danger">
+            {errorMessage ?? companiesQuery.errorMessage}
+          </StatusPill>
         ) : null}
         {companiesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
@@ -211,7 +214,7 @@ export function AdminCompaniesView() {
                   onClick={() => openCompany(item.id)}
                   type="button"
                 >
-                  <span className="status-pill">{item.status}</span>
+                  <StatusPill variant={companyStatusPillVariant(item.status)}>{item.status}</StatusPill>
                   <strong>{item.organizationName}</strong>
                   <span>
                     {item.subscriptionPlan ?? "без тарифа"} · {item._count.users} польз.
@@ -236,7 +239,9 @@ export function AdminCompaniesView() {
                 <>
                   <div className="list-row">
                     <div>
-                      <p className="status-pill">{selected.status}</p>
+                      <StatusPill as="p" variant={companyStatusPillVariant(selected.status)}>
+                        {selected.status}
+                      </StatusPill>
                       <h2>{selected.organizationName}</h2>
                       <p className="page-subtitle">
                         {selected.subscriptionPlan ?? "Без активного тарифа"}
@@ -272,7 +277,10 @@ export function AdminCompaniesView() {
                         {selected.subscriptions.map((subscription) => (
                           <article className="checklist-block" key={subscription.id}>
                             <strong>
-                              {subscription.plan} · {subscription.status}
+                              {subscription.plan} ·{" "}
+                              <StatusPill variant={subscriptionStatusPillVariant(subscription.status)}>
+                                {subscription.status}
+                              </StatusPill>
                             </strong>
                             <p>
                               {new Date(subscription.startsAt).toLocaleDateString("ru-RU")} →{" "}

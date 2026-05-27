@@ -3,6 +3,7 @@
 import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { useEffect } from "react";
+import { StatusPill } from "../src/components/StatusPill";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
@@ -21,9 +22,9 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
               кабинета.
             </p>
             {error.digest ? (
-              <p className="status-pill" style={{ marginTop: "12px" }}>
+              <StatusPill as="p" style={{ marginTop: "12px" }}>
                 Код инцидента: {error.digest}
-              </p>
+              </StatusPill>
             ) : null}
             <div className="auth-actions" style={{ marginTop: "24px" }}>
               <button className="button" type="button" onClick={reset}>
