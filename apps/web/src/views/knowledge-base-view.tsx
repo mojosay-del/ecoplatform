@@ -135,6 +135,7 @@ function KnowledgeBaseLayout({
                       alt={activeCover?.originalName ?? active.title}
                       src={activeCoverUrl}
                       fill
+                      loading="eager"
                       sizes="(max-width: 1024px) 100vw, 800px"
                       style={{ objectFit: "cover" }}
                     />

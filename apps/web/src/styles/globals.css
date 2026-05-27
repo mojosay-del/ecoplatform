@@ -3186,7 +3186,9 @@ body.news-modal-open .app-shell {
 }
 
 .knowledge-cover {
+  position: relative;
   margin: 0;
+  height: clamp(180px, 26vw, 320px);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -3197,7 +3199,7 @@ body.news-modal-open .app-shell {
 .knowledge-cover img {
   display: block;
   width: 100%;
-  max-height: 360px;
+  height: 100%;
   object-fit: cover;
 }
 
