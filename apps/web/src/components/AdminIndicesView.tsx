@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ChevronRight, FolderOpen, Package, Plus, Trash2 } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -138,12 +137,11 @@ export function AdminIndicesView() {
     <AppShell>
       <section className="page">
         <header className="page-header">
-          <h1 className="page-title">CMS</h1>
+          <h1 className="page-title">Индексы цен</h1>
           <p className="page-subtitle">
             Категории, номенклатура и история цен. Выберите позицию слева — справа откроется индекс.
           </p>
         </header>
-        <CmsTabs />
         {message ? <p className="cms-flash">{message}</p> : null}
 
         <div className="moderation-layout cms-vertical-layout">

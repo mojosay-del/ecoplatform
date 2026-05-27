@@ -63,8 +63,6 @@ const knowledgeBaseTab: AdminPanelTab = {
   roles: ["admin", "content_manager"],
 };
 
-const CMS_ADMIN_TABS: AdminPanelTab[] = [newsTab, indicesTab, educationTab, knowledgeBaseTab];
-
 const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
   {
     title: "CMS",
@@ -200,22 +198,9 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
   },
 ];
 
-const SETTINGS_HASHES = new Set(["moderation", "demo", "indices", "other"]);
-
-export function visibleCmsTabs(roles: readonly string[]) {
-  return CMS_ADMIN_TABS.filter((tab) => tab.roles.some((role) => roles.includes(role)));
-}
-
 export function visibleAdminHomeGroups(roles: readonly string[]): AdminHomeGroup[] {
   return ADMIN_HOME_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => item.roles.some((role) => roles.includes(role))),
   })).filter((group) => group.items.length > 0);
-}
-
-export function isCmsTabActive(tab: AdminPanelTab, pathname: string, hash: string) {
-  if (pathname !== tab.pathname && !pathname.startsWith(`${tab.pathname}/`)) return false;
-  if (!tab.hash) return true;
-  const currentHash = SETTINGS_HASHES.has(hash) ? hash : "moderation";
-  return currentHash === tab.hash;
 }

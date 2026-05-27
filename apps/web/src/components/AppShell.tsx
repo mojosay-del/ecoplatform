@@ -29,6 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // У админов своя полноценная страница /admin/support — drawer им
   // показывать не нужно, иначе двойная сущность.
   const isAdminUser = (user?.platformRoles?.length ?? 0) > 0;
+  const showAdminPanelBackLink = pathname.startsWith("/admin/");
 
   // Любой защищённый раздел оборачивается в AppShell. Если AuthProvider уже
   // попробовал восстановить refresh-cookie и токена нет — отправляем на /login.
@@ -167,7 +168,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </header>
         <DemoBanner user={user} pathname={pathname} />
-        <div className="page-surface">{children}</div>
+        <div className="page-surface">
+          {showAdminPanelBackLink ? (
+            <Link className="button ghost admin-panel-back-link" href="/admin">
+              ← Панель управления
+            </Link>
+          ) : null}
+          {children}
+        </div>
         <AppShellFooter />
       </main>
       {/* Drawer поддержки рендерим один раз на уровне AppShell — компонент

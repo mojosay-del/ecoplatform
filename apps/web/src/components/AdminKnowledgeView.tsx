@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronRight, FileText, FolderOpen, Plus } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import { ALL_BLOCK_KINDS, Block, BlocksEditor } from "./BlocksEditor";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
@@ -282,10 +281,9 @@ export function AdminKnowledgeView() {
     <AppShell>
       <section className="page">
         <header className="page-header">
-          <h1 className="page-title">CMS</h1>
+          <h1 className="page-title">База знаний</h1>
           <p className="page-subtitle">Иерархическая структура статей — до 3 уровней.</p>
         </header>
-        <CmsTabs />
         {message ? <p className="cms-flash">{message}</p> : null}
 
         <div className="moderation-layout cms-vertical-layout">

@@ -44,7 +44,7 @@
 
 Волна 12.4 закрыта: topbar breadcrumbs теперь показывают вложенный путь внутри единой админ-панели. CMS-страницы получают цепочку «Панель управления / CMS / раздел», операционные экраны — «Панель управления / Компании|Журнал|Поддержка|…»; текущий пункт помечен `aria-current="page"`, а длинные подписи не создают горизонтальный overflow в topbar.
 
-Навигационный фундамент под будущий `/admin`-дашборд 12.9 готов: `/admin` больше не редиректит в CMS, а показывает главную панель с группами быстрых переходов; CMS-страницы показывают только вкладки «Новости», «Индексы цен», «Обучение», «База знаний», а операционные разделы доступны через главную панель и breadcrumbs. Сам KPI-дашборд 12.9 пока не реализован.
+Навигационный фундамент под будущий `/admin`-дашборд 12.9 готов: `/admin` больше не редиректит в CMS, а показывает главную панель с группами быстрых переходов; локальная CMS-навигация убрана, а все дочерние страницы `/admin/*` ведут назад в центр через единую кнопку «← Панель управления». Сам KPI-дашборд 12.9 пока не реализован.
 
 Целевой следующий шаг: Волна 12.5 — CMS preview новостей в админке.
 
@@ -206,13 +206,13 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после правки админ-навигации под будущую задачу 12.9).
+Дата: 2026-05-27 (после упрощения навигации панели управления).
 
 - `pnpm --filter @ecoplatform/web typecheck` — успешно.
 - `pnpm --filter @ecoplatform/web lint` — успешно.
-- `pnpm --filter @ecoplatform/web test` — успешно: web 44/44.
-- Browser UI-check — `/admin/content/news`: только CMS-вкладки `Новости`, `Индексы цен`, `Обучение`, `База знаний`, breadcrumbs `Панель управления/CMS/Новости`, console errors = 0, desktop overflow = 0. `/admin`: главная панель с группами CMS/операции/контроль/настройки, без KPI-графиков, overflow = 0. `/admin/companies`: breadcrumbs `Панель управления/Компании`, без CMS-навигации, overflow = 0. Mobile 390px `/admin/content/news`: `Раздел: Новости`, desktop-вкладки скрыты, `documentOverflowX=0`, `bodyOverflowX=0`.
-- Скриншоты: `/private/tmp/ecoplatform-admin-nav-news-desktop.png`, `/private/tmp/ecoplatform-admin-nav-home-desktop.png`, `/private/tmp/ecoplatform-admin-nav-companies-desktop.png`, `/private/tmp/ecoplatform-admin-nav-news-mobile.png`.
+- `pnpm --filter @ecoplatform/web test` — успешно: web 42/42.
+- Browser UI-check — `/admin/content/news`: CMS-вкладок нет, есть ссылка `← Панель управления` на `/admin`, breadcrumbs `Панель управления/CMS/Новости`, console errors = 0, desktop overflow = 0. `/admin/companies`: есть та же ссылка на `/admin`, breadcrumbs `Панель управления/Компании`, overflow = 0. `/admin`: главная панель с группами CMS/операции/контроль/настройки, без кнопки назад и без KPI-графиков. Mobile 390px `/admin/content/news`: CMS-вкладок нет, `documentOverflowX=0`, `bodyOverflowX=0`.
+- Скриншоты: `/private/tmp/ecoplatform-admin-nav-simplified-news-desktop.png`, `/private/tmp/ecoplatform-admin-nav-simplified-companies-desktop.png`, `/private/tmp/ecoplatform-admin-nav-simplified-home-desktop.png`, `/private/tmp/ecoplatform-admin-nav-simplified-news-mobile.png`.
 - `pnpm exec prettier --check` по изменённым web/status-файлам — clean.
 - `git diff --check` — clean.
 - Последний полный root bundle до этой web-only правки: 2026-05-27 после Волны 12.4 (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm test:integration`, `pnpm build`, `pnpm format:check`, `git diff --check`).

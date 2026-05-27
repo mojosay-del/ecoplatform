@@ -481,6 +481,13 @@ input[type="checkbox"]:focus-visible {
   margin-bottom: 24px;
 }
 
+.admin-panel-back-link {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 18px;
+  white-space: nowrap;
+}
+
 .page-title {
   margin: 0 0 6px;
   font-size: var(--text-2xl);
@@ -1213,60 +1220,6 @@ input[type="checkbox"]:focus-visible {
   font-size: var(--text-xs);
 }
 
-/* CMS-навигация остаётся только на страницах контента. */
-.cms-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: -8px 0 22px;
-  padding: 6px;
-  background: var(--panel-soft);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-chip);
-  width: 100%;
-}
-
-.cms-tab {
-  padding: 8px 12px;
-  border-radius: var(--radius-chip);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-  white-space: nowrap;
-  transition:
-    background 120ms ease,
-    color 120ms ease;
-}
-
-.cms-tab:hover {
-  color: var(--text);
-}
-
-.cms-tab.active {
-  background: var(--text);
-  color: var(--white);
-}
-
-.cms-tabs-mobile {
-  display: none;
-  align-items: center;
-  gap: 8px;
-  margin: -8px 0 22px;
-  max-width: 100%;
-}
-
-.cms-tabs-mobile-label {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.cms-tabs-mobile-select {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
 .admin-home {
   display: grid;
   gap: 4px;
@@ -1370,14 +1323,6 @@ input[type="checkbox"]:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .cms-tabs {
-    display: none;
-  }
-
-  .cms-tabs-mobile {
-    display: flex;
-  }
-
   .admin-home-groups {
     gap: 22px;
   }

@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronRight, FileText, FolderOpen, Paperclip, Plus, Trash2 } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
-import { CmsTabs } from "./CmsTabs";
 import { Block, BlocksEditor, LESSON_BLOCK_KINDS, type BlockInsertExtraOption } from "./BlocksEditor";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
@@ -153,10 +152,9 @@ export function AdminEducationView() {
     <AppShell>
       <section className="page">
         <header className="page-header">
-          <h1 className="page-title">CMS</h1>
+          <h1 className="page-title">Обучение</h1>
           <p className="page-subtitle">Модули, главы и уроки. Структура справа — детали слева.</p>
         </header>
-        <CmsTabs />
         {message ? (
           <StatusPill as="p" variant="danger">
             {message}
