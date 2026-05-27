@@ -13,17 +13,21 @@ export const passwordSchema = z
 export const registerDtoSchema = z.object({
   organizationName: z.string().trim().min(2),
   companyType: z.enum(companyTypes),
-  billingInn: z
-    .string()
-    .trim()
-    .regex(/^\d{10}(\d{2})?$/, "ИНН должен состоять из 10 или 12 цифр."),
+  billingInn: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z
+      .string()
+      .trim()
+      .regex(/^\d{10}(\d{2})?$/, "ИНН должен состоять из 10 или 12 цифр.")
+      .optional(),
+  ),
   firstName: z.string().trim().min(1),
   lastName: z.string().trim().min(1),
   gender: z.enum(userGenders),
   phone: z
     .string()
     .trim()
-    .regex(/^\+7\d{10}$/, "Телефон должен быть в формате +7XXXXXXXXXX"),
+    .regex(/^\+[1-9]\d{6,14}$/, "Телефон должен быть в международном формате, например +79991234567"),
   email: z.string().trim().email(),
   password: passwordSchema,
   // ID документов, на которые пользователь явно поставил галочку при

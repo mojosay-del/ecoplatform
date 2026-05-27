@@ -244,15 +244,16 @@ async function fetchWithAuthRetry(path: string, init: ApiRequestInit, token?: st
 }
 
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const body = options.body === undefined ? undefined : JSON.stringify(options.body);
   const response = await fetchWithAuthRetry(
     path,
     {
       method: options.method ?? "GET",
       headers: {
-        "Content-Type": "application/json",
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         ...(options.headers ?? {}),
       },
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body,
     },
     options.token,
   );

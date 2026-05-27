@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { LegalDocumentType, consentSubmitDtoSchema, legalDocumentTypes } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
@@ -14,12 +15,14 @@ export class LegalController {
   // Публично, без auth. Поддерживает фильтр `?types=privacy_policy,terms_of_service`
   // — нужен на странице регистрации, чтобы получить только обязательные документы.
   @Get("documents")
+  @SkipThrottle({ short: true, long: true, auth: true })
   async listDocuments(@Query("types") types?: string) {
     const filtered = parseTypesQuery(types);
     return this.service.listActiveDocuments(filtered);
   }
 
   @Get("documents/:type/:version")
+  @SkipThrottle({ short: true, long: true, auth: true })
   async getDocument(@Param("type") type: string, @Param("version") version: string) {
     return this.service.getDocument(parseType(type), version);
   }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Eye, EyeOff, Factory, Forklift, Package, RussianRuble, Truck } from "lucide-react";
+import { Eye, EyeOff, Factory, Forklift, Package, RussianRuble, Truck } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -78,17 +78,121 @@ type RegisterStep = "company" | "person";
 type RegisterFormValues = {
   organizationName: string;
   companyType: string;
-  billingInn: string;
   lastName: string;
   firstName: string;
   gender: string;
+  phoneCountryId: PhoneCountryId;
   phoneDigits: string;
   email: string;
   password: string;
 };
 
-const PHONE_MAX_DIGITS = 10;
-const INN_MAX_DIGITS = 12;
+type PhoneCountry = {
+  id: string;
+  name: string;
+  dialCode: string;
+  nationalLength: number;
+  groups: number[];
+  placeholder: string;
+  flagClassName: string;
+};
+
+type PhoneCountryId = "ru" | "by" | "kz" | "am" | "kg" | "uz" | "tj" | "az" | "md" | "tm";
+
+const PHONE_COUNTRIES: PhoneCountry[] = [
+  {
+    id: "ru",
+    name: "Россия",
+    dialCode: "+7",
+    nationalLength: 10,
+    groups: [3, 3, 2, 2],
+    placeholder: "999 123-45-67",
+    flagClassName: "phone-flag-ru",
+  },
+  {
+    id: "by",
+    name: "Беларусь",
+    dialCode: "+375",
+    nationalLength: 9,
+    groups: [2, 3, 2, 2],
+    placeholder: "29 123-45-67",
+    flagClassName: "phone-flag-by",
+  },
+  {
+    id: "kz",
+    name: "Казахстан",
+    dialCode: "+7",
+    nationalLength: 10,
+    groups: [3, 3, 2, 2],
+    placeholder: "700 123-45-67",
+    flagClassName: "phone-flag-kz",
+  },
+  {
+    id: "am",
+    name: "Армения",
+    dialCode: "+374",
+    nationalLength: 8,
+    groups: [2, 3, 3],
+    placeholder: "77 123-456",
+    flagClassName: "phone-flag-am",
+  },
+  {
+    id: "kg",
+    name: "Киргизия",
+    dialCode: "+996",
+    nationalLength: 9,
+    groups: [3, 3, 3],
+    placeholder: "700 123 456",
+    flagClassName: "phone-flag-kg",
+  },
+  {
+    id: "uz",
+    name: "Узбекистан",
+    dialCode: "+998",
+    nationalLength: 9,
+    groups: [2, 3, 2, 2],
+    placeholder: "90 123-45-67",
+    flagClassName: "phone-flag-uz",
+  },
+  {
+    id: "tj",
+    name: "Таджикистан",
+    dialCode: "+992",
+    nationalLength: 9,
+    groups: [2, 3, 2, 2],
+    placeholder: "93 123-45-67",
+    flagClassName: "phone-flag-tj",
+  },
+  {
+    id: "az",
+    name: "Азербайджан",
+    dialCode: "+994",
+    nationalLength: 9,
+    groups: [2, 3, 2, 2],
+    placeholder: "50 123-45-67",
+    flagClassName: "phone-flag-az",
+  },
+  {
+    id: "md",
+    name: "Молдова",
+    dialCode: "+373",
+    nationalLength: 8,
+    groups: [2, 3, 3],
+    placeholder: "69 123 456",
+    flagClassName: "phone-flag-md",
+  },
+  {
+    id: "tm",
+    name: "Туркменистан",
+    dialCode: "+993",
+    nationalLength: 8,
+    groups: [2, 3, 3],
+    placeholder: "65 123 456",
+    flagClassName: "phone-flag-tm",
+  },
+];
+
+const DEFAULT_PHONE_COUNTRY = PHONE_COUNTRIES[0]!;
 const ORGANIZATION_NAME_EXAMPLES = ["ИП Иванов И.И.", "ООО Экология"];
 const ORGANIZATION_TYPE_DELAY = 150;
 const ORGANIZATION_ERASE_DELAY = 90;
@@ -97,48 +201,65 @@ const ORGANIZATION_EMPTY_DELAY = 600;
 const INITIAL_REGISTER_VALUES: RegisterFormValues = {
   organizationName: "",
   companyType: "collector",
-  billingInn: "",
   lastName: "",
   firstName: "",
   gender: "male",
+  phoneCountryId: DEFAULT_PHONE_COUNTRY.id as PhoneCountryId,
   phoneDigits: "",
   email: "",
   password: "",
 };
 
-function normalizeRussianPhoneDigits(value: string) {
+function getPhoneCountry(id: PhoneCountryId) {
+  return PHONE_COUNTRIES.find((country) => country.id === id) ?? DEFAULT_PHONE_COUNTRY;
+}
+
+function normalizePhoneDigits(value: string, country: PhoneCountry) {
   const digits = value.replace(/\D/g, "");
-  const withoutCountryCode =
-    digits.length > PHONE_MAX_DIGITS && (digits.startsWith("7") || digits.startsWith("8")) ? digits.slice(1) : digits;
+  const dialDigits = country.dialCode.replace(/\D/g, "");
+  let localDigits = digits;
 
-  return withoutCountryCode.slice(0, PHONE_MAX_DIGITS);
+  if (digits.length > country.nationalLength && digits.startsWith(dialDigits)) {
+    localDigits = digits.slice(dialDigits.length);
+  } else if (country.id === "ru" && digits.length > country.nationalLength && digits.startsWith("8")) {
+    localDigits = digits.slice(1);
+  }
+
+  return localDigits.slice(0, country.nationalLength);
 }
 
-function formatRussianPhoneLocal(digits: string) {
-  const operator = digits.slice(0, 3);
-  const first = digits.slice(3, 6);
-  const second = digits.slice(6, 8);
-  const third = digits.slice(8, 10);
+function formatPhoneLocal(digits: string, country: PhoneCountry) {
+  const parts: string[] = [];
+  let cursor = 0;
 
-  let value = "";
-  if (operator) value += `(${operator}${operator.length === 3 ? ")" : ""}`;
-  if (first) value += `${operator.length === 3 ? " " : ""}${first}`;
-  if (second) value += `-${second}`;
-  if (third) value += `-${third}`;
+  for (const groupLength of country.groups) {
+    if (cursor >= digits.length) break;
+    const part = digits.slice(cursor, cursor + groupLength);
+    if (part) parts.push(part);
+    cursor += groupLength;
+  }
 
-  return value;
+  if (parts.length <= 2) return parts.join(" ");
+
+  return `${parts.slice(0, 2).join(" ")}-${parts.slice(2).join("-")}`;
 }
 
-function formatRussianPhoneFull(digits: string) {
-  return digits.length === PHONE_MAX_DIGITS ? `+7${digits}` : "";
+function formatPhoneFull(country: PhoneCountry, digits: string) {
+  return digits.length === country.nationalLength ? `${country.dialCode}${digits}` : "";
+}
+
+function isPasswordStrong(password: string) {
+  return password.length >= MIN_PASSWORD_LENGTH && /[A-Za-zА-Яа-яЁё]/.test(password) && /[0-9]/.test(password);
+}
+
+function passwordStrength(password: string) {
+  const checks = [password.length >= MIN_PASSWORD_LENGTH, /[A-Za-zА-Яа-яЁё]/.test(password), /[0-9]/.test(password)];
+
+  return checks.filter(Boolean).length;
 }
 
 function normalizeEmailValue(value: string) {
   return value.trim().toLowerCase();
-}
-
-function normalizeInnValue(value: string) {
-  return value.replace(/\D/g, "").slice(0, INN_MAX_DIGITS);
 }
 
 function AuthVisual({ mode }: { mode: AuthMode }) {
@@ -154,7 +275,7 @@ function AuthVisual({ mode }: { mode: AuthMode }) {
   }, [current.key, current.hold]);
 
   return (
-    <section className="auth-visual" aria-hidden="true">
+    <section className="auth-visual" data-mode={mode} aria-hidden="true">
       {/* Лёгкий wordmark вверху — без него левая панель пустая, пользователь
           теряет контекст где находится. */}
       <div className="auth-visual-wordmark">ЭкоПлатформа</div>
@@ -165,23 +286,7 @@ function AuthVisual({ mode }: { mode: AuthMode }) {
         </div>
       </div>
 
-      {/* На странице регистрации добавляем три коротких преимущества —
-          снимаем страх перед заполнением длинной формы. */}
-      {mode === "register" ? (
-        <ul className="auth-visual-bullets">
-          <li>
-            <Check size={16} strokeWidth={3} /> Доступ на 24 часа
-          </li>
-          <li>
-            <Check size={16} strokeWidth={3} /> Без банковской карты
-          </li>
-          <li>
-            <Check size={16} strokeWidth={3} /> Полный доступ ко всем разделам
-          </li>
-        </ul>
-      ) : (
-        <div className="auth-visual-foot" />
-      )}
+      <div className="auth-visual-foot" />
     </section>
   );
 }
@@ -322,53 +427,100 @@ function OrganizationNameInput({ value, onValueChange }: { value?: string; onVal
   );
 }
 
-function RussianPhoneInput({
+function PhoneInput({
   name,
+  countryId,
   digits,
+  onCountryChange,
   onDigitsChange,
 }: {
   name: string;
+  countryId: PhoneCountryId;
   digits: string;
+  onCountryChange: (countryId: PhoneCountryId) => void;
   onDigitsChange: (digits: string) => void;
 }) {
-  const displayValue = formatRussianPhoneLocal(digits);
-  const fullValue = formatRussianPhoneFull(digits);
+  const [open, setOpen] = useState(false);
+  const country = getPhoneCountry(countryId);
+  const displayValue = formatPhoneLocal(digits, country);
+  const fullValue = formatPhoneFull(country, digits);
 
   function setPhoneValidity(input: HTMLInputElement, valueDigits: string) {
     input.setCustomValidity(
-      valueDigits.length === 0 || valueDigits.length === PHONE_MAX_DIGITS
+      valueDigits.length === 0 || valueDigits.length === country.nationalLength
         ? ""
-        : "Введите 10 цифр российского номера после +7.",
+        : `Введите ${country.nationalLength} цифр номера для страны ${country.name}.`,
     );
   }
 
   function onChange(event: ChangeEvent<HTMLInputElement>) {
-    const nextDigits = normalizeRussianPhoneDigits(event.currentTarget.value);
+    const nextDigits = normalizePhoneDigits(event.currentTarget.value, country);
     onDigitsChange(nextDigits);
     setPhoneValidity(event.currentTarget, nextDigits);
   }
 
+  function selectCountry(nextCountryId: PhoneCountryId) {
+    const nextCountry = getPhoneCountry(nextCountryId);
+    onCountryChange(nextCountryId);
+    onDigitsChange(digits.slice(0, nextCountry.nationalLength));
+    setOpen(false);
+  }
+
   return (
-    <div className="phone-input-wrap">
-      <span className="phone-country" aria-hidden="true">
-        <span className="phone-country-flag" />
-        <span className="phone-country-code">+7</span>
-      </span>
+    <div
+      className="phone-input-wrap"
+      onBlur={(event) => {
+        const nextTarget = event.relatedTarget as Node | null;
+        if (!nextTarget || !event.currentTarget.contains(nextTarget)) {
+          setOpen(false);
+        }
+      }}
+    >
+      <button
+        className="phone-country"
+        type="button"
+        aria-label={`Выбрать страну телефона. Сейчас ${country.name} ${country.dialCode}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <span className={`phone-country-flag ${country.flagClassName}`} aria-hidden="true" />
+        <span className="phone-country-code">{country.dialCode}</span>
+      </button>
+      {open ? (
+        <div className="phone-country-menu" role="listbox" aria-label="Страна телефона">
+          {PHONE_COUNTRIES.map((option) => (
+            <button
+              key={option.id}
+              className="phone-country-option"
+              type="button"
+              role="option"
+              aria-selected={option.id === country.id}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectCountry(option.id as PhoneCountryId)}
+            >
+              <span className={`phone-country-flag ${option.flagClassName}`} aria-hidden="true" />
+              <span className="phone-country-name">{option.name}</span>
+              <span className="phone-country-option-code">{option.dialCode}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <input
         className="input phone-input"
         type="tel"
         inputMode="numeric"
         autoComplete="tel-national"
-        placeholder="(999) 123-45-67"
+        placeholder={country.placeholder}
         value={displayValue}
         onChange={onChange}
         onBlur={(event) => setPhoneValidity(event.currentTarget, digits)}
         onInvalid={(event) => {
-          if (digits.length > 0 && digits.length < PHONE_MAX_DIGITS) {
+          if (digits.length > 0 && digits.length < country.nationalLength) {
             setPhoneValidity(event.currentTarget, digits);
           }
         }}
-        title="Введите номер в формате +7 (999) 123-45-67"
+        title={`Введите номер: ${country.dialCode} ${country.placeholder}`}
         required
       />
       <input type="hidden" name={name} value={fullValue} />
@@ -414,6 +566,30 @@ function PasswordInput({
       >
         <Icon size={18} strokeWidth={2.2} aria-hidden="true" />
       </button>
+    </div>
+  );
+}
+
+function PasswordStrengthMeter({ password }: { password: string }) {
+  const score = passwordStrength(password);
+  const tone = score === 3 ? "strong" : score >= 2 ? "medium" : "weak";
+  const label =
+    password.length === 0
+      ? "Введите пароль"
+      : score === 3
+        ? "Надёжный пароль"
+        : score >= 2
+          ? "Почти готово"
+          : "Слишком простой";
+
+  return (
+    <div className={`password-strength password-strength-${tone}`} aria-live="polite">
+      <div className="password-strength-track" aria-hidden="true">
+        <span className={score >= 1 ? "is-active" : ""} />
+        <span className={score >= 2 ? "is-active" : ""} />
+        <span className={score >= 3 ? "is-active" : ""} />
+      </div>
+      <span className="password-strength-label">{label}</span>
     </div>
   );
 }
@@ -519,12 +695,13 @@ export function RegisterForm() {
   }, []);
 
   const requiredDocs = useMemo(() => legalDocs.filter((d) => d.isRequired), [legalDocs]);
-  const optionalDocs = useMemo(() => legalDocs.filter((d) => !d.isRequired), [legalDocs]);
-  const requiredAccepted = requiredDocs.length > 0 && requiredDocs.every((d) => acceptedIds.has(d.id));
+  const requiredAccepted = requiredDocs.every((d) => acceptedIds.has(d.id));
+  const selectedPhoneCountry = getPhoneCountry(values.phoneCountryId);
+  const passwordReady = isPasswordStrong(values.password);
   // Кнопка submit заблокирована, пока документы не загружены или не отмечены
-  // все обязательные. Так пользователь не сможет «прокликать» регистрацию,
-  // а бэк имеет двойную защиту (см. auth.service.register).
-  const canSubmit = legalDocs.length > 0 && requiredAccepted;
+  // все обязательные, а пароль не дошёл до зелёной шкалы. Бэк сохраняет
+  // двойную защиту на те же документы и пароль.
+  const canSubmit = legalDocs.length > 0 && requiredAccepted && passwordReady;
   const currentStepNumber = step === "company" ? 1 : 2;
   const progressWidth = `${currentStepNumber * 50}%`;
 
@@ -561,17 +738,26 @@ export function RegisterForm() {
       return;
     }
 
+    if (!passwordReady) {
+      setError("Пароль должен стать зелёным: минимум 12 символов, буква и цифра.");
+      return;
+    }
+
+    if (!requiredAccepted) {
+      setError("Отметьте все обязательные согласия.");
+      return;
+    }
+
     setSubmitting(true);
     setError("");
     try {
       await register({
         organizationName: values.organizationName.trim(),
         companyType: values.companyType,
-        billingInn: values.billingInn,
         lastName: values.lastName.trim(),
         firstName: values.firstName.trim(),
         gender: values.gender,
-        phone: formatRussianPhoneFull(values.phoneDigits),
+        phone: formatPhoneFull(selectedPhoneCountry, values.phoneDigits),
         email: normalizeEmailValue(values.email),
         password: values.password,
         acceptedDocumentIds: Array.from(acceptedIds),
@@ -617,37 +803,21 @@ export function RegisterForm() {
                 onValueChange={(value) => setField("organizationName", value)}
               />
             </AuthField>
-            <div className="auth-grid-2">
-              <AuthField label="Тип компании">
-                <select
-                  className="select"
-                  name="companyType"
-                  value={values.companyType}
-                  onChange={(event) => setField("companyType", event.currentTarget.value)}
-                  required
-                >
-                  {companyTypeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </AuthField>
-              <AuthField label="ИНН" hint="10 цифр для компании или 12 для ИП.">
-                <input
-                  className="input"
-                  name="billingInn"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  pattern="\d{10}|\d{12}"
-                  title="Введите 10 или 12 цифр ИНН."
-                  maxLength={INN_MAX_DIGITS}
-                  value={values.billingInn}
-                  onChange={(event) => setField("billingInn", normalizeInnValue(event.currentTarget.value))}
-                  required
-                />
-              </AuthField>
-            </div>
+            <AuthField label="Тип компании">
+              <select
+                className="select"
+                name="companyType"
+                value={values.companyType}
+                onChange={(event) => setField("companyType", event.currentTarget.value)}
+                required
+              >
+                {companyTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </AuthField>
           </fieldset>
         ) : (
           <>
@@ -690,9 +860,11 @@ export function RegisterForm() {
                   </select>
                 </AuthField>
                 <AuthField label="Телефон">
-                  <RussianPhoneInput
+                  <PhoneInput
                     name="phone"
+                    countryId={values.phoneCountryId}
                     digits={values.phoneDigits}
+                    onCountryChange={(countryId) => setField("phoneCountryId", countryId)}
                     onDigitsChange={(digits) => setField("phoneDigits", digits)}
                   />
                 </AuthField>
@@ -710,10 +882,7 @@ export function RegisterForm() {
                     onValueChange={(value) => setField("email", value)}
                   />
                 </AuthField>
-                <AuthField
-                  label="Пароль"
-                  hint={`Не короче ${MIN_PASSWORD_LENGTH} символов, минимум одна буква и одна цифра.`}
-                >
+                <AuthField label="Пароль">
                   <PasswordInput
                     name="password"
                     autoComplete="new-password"
@@ -721,6 +890,7 @@ export function RegisterForm() {
                     value={values.password}
                     onValueChange={(value) => setField("password", value)}
                   />
+                  <PasswordStrengthMeter password={values.password} />
                 </AuthField>
               </div>
             </fieldset>
@@ -740,14 +910,6 @@ export function RegisterForm() {
                       checked={acceptedIds.has(doc.id)}
                       onChange={() => toggleAccepted(doc.id)}
                       required
-                    />
-                  ))}
-                  {optionalDocs.map((doc) => (
-                    <ConsentRow
-                      key={doc.id}
-                      document={doc}
-                      checked={acceptedIds.has(doc.id)}
-                      onChange={() => toggleAccepted(doc.id)}
                     />
                   ))}
                 </div>
@@ -801,8 +963,9 @@ function ConsentRow({
   const route = LEGAL_PUBLIC_ROUTES[document.type];
   return (
     <label className="consent-row">
-      <input type="checkbox" checked={checked} onChange={onChange} required={required} />
-      <span>
+      <input className="consent-input" type="checkbox" checked={checked} onChange={onChange} required={required} />
+      <span className="consent-box" aria-hidden="true" />
+      <span className="consent-copy">
         Я ознакомлен(а) и согласен(на) с{" "}
         {route ? (
           <Link href={route} target="_blank" rel="noopener noreferrer">

@@ -107,7 +107,6 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
   const res = await ctx.http.post("/api/auth/register").send({
     organizationName: `ООО Тест ${suffix}`,
     companyType: "collector",
-    billingInn: "7707083893",
     firstName: "Иван",
     lastName: "Тестов",
     gender: "male",
@@ -126,7 +125,7 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
   expect(me.body.company.organizationName).toBe(`ООО Тест ${suffix}`);
   expect(me.body.company.billingInn).toBeUndefined();
   const company = await ctx.prisma.company.findUniqueOrThrow({ where: { id: me.body.company.id } });
-  expect(company.billingInn).toBe("7707083893");
+  expect(company.billingInn).toBeNull();
   expect(me.body.requiresReConsent).toBe(false);
   return { token, companyId: me.body.company.id, userId: me.body.id };
 }
@@ -444,7 +443,7 @@ describe("Auth", () => {
       firstName: "Анна",
       lastName: "Тестова",
       gender: "female",
-      phone: "+71111111112",
+      phone: "+375291234567",
       email: "trader-female@test.local",
       password: "User12345678",
       acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
@@ -457,6 +456,8 @@ describe("Auth", () => {
     expect(me.body.company.type).toBe("trader");
     expect(me.body.company.organizationName).toBe("ООО Трейд Жен");
     expect(me.body.avatarUrl).toBe("/avatars/company/twoman.png");
+    const company = await ctx.prisma.company.findUniqueOrThrow({ where: { id: me.body.company.id } });
+    expect(company.billingInn).toBe("7707083893");
   });
 
   it("повторная регистрация с тем же email отбивается 409", async () => {
@@ -3082,7 +3083,6 @@ describe("Legal documents & consents", () => {
     const res = await ctx.http.post("/api/auth/register").send({
       organizationName: "ООО Без согласий",
       companyType: "collector",
-      billingInn: "7707083893",
       firstName: "Иван",
       lastName: "Тестов",
       gender: "male",

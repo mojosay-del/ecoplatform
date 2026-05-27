@@ -103,7 +103,7 @@ export class AuthService {
       data: {
         organizationName: input.organizationName,
         type: input.companyType,
-        billingInn: input.billingInn,
+        billingInn: input.billingInn ?? null,
         status: CompanyStatus.demo,
         demoEndsAt: new Date(Date.now() + demoHours * 60 * 60 * 1000),
       },

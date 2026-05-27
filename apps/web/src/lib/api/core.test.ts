@@ -52,6 +52,23 @@ describe("apiFetch", () => {
     await expect(apiFetch("/closed")).rejects.toMatchObject({ message: "Нет доступа", status: 403 });
   });
 
+  it("does not add JSON content type to GET requests without body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiFetch<{ ok: true }>("/legal/documents")).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:4000/api/legal/documents",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.not.objectContaining({
+          "Content-Type": "application/json",
+        }),
+      }),
+    );
+  });
+
   it("refreshes an expired access token and retries the original request", async () => {
     const fetchMock = vi
       .fn()

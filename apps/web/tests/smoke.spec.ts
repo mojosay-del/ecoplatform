@@ -4,7 +4,6 @@ const EMAIL_DOMAIN = process.env.SMOKE_TEST_EMAIL_DOMAIN ?? "example.com";
 
 type SmokeUser = {
   organizationName: string;
-  billingInn: string;
   firstName: string;
   lastName: string;
   phone: string;
@@ -33,13 +32,11 @@ async function registerSmokeUser(page: Page, user: SmokeUser) {
   const form = page.locator("form.auth-card");
   await form.locator("input[name='organizationName']").fill(user.organizationName);
   await form.locator("select[name='companyType']").selectOption("collector");
-  await form.locator("input[name='billingInn']").fill(user.billingInn);
   await page.getByRole("button", { name: "Далее" }).click();
   await expect(page.getByText("Шаг 2 из 2")).toBeVisible();
   await page.getByRole("button", { name: "Назад" }).click();
   await expect(page.getByText("Шаг 1 из 2")).toBeVisible();
   await expect(form.locator("input[name='organizationName']")).toHaveValue(user.organizationName);
-  await expect(form.locator("input[name='billingInn']")).toHaveValue(user.billingInn);
   await page.getByRole("button", { name: "Далее" }).click();
   await expect(page.getByText("Шаг 2 из 2")).toBeVisible();
   await form.locator("input[name='lastName']").fill(user.lastName);
@@ -49,11 +46,20 @@ async function registerSmokeUser(page: Page, user: SmokeUser) {
   await form.locator("input[name='email']").fill(user.email);
   await form.locator("input[name='password']").fill(user.password);
 
-  const requiredConsents = page.getByRole("group", { name: "Согласия" }).locator("input[type='checkbox'][required]");
-  await expectAtLeastOne(requiredConsents);
-  for (let index = 0; index < (await requiredConsents.count()); index += 1) {
-    await requiredConsents.nth(index).check();
+  const consentGroup = page.getByRole("group", { name: "Согласия" });
+  const requiredConsents = consentGroup.locator("input[type='checkbox'][required]");
+  const consentRows = consentGroup.locator("label.consent-row");
+  const consentBoxes = consentGroup.locator(".consent-box");
+  await expect.poll(async () => requiredConsents.count()).toBeGreaterThan(0);
+  const requiredConsentCount = await requiredConsents.count();
+  await expect(consentRows).toHaveCount(requiredConsentCount);
+  await expect(consentBoxes).toHaveCount(requiredConsentCount);
+  await expect(page.getByRole("button", { name: "Создать аккаунт" })).toBeDisabled();
+  for (let index = 0; index < requiredConsentCount; index += 1) {
+    await consentBoxes.nth(index).click();
+    await expect(requiredConsents.nth(index)).toBeChecked();
   }
+  await expect(page.getByRole("button", { name: "Создать аккаунт" })).toBeEnabled();
 
   await page.getByRole("button", { name: "Создать аккаунт" }).click();
   await expect(page).toHaveURL(/\/news(?:\?|$)/);
@@ -91,8 +97,10 @@ async function expectIndices(page: Page) {
 }
 
 async function logout(page: Page) {
-  await page.goto("/account");
-  await page.getByRole("button", { name: /^Выйти$/ }).click();
+  const accountMenuButton = page.locator("button[aria-label^='Открыть меню аккаунта:']");
+  await expect(accountMenuButton).toBeVisible();
+  await accountMenuButton.click();
+  await page.getByRole("menuitem", { name: "Выйти" }).click();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await expect(page.getByRole("heading", { name: "Войти в аккаунт" })).toBeVisible();
 }
@@ -115,7 +123,6 @@ function createSmokeUser(): SmokeUser {
 
   return {
     organizationName: `Smoke Test ${runId}`,
-    billingInn: "7707083893",
     firstName: "Smoke",
     lastName: "Tester",
     phone: `9${phoneSuffix}`,

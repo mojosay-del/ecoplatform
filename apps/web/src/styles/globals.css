@@ -2614,33 +2614,6 @@ body.news-modal-open .app-shell {
   }
 }
 
-.auth-visual-bullets {
-  position: relative;
-  z-index: 1;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-self: end;
-  justify-self: start;
-  color: var(--white);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.auth-visual-bullets li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.auth-visual-bullets svg {
-  flex-shrink: 0;
-  opacity: 0.95;
-}
-
 .auth-visual-foot {
   height: 1px; /* зарезервированный slot, чтобы grid 3-rows был стабилен */
 }
@@ -2869,17 +2842,34 @@ body.news-modal-open .app-shell {
 
 .phone-country {
   position: absolute;
-  left: 13px;
+  left: 8px;
   top: 50%;
   transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  height: 30px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: var(--text);
   font-size: 14px;
   font-weight: 700;
-  pointer-events: none;
+  cursor: pointer;
   z-index: 1;
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.phone-country:hover {
+  background: var(--panel-soft);
+}
+
+.phone-country:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .phone-country-flag {
@@ -2887,21 +2877,118 @@ body.news-modal-open .app-shell {
   height: 15px;
   border-radius: 3px;
   border: 1px solid rgb(var(--text-rgb) / 0.16);
+  background: var(--white);
+  box-shadow: 0 1px 2px rgb(var(--text-rgb) / 0.12);
+}
+
+.phone-flag-ru {
   background: linear-gradient(
     to bottom,
     var(--white) 0 33.333%,
     var(--flag-ru-blue) 33.333% 66.666%,
     var(--flag-ru-red) 66.666% 100%
   );
-  box-shadow: 0 1px 2px rgb(var(--text-rgb) / 0.12);
+}
+
+.phone-flag-by {
+  background:
+    linear-gradient(to right, #ffffff 0 18%, transparent 18%),
+    linear-gradient(to bottom, #c8313e 0 68%, #2b8f3f 68% 100%);
+}
+
+.phone-flag-kz {
+  background: radial-gradient(circle at 50% 50%, #f6c344 0 20%, transparent 21%), #1aa3c8;
+}
+
+.phone-flag-am {
+  background: linear-gradient(to bottom, #d90012 0 33.333%, #0033a0 33.333% 66.666%, #f2a800 66.666% 100%);
+}
+
+.phone-flag-kg {
+  background: radial-gradient(circle at 50% 50%, #ffd34d 0 20%, transparent 21%), #e8112d;
+}
+
+.phone-flag-uz {
+  background: linear-gradient(
+    to bottom,
+    #1eb4e8 0 30%,
+    #ce1126 30% 35%,
+    var(--white) 35% 62%,
+    #ce1126 62% 67%,
+    #009b3a 67% 100%
+  );
+}
+
+.phone-flag-tj {
+  background: linear-gradient(to bottom, #cc0000 0 33.333%, var(--white) 33.333% 66.666%, #00843d 66.666% 100%);
+}
+
+.phone-flag-az {
+  background: linear-gradient(to bottom, #00b5e2 0 33.333%, #ef3340 33.333% 66.666%, #509e2f 66.666% 100%);
+}
+
+.phone-flag-md {
+  background: linear-gradient(to right, #0032a0 0 33.333%, #ffd100 33.333% 66.666%, #c8102e 66.666% 100%);
+}
+
+.phone-flag-tm {
+  background: linear-gradient(to right, #b31b1b 0 20%, #00843d 20% 100%);
 }
 
 .phone-country-code {
   line-height: 1;
 }
 
+.phone-country-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  max-height: 238px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-auth);
+  box-shadow: var(--shadow-lg);
+}
+
+.phone-country-option {
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.phone-country-option:hover,
+.phone-country-option[aria-selected="true"] {
+  background: var(--panel-soft);
+}
+
+.phone-country-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone-country-option-code {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .phone-input {
-  padding-left: 84px;
+  padding-left: 100px;
 }
 
 .password-input-wrap {
@@ -2940,6 +3027,51 @@ body.news-modal-open .app-shell {
   outline: none;
   box-shadow: 0 0 0 3px var(--primary-soft);
   color: var(--primary);
+}
+
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.password-strength-track {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.password-strength-track span {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--button-secondary-bg);
+}
+
+.password-strength-label {
+  min-width: 88px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.password-strength-weak .password-strength-track .is-active {
+  background: var(--danger);
+}
+
+.password-strength-medium .password-strength-track .is-active {
+  background: var(--warning);
+}
+
+.password-strength-strong .password-strength-track .is-active {
+  background: var(--success);
+}
+
+.password-strength-strong .password-strength-label {
+  color: var(--success-text);
 }
 
 /* Парные поля в строку, на мобильном схлопываются в столбец. */
@@ -3125,10 +3257,6 @@ body.news-modal-open .app-shell {
   /* На мобильном grain отвлекает на маленькой плоскости — выключаем. */
   .auth-visual::after {
     display: none;
-  }
-
-  .auth-visual-bullets {
-    display: none; /* на мобильном экономим высоту, преимущества скрыты */
   }
 
   .auth-form-panel {
@@ -9046,24 +9174,77 @@ li.tree-add-row + li.tree-add-row,
 .consent-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .consent-row {
-  display: flex;
-  gap: 10px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
   align-items: flex-start;
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text);
-  line-height: 1.5;
+  line-height: 1.35;
+  cursor: pointer;
 }
 
-.consent-row input[type="checkbox"] {
-  flex-shrink: 0;
-  margin-top: 2px;
+.consent-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.consent-box {
   width: 18px;
   height: 18px;
-  cursor: pointer;
+  margin-top: 1px;
+  border-radius: 5px;
+  border: 1.5px solid var(--line-strong);
+  background: rgb(var(--white-rgb) / 0.82);
+  position: relative;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.consent-box::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--white);
+  border-width: 0 2px 2px 0;
+  opacity: 0;
+  transform: rotate(45deg) scale(0.65);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.consent-input:checked + .consent-box {
+  border-color: var(--primary);
+  background: var(--primary);
+  box-shadow: 0 6px 14px rgb(var(--brand-rgb) / 0.24);
+}
+
+.consent-input:checked + .consent-box::after {
+  opacity: 1;
+  transform: rotate(45deg) scale(1);
+}
+
+.consent-input:focus-visible + .consent-box {
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+}
+
+.consent-copy {
+  min-width: 0;
 }
 
 .consent-row a {
