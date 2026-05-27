@@ -10,6 +10,7 @@ import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
 
 type Article = {
   id: string;
@@ -560,7 +561,11 @@ function KnowledgeNode({
           <span className="tree-row-icon">
             <Icon size={16} />
           </span>
-          <span className={`tree-row-dot${node.status === "published" ? " is-published" : ""}`} aria-hidden />
+          <span
+            className={`tree-row-dot${node.status === "published" ? " is-published" : ""}`}
+            title={CONTENT_STATUS_LABELS[node.status]}
+            aria-hidden
+          />
           <span className="tree-row-title">{node.title}</span>
           {node.subtitle ? <span className="tree-row-meta">{node.subtitle}</span> : null}
         </button>

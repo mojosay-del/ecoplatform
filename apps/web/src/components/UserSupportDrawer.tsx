@@ -2,9 +2,11 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { ChevronLeft, MessageSquare, Plus, X } from "lucide-react";
+import { supportTicketCategories } from "@ecoplatform/shared";
 import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { api, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../lib/display-labels";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 // Drawer (правая выезжающая панель), открываемый по иконке «?» в шапке.
@@ -27,23 +29,6 @@ type Ticket = {
   createdAt: string;
   updatedAt: string;
   messages?: Message[];
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  billing: "Биллинг",
-  moderation_review: "Модерация",
-  company_management: "Компания",
-  technical: "Технический вопрос",
-  data_deletion: "Удаление данных",
-  other: "Другое",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  open: "Открыт",
-  in_progress: "В работе",
-  awaiting_user: "Ждёт ответа",
-  resolved: "Решён",
-  closed: "Закрыт",
 };
 
 type DrawerProps = {
@@ -200,11 +185,11 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                         <div className="support-drawer-ticket-head">
                           <strong>{ticket.subject}</strong>
                           <StatusPill variant={supportStatusPillVariant(ticket.status)}>
-                            {STATUS_LABELS[ticket.status] ?? ticket.status}
+                            {SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}
                           </StatusPill>
                         </div>
                         <span className="support-drawer-ticket-meta">
-                          {CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
+                          {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
                           {new Date(ticket.updatedAt).toLocaleString("ru-RU")}
                         </span>
                       </button>
@@ -222,9 +207,9 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                 <label className="form-field">
                   <span>Категория</span>
                   <select className="select" name="category" defaultValue="technical">
-                    {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
+                    {supportTicketCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {SUPPORT_CATEGORY_LABELS[category] ?? category}
                       </option>
                     ))}
                   </select>
@@ -288,9 +273,9 @@ function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => 
       <header className="support-drawer-thread-head">
         <strong>{ticket.subject}</strong>
         <span className="page-subtitle">
-          {CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
+          {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
           <StatusPill variant={supportStatusPillVariant(ticket.status)}>
-            {STATUS_LABELS[ticket.status] ?? ticket.status}
+            {SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}
           </StatusPill>
         </span>
       </header>

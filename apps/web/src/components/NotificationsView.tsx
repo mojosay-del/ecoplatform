@@ -8,6 +8,7 @@ import { StatusPill } from "./StatusPill";
 import { api, apiFetch } from "../lib/api";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
+import { NOTIFICATION_CATEGORY_LABELS } from "../lib/display-labels";
 
 type Notification = {
   id: string;
@@ -24,15 +25,6 @@ type Notification = {
 type NotificationPreferences = {
   inAppMutedCategories: string[];
   emailMutedCategories: string[];
-};
-
-const categoryLabels: Record<string, string> = {
-  security: "Безопасность",
-  billing: "Биллинг",
-  marketplace: "Площадка",
-  moderation: "Модерация",
-  support: "Поддержка",
-  system: "Система",
 };
 
 const categoryIcons: Record<string, LucideIcon> = {
@@ -216,7 +208,7 @@ export function NotificationsView() {
                       <div className="notification-head">
                         <StatusPill>
                           <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                          {categoryLabels[item.category] ?? item.category}
+                          {NOTIFICATION_CATEGORY_LABELS[item.category] ?? item.category}
                         </StatusPill>
                         <time>{new Date(item.createdAt).toLocaleString("ru-RU")}</time>
                       </div>
@@ -260,7 +252,7 @@ export function NotificationsView() {
                     <div className="preference-row" key={category}>
                       <span>
                         <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                        {categoryLabels[category]}
+                        {NOTIFICATION_CATEGORY_LABELS[category] ?? category}
                       </span>
                       <label style={{ marginRight: 12 }}>
                         <input
@@ -289,7 +281,7 @@ export function NotificationsView() {
                     <div className="preference-row locked" key={category}>
                       <span>
                         <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                        {categoryLabels[category]}
+                        {NOTIFICATION_CATEGORY_LABELS[category] ?? category}
                       </span>
                       <StatusPill variant="success">Всегда включено</StatusPill>
                     </div>

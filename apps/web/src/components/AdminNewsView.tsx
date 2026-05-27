@@ -11,6 +11,7 @@ import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
@@ -327,6 +328,7 @@ export function AdminNewsView() {
                         <div className="news-row-line">
                           <span
                             className={`news-row-dot${item.status === "published" ? " is-published" : ""}`}
+                            title={CONTENT_STATUS_LABELS[item.status]}
                             aria-hidden
                           />
                           <strong className="news-row-title">{item.title}</strong>

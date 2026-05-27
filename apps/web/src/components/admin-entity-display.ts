@@ -1,4 +1,5 @@
 import type { AdminJournalEntry } from "@ecoplatform/shared";
+import { formatAuditValue } from "../lib/display-labels";
 
 type PersonSummary = {
   firstName?: string | null;
@@ -97,9 +98,18 @@ export function getJournalEntityDisplay(entry: Pick<AdminJournalEntry, "entityTy
   return {
     typeLabel,
     title: entry.entity?.title ?? typeLabel,
-    subtitle: entry.entity?.subtitle ?? null,
+    subtitle: formatJournalEntitySubtitle(entry.entity?.subtitle),
     technicalId: entry.entityId,
   };
+}
+
+function formatJournalEntitySubtitle(value?: string | null) {
+  if (!value) return null;
+
+  return value.replace(
+    /Доступ: ([a-z_]+)/g,
+    (_match, accessLevel: string) => `Доступ: ${formatAuditValue("accessLevel", accessLevel)}`,
+  );
 }
 
 function formatDateTime(value?: string | Date | null) {

@@ -1,11 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState, type SetStateAction } from "react";
+import { subscriptionPlans } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { COMPANY_STATUS_LABELS, SUBSCRIPTION_PLAN_LABELS, SUBSCRIPTION_STATUS_LABELS } from "../lib/display-labels";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type CompanyItem = {
@@ -26,33 +28,6 @@ type CompanyItem = {
 };
 
 type ViewState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
-
-const plans = [
-  { value: "basic", label: "Базовый" },
-  { value: "extended", label: "Расширенный" },
-] as const;
-
-const COMPANY_STATUS_LABELS: Record<string, string> = {
-  demo: "Демо",
-  active: "Активна",
-  past_due: "Просрочена",
-  suspended: "Приостановлена",
-  pending_deletion: "Удаление запланировано",
-  blocked: "Заблокирована",
-  archived: "В архиве",
-};
-
-const SUBSCRIPTION_PLAN_LABELS: Record<string, string> = {
-  basic: "Базовый",
-  extended: "Расширенный",
-};
-
-const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
-  active: "Активна",
-  past_due: "Просрочена",
-  cancelled: "Отменена",
-  expired: "Истекла",
-};
 
 export function AdminBillingView() {
   const { token } = useAuth();
@@ -203,9 +178,9 @@ export function AdminBillingView() {
                 updateForm((prev) => ({ ...prev, plan: event.target.value as "basic" | "extended" }))
               }
             >
-              {plans.map((plan) => (
-                <option key={plan.value} value={plan.value}>
-                  {plan.label}
+              {subscriptionPlans.map((plan) => (
+                <option key={plan} value={plan}>
+                  {SUBSCRIPTION_PLAN_LABELS[plan]}
                 </option>
               ))}
             </select>

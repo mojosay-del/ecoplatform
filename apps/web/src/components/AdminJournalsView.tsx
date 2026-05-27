@@ -11,6 +11,7 @@ import { getJournalEntityDisplay } from "./admin-entity-display";
 import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { formatAuditFieldLabel, formatAuditValue } from "../lib/display-labels";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type JournalList = PaginatedResponse<AdminJournalEntry>;
@@ -295,13 +296,13 @@ function PayloadView({ payload }: { payload: AdminJournalPayload | null }) {
         <dl className="audit-diff">
           {Object.entries(diff!).map(([key, change]) => (
             <div className="audit-diff-row" key={key}>
-              <dt className="audit-diff-key">{key}</dt>
+              <dt className="audit-diff-key">{formatAuditFieldLabel(key)}</dt>
               <dd className="audit-diff-values">
-                <span className="audit-diff-before">{renderValue(change.before)}</span>
+                <span className="audit-diff-before">{renderValue(change.before, key)}</span>
                 <span className="audit-diff-arrow" aria-hidden="true">
                   →
                 </span>
-                <span className="audit-diff-after">{renderValue(change.after)}</span>
+                <span className="audit-diff-after">{renderValue(change.after, key)}</span>
               </dd>
             </div>
           ))}
@@ -312,15 +313,34 @@ function PayloadView({ payload }: { payload: AdminJournalPayload | null }) {
         <p className="page-subtitle">Изменений в полях не зафиксировано.</p>
       ) : null}
 
-      {hasExtra ? <pre className="audit-payload-extra">{JSON.stringify(extra, null, 2)}</pre> : null}
+      {hasExtra ? (
+        <pre className="audit-payload-extra">{JSON.stringify(formatExtraPayload(extra), null, 2)}</pre>
+      ) : null}
     </div>
   );
 }
 
-function renderValue(value: unknown): string {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "string") return value || '""';
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (Array.isArray(value)) return value.length ? value.map(renderValue).join(", ") : "[]";
-  return JSON.stringify(value);
+function renderValue(value: unknown, key: string): string {
+  return formatAuditValue(key, value);
+}
+
+function formatExtraPayload(value: unknown, key = ""): unknown {
+  if (value === null || value === undefined) return value;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => formatExtraPayload(item, key));
+  }
+
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([childKey, childValue]) => [childKey, formatExtraPayload(childValue, childKey)]),
+    );
+  }
+
+  if (typeof value === "string") {
+    const formatted = formatAuditValue(key, value);
+    return formatted === '""' ? "" : formatted;
+  }
+
+  return value;
 }

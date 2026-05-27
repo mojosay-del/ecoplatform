@@ -2,13 +2,20 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { RotateCcw, Search } from "lucide-react";
-import type { PaginatedResponse } from "@ecoplatform/shared";
+import { platformRoles, type PaginatedResponse } from "@ecoplatform/shared";
 import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { StatusPill, companyStatusPillVariant, userStatusPillVariant } from "./StatusPill";
 import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
+import {
+  COMPANY_STATUS_LABELS,
+  MODERATION_REASON_LABELS,
+  PLATFORM_ROLE_SHORT_LABELS,
+  USER_STATUS_LABELS,
+  formatPlatformRoles,
+} from "../lib/display-labels";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
 
@@ -46,43 +53,16 @@ type AdminUserDetail = AdminUserListItem & {
   }>;
 };
 
-const blockReasonLabels: ReadonlyArray<readonly [string, string]> = [
-  ["policy_violation", "Нарушение правил"],
-  ["fraud", "Мошенничество"],
-  ["suspicious_activity", "Подозрительная активность"],
-  ["support_request", "По запросу поддержки"],
-  ["other", "Иное"],
-];
+const blockReasonCodes = ["policy_violation", "fraud", "suspicious_activity", "support_request", "other"] as const;
 
-const allRoles = ["admin", "moderator", "content_manager"] as const;
+const allRoles = platformRoles;
 type PlatformRole = (typeof allRoles)[number];
-
-const statusLabel: Record<AdminUserListItem["status"], string> = {
-  active: "Активен",
-  blocked: "Заблокирован",
-};
-
-const companyStatusLabel: Record<string, string> = {
-  demo: "Демо",
-  active: "Активна",
-  past_due: "Просрочена",
-  suspended: "Приостановлена",
-  pending_deletion: "Удаление запланировано",
-  blocked: "Заблокирована",
-  archived: "В архиве",
-};
-
-const roleLabel: Record<string, string> = {
-  admin: "Админ",
-  moderator: "Модератор",
-  content_manager: "Контент-менеджер",
-};
 
 const userSortSelectors: Record<UserSortKey, (item: AdminUserListItem) => string | number> = {
   name: (item) => `${item.lastName} ${item.firstName}`,
-  status: (item) => statusLabel[item.status],
+  status: (item) => USER_STATUS_LABELS[item.status] ?? item.status,
   company: (item) => item.company?.organizationName ?? "",
-  role: (item) => formatRoles(item.platformStaff?.roles ?? []),
+  role: (item) => formatPlatformRoles(item.platformStaff?.roles ?? []),
   phone: (item) => item.phone,
   createdAt: (item) => Date.parse(item.createdAt),
 };
@@ -272,7 +252,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
           <option value="">Все роли</option>
           {allRoles.map((role) => (
             <option key={role} value={role}>
-              {roleLabel[role]}
+              {PLATFORM_ROLE_SHORT_LABELS[role]}
             </option>
           ))}
         </select>
@@ -344,10 +324,12 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                         </div>
                       </td>
                       <td>
-                        <StatusPill variant={userStatusPillVariant(item.status)}>{statusLabel[item.status]}</StatusPill>
+                        <StatusPill variant={userStatusPillVariant(item.status)}>
+                          {USER_STATUS_LABELS[item.status]}
+                        </StatusPill>
                       </td>
                       <td>{item.company?.organizationName ?? "Без компании"}</td>
-                      <td>{formatRoles(item.platformStaff?.isActive ? item.platformStaff.roles : [])}</td>
+                      <td>{formatPlatformRoles(item.platformStaff?.isActive ? item.platformStaff.roles : [])}</td>
                       <td>{item.phone}</td>
                       <td>{new Date(item.createdAt).toLocaleDateString("ru-RU")}</td>
                     </tr>
@@ -382,7 +364,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                 <div className="list-row">
                   <div>
                     <StatusPill as="p" variant={userStatusPillVariant(selected.status)}>
-                      {statusLabel[selected.status]}
+                      {USER_STATUS_LABELS[selected.status]}
                     </StatusPill>
                     <h2>
                       {selected.firstName} {selected.lastName}
@@ -406,7 +388,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                     <p>
                       {selected.company.organizationName} ·{" "}
                       <StatusPill variant={companyStatusPillVariant(selected.company.status)}>
-                        {companyStatusLabel[selected.company.status] ?? selected.company.status}
+                        {COMPANY_STATUS_LABELS[selected.company.status] ?? selected.company.status}
                       </StatusPill>
                     </p>
                   ) : (
@@ -428,7 +410,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                           }}
                           type="checkbox"
                         />
-                        {role}
+                        {PLATFORM_ROLE_SHORT_LABELS[role]}
                       </label>
                     ))}
                   </div>
@@ -447,7 +429,8 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                         <article className="checklist-block" key={restriction.id}>
                           <strong>{restriction.moduleCode}</strong>
                           <p>
-                            До {new Date(restriction.expiresAt).toLocaleString("ru-RU")} · {restriction.reasonCode}
+                            До {new Date(restriction.expiresAt).toLocaleString("ru-RU")} ·{" "}
+                            {MODERATION_REASON_LABELS[restriction.reasonCode] ?? restriction.reasonCode}
                           </p>
                         </article>
                       ))}
@@ -482,9 +465,9 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                       onChange={(event) => setBlockReason(event.target.value)}
                       value={blockReason}
                     >
-                      {blockReasonLabels.map(([value, label]) => (
+                      {blockReasonCodes.map((value) => (
                         <option key={value} value={value}>
-                          {label}
+                          {MODERATION_REASON_LABELS[value] ?? value}
                         </option>
                       ))}
                     </select>
@@ -514,9 +497,4 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       <section className="page">{content}</section>
     </AppShell>
   );
-}
-
-function formatRoles(roles: readonly string[]) {
-  if (roles.length === 0) return "—";
-  return roles.map((role) => roleLabel[role] ?? role).join(", ");
 }

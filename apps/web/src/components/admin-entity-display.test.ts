@@ -48,4 +48,19 @@ describe("admin entity display helpers", () => {
       technicalId: "cllesson123",
     });
   });
+
+  it("localizes enum values inside journal entity subtitles", () => {
+    const display = getJournalEntityDisplay({
+      entityType: "LearningModule",
+      entityId: "clmodule123",
+      entity: {
+        type: "LearningModule",
+        typeLabel: "Курс",
+        title: "Закупка сырья",
+        subtitle: "Доступ: basic",
+      },
+    });
+
+    expect(display.subtitle).toBe("Доступ: Базовый доступ");
+  });
 });

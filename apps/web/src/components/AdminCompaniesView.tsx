@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { RotateCcw, Search } from "lucide-react";
-import type { PaginatedResponse } from "@ecoplatform/shared";
+import { companyStatuses, subscriptionPlans, type PaginatedResponse } from "@ecoplatform/shared";
 import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
@@ -16,6 +16,15 @@ import {
 import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import {
+  COMPANY_STATUS_LABELS,
+  MODERATION_REASON_LABELS,
+  SUBSCRIPTION_PLAN_LABELS,
+  SUBSCRIPTION_STATUS_LABELS,
+  SUPPORT_CATEGORY_LABELS,
+  SUPPORT_STATUS_LABELS,
+  USER_STATUS_LABELS,
+} from "../lib/display-labels";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type AdminCompanyListItem = {
@@ -66,54 +75,14 @@ type AdminCompanyDetail = {
   }>;
 };
 
-const companyStatuses = ["demo", "active", "past_due", "suspended", "pending_deletion", "blocked", "archived"] as const;
-const subscriptionPlans = ["basic", "extended"] as const;
-const COMPANY_STATUS_LABELS: Record<string, string> = {
-  demo: "Демо",
-  active: "Активна",
-  past_due: "Просрочена",
-  suspended: "Приостановлена",
-  pending_deletion: "Удаление запланировано",
-  blocked: "Заблокирована",
-  archived: "В архиве",
-};
-const SUBSCRIPTION_PLAN_LABELS: Record<string, string> = {
-  basic: "Базовый",
-  extended: "Расширенный",
-};
-const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
-  active: "Активна",
-  past_due: "Просрочена",
-  cancelled: "Отменена",
-  expired: "Истекла",
-};
-const USER_STATUS_LABELS: Record<string, string> = {
-  active: "Активен",
-  blocked: "Заблокирован",
-};
-const SUPPORT_STATUS_LABELS: Record<string, string> = {
-  open: "Открыт",
-  in_progress: "В работе",
-  awaiting_user: "Ждёт ответа",
-  resolved: "Решён",
-  closed: "Закрыт",
-};
-const SUPPORT_CATEGORY_LABELS: Record<string, string> = {
-  billing: "Биллинг",
-  moderation_review: "Модерация",
-  company_management: "Компания",
-  technical: "Технический вопрос",
-  data_deletion: "Удаление данных",
-  other: "Другое",
-};
-const statusReasons: ReadonlyArray<readonly [string, string]> = [
-  ["policy_violation", "Нарушение правил"],
-  ["billing_issue", "Биллинг"],
-  ["support_request", "По запросу поддержки"],
-  ["manual_activation", "Ручная активация"],
-  ["manual_archive", "Архивирование"],
-  ["other", "Иное"],
-];
+const statusReasons = [
+  "policy_violation",
+  "billing_issue",
+  "support_request",
+  "manual_activation",
+  "manual_archive",
+  "other",
+] as const;
 
 const companySortSelectors: Record<CompanySortKey, (item: AdminCompanyListItem) => string | number> = {
   name: (item) => item.organizationName,
@@ -383,7 +352,9 @@ export function AdminCompaniesView() {
                       </StatusPill>
                       <h2>{selected.organizationName}</h2>
                       <p className="page-subtitle">
-                        {selected.subscriptionPlan ?? "Без активного тарифа"}
+                        {selected.subscriptionPlan
+                          ? (SUBSCRIPTION_PLAN_LABELS[selected.subscriptionPlan] ?? selected.subscriptionPlan)
+                          : "Без активного тарифа"}
                         {selected.subscriptionEndsAt
                           ? ` · до ${new Date(selected.subscriptionEndsAt).toLocaleDateString("ru-RU")}`
                           : ""}
@@ -474,9 +445,9 @@ export function AdminCompaniesView() {
                       onChange={(event) => setStatusReason(event.target.value)}
                       value={statusReason}
                     >
-                      {statusReasons.map(([value, label]) => (
+                      {statusReasons.map((value) => (
                         <option key={value} value={value}>
-                          {label}
+                          {MODERATION_REASON_LABELS[value] ?? value}
                         </option>
                       ))}
                     </select>

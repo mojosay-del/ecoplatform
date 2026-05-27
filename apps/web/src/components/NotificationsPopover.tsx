@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { CheckCheck } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { NOTIFICATION_CATEGORY_LABELS } from "../lib/display-labels";
 
 // Popover, который открывается по колокольчику в шапке. Цель — дать
 // быстрый просмотр последних уведомлений и одну кнопку «прочитать все»,
@@ -18,15 +19,6 @@ type Notification = {
   link: string | null;
   readAt: string | null;
   createdAt: string;
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  security: "Безопасность",
-  billing: "Биллинг",
-  marketplace: "Площадка",
-  moderation: "Модерация",
-  support: "Поддержка",
-  system: "Система",
 };
 
 const POPOVER_LIMIT = 10;
@@ -135,7 +127,9 @@ export function NotificationsPopover({ open, onClose, items, loading, onChanged 
               >
                 <div className="notif-popover-item-head">
                   <strong className="notif-popover-item-title">{item.title}</strong>
-                  <span className="notif-popover-item-cat">{CATEGORY_LABELS[item.category] ?? item.category}</span>
+                  <span className="notif-popover-item-cat">
+                    {NOTIFICATION_CATEGORY_LABELS[item.category] ?? item.category}
+                  </span>
                 </div>
                 <p className="notif-popover-item-body">{item.body}</p>
                 <span className="notif-popover-item-time">{formatRelative(item.createdAt)}</span>

@@ -8,31 +8,22 @@ import { StatusPill, moderationStatusPillVariant } from "./StatusPill";
 import { formatModerationCaseTitle, formatModerationEntityPreview } from "./admin-entity-display";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import {
+  MODERATION_CASE_STATUS_LABELS,
+  MODERATION_DECISION_LABELS,
+  MODERATION_REASON_LABELS,
+} from "../lib/display-labels";
 
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
-const caseStatusLabels: Record<string, string> = {
-  open: "Открыт",
-  in_review: "В работе",
-  resolved: "Решён",
-  escalated: "Эскалирован",
-  closed_by_admin: "Закрыт админом",
-};
-
-const decisionLabels = [
-  ["leave_as_is", "Оставить без изменений"],
-  ["remove_content", "Снять комментарий"],
-  ["warn_company", "Предупредить компанию"],
-  ["escalate_to_admin", "Эскалировать администратору"],
-] as const;
-
-const reasonLabels = [
-  ["valid_complaint", "Жалоба обоснована"],
-  ["repeated_violation", "Повторное нарушение"],
-  ["unfounded_complaint", "Жалоба необоснована"],
-  ["out_of_scope", "Вне компетенции модератора"],
-  ["severe_violation", "Серьёзное нарушение"],
-  ["other", "Иное"],
+const decisionCodes = ["leave_as_is", "remove_content", "warn_company", "escalate_to_admin"] as const;
+const reasonCodes = [
+  "valid_complaint",
+  "repeated_violation",
+  "unfounded_complaint",
+  "out_of_scope",
+  "severe_violation",
+  "other",
 ] as const;
 
 export function AdminModerationView() {
@@ -155,7 +146,7 @@ export function AdminModerationView() {
                   type="button"
                 >
                   <StatusPill variant={moderationStatusPillVariant(item.status)}>
-                    {caseStatusLabels[item.status] ?? item.status}
+                    {MODERATION_CASE_STATUS_LABELS[item.status] ?? item.status}
                   </StatusPill>
                   <strong>{formatModerationCaseTitle(item)}</strong>
                   <span>{formatModerationEntityPreview(item)}</span>
@@ -171,7 +162,7 @@ export function AdminModerationView() {
                   <div className="list-row moderation-detail-heading">
                     <div>
                       <StatusPill as="p" variant={moderationStatusPillVariant(selectedCase.status)}>
-                        {caseStatusLabels[selectedCase.status] ?? selectedCase.status}
+                        {MODERATION_CASE_STATUS_LABELS[selectedCase.status] ?? selectedCase.status}
                       </StatusPill>
                       <h2>{formatModerationCaseTitle(selectedCase)}</h2>
                       <p className="admin-table-muted">{formatModerationEntityPreview(selectedCase)}</p>
@@ -212,7 +203,7 @@ export function AdminModerationView() {
                     <div className="stack-list">
                       {selectedCase.complaints.map((complaint: any) => (
                         <article className="checklist-block" key={complaint.id}>
-                          <strong>{complaint.reasonCode}</strong>
+                          <strong>{MODERATION_REASON_LABELS[complaint.reasonCode] ?? complaint.reasonCode}</strong>
                           <p>{complaint.comment || "Без комментария"}</p>
                           <small>
                             {complaint.author?.firstName} {complaint.author?.lastName}
@@ -227,8 +218,8 @@ export function AdminModerationView() {
                       {selectedCase.decisions.length === 0 ? <p className="page-subtitle">Решений пока нет.</p> : null}
                       {selectedCase.decisions.map((decision: any) => (
                         <article className="checklist-block" key={decision.id}>
-                          <strong>{decision.type}</strong>
-                          <p>{decision.reasonCode}</p>
+                          <strong>{MODERATION_DECISION_LABELS[decision.type] ?? decision.type}</strong>
+                          <p>{MODERATION_REASON_LABELS[decision.reasonCode] ?? decision.reasonCode}</p>
                           <small>
                             {decision.actor?.firstName} {decision.actor?.lastName}
                           </small>
@@ -243,9 +234,9 @@ export function AdminModerationView() {
                         onChange={(event) => setDecisionType(event.target.value)}
                         value={decisionType}
                       >
-                        {decisionLabels.map(([value, label]) => (
+                        {decisionCodes.map((value) => (
                           <option key={value} value={value}>
-                            {label}
+                            {MODERATION_DECISION_LABELS[value] ?? value}
                           </option>
                         ))}
                       </select>
@@ -254,9 +245,9 @@ export function AdminModerationView() {
                         onChange={(event) => setReasonCode(event.target.value)}
                         value={reasonCode}
                       >
-                        {reasonLabels.map(([value, label]) => (
+                        {reasonCodes.map((value) => (
                           <option key={value} value={value}>
-                            {label}
+                            {MODERATION_REASON_LABELS[value] ?? value}
                           </option>
                         ))}
                       </select>

@@ -8,6 +8,7 @@ import { CmsTabs } from "./CmsTabs";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
 
 type Category = {
   id: string;
@@ -251,7 +252,7 @@ export function AdminIndicesView() {
                                   {hasIndex ? (
                                     <span
                                       className={`tree-row-dot${isPublished ? " is-published" : ""}`}
-                                      title={isPublished ? "Опубликован" : "Черновик"}
+                                      title={CONTENT_STATUS_LABELS[nomenclature.priceIndex!.status]}
                                       aria-hidden
                                     />
                                   ) : (
@@ -721,7 +722,7 @@ function PriceIndexCard({
             <div className="indices-summary-grid">
               <div>
                 <span>Статус</span>
-                <strong>{priceIndex.status === "published" ? "Опубликован" : "Черновик"}</strong>
+                <strong>{CONTENT_STATUS_LABELS[priceIndex.status]}</strong>
               </div>
               <div>
                 <span>Значений</span>

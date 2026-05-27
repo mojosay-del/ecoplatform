@@ -40,34 +40,17 @@ import {
 } from "../components/StatusPill";
 import { api, clearAccessToken } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import {
+  COMPANY_STATUS_LABELS,
+  COMPANY_TYPE_LABELS,
+  PLATFORM_ROLE_LABELS,
+  SUBSCRIPTION_PLAN_TITLE_LABELS,
+  SUBSCRIPTION_STATUS_LABELS,
+  SUPPORT_CATEGORY_LABELS,
+  SUPPORT_STATUS_LABELS,
+  USER_GENDER_LABELS,
+} from "../lib/display-labels";
 import { AuthRequired, ErrorState, useApiQuery, resolveUpgradeCta } from "./_shared";
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Администратор",
-  moderator: "Модератор",
-  content_manager: "Контент-менеджер",
-};
-
-const COMPANY_STATUS_LABELS: Record<string, string> = {
-  demo: "Демо",
-  active: "Активна",
-  past_due: "Подписка просрочена",
-  suspended: "Приостановлена",
-  pending_deletion: "Удаление запланировано",
-  blocked: "Заблокирована",
-  archived: "В архиве",
-};
-
-const COMPANY_TYPE_LABELS: Record<string, string> = {
-  collector: "Заготовитель",
-  trader: "Трейдер",
-  processor: "Переработчик",
-};
-
-const GENDER_LABELS: Record<string, string> = {
-  male: "Мужской",
-  female: "Женский",
-};
 
 const PROFILE_PHOTO_HINT =
   "Фото профиля подбирается автоматически по типу компании. Загрузка своего фото появится в следующих обновлениях.";
@@ -104,7 +87,7 @@ function describeSubscription(
   if (billing.status === "active" && billing.subscriptionPlan) {
     const endsAt = billing.subscriptionEndsAt ? new Date(billing.subscriptionEndsAt) : null;
     return {
-      tariff: billing.subscriptionPlan === "basic" ? "Базовая подписка" : "Расширенная подписка",
+      tariff: SUBSCRIPTION_PLAN_TITLE_LABELS[billing.subscriptionPlan] ?? billing.subscriptionPlan,
       note: endsAt ? `Действует до ${endsAt.toLocaleString("ru-RU")}` : "Подписка активна",
     };
   }
@@ -194,24 +177,6 @@ const NOTIFICATION_ROWS: Array<{
     description: "Правила, обновления и технические работы.",
   },
 ];
-
-const SUPPORT_CATEGORY_LABELS: Record<string, string> = {
-  billing: "Биллинг",
-  moderation_review: "Модерация",
-  company_management: "Компания",
-  technical: "Технический вопрос",
-  data_deletion: "Удаление данных",
-  other: "Другое",
-};
-
-const SUPPORT_STATUS_LABELS: Record<string, string> = {
-  new: "Новое",
-  open: "Открыт",
-  in_progress: "В работе",
-  awaiting_user: "Ждёт ответа",
-  resolved: "Решён",
-  closed: "Закрыт",
-};
 
 function accountDash(value: ReactNode) {
   return value || <span className="account-muted">Не заполнено</span>;
@@ -556,11 +521,11 @@ export function AccountView() {
             <h1 className="account-hero-name">{fullName}</h1>
             {user?.email ? <p className="account-hero-email">{user.email}</p> : null}
             <div className="account-hero-meta">
-              {user?.gender ? <StatusPill>{GENDER_LABELS[user.gender] ?? user.gender}</StatusPill> : null}
+              {user?.gender ? <StatusPill>{USER_GENDER_LABELS[user.gender] ?? user.gender}</StatusPill> : null}
               {isPlatformStaff
                 ? user?.platformRoles?.map((role) => (
                     <StatusPill key={role} variant="brand">
-                      {ROLE_LABELS[role] ?? role}
+                      {PLATFORM_ROLE_LABELS[role] ?? role}
                     </StatusPill>
                   ))
                 : null}
@@ -627,7 +592,7 @@ export function AccountView() {
                 <div className="account-pill-row">
                   {user?.platformRoles?.map((role) => (
                     <StatusPill key={role} variant="brand">
-                      {ROLE_LABELS[role] ?? role}
+                      {PLATFORM_ROLE_LABELS[role] ?? role}
                     </StatusPill>
                   ))}
                 </div>
@@ -698,12 +663,14 @@ export function AccountView() {
                   {billing.subscriptions.map((item: BillingSubscription) => (
                     <div className="account-history-row" key={item.id}>
                       <div>
-                        <strong>{item.plan === "basic" ? "Базовая подписка" : "Расширенная подписка"}</strong>
+                        <strong>{SUBSCRIPTION_PLAN_TITLE_LABELS[item.plan] ?? item.plan}</strong>
                         <span>
                           {formatAccountDate(item.startsAt)} — {formatAccountDate(item.endsAt)}
                         </span>
                       </div>
-                      <StatusPill variant={subscriptionStatusPillVariant(item.status)}>{item.status}</StatusPill>
+                      <StatusPill variant={subscriptionStatusPillVariant(item.status)}>
+                        {SUBSCRIPTION_STATUS_LABELS[item.status] ?? item.status}
+                      </StatusPill>
                     </div>
                   ))}
                 </div>

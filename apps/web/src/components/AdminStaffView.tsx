@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useMemo, useState } from "react";
 import { RotateCcw, Search } from "lucide-react";
-import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
+import { MIN_PASSWORD_LENGTH, platformRoles } from "@ecoplatform/shared";
 import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
@@ -11,6 +11,12 @@ import { StatusPill } from "./StatusPill";
 import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import {
+  PLATFORM_ROLE_SHORT_LABELS,
+  STAFF_STATUS_LABELS,
+  USER_GENDER_LABELS,
+  formatPlatformRoles,
+} from "../lib/display-labels";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type StaffItem = {
@@ -31,25 +37,19 @@ type StaffItem = {
   };
 };
 
-const allRoles = ["admin", "moderator", "content_manager"] as const;
+const allRoles = platformRoles;
 type PlatformRole = (typeof allRoles)[number];
 type StaffSortKey = "name" | "status" | "role" | "email" | "createdAt";
 
 const genderOptions = [
-  { value: "male", label: "Мужской" },
-  { value: "female", label: "Женский" },
+  { value: "male", label: USER_GENDER_LABELS.male },
+  { value: "female", label: USER_GENDER_LABELS.female },
 ] as const;
-
-const roleLabel: Record<string, string> = {
-  admin: "Админ",
-  moderator: "Модератор",
-  content_manager: "Контент-менеджер",
-};
 
 const staffSortSelectors: Record<StaffSortKey, (item: StaffItem) => string | number> = {
   name: (item) => `${item.user.lastName} ${item.user.firstName}`,
-  status: (item) => (item.isActive ? "Активен" : "Деактивирован"),
-  role: (item) => formatRoles(item.roles),
+  status: (item) => (item.isActive ? STAFF_STATUS_LABELS.active : STAFF_STATUS_LABELS.inactive),
+  role: (item) => formatPlatformRoles(item.roles),
   email: (item) => item.user.email,
   createdAt: (item) => Date.parse(item.createdAt),
 };
@@ -85,7 +85,7 @@ export function AdminStaffView() {
           staff.user.lastName,
           staff.user.email,
           staff.user.phone,
-          formatRoles(staff.roles),
+          formatPlatformRoles(staff.roles),
         ]
           .join(" ")
           .toLowerCase();
@@ -260,7 +260,7 @@ export function AdminStaffView() {
                     }
                     type="checkbox"
                   />
-                  {roleLabel[role]}
+                  {PLATFORM_ROLE_SHORT_LABELS[role]}
                 </label>
               ))}
             </div>
@@ -305,7 +305,7 @@ export function AdminStaffView() {
             <option value="">Все роли</option>
             {allRoles.map((role) => (
               <option key={role} value={role}>
-                {roleLabel[role]}
+                {PLATFORM_ROLE_SHORT_LABELS[role]}
               </option>
             ))}
           </select>
@@ -376,10 +376,10 @@ export function AdminStaffView() {
                     </td>
                     <td>
                       <StatusPill variant={staff.isActive ? "success" : "danger"}>
-                        {staff.isActive ? "Активен" : "Деактивирован"}
+                        {staff.isActive ? STAFF_STATUS_LABELS.active : STAFF_STATUS_LABELS.inactive}
                       </StatusPill>
                     </td>
-                    <td>{formatRoles(staff.roles)}</td>
+                    <td>{formatPlatformRoles(staff.roles)}</td>
                     <td>{staff.user.email}</td>
                     <td>{new Date(staff.createdAt).toLocaleDateString("ru-RU")}</td>
                     <td>
@@ -397,7 +397,9 @@ export function AdminStaffView() {
                               }
                               type="button"
                             >
-                              {has ? `Снять ${roleLabel[role]}` : `Дать ${roleLabel[role]}`}
+                              {has
+                                ? `Снять ${PLATFORM_ROLE_SHORT_LABELS[role]}`
+                                : `Дать ${PLATFORM_ROLE_SHORT_LABELS[role]}`}
                             </button>
                           );
                         })}
@@ -441,9 +443,4 @@ function resolvePlatformAvatarUrl(roles: string[], gender: string): string {
   const prefix = roles.includes("admin") ? "a" : "m";
 
   return `/avatars/platform/${prefix}${suffix}.png`;
-}
-
-function formatRoles(roles: readonly string[]) {
-  if (roles.length === 0) return "—";
-  return roles.map((role) => roleLabel[role] ?? role).join(", ");
 }

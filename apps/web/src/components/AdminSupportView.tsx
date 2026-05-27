@@ -9,6 +9,7 @@ import { CmsTabs } from "./CmsTabs";
 import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
+import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../lib/display-labels";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
 
@@ -35,23 +36,6 @@ type Ticket = {
   messages?: Message[];
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  open: "Открыт",
-  in_progress: "В работе",
-  awaiting_user: "Ждёт ответа",
-  resolved: "Решён",
-  closed: "Закрыт",
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  billing: "Биллинг",
-  moderation_review: "Модерация",
-  company_management: "Компания",
-  technical: "Технический вопрос",
-  data_deletion: "Удаление данных",
-  other: "Другое",
-};
-
 type Filter = "all" | "active" | "open" | "in_progress" | "resolved";
 type TicketSortKey = "updatedAt" | "subject" | "status" | "company";
 
@@ -66,7 +50,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 const ticketSortSelectors: Record<TicketSortKey, (ticket: Ticket) => string | number> = {
   updatedAt: (ticket) => Date.parse(ticket.updatedAt),
   subject: (ticket) => ticket.subject,
-  status: (ticket) => STATUS_LABELS[ticket.status] ?? ticket.status,
+  status: (ticket) => SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status,
   company: (ticket) => ticket.company?.organizationName ?? "",
 };
 
@@ -239,12 +223,12 @@ export function AdminSupportView() {
                       <div className="support-inbox-item-head">
                         <strong>{ticket.subject}</strong>
                         <StatusPill variant={supportStatusPillVariant(ticket.status)}>
-                          {STATUS_LABELS[ticket.status] ?? ticket.status}
+                          {SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}
                         </StatusPill>
                       </div>
                       <span className="support-inbox-item-company">
                         {ticket.company?.organizationName ?? "—"} ·{" "}
-                        {CATEGORY_LABELS[ticket.category] ?? ticket.category}
+                        {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category}
                       </span>
                       {preview ? <span className="support-inbox-item-preview">{preview}</span> : null}
                       <span className="support-inbox-item-time">
@@ -280,9 +264,11 @@ export function AdminSupportView() {
                   </div>
                   <div className="support-inbox-meta">
                     <StatusPill variant={supportStatusPillVariant(selectedTicket.status)}>
-                      {STATUS_LABELS[selectedTicket.status] ?? selectedTicket.status}
+                      {SUPPORT_STATUS_LABELS[selectedTicket.status] ?? selectedTicket.status}
                     </StatusPill>
-                    <StatusPill>{CATEGORY_LABELS[selectedTicket.category] ?? selectedTicket.category}</StatusPill>
+                    <StatusPill>
+                      {SUPPORT_CATEGORY_LABELS[selectedTicket.category] ?? selectedTicket.category}
+                    </StatusPill>
                   </div>
                 </header>
 

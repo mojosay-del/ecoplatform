@@ -11,6 +11,7 @@ import { RowKebab, type ActionItem } from "./RowKebab";
 import { StatusPill } from "./StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { CONTENT_STATUS_LABELS, LEARNING_ACCESS_LEVEL_LABELS } from "../lib/display-labels";
 
 type Attachment = { fileId: string; displayName: string };
 
@@ -340,7 +341,9 @@ function EducationTree({
                 icon={<FolderOpen size={16} />}
                 status={module.status}
                 title={module.title}
-                meta={`${module.isInDevelopment ? "В разработке · " : ""}${module.accessLevel} · ${module.chapters.length} ${pluralize(module.chapters.length, "глава", "главы", "глав")}`}
+                meta={`${module.isInDevelopment ? "В разработке · " : ""}${
+                  LEARNING_ACCESS_LEVEL_LABELS[module.accessLevel]
+                } · ${module.chapters.length} ${pluralize(module.chapters.length, "глава", "главы", "глав")}`}
                 actions={moduleActions}
               />
               {isExpanded ? (
@@ -523,9 +526,9 @@ function ModuleCreateForm({
           }
           value={draft.accessLevel}
         >
-          <option value="basic">basic — базовая подписка</option>
-          <option value="extended">extended — расширенная подписка</option>
-          <option value="one_time">one_time — разовая покупка</option>
+          <option value="basic">{LEARNING_ACCESS_LEVEL_LABELS.basic}</option>
+          <option value="extended">{LEARNING_ACCESS_LEVEL_LABELS.extended}</option>
+          <option value="one_time">{LEARNING_ACCESS_LEVEL_LABELS.one_time}</option>
         </select>
       </label>
       <label className="module-development-toggle">
@@ -588,7 +591,7 @@ function TreeRow({
         {status ? (
           <span
             className={`tree-row-dot${status === "published" ? " is-published" : ""}`}
-            title={status === "published" ? "Опубликован" : "Черновик"}
+            title={CONTENT_STATUS_LABELS[status]}
             aria-hidden
           />
         ) : null}
@@ -761,9 +764,9 @@ function ModuleForm({
             setDraft((prev) => ({ ...prev, accessLevel: event.target.value as "basic" | "extended" | "one_time" }))
           }
         >
-          <option value="basic">basic — базовая подписка</option>
-          <option value="extended">extended — расширенная подписка</option>
-          <option value="one_time">one_time — разовая покупка</option>
+          <option value="basic">{LEARNING_ACCESS_LEVEL_LABELS.basic}</option>
+          <option value="extended">{LEARNING_ACCESS_LEVEL_LABELS.extended}</option>
+          <option value="one_time">{LEARNING_ACCESS_LEVEL_LABELS.one_time}</option>
         </select>
       </label>
       {draft.accessLevel === "one_time" ? (
@@ -992,7 +995,7 @@ function LessonForm({
     <form className="form lesson-form" onSubmit={submit}>
       <header className="lesson-header">
         <span className={`lesson-header-status${lesson.status === "published" ? " is-published" : ""}`}>
-          {lesson.status === "published" ? "Опубликован" : "Черновик"}
+          {CONTENT_STATUS_LABELS[lesson.status]}
         </span>
         <input
           className="lesson-title-input"
