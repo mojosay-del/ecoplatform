@@ -8,9 +8,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
-import { useEffect, useState, type FormEvent } from "react";
-import { Flag, MessageCircle, Send, ThumbsUp, X } from "lucide-react";
-import type { NewsCommentDecorated, NewsListItem, NewsPostDetail } from "@ecoplatform/shared";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { ChevronDown, Flag, MessageCircle, Send, ThumbsUp, X } from "lucide-react";
+import type { NewsCommentDecorated, NewsListItem, NewsPostDetail, NewsTagSummary } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { NewsOnboardingCard } from "../components/NewsOnboardingCard";
 import { StatusPill } from "../components/StatusPill";
@@ -33,22 +33,64 @@ import {
   withUpdatedNewsLike,
   type ApiState,
   type LikeResult,
+  useApiQuery,
 } from "./_shared";
 import { ContentBlocks } from "./content-blocks";
+import {
+  NEWS_ALL_TAG_LIMIT,
+  NEWS_VISIBLE_TAG_LIMIT,
+  addNewsTagSelection,
+  buildNewsUrl,
+  getVisibleNewsTagNames,
+  normaliseNewsTagSelection,
+  toggleNewsTagSelection,
+} from "./news-tag-filters";
 
 const NEWS_PAGE_SIZE = 20;
 
 export function NewsView() {
   const { ready, token, user } = useAuth();
   const [onboardingDismissed, setOnboardingDismissed] = useState<boolean | null>(null);
-  const feed = useInfiniteApiQuery(ready && token ? "news-feed" : null, NEWS_PAGE_SIZE, ({ limit, offset }) =>
-    api.news.list({ limit, offset }),
+  const [isAllTagsOpen, setIsAllTagsOpen] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentSearch = searchParams.toString();
+  const selectedTags = useMemo(
+    () => normaliseNewsTagSelection(new URLSearchParams(currentSearch).getAll("tag")),
+    [currentSearch],
+  );
+  const selectedTagKey = selectedTags.join("\u001f");
+  const feed = useInfiniteApiQuery(
+    ready && token ? `news-feed:${selectedTagKey}` : null,
+    NEWS_PAGE_SIZE,
+    ({ limit, offset }) =>
+      api.news.list(
+        {
+          limit,
+          offset,
+          tags: selectedTags,
+        },
+        {
+          token,
+        },
+      ),
+  );
+  const { data: tagOptions, state: tagState } = useApiQuery<NewsTagSummary[]>(
+    ready && token ? "news-tags" : null,
+    () => api.news.tags({ limit: NEWS_ALL_TAG_LIMIT }, { token }),
+    [],
   );
   const { items, setItems, state, errorMessage, hasMore, isLoadingMore, sentinelRef } = feed;
   const covers = useCoverAssets(items);
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const openedSlug = searchParams.get("post");
+  const visibleTagNames = useMemo(
+    () =>
+      getVisibleNewsTagNames(
+        tagOptions.map((tag) => tag.name),
+        selectedTags,
+      ),
+    [selectedTags, tagOptions],
+  );
   const showOnboarding =
     user && onboardingDismissed === false ? shouldShowNewsOnboarding(user, onboardingDismissed) : false;
 
@@ -63,13 +105,34 @@ export function NewsView() {
   // Модалка открывается через query ?post=slug — это даёт shareable URL,
   // back/forward в браузере и закрытие по Esc через router.replace('/news').
   function openPost(slug: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("post", slug);
-    router.push(`/news?${params.toString()}`, { scroll: false });
+    router.push(buildNewsUrl(currentSearch, selectedTags, slug), { scroll: false });
   }
 
   function closePost() {
-    router.push("/news", { scroll: false });
+    router.push(buildNewsUrl(currentSearch, selectedTags), { scroll: false });
+  }
+
+  function postHref(slug: string) {
+    return buildNewsUrl(currentSearch, selectedTags, slug);
+  }
+
+  function applyTags(nextTags: string[]) {
+    setIsAllTagsOpen(false);
+    router.push(buildNewsUrl(currentSearch, nextTags), { scroll: true });
+  }
+
+  function toggleTag(tag: string) {
+    applyTags(toggleNewsTagSelection(selectedTags, tag));
+  }
+
+  function selectTag(tag: string) {
+    const nextTags = addNewsTagSelection(selectedTags, tag);
+    if (nextTags.length === selectedTags.length) return;
+    applyTags(nextTags);
+  }
+
+  function clearTags() {
+    applyTags([]);
   }
 
   function updatePostInFeed(updatedPost: NewsPostDetail) {
@@ -106,6 +169,16 @@ export function NewsView() {
           <h1>Новости рынка</h1>
         </header>
         {showOnboarding && user ? <NewsOnboardingCard user={user} onDismiss={dismissOnboarding} /> : null}
+        <NewsTagFilters
+          isAllTagsOpen={isAllTagsOpen}
+          isLoading={tagState === "loading"}
+          onClear={clearTags}
+          onToggleDropdown={() => setIsAllTagsOpen((value) => !value)}
+          onToggleTag={toggleTag}
+          selectedTags={selectedTags}
+          tagOptions={tagOptions}
+          visibleTagNames={visibleTagNames}
+        />
 
         {state === "loading" ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
@@ -113,11 +186,11 @@ export function NewsView() {
           </p>
         ) : items.length === 0 ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            Пока нет публикаций.
+            {selectedTags.length > 0 ? "Нет публикаций с выбранными тегами." : "Пока нет публикаций."}
           </p>
         ) : (
           <div className="news-masonry">
-            {items.map((post) => {
+            {items.map((post, index) => {
               const cover = post.coverImageId ? covers.get(post.coverImageId) : null;
               const coverUrl = preferredFileAssetImageUrl(cover);
               const hasCover = Boolean(coverUrl);
@@ -127,47 +200,50 @@ export function NewsView() {
                 //  1) ломало SEO (поисковики не видели shareable URL),
                 //  2) ломало UX (Ctrl/Cmd-клик не открывал в новой вкладке,
                 //     curl/middle-click не работали).
-                // Теперь <a href> с shareable URL, при обычном клике
-                // preventDefault → open modal без перезагрузки страницы.
-                <a
-                  className={`news-tile ${hasCover ? "news-tile-with-cover" : "news-tile-text"}`}
-                  href={`/news?post=${encodeURIComponent(post.slug)}`}
-                  onClick={(event) => {
-                    // Ctrl/Cmd/Shift/middle-click — пускаем браузерное поведение.
-                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-                    event.preventDefault();
-                    openPost(post.slug);
-                  }}
-                  key={post.id}
-                >
-                  {hasCover ? (
-                    <div className="news-tile-cover">
-                      {/* `fill` + parent `position: relative` (см. .news-tile-cover в globals.css);
-                          `sizes` подсказывает next/image, какой preset запросить под viewport. */}
-                      <Image
-                        alt={cover?.originalName ?? post.title}
-                        src={coverUrl!}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                        style={{ objectFit: "cover" }}
-                      />
+                // Основное тело карточки осталось <a href> с shareable URL,
+                // а теги вынесены рядом, чтобы не вкладывать кнопку в ссылку.
+                <article className={`news-tile ${hasCover ? "news-tile-with-cover" : "news-tile-text"}`} key={post.id}>
+                  <a
+                    className="news-tile-main"
+                    href={postHref(post.slug)}
+                    onClick={(event) => {
+                      // Ctrl/Cmd/Shift/middle-click — пускаем браузерное поведение.
+                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+                      event.preventDefault();
+                      openPost(post.slug);
+                    }}
+                  >
+                    {hasCover ? (
+                      <div className="news-tile-cover">
+                        {/* `fill` + parent `position: relative` (см. .news-tile-cover в globals.css);
+                            `sizes` подсказывает next/image, какой preset запросить под viewport. */}
+                        <Image
+                          alt={cover?.originalName ?? post.title}
+                          src={coverUrl!}
+                          fill
+                          loading={index < 4 ? "eager" : "lazy"}
+                          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                          style={{ objectFit: "cover" }}
+                        />
+                      </div>
+                    ) : null}
+                    <div className="news-tile-body">
+                      <span className="news-tile-category">Новости</span>
+                      <h2 className="news-tile-title">{post.title}</h2>
+                      <p className="news-tile-lead">{post.lead}</p>
+                      <div className="news-tile-meta">
+                        <NewsMetaItem count={post._count?.likes ?? 0} icon={ThumbsUp} label="Лайки" />
+                        <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
+                        {publishedDate ? (
+                          <time className="news-tile-date" dateTime={publishedDate.toISOString()}>
+                            {formatNewsDate(publishedDate)}
+                          </time>
+                        ) : null}
+                      </div>
                     </div>
-                  ) : null}
-                  <div className="news-tile-body">
-                    <span className="news-tile-category">Новости</span>
-                    <h2 className="news-tile-title">{post.title}</h2>
-                    <p className="news-tile-lead">{post.lead}</p>
-                    <div className="news-tile-meta">
-                      <NewsMetaItem count={post._count?.likes ?? 0} icon={ThumbsUp} label="Лайки" />
-                      <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
-                      {publishedDate ? (
-                        <time className="news-tile-date" dateTime={publishedDate.toISOString()}>
-                          {formatNewsDate(publishedDate)}
-                        </time>
-                      ) : null}
-                    </div>
-                  </div>
-                </a>
+                  </a>
+                  <NewsCardTags tags={post.tags} selectedTags={selectedTags} onSelectTag={selectTag} />
+                </article>
               );
             })}
           </div>
@@ -186,6 +262,118 @@ export function NewsView() {
       </section>
       {openedSlug ? <NewsModal slug={openedSlug} onClose={closePost} onPostUpdate={updatePostInFeed} /> : null}
     </AppShell>
+  );
+}
+
+function NewsTagFilters({
+  isAllTagsOpen,
+  isLoading,
+  onClear,
+  onToggleDropdown,
+  onToggleTag,
+  selectedTags,
+  tagOptions,
+  visibleTagNames,
+}: {
+  isAllTagsOpen: boolean;
+  isLoading: boolean;
+  onClear: () => void;
+  onToggleDropdown: () => void;
+  onToggleTag: (tag: string) => void;
+  selectedTags: string[];
+  tagOptions: NewsTagSummary[];
+  visibleTagNames: string[];
+}) {
+  if (!isLoading && visibleTagNames.length === 0) return null;
+
+  const hasDropdown = tagOptions.length > 0;
+
+  return (
+    <nav className="news-tags" aria-label="Фильтр новостей по тегам">
+      <div className="news-tags-row">
+        {visibleTagNames.map((tag) => {
+          const isActive = selectedTags.includes(tag);
+          return (
+            <button
+              aria-pressed={isActive}
+              className={`news-tag-chip ${isActive ? "is-active" : ""}`}
+              key={tag}
+              onClick={() => onToggleTag(tag)}
+              type="button"
+            >
+              {tag}
+            </button>
+          );
+        })}
+        {isLoading ? <span className="news-tags-loading">Теги загружаются…</span> : null}
+      </div>
+
+      <div className="news-tags-actions">
+        {selectedTags.length > 0 ? (
+          <button className="news-tags-clear" onClick={onClear} type="button">
+            <X aria-hidden="true" size={14} />
+            Сбросить
+          </button>
+        ) : null}
+        {hasDropdown ? (
+          <button aria-expanded={isAllTagsOpen} className="news-tags-more" onClick={onToggleDropdown} type="button">
+            Все теги
+            <ChevronDown aria-hidden="true" className={isAllTagsOpen ? "is-open" : ""} size={15} />
+          </button>
+        ) : null}
+      </div>
+
+      {hasDropdown && isAllTagsOpen ? (
+        <div className="news-tags-dropdown">
+          {tagOptions.map((tag) => {
+            const isActive = selectedTags.includes(tag.name);
+            return (
+              <button
+                aria-pressed={isActive}
+                className={`news-tag-dropdown-item ${isActive ? "is-active" : ""}`}
+                key={tag.id}
+                onClick={() => onToggleTag(tag.name)}
+                type="button"
+              >
+                <span>{tag.name}</span>
+                <strong>{tag.usageCount}</strong>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </nav>
+  );
+}
+
+function NewsCardTags({
+  tags,
+  selectedTags,
+  onSelectTag,
+}: {
+  tags: NewsListItem["tags"];
+  selectedTags: string[];
+  onSelectTag: (tag: string) => void;
+}) {
+  if (tags.length === 0) return null;
+
+  return (
+    <div className="news-tile-tags" aria-label="Теги новости">
+      {tags.map(({ newsTag }) => {
+        const isActive = selectedTags.includes(newsTag.name);
+        return (
+          <button
+            aria-pressed={isActive}
+            className={`news-tile-tag ${isActive ? "is-active" : ""}`}
+            key={newsTag.id}
+            onClick={() => onSelectTag(newsTag.name)}
+            type="button"
+          >
+            {newsTag.name}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

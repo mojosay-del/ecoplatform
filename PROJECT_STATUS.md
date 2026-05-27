@@ -28,7 +28,9 @@
 
 Волна 11.10 закрыта: сетка `/indices` переведена на `auto-fit/minmax`, карточки перестали расширять страницу на мобильной ширине, а переключатели периода остаются в одну строку и скроллятся внутри карточки.
 
-Целевой следующий шаг: Волна 11.11 — `/news` chip-row тегов + фильтрация.
+Волна 11.11 закрыта: `/news` получил chip-row тегов, dropdown «Все теги», URL-фильтр `?tag=...`, кликабельные теги на карточках и сброс infinite-scroll на `offset=0` при смене фильтра.
+
+Целевой следующий шаг: Волна 11.12 — микро-копирайтинг.
 
 ## Что уже сделано
 
@@ -143,7 +145,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 11** — UX/дизайн-система: фильтры новостей, микрокопирайтинг и доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов, докрутка disabled-пунктов сайдбара, регистрация в 2 шага, sticky demo-баннер, onboarding-card, сводная таблица движений индексов и адаптивная сетка индексов закрыты в 11.1–11.10.
+- **Волна 11** — UX/дизайн-система: микрокопирайтинг и доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов, докрутка disabled-пунктов сайдбара, регистрация в 2 шага, sticky demo-баннер, onboarding-card, сводная таблица движений индексов, адаптивная сетка индексов и фильтры новостей закрыты в 11.1–11.11.
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
@@ -179,7 +181,7 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 100 unit-тестов (shared 7, web 20, api 73)
+pnpm test                                             # 104 unit-теста (shared 7, web 24, api 73)
 pnpm build                                            # tsc + next build
 pnpm test:integration                                 # 114 integration-тестов против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
@@ -188,16 +190,15 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 11.10).
+Дата: 2026-05-27 (после Волны 11.11).
 
 - `pnpm typecheck` — успешно (4/4).
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 20/20, api 73/73.
+- `pnpm test` — успешно: shared 7/7, web 24/24, api 73/73.
 - `pnpm test:integration` — успешно: API integration 114/114.
 - `pnpm build` — успешно (3/3).
-- Browser UI-check — `/indices`: desktop 1440px показывает адаптивную сетку `544px 544px` без document/body overflow; mobile 390px показывает одну колонку `274px`, `documentOverflowX=0`, `bodyOverflowX=0`, period-tabs остаются в одну строку и скроллятся внутри карточки (`clientWidth=234`, `scrollWidth=436`), console errors отсутствуют. Скриншоты: `/private/tmp/ecoplatform-11-10-indices-desktop.png`, `/private/tmp/ecoplatform-11-10-indices-mobile.png`, `/private/tmp/ecoplatform-11-10-indices-mobile-tabs.png`.
+- Browser UI-check — `/news`: demo-login, chip `Пластик` даёт URL `?tag=Пластик` и одну карточку с этим тегом; клик по карточному тегу `рынок` даёт AND-фильтр `?tag=Пластик&tag=рынок`; dropdown «Все теги» открывается и подсвечивает активные теги; ссылка карточки сохраняет `tag=...&post=slug`; desktop/mobile показывают `documentOverflowX=0`, `bodyOverflowX=0`. Скриншоты: `/private/tmp/ecoplatform-11-11-news-tags-desktop.png`, `/private/tmp/ecoplatform-11-11-news-tags-mobile.png`.
 - `pnpm format:check` — clean.
-- CSS token sanity — прямых `#...`, `rgba(...)`, нетокенизированных `rgb(...)` в `globals.css` нет.
 - `git diff --check` — clean.
 - Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
 

@@ -29,6 +29,7 @@ import { apiDownload, apiFetch, type FileAsset } from "./core";
 
 type PaginationInput = { limit?: number; offset?: number };
 type NewsListInput = PaginationInput & { tags?: string[] };
+type ApiRequestOptions = { token?: string | null };
 
 // Лайки и комментарии возвращают одинаковую полезную нагрузку — выносим.
 export type LikeResult = {
@@ -67,9 +68,12 @@ function newsListSuffix(input: NewsListInput = {}) {
 export const api = {
   // ── Новости ─────────────────────────────────────────────────────────────
   news: {
-    list: (input: NewsListInput = {}) => apiFetch<PaginatedResponse<NewsListItem>>(`/news${newsListSuffix(input)}`),
-    tags: (options: { limit?: number } = {}) =>
-      apiFetch<NewsTagSummary[]>(`/news/tags${options.limit !== undefined ? `?limit=${options.limit}` : ""}`),
+    list: (input: NewsListInput = {}, options: ApiRequestOptions = {}) =>
+      apiFetch<PaginatedResponse<NewsListItem>>(`/news${newsListSuffix(input)}`, { token: options.token }),
+    tags: (options: { limit?: number } = {}, requestOptions: ApiRequestOptions = {}) =>
+      apiFetch<NewsTagSummary[]>(`/news/tags${options.limit !== undefined ? `?limit=${options.limit}` : ""}`, {
+        token: requestOptions.token,
+      }),
     get: (slug: string) => apiFetch<NewsPostDetail>(`/news/${enc(slug)}`),
     like: (id: string) => apiFetch<LikeResult>(`/news/${enc(id)}/like`, { method: "POST" }),
     addComment: (postId: string, body: { text: string; parentCommentId?: string }) =>
