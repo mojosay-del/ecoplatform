@@ -2463,6 +2463,73 @@ body.news-modal-open .app-shell {
   }
 }
 
+.marketing-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 24px;
+  padding: 28px 24px 24px;
+  background: var(--surface-auth);
+}
+
+.marketing-header {
+  display: flex;
+  justify-content: center;
+}
+
+.marketing-wordmark {
+  color: var(--brand);
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.marketing-wordmark:hover {
+  color: var(--brand-strong);
+}
+
+.marketing-content {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+
+.marketing-card {
+  max-width: 500px;
+}
+
+.marketing-card-centered {
+  align-items: center;
+  text-align: center;
+}
+
+.marketing-card-centered .auth-card-title {
+  text-align: center;
+}
+
+.marketing-actions {
+  margin-top: 24px;
+}
+
+.marketing-incident {
+  margin-top: 12px;
+}
+
+.marketing-footer {
+  margin: 0 auto;
+}
+
+@media (max-width: 540px) {
+  .marketing-page {
+    gap: 18px;
+    padding: 22px 20px 20px;
+  }
+
+  .marketing-actions .button {
+    width: 100%;
+  }
+}
+
 .auth-progress {
   display: flex;
   flex-direction: column;

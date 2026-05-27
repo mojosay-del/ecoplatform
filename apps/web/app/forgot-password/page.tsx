@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { MarketingShell } from "../../src/components/MarketingShell";
 
 const SUPPORT_EMAIL = "support@ecoplatform.local";
 
@@ -47,44 +48,36 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="auth-page">
-      <div className="auth-layout">
-        <div className="auth-form-panel">
-          <div className="auth-card">
-            <header className="auth-card-head">
-              <h1 className="auth-card-title">Восстановление пароля</h1>
-              <p className="auth-card-sub">
-                Пока на стадии MVP — самостоятельный сброс пароля будет доступен в ближайшем обновлении.
-              </p>
-            </header>
-            <p className="page-subtitle">
-              Если вы не можете войти, напишите администратору платформы — мы вручную поможем восстановить доступ.
-            </p>
-            <div className="forgot-support-contact">
-              <span>Почта поддержки</span>
-              <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
-              <button className="button secondary forgot-support-copy" onClick={copySupportEmail} type="button">
-                {copyStatus === "copied" ? (
-                  <Check aria-hidden="true" size={15} />
-                ) : (
-                  <Copy aria-hidden="true" size={15} />
-                )}
-                {copyStatus === "copied" ? "Скопировано" : "Скопировать"}
-              </button>
-            </div>
-            {copyStatus === "failed" ? (
-              <p className="auth-copy-status" role="status">
-                Не удалось скопировать автоматически. Выделите email вручную.
-              </p>
-            ) : null}
-            <div className="auth-actions" style={{ marginTop: "24px" }}>
-              <Link className="button" href="/login">
-                Вернуться к входу
-              </Link>
-            </div>
-          </div>
+    <MarketingShell>
+      <div className="auth-card marketing-card">
+        <header className="auth-card-head">
+          <h1 className="auth-card-title">Восстановление пароля</h1>
+          <p className="auth-card-sub">
+            Пока на стадии MVP — самостоятельный сброс пароля будет доступен в ближайшем обновлении.
+          </p>
+        </header>
+        <p className="page-subtitle">
+          Если вы не можете войти, напишите администратору платформы — мы вручную поможем восстановить доступ.
+        </p>
+        <div className="forgot-support-contact">
+          <span>Почта поддержки</span>
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+          <button className="button secondary forgot-support-copy" onClick={copySupportEmail} type="button">
+            {copyStatus === "copied" ? <Check aria-hidden="true" size={15} /> : <Copy aria-hidden="true" size={15} />}
+            {copyStatus === "copied" ? "Скопировано" : "Скопировать"}
+          </button>
+        </div>
+        {copyStatus === "failed" ? (
+          <p className="auth-copy-status" role="status">
+            Не удалось скопировать автоматически. Выделите email вручную.
+          </p>
+        ) : null}
+        <div className="auth-actions marketing-actions">
+          <Link className="button" href="/login">
+            Вернуться к входу
+          </Link>
         </div>
       </div>
-    </main>
+    </MarketingShell>
   );
 }

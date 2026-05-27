@@ -32,7 +32,9 @@
 
 Волна 11.12 закрыта: точечный микро-копирайтинг улучшил `/forgot-password`, `/account`, пустые комментарии в `/news` и админские статусы/тарифы без изменения бизнес-логики.
 
-Целевой следующий шаг: Волна 11.13 — `/forgot-password` и `/404`: layout без пустой правой колонки.
+Волна 11.13 закрыта: `/forgot-password`, 404 и error fallback’и переведены на общий `MarketingShell` без пустой правой колонки; контент центрируется, юридический footer остаётся внизу, mobile/desktop проверены без горизонтального overflow.
+
+Целевой следующий шаг: Волна 11.14 — доступность: navigation role, skip-link, aria-label, checkbox focus-visible, контраст текста.
 
 ## Что уже сделано
 
@@ -147,7 +149,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 11** — UX/дизайн-система: layout `/forgot-password`/`/404` и доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов, докрутка disabled-пунктов сайдбара, регистрация в 2 шага, sticky demo-баннер, onboarding-card, сводная таблица движений индексов, адаптивная сетка индексов, фильтры новостей и микро-копирайтинг закрыты в 11.1–11.12.
+- **Волна 11** — UX/дизайн-система: осталась доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов, докрутка disabled-пунктов сайдбара, регистрация в 2 шага, sticky demo-баннер, onboarding-card, сводная таблица движений индексов, адаптивная сетка индексов, фильтры новостей, микро-копирайтинг и layout `/forgot-password`/`/404` закрыты в 11.1–11.13.
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
@@ -192,14 +194,14 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 11.11).
+Дата: 2026-05-27 (после Волны 11.13).
 
 - `pnpm typecheck` — успешно (4/4).
 - `pnpm lint` — успешно (4/4).
 - `pnpm test` — успешно: shared 7/7, web 24/24, api 73/73.
 - `pnpm test:integration` — успешно: API integration 114/114.
 - `pnpm build` — успешно (3/3).
-- Browser UI-check — `/news`: demo-login, chip `Пластик` даёт URL `?tag=Пластик` и одну карточку с этим тегом; клик по карточному тегу `рынок` даёт AND-фильтр `?tag=Пластик&tag=рынок`; dropdown «Все теги» открывается и подсвечивает активные теги; ссылка карточки сохраняет `tag=...&post=slug`; desktop/mobile показывают `documentOverflowX=0`, `bodyOverflowX=0`. Скриншоты: `/private/tmp/ecoplatform-11-11-news-tags-desktop.png`, `/private/tmp/ecoplatform-11-11-news-tags-mobile.png`.
+- Browser UI-check — `/forgot-password` и несуществующий URL: desktop 1280px без `.auth-layout`, с `marketingPageCount=1`, центрированием `cardCenterDelta=0`, footer из 5 ссылок и `documentOverflowX=0`/`bodyOverflowX=0`; mobile 390px также без horizontal overflow. Скриншоты: `/private/tmp/ecoplatform-11-13-forgot-desktop.png`, `/private/tmp/ecoplatform-11-13-404-desktop.png`, `/private/tmp/ecoplatform-11-13-forgot-mobile.png`, `/private/tmp/ecoplatform-11-13-404-mobile.png`.
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.
 - Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
