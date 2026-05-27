@@ -447,6 +447,121 @@ input[type="checkbox"]:focus-visible {
   object-fit: cover;
 }
 
+.account-menu-root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-menu-avatar {
+  border: 1px solid var(--line);
+  cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--white);
+  font: inherit;
+}
+
+.account-menu-avatar-initials {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--white);
+}
+
+.account-menu-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 95;
+  width: min(320px, calc(100vw - 24px));
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 18px 40px -16px rgb(var(--shadow-deep-rgb) / 0.25);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: notif-pop-in 140ms ease;
+}
+
+.account-menu-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-menu-head strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.account-menu-head span {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu-section {
+  display: grid;
+  gap: 2px;
+}
+
+.account-menu-section p {
+  margin: 6px 8px 2px;
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.account-menu-link,
+.account-menu-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.account-menu-link:hover,
+.account-menu-logout:hover {
+  background: var(--panel-soft);
+  color: var(--text);
+}
+
+.account-menu-link.active {
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
+
+.account-menu-logout {
+  margin-top: 2px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+  color: var(--danger-text-strong);
+}
+
 .page {
   max-width: 1440px;
   margin: 0 auto;
@@ -7938,6 +8053,222 @@ li.tree-add-row + li.tree-add-row,
   font-weight: 700;
 }
 
+.account-section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.account-panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-detail-list {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 0;
+}
+
+.account-detail-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.45fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-detail-row:last-child {
+  border-bottom: 0;
+}
+
+.account-detail-row dt {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-detail-row dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.account-muted {
+  color: var(--muted);
+}
+
+.account-action-list,
+.account-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.account-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.account-state-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-card);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.account-state-banner strong {
+  color: inherit;
+}
+
+.account-state-banner.status-pending_deletion,
+.account-state-banner.status-blocked,
+.account-state-banner.status-suspended {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger-text-strong);
+}
+
+.account-doc-grid,
+.account-history-list,
+.account-session-list {
+  display: grid;
+  gap: 10px;
+}
+
+.account-history-row,
+.account-session-row,
+.account-ticket-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-history-row:last-child,
+.account-session-row:last-child,
+.account-ticket-row:last-child {
+  border-bottom: 0;
+}
+
+.account-history-row > div,
+.account-session-row > div,
+.account-ticket-row > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.account-history-row span,
+.account-session-row span,
+.account-ticket-row span,
+.account-doc-grid p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.account-ticket-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-ticket-row:hover {
+  color: var(--primary-hover);
+}
+
+.account-form,
+.account-security-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.account-form label {
+  display: grid;
+  gap: 5px;
+}
+
+.account-form label > span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-security-actions > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+}
+
+.account-notification-table {
+  display: grid;
+  gap: 0;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.account-notification-head,
+.account-notification-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 120px 120px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.account-notification-head {
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.account-notification-row {
+  border-top: 1px solid var(--line);
+}
+
+.account-notification-row p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.account-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-toggle input {
+  accent-color: var(--primary);
+}
+
 .account-danger-zone {
   border-color: rgb(var(--danger-strong-rgb) / 0.24);
   background: linear-gradient(180deg, rgb(var(--danger-strong-rgb) / 0.04), rgb(var(--white-rgb) / 0.92));
@@ -7998,6 +8329,39 @@ li.tree-add-row + li.tree-add-row,
 .account-form-message-error {
   background: rgb(var(--danger-strong-rgb) / 0.1);
   color: var(--danger-text-strong);
+}
+
+@media (max-width: 720px) {
+  .account-section-grid,
+  .account-form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .account-form-field-wide {
+    grid-column: span 1;
+  }
+
+  .account-detail-row,
+  .account-notification-head,
+  .account-notification-row {
+    grid-template-columns: 1fr;
+  }
+
+  .account-card-head,
+  .account-history-row,
+  .account-session-row,
+  .account-ticket-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-notification-head {
+    display: none;
+  }
+
+  .account-notification-row {
+    gap: 8px;
+  }
 }
 
 /* Popover уведомлений у колокольчика в шапке. Заменяет старую страницу,

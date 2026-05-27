@@ -4,25 +4,11 @@
 // биллинг и список тикетов поддержки. Самый крупный view в проекте — раньше
 // жил в DataViews.tsx, теперь изолирован.
 
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
-import {
-  Bell,
-  Building2,
-  CreditCard,
-  Download,
-  KeyRound,
-  LifeBuoy,
-  LogOut,
-  RotateCcw,
-  ShieldCheck,
-  Smartphone,
-  Trash2,
-  UserRound,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { Download, KeyRound, LifeBuoy, LogOut, RotateCcw, Smartphone, Trash2 } from "lucide-react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type {
   AddressDto,
   BillingStatus,
@@ -32,6 +18,7 @@ import type {
 } from "@ecoplatform/shared";
 import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
+import { accountSectionHref, isAccountBusinessSection, type AccountSectionId } from "../components/app-shell-nav";
 import {
   StatusPill,
   companyStatusPillVariant,
@@ -50,16 +37,10 @@ import {
   SUPPORT_STATUS_LABELS,
   USER_GENDER_LABELS,
 } from "../lib/display-labels";
-import { AuthRequired, ErrorState, useApiQuery, resolveUpgradeCta } from "./_shared";
+import { useApiQuery } from "./_shared";
 
 const PROFILE_PHOTO_HINT =
   "Фото профиля подбирается автоматически по типу компании. Загрузка своего фото появится в следующих обновлениях.";
-
-// Какую CTA «обновления тарифа» показывать сверху урока:
-// — нет компании (стафф) или extended-подписка → ничего;
-// — basic-подписка → предложить Расширенный доступ;
-// — demo/past_due/blocked → предложить Полный доступ.
-// resolveUpgradeCta переехала в ../views/_shared.tsx
 
 function describeSubscription(
   billing: {
@@ -100,8 +81,6 @@ function describeSubscription(
   return { tariff: "не активирован", note: "Подписка не активна" };
 }
 
-type AccountTab = "profile" | "company" | "billing" | "security" | "notifications" | "support";
-
 type AccountSession = {
   id: string;
   userAgent: string | null;
@@ -125,15 +104,6 @@ type AccountSupportTicket = {
   status: string;
   updatedAt: string;
 };
-
-const ACCOUNT_TABS: Array<{ id: AccountTab; label: string; icon: LucideIcon; companyOnly?: boolean }> = [
-  { id: "profile", label: "Профиль", icon: UserRound },
-  { id: "company", label: "Компания", icon: Building2, companyOnly: true },
-  { id: "billing", label: "Подписка", icon: CreditCard, companyOnly: true },
-  { id: "security", label: "Безопасность", icon: ShieldCheck },
-  { id: "notifications", label: "Уведомления", icon: Bell },
-  { id: "support", label: "Поддержка", icon: LifeBuoy, companyOnly: true },
-];
 
 const NOTIFICATION_ROWS: Array<{
   category: string;
@@ -267,15 +237,15 @@ function getAccountModuleCards(companyType?: string | null, status?: string | nu
   ];
 }
 
-export function AccountView() {
-  const searchParams = useSearchParams();
+export function AccountView({ section }: { section: AccountSectionId }) {
+  const router = useRouter();
   const { user, token, logout, refreshMe } = useAuth();
   const isPlatformStaff = (user?.platformRoles?.length ?? 0) > 0;
-  const { data: billing, setData: setBilling } = useApiQuery<BillingStatus | null>(
-    isPlatformStaff ? null : "billing-status",
-    () => api.billing.status(),
-    null,
-  );
+  const {
+    data: billing,
+    setData: setBilling,
+    state: billingState,
+  } = useApiQuery<BillingStatus | null>(isPlatformStaff ? null : "billing-status", () => api.billing.status(), null);
   const {
     data: sessions,
     setData: setSessions,
@@ -295,7 +265,6 @@ export function AccountView() {
     () => api.support.listMyTickets(),
     { items: [], total: 0, hasMore: false } as PaginatedResponse<AccountSupportTicket>,
   );
-  const [activeTab, setActiveTab] = useState<AccountTab>("profile");
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
@@ -304,22 +273,13 @@ export function AccountView() {
   const [deletionMessage, setDeletionMessage] = useState<string | null>(null);
   const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
   const [notificationBusyKey, setNotificationBusyKey] = useState<string | null>(null);
-
-  const tabs = useMemo(() => ACCOUNT_TABS.filter((tab) => !tab.companyOnly || !isPlatformStaff), [isPlatformStaff]);
-  const requestedTab = searchParams.get("tab");
+  const activeSection = isPlatformStaff && isAccountBusinessSection(section) ? "profile" : section;
 
   useEffect(() => {
-    if (!tabs.some((tab) => tab.id === activeTab)) {
-      setActiveTab(tabs[0]?.id ?? "profile");
+    if (isPlatformStaff && isAccountBusinessSection(section)) {
+      router.replace(accountSectionHref("profile"));
     }
-  }, [activeTab, tabs]);
-
-  useEffect(() => {
-    if (!requestedTab || requestedTab === activeTab) return;
-    if (tabs.some((tab) => tab.id === requestedTab)) {
-      setActiveTab(requestedTab as AccountTab);
-    }
-  }, [activeTab, requestedTab, tabs]);
+  }, [isPlatformStaff, router, section]);
 
   // Подписка и статус компании теперь рендерятся в отдельных карточках —
   // форма поддержки переехала в drawer (иконка «?» в шапке), чтобы личный
@@ -533,32 +493,15 @@ export function AccountView() {
                 <StatusPill variant={companyStatusPillVariant(billing?.status)}>{companyStatusLabel}</StatusPill>
               ) : null}
               {billing?.status === "demo" && !isPlatformStaff ? (
-                <button className="account-hero-cta" onClick={() => setActiveTab("billing")} type="button">
+                <Link className="account-hero-cta" href={accountSectionHref("billing")}>
                   Активировать подписку
-                </button>
+                </Link>
               ) : null}
             </div>
           </div>
         </header>
 
-        <nav className="account-tabs" aria-label="Разделы личного кабинета">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                className={`account-tab ${activeTab === tab.id ? "active" : ""}`}
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                type="button"
-              >
-                <Icon size={16} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {activeTab === "profile" ? (
+        {activeSection === "profile" ? (
           <div className="account-section-grid">
             <article className="card account-card">
               <h2>Пользователь</h2>
@@ -601,11 +544,20 @@ export function AccountView() {
           </div>
         ) : null}
 
-        {activeTab === "company" && !isPlatformStaff && billing ? (
-          <CompanyProfileForm billing={billing} onSaved={(updated) => setBilling(updated)} />
+        {activeSection === "company" && !isPlatformStaff ? (
+          billing ? (
+            <CompanyProfileForm billing={billing} onSaved={(updated) => setBilling(updated)} />
+          ) : (
+            <article className="card account-card">
+              <h2>Компания</h2>
+              <p className="page-subtitle">
+                {billingState === "loading" ? "Загружаем реквизиты компании..." : "Данные компании пока недоступны."}
+              </p>
+            </article>
+          )
         ) : null}
 
-        {activeTab === "billing" && !isPlatformStaff ? (
+        {activeSection === "billing" && !isPlatformStaff ? (
           <div className="account-panel-stack">
             {showBillingStateBanner ? (
               <div className={`account-state-banner status-${company.status}`}>
@@ -705,7 +657,7 @@ export function AccountView() {
           </div>
         ) : null}
 
-        {activeTab === "security" ? (
+        {activeSection === "security" ? (
           <div className="account-panel-stack">
             <div className="account-section-grid">
               <article className="card account-card">
@@ -766,103 +718,111 @@ export function AccountView() {
                   Завершить эту сессию
                 </button>
               </article>
-              <article className="card account-card">
-                <h2>Мои данные</h2>
-                <p className="page-subtitle">
-                  Архив включает профиль, согласия, сессии, уведомления, обращения и данные компании.
-                </p>
-                {exportMessage ? <p className="account-form-message">{exportMessage}</p> : null}
-                <button className="button secondary" type="button" onClick={exportData} disabled={exportBusy}>
-                  <Download size={16} />
-                  {exportBusy ? "Готовим..." : "Скачать архив"}
-                </button>
-              </article>
-              <article className="card account-card account-danger-zone">
-                <h2>Опасная зона</h2>
-                {user?.deletionRequestedAt ? (
-                  <p className="page-subtitle">
-                    Удаление аккаунта запланировано на {formatAccountDate(user.deletionScheduledFor)}. До этой даты
-                    запрос можно отменить.
-                  </p>
-                ) : (
-                  <p className="page-subtitle">
-                    Запрос ставит аккаунт в очередь удаления на 30 дней и закрывает функциональные разделы компании.
-                  </p>
-                )}
-                {deletionMessage ? <p className="account-form-message">{deletionMessage}</p> : null}
-                {user?.deletionRequestedAt ? (
-                  <button className="button secondary" type="button" onClick={cancelDeletion} disabled={deletionBusy}>
-                    <RotateCcw size={16} />
-                    {deletionBusy ? "Отменяем..." : "Передумал"}
-                  </button>
-                ) : (
-                  <button
-                    className="button secondary danger"
-                    type="button"
-                    onClick={requestDeletion}
-                    disabled={deletionBusy}
-                  >
-                    <Trash2 size={16} />
-                    {deletionBusy ? "Планируем..." : "Запросить удаление"}
-                  </button>
-                )}
-              </article>
             </div>
+          </div>
+        ) : null}
+
+        {activeSection === "data-privacy" ? (
+          <div className="account-section-grid">
             <article className="card account-card">
-              <div className="account-card-head">
-                <div>
-                  <h2>Активные сессии</h2>
-                  <p className="page-subtitle">Устройства, с которых сейчас открыт кабинет.</p>
-                </div>
+              <h2>Мои данные</h2>
+              <p className="page-subtitle">
+                Архив включает профиль, согласия, сессии, уведомления, обращения и данные компании.
+              </p>
+              {exportMessage ? <p className="account-form-message">{exportMessage}</p> : null}
+              <button className="button secondary" type="button" onClick={exportData} disabled={exportBusy}>
+                <Download size={16} />
+                {exportBusy ? "Готовим..." : "Скачать архив"}
+              </button>
+            </article>
+            <article className="card account-card account-danger-zone">
+              <h2>Опасная зона</h2>
+              {user?.deletionRequestedAt ? (
+                <p className="page-subtitle">
+                  Удаление аккаунта запланировано на {formatAccountDate(user.deletionScheduledFor)}. До этой даты запрос
+                  можно отменить.
+                </p>
+              ) : (
+                <p className="page-subtitle">
+                  Запрос ставит аккаунт в очередь удаления на 30 дней и закрывает функциональные разделы компании.
+                </p>
+              )}
+              {deletionMessage ? <p className="account-form-message">{deletionMessage}</p> : null}
+              {user?.deletionRequestedAt ? (
+                <button className="button secondary" type="button" onClick={cancelDeletion} disabled={deletionBusy}>
+                  <RotateCcw size={16} />
+                  {deletionBusy ? "Отменяем..." : "Передумал"}
+                </button>
+              ) : (
                 <button
                   className="button secondary danger"
-                  onClick={logoutEverywhere}
                   type="button"
-                  disabled={sessionBusyId === "all"}
+                  onClick={requestDeletion}
+                  disabled={deletionBusy}
                 >
-                  Выйти со всех устройств
+                  <Trash2 size={16} />
+                  {deletionBusy ? "Планируем..." : "Запросить удаление"}
                 </button>
-              </div>
-              {sessionsState === "loading" ? <p className="page-subtitle">Загружаем сессии...</p> : null}
-              <div className="account-session-list">
-                {sessions.map((session) => (
-                  <div className="account-session-row" key={session.id}>
-                    <div>
-                      <strong>
-                        {describeSessionDevice(session.userAgent)}
-                        {session.current ? (
-                          <>
-                            {" "}
-                            <StatusPill variant="brand">Текущая</StatusPill>
-                          </>
-                        ) : null}
-                      </strong>
-                      <span>
-                        IP {session.ipAddress ?? "—"} · последний раз {formatAccountDateTime(session.updatedAt)} · до{" "}
-                        {formatAccountDateTime(session.expiresAt)}
-                      </span>
-                    </div>
-                    {!session.current ? (
-                      <button
-                        className="button secondary"
-                        onClick={() => void revokeSession(session.id)}
-                        type="button"
-                        disabled={sessionBusyId === session.id}
-                      >
-                        Отозвать
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                {sessionsState !== "loading" && sessions.length === 0 ? (
-                  <p className="page-subtitle">Активных сессий не найдено.</p>
-                ) : null}
-              </div>
+              )}
             </article>
           </div>
         ) : null}
 
-        {activeTab === "notifications" ? (
+        {activeSection === "sessions" ? (
+          <article className="card account-card">
+            <div className="account-card-head">
+              <div>
+                <h2>Активные сессии</h2>
+                <p className="page-subtitle">Устройства, с которых сейчас открыт кабинет.</p>
+              </div>
+              <button
+                className="button secondary danger"
+                onClick={logoutEverywhere}
+                type="button"
+                disabled={sessionBusyId === "all"}
+              >
+                Выйти со всех устройств
+              </button>
+            </div>
+            {sessionsState === "loading" ? <p className="page-subtitle">Загружаем сессии...</p> : null}
+            <div className="account-session-list">
+              {sessions.map((session) => (
+                <div className="account-session-row" key={session.id}>
+                  <div>
+                    <strong>
+                      {describeSessionDevice(session.userAgent)}
+                      {session.current ? (
+                        <>
+                          {" "}
+                          <StatusPill variant="brand">Текущая</StatusPill>
+                        </>
+                      ) : null}
+                    </strong>
+                    <span>
+                      IP {session.ipAddress ?? "—"} · последний раз {formatAccountDateTime(session.updatedAt)} · до{" "}
+                      {formatAccountDateTime(session.expiresAt)}
+                    </span>
+                  </div>
+                  {!session.current ? (
+                    <button
+                      className="button secondary"
+                      onClick={() => void revokeSession(session.id)}
+                      type="button"
+                      disabled={sessionBusyId === session.id}
+                    >
+                      Отозвать
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              {sessionsState !== "loading" && sessions.length === 0 ? (
+                <p className="page-subtitle">Активных сессий не найдено.</p>
+              ) : null}
+            </div>
+          </article>
+        ) : null}
+
+        {activeSection === "notifications" ? (
           <article className="card account-card">
             <h2>Настройки уведомлений</h2>
             <div className="account-notification-table">
@@ -906,7 +866,7 @@ export function AccountView() {
           </article>
         ) : null}
 
-        {activeTab === "support" && !isPlatformStaff ? (
+        {activeSection === "support" && !isPlatformStaff ? (
           <div className="account-section-grid">
             <article className="card account-card">
               <h2>Поддержка</h2>

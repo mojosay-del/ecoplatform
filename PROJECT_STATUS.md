@@ -46,6 +46,8 @@
 
 Навигационный фундамент под будущий `/admin`-дашборд 12.9 готов: `/admin` больше не редиректит в CMS, а показывает главную панель с группами быстрых переходов; локальная CMS-навигация убрана, а все дочерние страницы `/admin/*` ведут назад в центр через единую кнопку «← Панель управления». Сам KPI-дашборд 12.9 пока не реализован.
 
+Внеплановая навигационная правка закрыта: `/account` переведён из одной большой страницы с табами в современные настройки аккаунта с прямыми маршрутами `/account/profile`, `/account/security`, `/account/notifications`, `/account/data-privacy`, `/account/sessions`; на `/account/*` левое меню `AppShell` заменяется меню кабинета, а бизнес-разделы «Компания», «Подписка», «Поддержка» показываются только обычным пользователям компании.
+
 Целевой следующий шаг: Волна 12.5 — CMS preview новостей в админке.
 
 ## Что уже сделано
@@ -206,13 +208,14 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после упрощения навигации панели управления).
+Дата: 2026-05-27 (после реструктуризации личного кабинета).
 
 - `pnpm --filter @ecoplatform/web typecheck` — успешно.
 - `pnpm --filter @ecoplatform/web lint` — успешно.
-- `pnpm --filter @ecoplatform/web test` — успешно: web 42/42.
-- Browser UI-check — `/admin/content/news`: CMS-вкладок нет, есть ссылка `← Панель управления` на `/admin`, breadcrumbs `Панель управления/CMS/Новости`, console errors = 0, desktop overflow = 0. `/admin/companies`: есть та же ссылка на `/admin`, breadcrumbs `Панель управления/Компании`, overflow = 0. `/admin`: главная панель с группами CMS/операции/контроль/настройки, без кнопки назад и без KPI-графиков. Mobile 390px `/admin/content/news`: CMS-вкладок нет, `documentOverflowX=0`, `bodyOverflowX=0`.
-- Скриншоты: `/private/tmp/ecoplatform-admin-nav-simplified-news-desktop.png`, `/private/tmp/ecoplatform-admin-nav-simplified-companies-desktop.png`, `/private/tmp/ecoplatform-admin-nav-simplified-home-desktop.png`, `/private/tmp/ecoplatform-admin-nav-simplified-news-mobile.png`.
+- `pnpm --filter @ecoplatform/web test` — успешно: web 46/46.
+- `pnpm --filter @ecoplatform/web build` — успешно.
+- Browser UI-check — demo-пользователь: прямые `/account/security`, `/account/data-privacy`, `/account/sessions`, `/account/billing` показывают `aria-label="Навигация личного кабинета"`, активный пункт слева, breadcrumbs `Настройки аккаунта / раздел`, business-группу и `documentOverflowX=0`, `bodyOverflowX=0`; topbar account-menu открывается и подсвечивает активную «Безопасность». Mobile 390px `/account/security`: burger открывает account-меню слева, active «Безопасность», overflow = 0. Platform admin: `/account/billing` редиректит на `/account/profile`, бизнес-пункты скрыты, кнопки поддержки в topbar нет.
+- Скриншоты: `/private/tmp/ecoplatform-account-settings-desktop.png`, `/private/tmp/ecoplatform-account-settings-mobile.png`, `/private/tmp/ecoplatform-account-settings-admin.png`.
 - `pnpm exec prettier --check` по изменённым web/status-файлам — clean.
 - `git diff --check` — clean.
 - Последний полный root bundle до этой web-only правки: 2026-05-27 после Волны 12.4 (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm test:integration`, `pnpm build`, `pnpm format:check`, `git diff --check`).
@@ -229,6 +232,7 @@ pnpm format:check                                     # prettier
 - Demo приравнен к basic-доступу только пока `demoEndsAt` в будущем.
 - После истечения demo функциональные разделы API закрываются, но `/account`, `/billing/status`, `/support/tickets`, `/notifications` остаются.
 - В статусе `pending_deletion` функциональные разделы тоже закрыты (через `access.ts`), доступ к `/account` сохраняется до фактического удаления через 30 дней.
+- `/account/*` использует отдельное меню настроек аккаунта вместо глобального сайдбара; постоянные пункты личного кабинета и уведомлений не возвращать в основное меню платформы.
 - Ручная оплата остаётся через админа: `POST /api/admin/billing/manual-subscriptions` с `Idempotency-Key`.
 - Content-блоки хранятся как `type + payload Json`, в каждом payload теперь есть `v: 1` — это задел под параллельные парсеры v1/v2 без массовой миграции.
 - Поддержка проверяет принадлежность тикета компании; ответ на чужой тикет — 404, не 403.

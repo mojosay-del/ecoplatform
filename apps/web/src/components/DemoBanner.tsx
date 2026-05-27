@@ -25,7 +25,7 @@ export function DemoBanner({ user, pathname }: { user: AuthMeUser | null; pathna
   return (
     <div className={`demo-banner demo-banner-${state.mode}`} role="status" aria-live="polite">
       <span>{state.text}</span>
-      <Link className="button demo-banner-action" href="/account?tab=billing">
+      <Link className="button demo-banner-action" href="/account/billing">
         Активировать подписку
       </Link>
     </div>

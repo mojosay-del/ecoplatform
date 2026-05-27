@@ -1,16 +1,25 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowLeft,
+  Bell,
   BookOpen,
+  Building2,
   Calculator,
+  CreditCard,
+  Database,
   FileText,
   GraduationCap,
+  KeyRound,
   LayoutDashboard,
   LineChart,
-  Map,
+  LifeBuoy,
+  Map as MapIcon,
   MessageCircle,
   Newspaper,
   ShoppingBag,
+  Smartphone,
   Store,
+  UserRound,
 } from "lucide-react";
 
 export type NavItem = {
@@ -34,6 +43,16 @@ export type BreadcrumbItem = {
   label: string;
   icon?: LucideIcon;
 };
+
+export type AccountSectionId =
+  | "profile"
+  | "security"
+  | "notifications"
+  | "data-privacy"
+  | "sessions"
+  | "company"
+  | "billing"
+  | "support";
 
 const futureItem = (label: string, icon: LucideIcon, disabledHint: string): NavItem => ({
   label,
@@ -70,7 +89,7 @@ export const appNavSections: NavSection[] = [
   {
     title: "Инструменты",
     items: [
-      futureItem("Карты", Map, "Карты — география переработчиков, складов и логистики."),
+      futureItem("Карты", MapIcon, "Карты — география переработчиков, складов и логистики."),
       futureItem("Калькуляторы", Calculator, "Калькуляторы — расчёт экономики сделок, логистики и переработки."),
     ],
   },
@@ -90,6 +109,69 @@ export const appNavSections: NavSection[] = [
   },
 ];
 
+const accountSettingsItems: NavItem[] = [
+  { href: "/account/profile", label: "Профиль", icon: UserRound },
+  { href: "/account/security", label: "Безопасность", icon: KeyRound },
+  { href: "/account/notifications", label: "Уведомления", icon: Bell },
+  { href: "/account/data-privacy", label: "Данные и приватность", icon: Database },
+  { href: "/account/sessions", label: "Сессии", icon: Smartphone },
+];
+
+const accountBusinessItems: NavItem[] = [
+  { href: "/account/company", label: "Компания", icon: Building2 },
+  { href: "/account/billing", label: "Подписка", icon: CreditCard },
+  { href: "/account/support", label: "Поддержка", icon: LifeBuoy },
+];
+
+export const accountBusinessSections: AccountSectionId[] = ["company", "billing", "support"];
+
+export function getAccountNavSections(includeBusiness: boolean): NavSection[] {
+  return [
+    {
+      title: "Переход",
+      items: [{ href: "/news", label: "К платформе", icon: ArrowLeft }],
+    },
+    {
+      title: "Настройки",
+      items: accountSettingsItems,
+    },
+    ...(includeBusiness
+      ? [
+          {
+            title: "Компания",
+            items: accountBusinessItems,
+          },
+        ]
+      : []),
+  ];
+}
+
+export function getAccountMenuSections(includeBusiness: boolean): NavSection[] {
+  return getAccountNavSections(includeBusiness).filter((section) => section.title !== "Переход");
+}
+
+export function isAccountPath(pathname: string): boolean {
+  return pathname === "/account" || pathname.startsWith("/account/");
+}
+
+export function isAccountBusinessSection(section: AccountSectionId): boolean {
+  return accountBusinessSections.includes(section);
+}
+
+export function normalizeAccountSection(value: string): AccountSectionId | null {
+  return accountSectionIds.has(value as AccountSectionId) ? (value as AccountSectionId) : null;
+}
+
+export function accountSectionHref(section: AccountSectionId): string {
+  return `/account/${section}`;
+}
+
+export function getLegacyAccountTabHref(tab: string | null | undefined): string | null {
+  if (!tab) return null;
+  const section = legacyAccountTabToSection.get(tab);
+  return section ? accountSectionHref(section) : null;
+}
+
 export function futureNavItems(sections: NavSection[] = appNavSections): NavItem[] {
   return sections.flatMap((section) => flattenItems(section.items)).filter((item) => item.disabled);
 }
@@ -103,6 +185,9 @@ export function isNavItemActive(item: NavItem, pathname: string): boolean {
 }
 
 export function getBreadcrumbTrail(nav: NavSection[], pathname: string): BreadcrumbItem[] | null {
+  const accountTrail = getAccountBreadcrumbTrail(pathname);
+  if (accountTrail) return accountTrail;
+
   const adminTrail = getAdminBreadcrumbTrail(pathname);
   if (adminTrail) return adminTrail;
 
@@ -161,4 +246,45 @@ const adminBreadcrumbs: { prefix: string; trail: BreadcrumbItem[] }[] = [
 
 function getAdminBreadcrumbTrail(pathname: string): BreadcrumbItem[] | null {
   return adminBreadcrumbs.find(({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`))?.trail ?? null;
+}
+
+const accountRoot: BreadcrumbItem = {
+  href: "/account/profile",
+  label: "Настройки аккаунта",
+  icon: UserRound,
+};
+
+const accountBreadcrumbs: { prefix: string; section: AccountSectionId; label: string }[] = [
+  { prefix: "/account/profile", section: "profile", label: "Профиль" },
+  { prefix: "/account/security", section: "security", label: "Безопасность" },
+  { prefix: "/account/notifications", section: "notifications", label: "Уведомления" },
+  { prefix: "/account/data-privacy", section: "data-privacy", label: "Данные и приватность" },
+  { prefix: "/account/sessions", section: "sessions", label: "Сессии" },
+  { prefix: "/account/company", section: "company", label: "Компания" },
+  { prefix: "/account/billing", section: "billing", label: "Подписка" },
+  { prefix: "/account/support", section: "support", label: "Поддержка" },
+];
+
+const accountSectionIds = new Set<AccountSectionId>(accountBreadcrumbs.map((item) => item.section));
+
+const legacyAccountTabToSection = new Map<string, AccountSectionId>([
+  ["profile", "profile"],
+  ["security", "security"],
+  ["notifications", "notifications"],
+  ["company", "company"],
+  ["billing", "billing"],
+  ["support", "support"],
+]);
+
+function getAccountBreadcrumbTrail(pathname: string): BreadcrumbItem[] | null {
+  const matched = accountBreadcrumbs.find(({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  if (matched) {
+    return [accountRoot, { href: matched.prefix, label: matched.label }];
+  }
+
+  if (pathname === "/account") {
+    return [accountRoot];
+  }
+
+  return null;
 }

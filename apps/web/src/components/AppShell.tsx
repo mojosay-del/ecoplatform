@@ -3,12 +3,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
-import { ChevronsLeft, ChevronsRight, HelpCircle, Menu, Settings, X } from "lucide-react";
-import { useAuth } from "../lib/auth";
+import { useEffect, useId, useRef, useState } from "react";
+import { ChevronsLeft, ChevronsRight, HelpCircle, LogOut, Menu, Settings, X } from "lucide-react";
+import { useAuth, type User } from "../lib/auth";
 import {
   appNavSections,
+  getAccountMenuSections,
+  getAccountNavSections,
   getBreadcrumbTrail,
+  isAccountPath,
   isNavItemActive,
   type BreadcrumbItem,
   type NavItem,
@@ -21,13 +24,14 @@ import { UserSupportDrawer } from "./UserSupportDrawer";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, token, ready } = useAuth();
+  const { user, token, ready, logout } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   // У админов своя полноценная страница /admin/support — drawer им
   // показывать не нужно, иначе двойная сущность.
   const isAdminUser = (user?.platformRoles?.length ?? 0) > 0;
+  const inAccountSettings = isAccountPath(pathname);
   const showAdminPanelBackLink = pathname.startsWith("/admin/");
 
   // Любой защищённый раздел оборачивается в AppShell. Если AuthProvider уже
@@ -77,7 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  const visibleNav = appNavSections
+  const visibleAppNav = appNavSections
     .map((section) => ({
       ...section,
       items: filterVisibleItems(section.items, user?.platformRoles ?? []),
@@ -85,13 +89,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // Если в секции не осталось ни одного пункта (например, «Служебное»
     // для обычного пользователя без админских ролей) — секцию не показываем.
     .filter((section) => section.items.length > 0);
+  const visibleNav = inAccountSettings ? getAccountNavSections(!isAdminUser) : visibleAppNav;
 
   return (
     <div className="app-shell" data-collapsed={collapsed ? "true" : "false"}>
       <aside
         className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}
         role="navigation"
-        aria-label="Основная навигация"
+        aria-label={inAccountSettings ? "Навигация личного кабинета" : "Основная навигация"}
       >
         <div className="sidebar-head">
           <Link className="brand" href="/news">
@@ -154,17 +159,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <HelpCircle size={20} />
             </button>
           )}
-          <Link className="icon-button" href="/account" title="Настройки" aria-label="Открыть настройки">
-            <Settings size={20} />
-          </Link>
-          <Link
-            className={`avatar ${user?.avatarUrl ? "avatar-with-image" : ""}`}
-            title={user ? `${user.firstName} ${user.lastName}` : "Войти"}
-            href={user ? "/account" : "/login"}
-            aria-label={user ? `Открыть профиль: ${user.firstName} ${user.lastName}` : "Войти"}
-          >
-            {user?.avatarUrl ? <Image alt="" src={user.avatarUrl} width={40} height={40} /> : null}
-          </Link>
+          <AccountMenu includeBusiness={!isAdminUser} onLogout={logout} pathname={pathname} user={user} />
         </header>
         <DemoBanner user={user} pathname={pathname} />
         <div className="page-surface">
@@ -180,6 +175,105 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Drawer поддержки рендерим один раз на уровне AppShell — компонент
           сам проверяет проп `open` и ничего не рисует, пока он false. */}
       {isAdminUser ? null : <UserSupportDrawer open={supportOpen} onClose={() => setSupportOpen(false)} />}
+    </div>
+  );
+}
+
+function AccountMenu({
+  includeBusiness,
+  onLogout,
+  pathname,
+  user,
+}: {
+  includeBusiness: boolean;
+  onLogout: () => Promise<void>;
+  pathname: string;
+  user: User | null;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const sections = getAccountMenuSections(includeBusiness);
+  const fullName = user ? `${user.firstName} ${user.lastName}` : "Аккаунт";
+  const initials = user ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() : "";
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocumentMouseDown(event: MouseEvent) {
+      if (!rootRef.current || rootRef.current.contains(event.target as Node)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocumentMouseDown);
+    return () => document.removeEventListener("mousedown", onDocumentMouseDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  return (
+    <div className="account-menu-root" ref={rootRef}>
+      <button
+        className="icon-button"
+        type="button"
+        title="Настройки аккаунта"
+        aria-label="Открыть настройки аккаунта"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Settings size={20} />
+      </button>
+      <button
+        className={`avatar account-menu-avatar ${user?.avatarUrl ? "avatar-with-image" : ""}`}
+        type="button"
+        title={fullName}
+        aria-label={`Открыть меню аккаунта: ${fullName}`}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {user?.avatarUrl ? <Image alt="" src={user.avatarUrl} width={40} height={40} /> : null}
+        {!user?.avatarUrl ? <span className="account-menu-avatar-initials">{initials || "?"}</span> : null}
+      </button>
+      {open ? (
+        <div className="account-menu-popover" role="menu" aria-label="Меню аккаунта">
+          <header className="account-menu-head">
+            <strong>{fullName}</strong>
+            {user?.email ? <span>{user.email}</span> : null}
+          </header>
+          {sections.map((section) => (
+            <div className="account-menu-section" key={section.title}>
+              <p>{section.title}</p>
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const active = isNavItemActive(item, pathname);
+                return item.href ? (
+                  <Link
+                    className={`account-menu-link ${active ? "active" : ""}`}
+                    href={item.href}
+                    key={item.href}
+                    role="menuitem"
+                  >
+                    <Icon size={16} />
+                    <span>{item.label}</span>
+                  </Link>
+                ) : null;
+              })}
+            </div>
+          ))}
+          <button className="account-menu-logout" type="button" onClick={() => void onLogout()} role="menuitem">
+            <LogOut size={16} />
+            <span>Выйти</span>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
