@@ -218,7 +218,10 @@ function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: 
 
 function isActiveNavItem(item: NavItem, pathname: string): boolean {
   const selfActive = Boolean(item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`)));
-  return selfActive || Boolean(item.children?.some((child) => isActiveNavItem(child, pathname)));
+  const prefixActive = Boolean(
+    item.activePathPrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)),
+  );
+  return selfActive || prefixActive || Boolean(item.children?.some((child) => isActiveNavItem(child, pathname)));
 }
 
 // Хлебные крошки в топбаре: ищем в навигации активный пункт и показываем

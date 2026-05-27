@@ -1,11 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { RotateCcw, Search } from "lucide-react";
 import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
-import { AdminPeopleTabs } from "./AdminPeopleTabs";
+import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
+import { CmsTabs } from "./CmsTabs";
 import { StatusPill } from "./StatusPill";
+import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -29,11 +32,27 @@ type StaffItem = {
 };
 
 const allRoles = ["admin", "moderator", "content_manager"] as const;
+type PlatformRole = (typeof allRoles)[number];
+type StaffSortKey = "name" | "status" | "role" | "email" | "createdAt";
 
 const genderOptions = [
   { value: "male", label: "Мужской" },
   { value: "female", label: "Женский" },
 ] as const;
+
+const roleLabel: Record<string, string> = {
+  admin: "Админ",
+  moderator: "Модератор",
+  content_manager: "Контент-менеджер",
+};
+
+const staffSortSelectors: Record<StaffSortKey, (item: StaffItem) => string | number> = {
+  name: (item) => `${item.user.lastName} ${item.user.firstName}`,
+  status: (item) => (item.isActive ? "Активен" : "Деактивирован"),
+  role: (item) => formatRoles(item.roles),
+  email: (item) => item.user.email,
+  createdAt: (item) => Date.parse(item.createdAt),
+};
 
 export function AdminStaffView() {
   const { token } = useAuth();
@@ -43,6 +62,41 @@ export function AdminStaffView() {
     return apiFetch<{ items: StaffItem[]; total: number; hasMore: boolean }>(`/admin/staff?${query}`, { token });
   });
   const items = staffQuery.items;
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
+  const [roleFilter, setRoleFilter] = useState<"" | PlatformRole>("");
+  const [filters, setFilters] = useState<{
+    search: string;
+    status: "" | "active" | "inactive";
+    role: "" | PlatformRole;
+  }>({ search: "", status: "", role: "" });
+  const [sort, setSort] = useState<SortState<StaffSortKey>>({ key: "createdAt", direction: "desc" });
+  const filteredItems = useMemo(() => {
+    const query = filters.search.toLowerCase();
+
+    return items.filter((staff) => {
+      if (filters.status === "active" && !staff.isActive) return false;
+      if (filters.status === "inactive" && staff.isActive) return false;
+      if (filters.role && !staff.roles.includes(filters.role)) return false;
+
+      if (query) {
+        const haystack = [
+          staff.user.firstName,
+          staff.user.lastName,
+          staff.user.email,
+          staff.user.phone,
+          formatRoles(staff.roles),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+
+      return true;
+    });
+  }, [filters, items]);
+  const sortedItems = useMemo(() => sortItems(filteredItems, sort, staffSortSelectors), [filteredItems, sort]);
+  const hasActiveFilters = Boolean(filters.search || filters.status || filters.role);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -86,6 +140,13 @@ export function AdminStaffView() {
     }
   }
 
+  function resetFilters() {
+    setSearch("");
+    setStatusFilter("");
+    setRoleFilter("");
+    setFilters({ search: "", status: "", role: "" });
+  }
+
   if (!token || staffQuery.state === "unauthenticated") {
     return (
       <AppShell>
@@ -115,7 +176,7 @@ export function AdminStaffView() {
           <h1 className="page-title">Сотрудники</h1>
           <p className="page-subtitle">Платформенные роли: админ, модератор, контент-менеджер.</p>
         </header>
-        <AdminPeopleTabs />
+        <CmsTabs />
 
         {errorMessage || staffQuery.errorMessage ? (
           <StatusPill as="p" variant="danger">
@@ -199,7 +260,7 @@ export function AdminStaffView() {
                     }
                     type="checkbox"
                   />
-                  {role}
+                  {roleLabel[role]}
                 </label>
               ))}
             </div>
@@ -209,61 +270,163 @@ export function AdminStaffView() {
           </form>
         ) : null}
 
-        <div className="stack-list">
-          {items.map((staff) => (
-            <article className="checklist-block" key={staff.id}>
-              <div className="staff-profile">
-                <Image
-                  className="staff-avatar"
-                  alt=""
-                  src={resolvePlatformAvatarUrl(staff.roles, staff.user.gender)}
-                  width={58}
-                  height={58}
-                />
-                <div>
-                  <strong>
-                    {staff.user.firstName} {staff.user.lastName}
-                  </strong>
-                  <p>
-                    {staff.user.email} · {staff.user.phone}
-                  </p>
-                  <p className="page-subtitle">Пол: {staff.user.gender === "female" ? "Женский" : "Мужской"}</p>
-                </div>
-              </div>
-              <p>
-                <StatusPill variant={staff.isActive ? "success" : "danger"}>
-                  {staff.isActive ? "Активен" : "Деактивирован"}
-                </StatusPill>{" "}
-                Роли: {staff.roles.join(", ") || "—"}
-              </p>
-              <div className="auth-actions">
-                {allRoles.map((role) => {
-                  const has = staff.roles.includes(role);
-                  return (
-                    <button
-                      className={`button ${has ? "secondary" : ""}`}
-                      key={role}
-                      onClick={() =>
-                        updateStaff(staff.userId, {
-                          roles: has ? staff.roles.filter((item) => item !== role) : [...staff.roles, role],
-                        })
-                      }
-                      type="button"
-                    >
-                      {has ? `Снять ${role}` : `Дать ${role}`}
-                    </button>
-                  );
-                })}
-                <button
-                  className="button secondary"
-                  onClick={() => updateStaff(staff.userId, { isActive: !staff.isActive })}
-                  type="button"
-                >
-                  {staff.isActive ? "Деактивировать" : "Активировать"}
+        <form
+          className="admin-filter-bar"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setFilters({ search: search.trim(), status: statusFilter, role: roleFilter });
+          }}
+        >
+          <label className="admin-filter-field">
+            <Search aria-hidden size={16} />
+            <input
+              aria-label="Поиск сотрудников"
+              className="input"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Поиск по имени, email, телефону"
+              type="search"
+              value={search}
+            />
+          </label>
+          <select
+            className="select"
+            onChange={(event) => setStatusFilter(event.target.value as "" | "active" | "inactive")}
+            value={statusFilter}
+          >
+            <option value="">Все статусы</option>
+            <option value="active">Активные</option>
+            <option value="inactive">Деактивированные</option>
+          </select>
+          <select
+            className="select"
+            onChange={(event) => setRoleFilter(event.target.value as "" | PlatformRole)}
+            value={roleFilter}
+          >
+            <option value="">Все роли</option>
+            {allRoles.map((role) => (
+              <option key={role} value={role}>
+                {roleLabel[role]}
+              </option>
+            ))}
+          </select>
+          <div className="admin-filter-actions">
+            <button className="button" type="submit">
+              Применить
+            </button>
+            <button className="button secondary" onClick={resetFilters} type="button">
+              <RotateCcw aria-hidden size={16} />
+              Сбросить
+            </button>
+          </div>
+        </form>
+
+        <div className="admin-table-shell">
+          <div className="admin-table-meta">
+            <p className="page-subtitle">
+              Загружено {items.length} из {staffQuery.total}.
+            </p>
+          </div>
+          <div className="admin-table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">
+                    <AdminSortButton label="Сотрудник" sort={sort} sortKey="name" onSort={setSort} />
+                  </th>
+                  <th scope="col">
+                    <AdminSortButton label="Статус" sort={sort} sortKey="status" onSort={setSort} />
+                  </th>
+                  <th scope="col">
+                    <AdminSortButton label="Роли" sort={sort} sortKey="role" onSort={setSort} />
+                  </th>
+                  <th scope="col">
+                    <AdminSortButton label="Email" sort={sort} sortKey="email" onSort={setSort} />
+                  </th>
+                  <th scope="col">
+                    <AdminSortButton
+                      defaultDirection="desc"
+                      label="Создан"
+                      sort={sort}
+                      sortKey="createdAt"
+                      onSort={setSort}
+                    />
+                  </th>
+                  <th scope="col">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedItems.map((staff) => (
+                  <tr key={staff.id}>
+                    <td>
+                      <div className="staff-profile">
+                        <Image
+                          className="staff-avatar"
+                          alt=""
+                          src={resolvePlatformAvatarUrl(staff.roles, staff.user.gender)}
+                          width={36}
+                          height={36}
+                        />
+                        <div className="admin-table-cell-main">
+                          <strong>
+                            {staff.user.firstName} {staff.user.lastName}
+                          </strong>
+                          <span className="admin-table-muted">{staff.user.phone}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <StatusPill variant={staff.isActive ? "success" : "danger"}>
+                        {staff.isActive ? "Активен" : "Деактивирован"}
+                      </StatusPill>
+                    </td>
+                    <td>{formatRoles(staff.roles)}</td>
+                    <td>{staff.user.email}</td>
+                    <td>{new Date(staff.createdAt).toLocaleDateString("ru-RU")}</td>
+                    <td>
+                      <div className="admin-table-actions">
+                        {allRoles.map((role) => {
+                          const has = staff.roles.includes(role);
+                          return (
+                            <button
+                              className={`button ${has ? "secondary" : ""}`}
+                              key={role}
+                              onClick={() =>
+                                updateStaff(staff.userId, {
+                                  roles: has ? staff.roles.filter((item) => item !== role) : [...staff.roles, role],
+                                })
+                              }
+                              type="button"
+                            >
+                              {has ? `Снять ${roleLabel[role]}` : `Дать ${roleLabel[role]}`}
+                            </button>
+                          );
+                        })}
+                        <button
+                          className="button secondary"
+                          onClick={() => updateStaff(staff.userId, { isActive: !staff.isActive })}
+                          type="button"
+                        >
+                          {staff.isActive ? "Деактивировать" : "Активировать"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {sortedItems.length === 0 && !staffQuery.isInitialLoading ? (
+            <div className="admin-empty-state">
+              <p>{hasActiveFilters ? "По текущим фильтрам сотрудников нет." : "Сотрудников пока нет."}</p>
+              {hasActiveFilters ? (
+                <button className="button secondary" onClick={resetFilters} type="button">
+                  Очистить фильтры
                 </button>
-              </div>
-            </article>
-          ))}
+              ) : null}
+            </div>
+          ) : null}
+
           <div ref={staffQuery.sentinelRef} aria-hidden="true" />
           {staffQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
           {!staffQuery.hasMore && items.length > 0 ? <p className="page-subtitle">Это все сотрудники.</p> : null}
@@ -278,4 +441,9 @@ function resolvePlatformAvatarUrl(roles: string[], gender: string): string {
   const prefix = roles.includes("admin") ? "a" : "m";
 
   return `/avatars/platform/${prefix}${suffix}.png`;
+}
+
+function formatRoles(roles: readonly string[]) {
+  if (roles.length === 0) return "—";
+  return roles.map((role) => roleLabel[role] ?? role).join(", ");
 }

@@ -1,17 +1,29 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import type { AdminJournalEntry, AdminJournalPayload, PaginatedResponse } from "@ecoplatform/shared";
+import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
+import { CmsTabs } from "./CmsTabs";
 import { StatusPill } from "./StatusPill";
+import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 type JournalList = PaginatedResponse<AdminJournalEntry>;
+type JournalSortKey = "createdAt" | "action" | "entity" | "actor";
 
 type AdminJournalsViewProps = {
   embedded?: boolean;
+};
+
+const journalSortSelectors: Record<JournalSortKey, (item: AdminJournalEntry) => string | number> = {
+  createdAt: (item) => Date.parse(item.createdAt),
+  action: (item) => item.action,
+  entity: (item) => `${item.entityType} ${item.entityId}`,
+  actor: (item) => (item.actor ? formatActor(item.actor) : ""),
 };
 
 export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) {
@@ -24,6 +36,7 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [filters, setFilters] = useState({ action: "", entityType: "", actorId: "", from: "", to: "" });
+  const [sort, setSort] = useState<SortState<JournalSortKey>>({ key: "createdAt", direction: "desc" });
   const take = 25;
   const journalsQuery = useInfiniteApiQuery<AdminJournalEntry>(
     token
@@ -47,6 +60,23 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
     event.preventDefault();
     setFilters({ action: action.trim(), entityType: entityType.trim(), actorId: actorId.trim(), from, to });
   }
+
+  function resetFilters() {
+    setAction("");
+    setEntityType("");
+    setActorId("");
+    setFrom("");
+    setTo("");
+    setFilters({ action: "", entityType: "", actorId: "", from: "", to: "" });
+  }
+
+  const sortedEntries = useMemo(
+    () => sortItems(journalsQuery.items, sort, journalSortSelectors),
+    [journalsQuery.items, sort],
+  );
+  const hasActiveFilters = Boolean(
+    filters.action || filters.entityType || filters.actorId || filters.from || filters.to,
+  );
 
   if (!token || journalsQuery.state === "unauthenticated") {
     const content = (
@@ -86,43 +116,53 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
         <h1 className="page-title">Журнал действий администраторов</h1>
         <p className="page-subtitle">Все изменения в админке фиксируются и доступны для аудита.</p>
       </header>
+      <CmsTabs />
 
-      <form className="form" onSubmit={submit}>
-        <div className="auth-actions">
-          <input
-            className="input"
-            onChange={(event) => setAction(event.target.value)}
-            placeholder="Действие (например, admin.user.block)"
-            value={action}
-          />
-          <input
-            className="input"
-            onChange={(event) => setEntityType(event.target.value)}
-            placeholder="Тип сущности (User, Company, PlatformSetting…)"
-            value={entityType}
-          />
-          <input
-            className="input"
-            onChange={(event) => setActorId(event.target.value)}
-            placeholder="ID администратора"
-            value={actorId}
-          />
-          <input
-            className="input"
-            onChange={(event) => setFrom(event.target.value)}
-            placeholder="С даты"
-            type="datetime-local"
-            value={from}
-          />
-          <input
-            className="input"
-            onChange={(event) => setTo(event.target.value)}
-            placeholder="По дату"
-            type="datetime-local"
-            value={to}
-          />
+      <form className="admin-filter-bar" onSubmit={submit}>
+        <input
+          aria-label="Фильтр по действию"
+          className="input"
+          onChange={(event) => setAction(event.target.value)}
+          placeholder="Действие"
+          value={action}
+        />
+        <input
+          aria-label="Фильтр по типу сущности"
+          className="input"
+          onChange={(event) => setEntityType(event.target.value)}
+          placeholder="Тип сущности"
+          value={entityType}
+        />
+        <input
+          aria-label="Фильтр по ID администратора"
+          className="input"
+          onChange={(event) => setActorId(event.target.value)}
+          placeholder="ID администратора"
+          value={actorId}
+        />
+        <input
+          aria-label="Дата начала"
+          className="input"
+          onChange={(event) => setFrom(event.target.value)}
+          placeholder="С даты"
+          type="datetime-local"
+          value={from}
+        />
+        <input
+          aria-label="Дата окончания"
+          className="input"
+          onChange={(event) => setTo(event.target.value)}
+          placeholder="По дату"
+          type="datetime-local"
+          value={to}
+        />
+        <div className="admin-filter-actions">
           <button className="button" type="submit">
             Применить
+          </button>
+          <button className="button secondary" onClick={resetFilters} type="button">
+            <RotateCcw aria-hidden size={16} />
+            Сбросить
           </button>
         </div>
       </form>
@@ -135,24 +175,72 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
       {journalsQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
       {journalsQuery.state === "ready" || journalsQuery.items.length > 0 ? (
-        <div className="stack-list">
-          <p className="page-subtitle">
-            Загружено {journalsQuery.items.length} из {journalsQuery.total}.
-          </p>
-          {journalsQuery.items.map((entry) => (
-            <article className="checklist-block" key={entry.id}>
-              <strong>{entry.action}</strong>
-              <p>
-                {entry.entityType} · ID: {entry.entityId}
-              </p>
-              <p>
-                {new Date(entry.createdAt).toLocaleString("ru-RU")}
-                {entry.actor ? ` · ${formatActor(entry.actor)}` : ""}
-              </p>
-              {entry.comment ? <p>«{entry.comment}»</p> : null}
-              <PayloadView payload={entry.payload} />
-            </article>
-          ))}
+        <div className="admin-table-shell">
+          <div className="admin-table-meta">
+            <p className="page-subtitle">
+              Загружено {journalsQuery.items.length} из {journalsQuery.total}.
+            </p>
+          </div>
+          <div className="admin-table-scroll">
+            <table className="admin-table admin-journal-table">
+              <thead>
+                <tr>
+                  <th scope="col">
+                    <AdminSortButton
+                      defaultDirection="desc"
+                      label="Дата"
+                      sort={sort}
+                      sortKey="createdAt"
+                      onSort={setSort}
+                    />
+                  </th>
+                  <th scope="col">
+                    <AdminSortButton label="Действие" sort={sort} sortKey="action" onSort={setSort} />
+                  </th>
+                  <th scope="col">
+                    <AdminSortButton label="Сущность" sort={sort} sortKey="entity" onSort={setSort} />
+                  </th>
+                  <th scope="col">Diff</th>
+                  <th scope="col">
+                    <AdminSortButton label="Администратор" sort={sort} sortKey="actor" onSort={setSort} />
+                  </th>
+                  <th scope="col">Комментарий</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedEntries.map((entry) => (
+                  <tr key={entry.id}>
+                    <td>{new Date(entry.createdAt).toLocaleString("ru-RU")}</td>
+                    <td>
+                      <strong>{entry.action}</strong>
+                    </td>
+                    <td>
+                      <div className="admin-table-cell-main">
+                        <strong>{entry.entityType}</strong>
+                        <span className="admin-table-muted">{entry.entityId}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <PayloadView payload={entry.payload} />
+                    </td>
+                    <td>{entry.actor ? formatActor(entry.actor) : "—"}</td>
+                    <td>{entry.comment ? `«${entry.comment}»` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {sortedEntries.length === 0 && !journalsQuery.isInitialLoading ? (
+            <div className="admin-empty-state">
+              <p>{hasActiveFilters ? "По текущим фильтрам записей нет." : "Записей журнала пока нет."}</p>
+              {hasActiveFilters ? (
+                <button className="button secondary" onClick={resetFilters} type="button">
+                  Очистить фильтры
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           <div ref={journalsQuery.sentinelRef} aria-hidden="true" />
           {journalsQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}

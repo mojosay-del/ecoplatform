@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "./AppShell";
-import { AdminJournalsView } from "./AdminJournalsView";
-import { AdminUsersView } from "./AdminUsersView";
+import { CmsTabs } from "./CmsTabs";
 import { StatusPill } from "./StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -59,32 +58,13 @@ const GROUPS: GroupDef[] = [
 ];
 const DEFAULT_GROUP = GROUPS[0]!;
 
-const SERVICE_SECTIONS = [
-  {
-    id: "users",
-    title: "Пользователи",
-    description: "Управление учётными записями и платформенными ролями.",
-  },
-  {
-    id: "journals",
-    title: "Журнал действий",
-    description: "Аудит действий администраторов.",
-  },
-] as const;
-
-type ServiceSectionId = (typeof SERVICE_SECTIONS)[number]["id"];
-
 function groupOf(key: string): string {
   const prefix = key.split(".")[0] ?? "other";
   return GROUPS.some((g) => g.id === prefix) ? prefix : "other";
 }
 
 function isSettingsSection(id: string) {
-  return GROUPS.some((g) => g.id === id) || SERVICE_SECTIONS.some((section) => section.id === id);
-}
-
-function isServiceSection(id: string): id is ServiceSectionId {
-  return SERVICE_SECTIONS.some((section) => section.id === id);
+  return GROUPS.some((g) => g.id === id);
 }
 
 export function AdminSettingsView() {
@@ -155,24 +135,13 @@ export function AdminSettingsView() {
       const fromHash = window.location.hash.replace("#", "");
       if (isSettingsSection(fromHash)) {
         setActiveGroup(fromHash);
+      } else {
+        setActiveGroup("moderation");
       }
     }
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
-
-  // Считаем, какие группы вообще имеют поля — пустые в навигации не показываем.
-  const usedGroups = useMemo(() => {
-    const ids = new Set(items.map((item) => groupOf(item.key)));
-    return GROUPS.filter((g) => ids.has(g.id));
-  }, [items]);
-
-  function switchGroup(id: string) {
-    setActiveGroup(id);
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", `#${id}`);
-    }
-  }
 
   if (state === "unauthenticated") {
     return (
@@ -198,7 +167,6 @@ export function AdminSettingsView() {
 
   const groupDef = GROUPS.find((g) => g.id === activeGroup) ?? DEFAULT_GROUP;
   const groupItems = items.filter((item) => groupOf(item.key) === activeGroup);
-  const activeService = isServiceSection(activeGroup) ? activeGroup : null;
 
   return (
     <AppShell>
@@ -209,6 +177,7 @@ export function AdminSettingsView() {
             Параметры, которые раньше были жёстко прописаны в коде. Сохранение действует моментально.
           </p>
         </header>
+        <CmsTabs />
 
         {errorMessage ? (
           <StatusPill as="p" variant="danger">
@@ -217,87 +186,51 @@ export function AdminSettingsView() {
         ) : null}
         {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
 
-        <div className="settings-layout">
-          {/* Левая колонка — навигация по группам. Используется тот же
-              визуальный язык, что и в табах CMS, но в вертикальной форме. */}
-          <nav className="settings-nav" aria-label="Группы настроек">
-            {usedGroups.map((group) => (
-              <button
-                key={group.id}
-                type="button"
-                className={`settings-nav-item${activeGroup === group.id ? " active" : ""}`}
-                onClick={() => switchGroup(group.id)}
-              >
-                <span className="settings-nav-title">{group.title}</span>
-                <span className="settings-nav-count">{items.filter((it) => groupOf(it.key) === group.id).length}</span>
-              </button>
-            ))}
-            {SERVICE_SECTIONS.map((section) => (
-              <button
-                key={section.id}
-                type="button"
-                className={`settings-nav-item${activeGroup === section.id ? " active" : ""}`}
-                onClick={() => switchGroup(section.id)}
-              >
-                <span className="settings-nav-title">{section.title}</span>
-              </button>
-            ))}
-          </nav>
+        <div className="settings-pane">
+          <header className="settings-pane-head">
+            <h2 className="settings-pane-title">{groupDef.title}</h2>
+            <p className="settings-pane-subtitle">{groupDef.description}</p>
+          </header>
 
-          {/* Правая колонка — содержимое выбранной группы. Каждая настройка —
-              отдельная строка-карточка с понятной подписью и единицей. */}
-          {activeService === "users" ? (
-            <AdminUsersView embedded />
-          ) : activeService === "journals" ? (
-            <AdminJournalsView embedded />
-          ) : (
-            <div className="settings-pane">
-              <header className="settings-pane-head">
-                <h2 className="settings-pane-title">{groupDef.title}</h2>
-                <p className="settings-pane-subtitle">{groupDef.description}</p>
-              </header>
-
-              <div className="settings-list">
-                {groupItems.length === 0 ? <p className="page-subtitle">В этой группе пока нет настроек.</p> : null}
-                {groupItems.map((item) => {
-                  const unit = groupDef.unit(item.key);
-                  const isDirty = drafts[item.key] !== String(item.value);
-                  return (
-                    <article className="setting-row" key={item.key}>
-                      <div className="setting-row-info">
-                        <strong className="setting-row-label">{item.label}</strong>
-                        <p className="setting-row-description">{item.description}</p>
-                        <small className="setting-row-meta">
-                          По умолчанию: {item.defaultValue}
-                          {unit ? ` ${unit}` : ""}
-                          {item.updatedAt ? ` · Изменено ${new Date(item.updatedAt).toLocaleString("ru-RU")}` : ""}
-                        </small>
-                      </div>
-                      <div className="setting-row-control">
-                        <div className="setting-row-input">
-                          <input
-                            className="input"
-                            onChange={(event) => setDrafts((prev) => ({ ...prev, [item.key]: event.target.value }))}
-                            type="number"
-                            value={drafts[item.key] ?? ""}
-                          />
-                          {unit ? <span className="setting-row-unit">{unit}</span> : null}
-                        </div>
-                        <button
-                          className="button"
-                          disabled={savingKey === item.key || !isDirty}
-                          onClick={() => save(item.key)}
-                          type="button"
-                        >
-                          {savingKey === item.key ? "Сохраняю…" : "Сохранить"}
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <div className="settings-list">
+            {groupItems.length === 0 ? <p className="page-subtitle">В этой группе пока нет настроек.</p> : null}
+            {groupItems.map((item) => {
+              const unit = groupDef.unit(item.key);
+              const isDirty = drafts[item.key] !== String(item.value);
+              return (
+                <article className="setting-row" key={item.key}>
+                  <div className="setting-row-info">
+                    <strong className="setting-row-label">{item.label}</strong>
+                    <p className="setting-row-description">{item.description}</p>
+                    <small className="setting-row-meta">
+                      По умолчанию: {item.defaultValue}
+                      {unit ? ` ${unit}` : ""}
+                      {item.updatedAt ? ` · Изменено ${new Date(item.updatedAt).toLocaleString("ru-RU")}` : ""}
+                    </small>
+                  </div>
+                  <div className="setting-row-control">
+                    <div className="setting-row-input">
+                      <input
+                        className="input"
+                        onChange={(event) => setDrafts((prev) => ({ ...prev, [item.key]: event.target.value }))}
+                        type="number"
+                        value={drafts[item.key] ?? ""}
+                      />
+                      {unit ? <span className="setting-row-unit">{unit}</span> : null}
+                    </div>
+                    <button
+                      className="button"
+                      disabled={savingKey === item.key || !isDirty}
+                      onClick={() => save(item.key)}
+                      type="button"
+                    >
+                      {savingKey === item.key ? "Сохраняю…" : "Сохранить"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </section>
     </AppShell>

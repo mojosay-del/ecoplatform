@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { RotateCcw, Search } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
-import { AdminPeopleTabs } from "./AdminPeopleTabs";
+import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
+import { CmsTabs } from "./CmsTabs";
 import {
   StatusPill,
   companyStatusPillVariant,
@@ -11,6 +13,7 @@ import {
   supportStatusPillVariant,
   userStatusPillVariant,
 } from "./StatusPill";
+import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
@@ -27,6 +30,7 @@ type AdminCompanyListItem = {
 };
 
 type AdminCompanyList = PaginatedResponse<AdminCompanyListItem>;
+type CompanySortKey = "name" | "status" | "plan" | "users" | "tickets" | "subscriptions" | "createdAt";
 
 type AdminCompanyDetail = {
   id: string;
@@ -111,6 +115,17 @@ const statusReasons: ReadonlyArray<readonly [string, string]> = [
   ["other", "Иное"],
 ];
 
+const companySortSelectors: Record<CompanySortKey, (item: AdminCompanyListItem) => string | number> = {
+  name: (item) => item.organizationName,
+  status: (item) => COMPANY_STATUS_LABELS[item.status] ?? item.status,
+  plan: (item) =>
+    item.subscriptionPlan ? (SUBSCRIPTION_PLAN_LABELS[item.subscriptionPlan] ?? item.subscriptionPlan) : "",
+  users: (item) => item._count.users,
+  tickets: (item) => item._count.supportTickets,
+  subscriptions: (item) => item._count.subscriptions,
+  createdAt: (item) => Date.parse(item.createdAt),
+};
+
 export function AdminCompaniesView() {
   const { token } = useAuth();
   const [selected, setSelected] = useState<AdminCompanyDetail | null>(null);
@@ -120,6 +135,7 @@ export function AdminCompaniesView() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [planFilter, setPlanFilter] = useState<string>("");
   const [filters, setFilters] = useState({ search: "", status: "", plan: "" });
+  const [sort, setSort] = useState<SortState<CompanySortKey>>({ key: "createdAt", direction: "desc" });
   const take = 20;
   const companiesQuery = useInfiniteApiQuery<AdminCompanyListItem>(
     token ? `admin-companies:${filters.search}:${filters.status}:${filters.plan}` : null,
@@ -138,6 +154,18 @@ export function AdminCompaniesView() {
   const [nextStatus, setNextStatus] = useState<string>("active");
   const [statusReason, setStatusReason] = useState<string>("manual_activation");
   const [statusComment, setStatusComment] = useState("");
+  const sortedCompanies = useMemo(
+    () => sortItems(companiesQuery.items, sort, companySortSelectors),
+    [companiesQuery.items, sort],
+  );
+  const hasActiveFilters = Boolean(filters.search || filters.status || filters.plan);
+
+  function resetFilters() {
+    setSearch("");
+    setStatusFilter("");
+    setPlanFilter("");
+    setFilters({ search: "", status: "", plan: "" });
+  }
 
   async function openCompany(id: string) {
     if (!token) return;
@@ -199,41 +227,49 @@ export function AdminCompaniesView() {
           <h1 className="page-title">Компании</h1>
           <p className="page-subtitle">Управление компаниями и их подписками.</p>
         </header>
-        <AdminPeopleTabs />
+        <CmsTabs />
 
         <form
-          className="form"
+          className="admin-filter-bar"
           onSubmit={(event) => {
             event.preventDefault();
             setFilters({ search: search.trim(), status: statusFilter, plan: planFilter });
           }}
         >
-          <div className="auth-actions">
+          <label className="admin-filter-field">
+            <Search aria-hidden size={16} />
             <input
+              aria-label="Поиск компаний"
               className="input"
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Поиск по названию или ИНН"
               type="search"
               value={search}
             />
-            <select className="select" onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
-              <option value="">Все статусы</option>
-              {companyStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {COMPANY_STATUS_LABELS[status] ?? status}
-                </option>
-              ))}
-            </select>
-            <select className="select" onChange={(event) => setPlanFilter(event.target.value)} value={planFilter}>
-              <option value="">Все тарифы</option>
-              {subscriptionPlans.map((plan) => (
-                <option key={plan} value={plan}>
-                  {SUBSCRIPTION_PLAN_LABELS[plan] ?? plan}
-                </option>
-              ))}
-            </select>
+          </label>
+          <select className="select" onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
+            <option value="">Все статусы</option>
+            {companyStatuses.map((status) => (
+              <option key={status} value={status}>
+                {COMPANY_STATUS_LABELS[status] ?? status}
+              </option>
+            ))}
+          </select>
+          <select className="select" onChange={(event) => setPlanFilter(event.target.value)} value={planFilter}>
+            <option value="">Все тарифы</option>
+            {subscriptionPlans.map((plan) => (
+              <option key={plan} value={plan}>
+                {SUBSCRIPTION_PLAN_LABELS[plan] ?? plan}
+              </option>
+            ))}
+          </select>
+          <div className="admin-filter-actions">
             <button className="button" type="submit">
               Применить
+            </button>
+            <button className="button secondary" onClick={resetFilters} type="button">
+              <RotateCcw aria-hidden size={16} />
+              Сбросить
             </button>
           </div>
         </form>
@@ -246,33 +282,87 @@ export function AdminCompaniesView() {
         {companiesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
         {companiesQuery.state === "ready" || companiesQuery.items.length > 0 ? (
-          <div className="moderation-layout">
-            <div className="stack-list">
-              <p className="page-subtitle">
-                Загружено {companiesQuery.items.length} из {companiesQuery.total}.
-              </p>
-              {companiesQuery.items.map((item) => (
-                <button
-                  className={`moderation-case-row ${selected?.id === item.id ? "active" : ""}`}
-                  key={item.id}
-                  onClick={() => openCompany(item.id)}
-                  type="button"
-                >
-                  <StatusPill variant={companyStatusPillVariant(item.status)}>
-                    {COMPANY_STATUS_LABELS[item.status] ?? item.status}
-                  </StatusPill>
-                  <strong>{item.organizationName}</strong>
-                  <span>
-                    {item.subscriptionPlan
-                      ? (SUBSCRIPTION_PLAN_LABELS[item.subscriptionPlan] ?? item.subscriptionPlan)
-                      : "без тарифа"}{" "}
-                    · {item._count.users} польз.
-                  </span>
-                  <small>
-                    Тикетов: {item._count.supportTickets} · Подписок: {item._count.subscriptions}
-                  </small>
-                </button>
-              ))}
+          <div className="moderation-layout admin-master-detail">
+            <div className="admin-table-shell">
+              <div className="admin-table-meta">
+                <p className="page-subtitle">
+                  Загружено {companiesQuery.items.length} из {companiesQuery.total}.
+                </p>
+              </div>
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">
+                        <AdminSortButton label="Компания" sort={sort} sortKey="name" onSort={setSort} />
+                      </th>
+                      <th scope="col">
+                        <AdminSortButton label="Статус" sort={sort} sortKey="status" onSort={setSort} />
+                      </th>
+                      <th scope="col">
+                        <AdminSortButton label="Тариф" sort={sort} sortKey="plan" onSort={setSort} />
+                      </th>
+                      <th scope="col">
+                        <AdminSortButton label="Польз." sort={sort} sortKey="users" onSort={setSort} />
+                      </th>
+                      <th scope="col">
+                        <AdminSortButton label="Тикеты" sort={sort} sortKey="tickets" onSort={setSort} />
+                      </th>
+                      <th scope="col">
+                        <AdminSortButton label="Подписки" sort={sort} sortKey="subscriptions" onSort={setSort} />
+                      </th>
+                      <th scope="col">
+                        <AdminSortButton
+                          defaultDirection="desc"
+                          label="Создана"
+                          sort={sort}
+                          sortKey="createdAt"
+                          onSort={setSort}
+                        />
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedCompanies.map((item) => (
+                      <tr className={selected?.id === item.id ? "active" : ""} key={item.id}>
+                        <td>
+                          <div className="admin-table-cell-main">
+                            <button className="admin-row-button" onClick={() => openCompany(item.id)} type="button">
+                              {item.organizationName}
+                            </button>
+                            <span className="admin-table-muted">Детали справа</span>
+                          </div>
+                        </td>
+                        <td>
+                          <StatusPill variant={companyStatusPillVariant(item.status)}>
+                            {COMPANY_STATUS_LABELS[item.status] ?? item.status}
+                          </StatusPill>
+                        </td>
+                        <td>
+                          {item.subscriptionPlan
+                            ? (SUBSCRIPTION_PLAN_LABELS[item.subscriptionPlan] ?? item.subscriptionPlan)
+                            : "Без тарифа"}
+                        </td>
+                        <td>{item._count.users}</td>
+                        <td>{item._count.supportTickets}</td>
+                        <td>{item._count.subscriptions}</td>
+                        <td>{new Date(item.createdAt).toLocaleDateString("ru-RU")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {sortedCompanies.length === 0 && !companiesQuery.isInitialLoading ? (
+                <div className="admin-empty-state">
+                  <p>{hasActiveFilters ? "По текущим фильтрам компаний нет." : "Компаний пока нет."}</p>
+                  {hasActiveFilters ? (
+                    <button className="button secondary" onClick={resetFilters} type="button">
+                      Очистить фильтры
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div ref={companiesQuery.sentinelRef} aria-hidden="true" />
               {companiesQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}

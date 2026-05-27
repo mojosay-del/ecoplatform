@@ -1204,26 +1204,26 @@ input[type="checkbox"]:focus-visible {
   font-size: var(--text-xs);
 }
 
-/* Подменю CMS: 4 раздела сверху каждого экрана редактирования контента,
-   чтобы КМ/админу не приходилось бегать по прямым URL. */
+/* Верхняя навигация панели управления: CMS, люди, поддержка, настройки и журнал. */
 .cms-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   margin: -8px 0 22px;
-  padding: 4px;
+  padding: 6px;
   background: var(--panel-soft);
   border: 1px solid var(--line);
   border-radius: var(--radius-chip);
-  width: fit-content;
+  width: 100%;
 }
 
 .cms-tab {
-  padding: 8px 16px;
+  padding: 8px 12px;
   border-radius: var(--radius-chip);
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
+  white-space: nowrap;
   transition:
     background 120ms ease,
     color 120ms ease;
@@ -4311,6 +4311,10 @@ body.news-modal-open .app-shell {
   align-items: start;
 }
 
+.admin-master-detail {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+}
+
 .cms-vertical-layout {
   grid-template-columns: 1fr;
 }
@@ -4369,6 +4373,235 @@ body.news-modal-open .app-shell {
   padding: 16px;
   box-shadow: var(--shadow-card);
   align-self: start;
+}
+
+.admin-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 10px;
+  box-shadow: var(--shadow-card);
+}
+
+.admin-filter-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.admin-filter-field svg {
+  position: absolute;
+  left: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.admin-filter-field .input {
+  width: 100%;
+  padding-left: 36px;
+}
+
+.admin-filter-bar > .input {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+
+.admin-filter-bar .select {
+  flex: 0 1 180px;
+}
+
+.admin-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.admin-table-shell {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.admin-table-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-table-scroll {
+  max-height: 620px;
+  overflow: auto;
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-sm);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-table tbody tr:hover td,
+.admin-table tbody tr.active td {
+  background: rgb(var(--info-rgb) / 0.06);
+}
+
+.admin-table-cell-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-table-cell-main strong,
+.admin-row-button {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.admin-table-muted {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.admin-row-button {
+  width: fit-content;
+  max-width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-row-button:hover,
+.admin-row-button:focus-visible {
+  color: var(--primary);
+}
+
+.admin-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+}
+
+.admin-sort-button.active {
+  color: var(--text);
+}
+
+.admin-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-table-actions .button {
+  min-height: 30px;
+  padding: 6px 10px;
+  font-size: var(--text-xs);
+}
+
+.admin-table .staff-avatar {
+  width: 36px;
+  height: 36px;
+}
+
+.admin-journal-table {
+  min-width: 760px;
+  table-layout: fixed;
+}
+
+.admin-journal-table th:nth-child(1),
+.admin-journal-table td:nth-child(1) {
+  width: 90px;
+}
+
+.admin-journal-table th:nth-child(2),
+.admin-journal-table td:nth-child(2) {
+  width: 145px;
+}
+
+.admin-journal-table th:nth-child(3),
+.admin-journal-table td:nth-child(3) {
+  width: 120px;
+}
+
+.admin-journal-table th:nth-child(4),
+.admin-journal-table td:nth-child(4) {
+  width: 200px;
+}
+
+.admin-journal-table th:nth-child(5),
+.admin-journal-table td:nth-child(5) {
+  width: 130px;
+}
+
+.admin-journal-table th:nth-child(6),
+.admin-journal-table td:nth-child(6) {
+  width: 75px;
+}
+
+.admin-journal-table td {
+  word-break: break-word;
+}
+
+.admin-journal-table .audit-payload {
+  margin-top: 0;
+}
+
+.admin-journal-table .audit-diff-key {
+  min-width: 96px;
+}
+
+.admin-empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
 }
 
 .moderation-detail > .form {
@@ -6987,76 +7220,6 @@ li.tree-add-row + li.tree-add-row,
   line-height: 1.4;
 }
 
-/* Раскладка «Настройки админа»: слева — вертикальная навигация по группам,
-   справа — содержимое активной группы. На мобильном схлопывается в столбец. */
-.settings-layout {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 24px;
-  align-items: start;
-}
-
-@media (max-width: 860px) {
-  .settings-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-.settings-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  background: var(--panel-soft);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  padding: 6px;
-  position: sticky;
-  top: 16px;
-}
-
-.settings-nav-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-chip);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-  text-align: left;
-  transition:
-    background 120ms ease,
-    color 120ms ease;
-}
-
-.settings-nav-item:hover {
-  color: var(--text);
-  background: rgb(var(--black-rgb) / 0.03);
-}
-
-.settings-nav-item.active {
-  background: var(--text);
-  color: var(--white);
-}
-
-.settings-nav-count {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgb(var(--black-rgb) / 0.06);
-  color: inherit;
-  opacity: 0.85;
-}
-
-.settings-nav-item.active .settings-nav-count {
-  background: rgb(var(--white-rgb) / 0.18);
-}
-
 .settings-pane {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -7863,6 +8026,15 @@ li.tree-add-row + li.tree-add-row,
   flex: 1;
 }
 
+.support-inbox-sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
 .support-inbox-items {
   list-style: none;
   margin: 0;
@@ -7875,6 +8047,9 @@ li.tree-add-row + li.tree-add-row,
 }
 
 .support-inbox-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
   padding: 24px 12px;
   text-align: center;
   color: var(--muted);
@@ -7886,8 +8061,8 @@ li.tree-add-row + li.tree-add-row,
   text-align: left;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 8px 10px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -7931,7 +8106,7 @@ li.tree-add-row + li.tree-add-row,
   font-size: 12px;
   color: var(--muted);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.4;

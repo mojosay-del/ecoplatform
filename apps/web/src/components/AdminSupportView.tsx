@@ -2,9 +2,12 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
+import { RotateCcw, Search } from "lucide-react";
+import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
+import { CmsTabs } from "./CmsTabs";
 import { StatusPill, supportStatusPillVariant } from "./StatusPill";
+import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
@@ -50,6 +53,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 type Filter = "all" | "active" | "open" | "in_progress" | "resolved";
+type TicketSortKey = "updatedAt" | "subject" | "status" | "company";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "active", label: "Активные" },
@@ -59,12 +63,20 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "Все" },
 ];
 
+const ticketSortSelectors: Record<TicketSortKey, (ticket: Ticket) => string | number> = {
+  updatedAt: (ticket) => Date.parse(ticket.updatedAt),
+  subject: (ticket) => ticket.subject,
+  status: (ticket) => STATUS_LABELS[ticket.status] ?? ticket.status,
+  company: (ticket) => ticket.company?.organizationName ?? "",
+};
+
 export function AdminSupportView() {
   const { token } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filter, setFilter] = useState<Filter>("active");
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortState<TicketSortKey>>({ key: "updatedAt", direction: "desc" });
   const [result, setResult] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const ticketsQuery = useInfiniteApiQuery<Ticket>(
@@ -110,7 +122,14 @@ export function AdminSupportView() {
     });
   }, [tickets, filter, query]);
 
+  const sortedTickets = useMemo(() => sortItems(filteredTickets, sort, ticketSortSelectors), [filteredTickets, sort]);
   const selectedTicket = useMemo(() => tickets.find((t) => t.id === selectedId) ?? null, [tickets, selectedId]);
+  const hasActiveFilters = filter !== "all" || Boolean(query.trim());
+
+  function resetFilters() {
+    setFilter("active");
+    setQuery("");
+  }
 
   function selectTicket(id: string | null) {
     const params = new URLSearchParams(searchParams?.toString() ?? "");
@@ -155,6 +174,7 @@ export function AdminSupportView() {
           <h1 className="page-title">Поддержка администратора</h1>
           <p className="page-subtitle">Очередь обращений компаний. Слева — список, справа — переписка.</p>
         </header>
+        <CmsTabs />
 
         {result ? (
           <StatusPill as="p" variant="danger">
@@ -180,6 +200,7 @@ export function AdminSupportView() {
             <div className="support-inbox-search">
               <Search size={14} aria-hidden />
               <input
+                aria-label="Поиск обращений"
                 className="input"
                 placeholder="Поиск по теме, компании, автору"
                 value={query}
@@ -187,9 +208,25 @@ export function AdminSupportView() {
                 type="search"
               />
             </div>
+            <div className="support-inbox-sort">
+              <AdminSortButton label="Тема" sort={sort} sortKey="subject" onSort={setSort} />
+              <AdminSortButton label="Статус" sort={sort} sortKey="status" onSort={setSort} />
+              <AdminSortButton label="Компания" sort={sort} sortKey="company" onSort={setSort} />
+              <AdminSortButton defaultDirection="desc" label="Дата" sort={sort} sortKey="updatedAt" onSort={setSort} />
+            </div>
             <ul className="support-inbox-items">
-              {filteredTickets.length === 0 ? <li className="support-inbox-empty">Ничего не найдено.</li> : null}
-              {filteredTickets.map((ticket) => {
+              {sortedTickets.length === 0 ? (
+                <li className="support-inbox-empty">
+                  <p>{hasActiveFilters ? "По текущим фильтрам обращений нет." : "Обращений пока нет."}</p>
+                  {hasActiveFilters ? (
+                    <button className="button secondary" onClick={resetFilters} type="button">
+                      <RotateCcw aria-hidden size={16} />
+                      Очистить
+                    </button>
+                  ) : null}
+                </li>
+              ) : null}
+              {sortedTickets.map((ticket) => {
                 const last = ticket.messages?.[ticket.messages.length - 1];
                 const preview = last?.text ?? "";
                 return (
@@ -205,7 +242,10 @@ export function AdminSupportView() {
                           {STATUS_LABELS[ticket.status] ?? ticket.status}
                         </StatusPill>
                       </div>
-                      <span className="support-inbox-item-company">{ticket.company?.organizationName ?? "—"}</span>
+                      <span className="support-inbox-item-company">
+                        {ticket.company?.organizationName ?? "—"} ·{" "}
+                        {CATEGORY_LABELS[ticket.category] ?? ticket.category}
+                      </span>
                       {preview ? <span className="support-inbox-item-preview">{preview}</span> : null}
                       <span className="support-inbox-item-time">
                         {new Date(ticket.updatedAt).toLocaleString("ru-RU")}

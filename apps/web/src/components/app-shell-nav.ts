@@ -4,14 +4,11 @@ import {
   Calculator,
   FileText,
   GraduationCap,
-  HelpCircle,
   LayoutDashboard,
   LineChart,
   Map,
   MessageCircle,
   Newspaper,
-  Settings,
-  ShieldCheck,
   ShoppingBag,
   Store,
 } from "lucide-react";
@@ -20,6 +17,7 @@ export type NavItem = {
   href?: string;
   label: string;
   icon: LucideIcon;
+  activePathPrefixes?: string[];
   disabled?: boolean;
   disabledBadge?: string;
   disabledHint?: string;
@@ -78,18 +76,14 @@ export const appNavSections: NavSection[] = [
     title: "Служебное",
     items: [
       // Личный кабинет и уведомления уже доступны через иконки в топбаре —
-      // здесь дублировать не нужно. Секция показывается только админам.
-      // Раньше «Компании» и «Сотрудники» были отдельными пунктами; теперь
-      // это табы внутри «Пользователи» — так навигация чище.
+      // здесь дублировать не нужно. Админские разделы собраны в одной панели.
       {
-        href: "/admin/content/news",
+        href: "/admin",
         label: "Панель управления",
         icon: LayoutDashboard,
-        roles: ["admin", "content_manager"],
+        activePathPrefixes: ["/admin"],
+        roles: ["admin", "content_manager", "moderator"],
       },
-      { href: "/admin/moderation", label: "Модерация", icon: ShieldCheck, roles: ["admin", "moderator"] },
-      { href: "/admin/settings", label: "Настройки", icon: Settings, roles: ["admin"] },
-      { href: "/admin/support", label: "Поддержка", icon: HelpCircle, roles: ["admin"] },
     ],
   },
 ];

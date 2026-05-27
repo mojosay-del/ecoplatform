@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState, type SetStateAction } from "react";
 import { AppShell } from "./AppShell";
+import { CmsTabs } from "./CmsTabs";
 import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -162,6 +163,7 @@ export function AdminBillingView() {
             Используется, пока нет автоматического платёжного шлюза. Действие фиксируется в журнале админов.
           </p>
         </header>
+        <CmsTabs />
         {successMessage ? (
           <StatusPill as="p" variant="success">
             {successMessage}
