@@ -7,6 +7,7 @@ import { useEffect, useId, useState } from "react";
 import { ChevronsLeft, ChevronsRight, HelpCircle, Menu, Settings, X } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { appNavSections, COMING_SOON_BADGE, type NavItem, type NavSection } from "./app-shell-nav";
+import { DemoBanner } from "./DemoBanner";
 import { NotificationBell } from "./NotificationBell";
 import { UserSupportDrawer } from "./UserSupportDrawer";
 
@@ -152,6 +153,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {user?.avatarUrl ? <Image alt="" src={user.avatarUrl} width={40} height={40} /> : null}
           </Link>
         </header>
+        <DemoBanner user={user} pathname={pathname} />
         <div className="page-surface">{children}</div>
         <AppShellFooter />
       </main>

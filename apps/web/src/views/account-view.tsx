@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import type {
   AddressDto,
   BillingStatus,
@@ -299,6 +300,7 @@ function getAccountModuleCards(companyType?: string | null, status?: string | nu
 }
 
 export function AccountView() {
+  const searchParams = useSearchParams();
   const { user, token, logout, refreshMe } = useAuth();
   const isPlatformStaff = (user?.platformRoles?.length ?? 0) > 0;
   const { data: billing, setData: setBilling } = useApiQuery<BillingStatus | null>(
@@ -336,12 +338,20 @@ export function AccountView() {
   const [notificationBusyKey, setNotificationBusyKey] = useState<string | null>(null);
 
   const tabs = useMemo(() => ACCOUNT_TABS.filter((tab) => !tab.companyOnly || !isPlatformStaff), [isPlatformStaff]);
+  const requestedTab = searchParams.get("tab");
 
   useEffect(() => {
     if (!tabs.some((tab) => tab.id === activeTab)) {
       setActiveTab(tabs[0]?.id ?? "profile");
     }
   }, [activeTab, tabs]);
+
+  useEffect(() => {
+    if (!requestedTab || requestedTab === activeTab) return;
+    if (tabs.some((tab) => tab.id === requestedTab)) {
+      setActiveTab(requestedTab as AccountTab);
+    }
+  }, [activeTab, requestedTab, tabs]);
 
   // Подписка и статус компании теперь рендерятся в отдельных карточках —
   // форма поддержки переехала в drawer (иконка «?» в шапке), чтобы личный

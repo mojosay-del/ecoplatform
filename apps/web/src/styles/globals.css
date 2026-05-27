@@ -305,6 +305,50 @@ select:disabled {
   background: transparent;
 }
 
+.demo-banner {
+  position: sticky;
+  top: 0;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  box-sizing: border-box;
+  height: 36px;
+  min-height: 36px;
+  margin-left: 16px;
+  padding: 3px 12px 3px 18px;
+  border-top-left-radius: 18px;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+  border-right: 0;
+  color: var(--warning-text);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.demo-banner > span {
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.demo-banner-critical {
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+  color: var(--danger-text-strong);
+}
+
+.demo-banner .demo-banner-action {
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .page-surface {
   flex: 1;
   /* Серый «лист» страницы — другой цвет, чем белый L-блок сайдбара/топбара. */
@@ -3889,6 +3933,21 @@ a.topbar-breadcrumb-current:hover {
     margin: 0 -18px 20px;
     padding: 0 18px;
     gap: 10px;
+  }
+
+  .demo-banner {
+    margin: -12px -18px 18px;
+    border-right: 1px solid var(--warning-border);
+    border-radius: 0;
+  }
+
+  .demo-banner-critical {
+    border-color: var(--danger-border);
+  }
+
+  .demo-banner .demo-banner-action {
+    padding: 6px 10px;
+    font-size: 12px;
   }
 
   .card-grid {

@@ -20,7 +20,9 @@
 
 Волна 11.6 закрыта: регистрация стала двухшаговой — сначала компания, тип и ИНН, затем личные данные, доступ и согласия; кнопка «Назад» сохраняет данные обоих шагов, а ИНН валидируется на web/API и сохраняется в `Company.billingInn`.
 
-Целевой следующий шаг: Волна 11.7 — демо-баннер sticky.
+Волна 11.7 закрыта: в `AppShell` добавлен sticky demo-баннер 36px под топбаром; он виден только demo-компаниям до истечения `demoEndsAt`, обновляет countdown каждую минуту, краснеет за 2 часа до конца, ведёт в `/account?tab=billing` и не показывается на `/admin/*`.
+
+Целевой следующий шаг: Волна 11.8 — onboarding-card для нового пользователя.
 
 ## Что уже сделано
 
@@ -135,7 +137,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 11** — UX/дизайн-система: демо-баннер, onboarding, индексы, фильтры новостей, микрокопирайтинг и доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов, докрутка disabled-пунктов сайдбара и регистрация в 2 шага закрыты в 11.1–11.6.
+- **Волна 11** — UX/дизайн-система: onboarding, индексы, фильтры новостей, микрокопирайтинг и доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов, докрутка disabled-пунктов сайдбара, регистрация в 2 шага и sticky demo-баннер закрыты в 11.1–11.7.
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
@@ -171,26 +173,25 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 92 unit-теста (shared 7, web 12, api 73)
+pnpm test                                             # 96 unit-тестов (shared 7, web 16, api 73)
 pnpm build                                            # tsc + next build
-pnpm test:integration                                 # 113 integration-тестов против ecoplatform_test
+pnpm test:integration                                 # 114 integration-тестов против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
 pnpm format:check                                     # prettier
 ```
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 11.6).
+Дата: 2026-05-27 (после Волны 11.7).
 
 - `pnpm typecheck` — успешно (4/4).
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 13/13, api 73/73.
+- `pnpm test` — успешно: shared 7/7, web 16/16, api 73/73.
 - `pnpm test:integration` — успешно: API integration 114/114.
 - `pnpm build` — успешно (3/3).
-- Browser UI-check — `/register`: шаг 1 показывает компанию/тип/ИНН и progress `Шаг 1 из 2`; шаг 2 показывает личные данные, email/пароль и consent-чекбоксы; сценарий `Далее → Назад → Далее` сохраняет данные обоих шагов, тестовая регистрация уходит на `/news`, горизонтального overflow и console errors нет. Скриншот: `/private/tmp/ecoplatform-11-6-register-step2.png`.
-- Playwright smoke — `PLAYWRIGHT_TEST_BASE_URL=http://localhost:3000 pnpm test:smoke` успешно: Chromium 1/1.
+- Browser UI-check — `/news`: demo-компания видит sticky-баннер 36px под топбаром с countdown и CTA; на мобильной ширине 390px текст и кнопка не налезают друг на друга; на `/admin/companies` баннер не показывается. Скриншоты: `/private/tmp/ecoplatform-11-7-news-banner.png`, `/private/tmp/ecoplatform-11-7-news-banner-mobile.png`.
 - `pnpm format:check` — clean.
-- CSS token sanity — все `var(--...)` в `tokens.css`/`globals.css` имеют определения; прямых `#...`, `rgba(...)`, нетокенизированных `rgb(...)` в `globals.css` нет.
+- CSS token sanity — прямых `#...`, `rgba(...)`, нетокенизированных `rgb(...)` в `globals.css` нет.
 - `git diff --check` — clean.
 - Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
 
