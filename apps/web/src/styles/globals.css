@@ -4798,17 +4798,34 @@ body.news-modal-open .app-shell {
 .topbar-breadcrumb {
   display: inline-flex;
   align-items: center;
+  flex: 1 1 auto;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
   font-size: 14px;
   color: var(--muted);
   margin-left: 8px;
+  scrollbar-width: none;
+}
+
+.topbar-breadcrumb::-webkit-scrollbar {
+  display: none;
 }
 
 .topbar-breadcrumb-section {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   font-weight: 500;
 }
 
 .topbar-breadcrumb-sep {
+  flex: 0 0 auto;
   color: var(--line-strong);
 }
 
@@ -4816,15 +4833,39 @@ body.news-modal-open .app-shell {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   color: var(--text);
   font-weight: 600;
   transition: color 120ms ease;
 }
 
-a.topbar-breadcrumb-current:hover {
+.topbar-breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-weight: 600;
+  transition: color 120ms ease;
+}
+
+.topbar-breadcrumb-link span,
+.topbar-breadcrumb-section span,
+.topbar-breadcrumb-current span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-breadcrumb-link:hover {
   color: var(--primary);
 }
 
+.topbar-breadcrumb-link svg,
 .topbar-breadcrumb-current svg {
   color: var(--primary);
 }

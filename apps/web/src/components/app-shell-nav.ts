@@ -30,6 +30,12 @@ export type NavSection = {
   items: NavItem[];
 };
 
+export type BreadcrumbItem = {
+  href?: string;
+  label: string;
+  icon?: LucideIcon;
+};
+
 export const COMING_SOON_BADGE = "Скоро";
 
 const futureItem = (label: string, icon: LucideIcon, disabledHint: string): NavItem => ({
@@ -92,6 +98,71 @@ export function futureNavItems(sections: NavSection[] = appNavSections): NavItem
   return sections.flatMap((section) => flattenItems(section.items)).filter((item) => item.disabled);
 }
 
+export function isNavItemActive(item: NavItem, pathname: string): boolean {
+  const selfActive = Boolean(item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`)));
+  const prefixActive = Boolean(
+    item.activePathPrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)),
+  );
+  return selfActive || prefixActive || Boolean(item.children?.some((child) => isNavItemActive(child, pathname)));
+}
+
+export function getBreadcrumbTrail(nav: NavSection[], pathname: string): BreadcrumbItem[] | null {
+  const adminTrail = getAdminBreadcrumbTrail(pathname);
+  if (adminTrail) return adminTrail;
+
+  for (const section of nav) {
+    for (const item of section.items) {
+      if (isNavItemActive(item, pathname)) {
+        return [{ label: section.title }, { href: item.href, label: item.label, icon: item.icon }];
+      }
+    }
+  }
+
+  return null;
+}
+
 function flattenItems(items: NavItem[]): NavItem[] {
   return items.flatMap((item) => [item, ...(item.children ? flattenItems(item.children) : [])]);
+}
+
+const adminPanelRoot: BreadcrumbItem = {
+  href: "/admin",
+  label: "Панель управления",
+  icon: LayoutDashboard,
+};
+
+const adminContentRoot: BreadcrumbItem = {
+  label: "CMS",
+};
+
+const adminBreadcrumbs: { prefix: string; trail: BreadcrumbItem[] }[] = [
+  {
+    prefix: "/admin/content/knowledge-base",
+    trail: [adminPanelRoot, adminContentRoot, { href: "/admin/content/knowledge-base", label: "База знаний" }],
+  },
+  {
+    prefix: "/admin/content/education",
+    trail: [adminPanelRoot, adminContentRoot, { href: "/admin/content/education", label: "Обучение" }],
+  },
+  {
+    prefix: "/admin/content/indices",
+    trail: [adminPanelRoot, adminContentRoot, { href: "/admin/content/indices", label: "Индексы цен" }],
+  },
+  {
+    prefix: "/admin/content/news",
+    trail: [adminPanelRoot, adminContentRoot, { href: "/admin/content/news", label: "Новости" }],
+  },
+  { prefix: "/admin/users", trail: [adminPanelRoot, { href: "/admin/users", label: "Пользователи" }] },
+  { prefix: "/admin/companies", trail: [adminPanelRoot, { href: "/admin/companies", label: "Компании" }] },
+  { prefix: "/admin/staff", trail: [adminPanelRoot, { href: "/admin/staff", label: "Сотрудники" }] },
+  { prefix: "/admin/support", trail: [adminPanelRoot, { href: "/admin/support", label: "Поддержка" }] },
+  { prefix: "/admin/billing", trail: [adminPanelRoot, { href: "/admin/billing", label: "Подписки" }] },
+  { prefix: "/admin/moderation", trail: [adminPanelRoot, { href: "/admin/moderation", label: "Очередь модерации" }] },
+  { prefix: "/admin/settings", trail: [adminPanelRoot, { href: "/admin/settings", label: "Настройки" }] },
+  { prefix: "/admin/journals", trail: [adminPanelRoot, { href: "/admin/journals", label: "Журнал" }] },
+  { prefix: "/admin", trail: [adminPanelRoot] },
+];
+
+function getAdminBreadcrumbTrail(pathname: string): BreadcrumbItem[] | null {
+  return adminBreadcrumbs.find(({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`))?.trail ?? null;
 }

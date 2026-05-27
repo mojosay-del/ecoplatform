@@ -42,7 +42,9 @@
 
 Волна 12.3 закрыта: enum-статусы и служебные коды больше не размазаны по UI локальными словарями. Общий web-helper `display-labels` даёт русские подписи для компаний, пользователей, ролей, подписок, поддержки, уведомлений, CMS, обучения, модерации, платежей, юридических документов, согласий, комментариев и файлов; `/admin/journals` локализует diff-поля, before/after и legacy payload.
 
-Целевой следующий шаг: Волна 12.4 — хлебные крошки на админ-страницах.
+Волна 12.4 закрыта: topbar breadcrumbs теперь показывают вложенный путь внутри единой админ-панели. CMS-страницы получают цепочку «Панель управления / CMS / раздел», операционные экраны — «Панель управления / Компании|Журнал|Поддержка|…»; текущий пункт помечен `aria-current="page"`, а длинные подписи не создают горизонтальный overflow в topbar.
+
+Целевой следующий шаг: Волна 12.5 — CMS preview новостей в админке.
 
 ## Что уже сделано
 
@@ -158,7 +160,7 @@
 ### Дальше по плану (`audit/ROADMAP.md`)
 
 - **Волна 11** — UX/дизайн-система закрыта полностью: токены, типографика, цветовая семантика, состояния контролов, сайдбар, регистрация, demo-баннер, onboarding, индексы, фильтры новостей, микро-копирайтинг, публичные fallback-layouts и доступность.
-- **Волна 12** — CMS-полишинг и админ-таблицы: 12.1 закрыта (компактные админ-таблицы и единая панель управления), 12.2 закрыта (скрытие cuid в модерации и журнале), 12.3 закрыта (локализация enum-значений); дальше — breadcrumbs, CMS preview, drag-and-drop, auto-save, preview «как видит пользователь», admin dashboard.
+- **Волна 12** — CMS-полишинг и админ-таблицы: 12.1 закрыта (компактные админ-таблицы и единая панель управления), 12.2 закрыта (скрытие cuid в модерации и журнале), 12.3 закрыта (локализация enum-значений), 12.4 закрыта (breadcrumbs в админке); дальше — CMS preview, drag-and-drop, auto-save, preview «как видит пользователь», admin dashboard.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
 ### Тех-долг, осознанно отложенный
@@ -193,7 +195,7 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 120 unit-тестов (shared 7, web 38, api 75)
+pnpm test                                             # 123 unit-теста (shared 7, web 41, api 75)
 pnpm build                                            # tsc + next build
 pnpm test:integration                                 # 114 integration-тестов против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
@@ -202,17 +204,17 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 12.3).
+Дата: 2026-05-27 (после Волны 12.4).
 
 - `pnpm typecheck` — успешно (4/4).
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 38/38, api 75/75.
+- `pnpm test` — успешно: shared 7/7, web 41/41, api 75/75.
 - `pnpm test:integration` — успешно: API integration 114/114.
 - `pnpm build` — успешно (3/3).
-- Browser UI-check — `/admin/journals`, `/admin/moderation`, `/admin/companies`, `/admin/users`, `/admin/staff`, `/admin/support`: raw enum-строки вроде `basic`, `extended`, `content_manager`, `policy_violation`, `awaiting_user` не найдены, `overflowX=0`. Скриншот: `/private/tmp/ecoplatform-12-3-admin-labels.png`.
+- Browser UI-check — `/admin/content/news`: `Панель управления/CMS/Новости`, `/admin/companies`: `Панель управления/Компании`, console errors = 0, desktop overflow = 0. Mobile 390px: `/admin/companies` и `/admin/journals` без горизонтального overflow; screenshots в `/private/tmp/ecoplatform-12-4-admin-news-breadcrumbs.png`, `/private/tmp/ecoplatform-12-4-admin-companies-breadcrumbs.png`, `/private/tmp/ecoplatform-12-4-admin-companies-mobile.png`, `/private/tmp/ecoplatform-12-4-admin-journals-mobile.png`.
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.
-- Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
+- Lighthouse desktop baseline (commit `b8e3101`, без перезапуска в 12.4): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
 
 ## Целевая БД для деплоя
 

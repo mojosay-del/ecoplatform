@@ -6,7 +6,15 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { ChevronsLeft, ChevronsRight, HelpCircle, Menu, Settings, X } from "lucide-react";
 import { useAuth } from "../lib/auth";
-import { appNavSections, COMING_SOON_BADGE, type NavItem, type NavSection } from "./app-shell-nav";
+import {
+  appNavSections,
+  COMING_SOON_BADGE,
+  getBreadcrumbTrail,
+  isNavItemActive,
+  type BreadcrumbItem,
+  type NavItem,
+  type NavSection,
+} from "./app-shell-nav";
 import { DemoBanner } from "./DemoBanner";
 import { NotificationBell } from "./NotificationBell";
 import { UserSupportDrawer } from "./UserSupportDrawer";
@@ -172,7 +180,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: string; child?: boolean }) {
   const Icon = item.icon;
   const tooltipId = useId();
-  const active = isActiveNavItem(item, pathname);
+  const active = isNavItemActive(item, pathname);
   const className = `nav-link ${child ? "nav-link-child" : ""} ${active ? "active" : ""} ${item.disabled ? "disabled" : ""}`;
   const iconSize = child ? 16 : 19;
   const badge = item.disabledBadge ?? COMING_SOON_BADGE;
@@ -216,54 +224,50 @@ function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: 
   );
 }
 
-function isActiveNavItem(item: NavItem, pathname: string): boolean {
-  const selfActive = Boolean(item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`)));
-  const prefixActive = Boolean(
-    item.activePathPrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)),
-  );
-  return selfActive || prefixActive || Boolean(item.children?.some((child) => isActiveNavItem(child, pathname)));
-}
-
-// Хлебные крошки в топбаре: ищем в навигации активный пункт и показываем
-// «Категория / Пункт» (например, «Главная / Обучение»). Если ничего не нашли —
-// прячем (на /login и подобных страницах AppShell всё равно не отрисуется).
+// Хлебные крошки в топбаре: для обычных разделов берём активный пункт меню,
+// а для админки показываем вложенный путь внутри единой панели управления.
 function Breadcrumb({ nav, pathname }: { nav: NavSection[]; pathname: string }) {
-  let sectionTitle: string | null = null;
-  let activeItem: NavItem | null = null;
-  let activeHref: string | null = null;
-  for (const section of nav) {
-    for (const item of section.items) {
-      if (isActiveNavItem(item, pathname)) {
-        sectionTitle = section.title;
-        activeItem = item;
-        activeHref = item.href ?? null;
-        break;
-      }
-    }
-    if (activeItem) break;
-  }
-
-  if (!sectionTitle || !activeItem) return null;
-  const Icon = activeItem.icon;
+  const trail = getBreadcrumbTrail(nav, pathname);
+  if (!trail) return null;
 
   return (
     <nav className="topbar-breadcrumb" aria-label="Хлебные крошки">
-      <span className="topbar-breadcrumb-section">{sectionTitle}</span>
-      <span className="topbar-breadcrumb-sep" aria-hidden>
-        /
-      </span>
-      {activeHref ? (
-        <Link className="topbar-breadcrumb-current" href={activeHref}>
-          <Icon size={15} />
-          <span>{activeItem.label}</span>
+      {trail.map((crumb, index) => (
+        <BreadcrumbCrumb crumb={crumb} current={index === trail.length - 1} key={`${crumb.label}-${index}`} />
+      ))}
+    </nav>
+  );
+}
+
+function BreadcrumbCrumb({ crumb, current }: { crumb: BreadcrumbItem; current: boolean }) {
+  const Icon = crumb.icon;
+  const content = (
+    <>
+      {Icon ? <Icon size={15} /> : null}
+      <span>{crumb.label}</span>
+    </>
+  );
+
+  return (
+    <>
+      {crumb.href && !current ? (
+        <Link className="topbar-breadcrumb-link" href={crumb.href}>
+          {content}
         </Link>
       ) : (
-        <span className="topbar-breadcrumb-current">
-          <Icon size={15} />
-          <span>{activeItem.label}</span>
+        <span
+          className={current ? "topbar-breadcrumb-current" : "topbar-breadcrumb-section"}
+          aria-current={current ? "page" : undefined}
+        >
+          {content}
         </span>
       )}
-    </nav>
+      {current ? null : (
+        <span className="topbar-breadcrumb-sep" aria-hidden>
+          /
+        </span>
+      )}
+    </>
   );
 }
 
