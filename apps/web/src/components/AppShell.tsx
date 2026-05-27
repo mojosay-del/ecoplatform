@@ -3,93 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
-import type { LucideIcon } from "lucide-react";
-import {
-  BookOpen,
-  Calculator,
-  ChevronsLeft,
-  ChevronsRight,
-  FileText,
-  GraduationCap,
-  HelpCircle,
-  LayoutDashboard,
-  LineChart,
-  Map,
-  Menu,
-  MessageCircle,
-  Newspaper,
-  Settings,
-  ShieldCheck,
-  ShoppingBag,
-  Store,
-  X,
-} from "lucide-react";
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { ChevronsLeft, ChevronsRight, HelpCircle, Menu, Settings, X } from "lucide-react";
 import { useAuth } from "../lib/auth";
+import { appNavSections, COMING_SOON_BADGE, type NavItem, type NavSection } from "./app-shell-nav";
 import { NotificationBell } from "./NotificationBell";
 import { UserSupportDrawer } from "./UserSupportDrawer";
-
-type NavItem = {
-  href?: string;
-  label: string;
-  icon: LucideIcon;
-  disabled?: boolean;
-  roles?: string[];
-  children?: NavItem[];
-};
-
-const nav: Array<{ title: string; items: NavItem[] }> = [
-  {
-    title: "Главная",
-    items: [
-      { href: "/news", label: "Новости", icon: Newspaper },
-      { href: "/indices", label: "Индексы цен", icon: LineChart },
-      { href: "/education", label: "Обучение", icon: GraduationCap },
-      { label: "Торговая площадка", icon: ShoppingBag, disabled: true },
-    ],
-  },
-  {
-    title: "Сообщество",
-    items: [{ label: "Форум", icon: MessageCircle, disabled: true }],
-  },
-  {
-    title: "Автоматизация",
-    items: [{ label: "Магазин", icon: Store, disabled: true }],
-  },
-  {
-    title: "Базы знаний",
-    items: [
-      { href: "/knowledge-base", label: "Сырьё", icon: BookOpen },
-      { label: "Документация", icon: FileText, disabled: true },
-    ],
-  },
-  {
-    title: "Инструменты",
-    items: [
-      { label: "Карты", icon: Map, disabled: true },
-      { label: "Калькуляторы", icon: Calculator, disabled: true },
-    ],
-  },
-  {
-    title: "Служебное",
-    items: [
-      // Личный кабинет и уведомления уже доступны через иконки в топбаре —
-      // здесь дублировать не нужно. Секция показывается только админам.
-      // Раньше «Компании» и «Сотрудники» были отдельными пунктами; теперь
-      // это табы внутри «Пользователи» — так навигация чище.
-      {
-        href: "/admin/content/news",
-        label: "Панель управления",
-        icon: LayoutDashboard,
-        roles: ["admin", "content_manager"],
-      },
-      { href: "/admin/moderation", label: "Модерация", icon: ShieldCheck, roles: ["admin", "moderator"] },
-      { href: "/admin/settings", label: "Настройки", icon: Settings, roles: ["admin"] },
-      { href: "/admin/support", label: "Поддержка", icon: HelpCircle, roles: ["admin"] },
-    ],
-  },
-];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -149,7 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  const visibleNav = nav
+  const visibleNav = appNavSections
     .map((section) => ({
       ...section,
       items: filterVisibleItems(section.items, user?.platformRoles ?? []),
@@ -245,9 +164,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: string; child?: boolean }) {
   const Icon = item.icon;
+  const tooltipId = useId();
   const active = isActiveNavItem(item, pathname);
   const className = `nav-link ${child ? "nav-link-child" : ""} ${active ? "active" : ""} ${item.disabled ? "disabled" : ""}`;
   const iconSize = child ? 16 : 19;
+  const badge = item.disabledBadge ?? COMING_SOON_BADGE;
 
   return (
     <div className="nav-entry">
@@ -257,9 +178,24 @@ function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: 
           <span className="nav-label">{item.label}</span>
         </Link>
       ) : (
-        <span className={className} title={item.label}>
+        <span
+          className={className}
+          title={item.disabledHint ?? item.label}
+          role={item.disabled ? "link" : undefined}
+          aria-disabled={item.disabled ? "true" : undefined}
+          aria-describedby={item.disabled && item.disabledHint ? tooltipId : undefined}
+          tabIndex={item.disabled ? 0 : undefined}
+        >
           <Icon size={iconSize} />
-          <span className="nav-label">{item.label}</span>
+          <span className={`nav-label ${item.disabled ? "nav-label-disabled" : ""}`}>
+            <span className="nav-label-text">{item.label}</span>
+            {item.disabled ? <span className="nav-disabled-badge">{badge}</span> : null}
+          </span>
+          {item.disabledHint ? (
+            <span className="nav-tooltip" id={tooltipId} role="tooltip">
+              {item.disabledHint}
+            </span>
+          ) : null}
         </span>
       )}
       {item.children?.length ? (
@@ -281,7 +217,7 @@ function isActiveNavItem(item: NavItem, pathname: string): boolean {
 // Хлебные крошки в топбаре: ищем в навигации активный пункт и показываем
 // «Категория / Пункт» (например, «Главная / Обучение»). Если ничего не нашли —
 // прячем (на /login и подобных страницах AppShell всё равно не отрисуется).
-function Breadcrumb({ nav, pathname }: { nav: Array<{ title: string; items: NavItem[] }>; pathname: string }) {
+function Breadcrumb({ nav, pathname }: { nav: NavSection[]; pathname: string }) {
   let sectionTitle: string | null = null;
   let activeItem: NavItem | null = null;
   let activeHref: string | null = null;
