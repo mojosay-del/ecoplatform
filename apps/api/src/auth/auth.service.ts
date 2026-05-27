@@ -461,18 +461,14 @@ export class AuthService {
     // sourceId сам подавит повторы без доп. запросов.
     const fp = this.fingerprintUserAgent(meta.userAgent);
     const dayBucket = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
-    const when = new Date();
-    const where = [meta.ipAddress ?? "—", meta.userAgent ?? "—"].join(" · ");
 
     await this.notifications.createInApp({
       userId,
       eventType: newDevice ? "auth.login.new_device" : "auth.login",
       sourceId: `${newDevice ? "new_device" : "login"}:${fp}:${dayBucket}`,
       category: NotificationCategory.security,
-      title: newDevice ? "Вход с нового устройства" : "Новый вход в аккаунт",
-      body: newDevice
-        ? `Зафиксирован вход с устройства, отличного от предыдущих: ${where}.`
-        : `Вход в аккаунт выполнен ${when.toLocaleString("ru-RU")}.`,
+      title: "Новый вход в аккаунт",
+      body: "Вход выполнен.",
       link: "/account",
       payload: {
         ipAddress: meta.ipAddress ?? null,

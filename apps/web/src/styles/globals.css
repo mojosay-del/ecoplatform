@@ -247,18 +247,18 @@ input[type="checkbox"]:focus-visible {
 }
 
 .nav-link.disabled {
-  color: var(--text-muted);
+  color: rgb(var(--text-rgb) / 0.34);
   cursor: not-allowed;
 }
 
 .nav-link.disabled svg {
-  color: var(--text-subtle);
+  color: currentColor;
 }
 
 .nav-link.disabled:hover,
 .nav-link.disabled:focus-visible {
   background: transparent;
-  color: var(--text-muted);
+  color: rgb(var(--text-rgb) / 0.4);
 }
 
 .nav-link.disabled:focus-visible {
@@ -540,19 +540,37 @@ input[type="checkbox"]:focus-visible {
 }
 
 .account-menu-head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   padding: 8px 10px 10px;
   border-bottom: 1px solid var(--line);
+}
+
+.account-menu-head-avatar {
+  cursor: default;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--white);
+}
+
+.account-menu-head-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .account-menu-head strong {
   color: var(--text);
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.account-menu-head span {
+.account-menu-head-email {
   color: var(--muted);
   font-size: 12px;
   overflow: hidden;
@@ -2139,6 +2157,72 @@ input[type="checkbox"]:focus-visible {
 .lesson-task-list li.done strong {
   color: var(--muted);
   text-decoration: line-through;
+}
+
+.lesson-material-list {
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-material-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+
+.lesson-material-icon {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--text-subtle);
+}
+
+.lesson-material-title {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-material-download {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.lesson-material-download:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
+
+.lesson-material-unavailable {
+  justify-self: end;
+  color: var(--text-subtle);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 @media (max-width: 1100px) {
@@ -5192,6 +5276,8 @@ body.news-modal-open .app-shell {
 .sidebar-collapse {
   width: 28px;
   height: 28px;
+  margin-left: 12px;
+  margin-right: -4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5217,6 +5303,10 @@ body.news-modal-open .app-shell {
   flex-direction: column;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.app-shell[data-collapsed="true"] .sidebar-collapse {
+  margin: 0;
 }
 
 .mobile-menu-button {

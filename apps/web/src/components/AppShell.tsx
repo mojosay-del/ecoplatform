@@ -231,22 +231,17 @@ function AccountMenu({
       >
         <Settings size={20} />
       </button>
-      <button
-        className={`avatar account-menu-avatar ${user?.avatarUrl ? "avatar-with-image" : ""}`}
-        type="button"
-        title={fullName}
-        aria-label={`Открыть меню аккаунта: ${fullName}`}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        {user?.avatarUrl ? <Image alt="" src={user.avatarUrl} width={40} height={40} /> : null}
-        {!user?.avatarUrl ? <span className="account-menu-avatar-initials">{initials || "?"}</span> : null}
-      </button>
       {open ? (
         <div className="account-menu-popover" role="menu" aria-label="Меню аккаунта">
           <header className="account-menu-head">
-            <strong>{fullName}</strong>
-            {user?.email ? <span>{user.email}</span> : null}
+            <span className={`avatar account-menu-head-avatar ${user?.avatarUrl ? "avatar-with-image" : ""}`}>
+              {user?.avatarUrl ? <Image alt="" src={user.avatarUrl} width={40} height={40} /> : null}
+              {!user?.avatarUrl ? <span className="account-menu-avatar-initials">{initials || "?"}</span> : null}
+            </span>
+            <span className="account-menu-head-text">
+              <strong>{fullName}</strong>
+              {user?.email ? <span className="account-menu-head-email">{user.email}</span> : null}
+            </span>
           </header>
           {sections.map((section) => (
             <div className="account-menu-section" key={section.title}>

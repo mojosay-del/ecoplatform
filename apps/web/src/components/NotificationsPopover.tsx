@@ -126,12 +126,12 @@ export function NotificationsPopover({ open, onClose, items, loading, onChanged 
                 }}
               >
                 <div className="notif-popover-item-head">
-                  <strong className="notif-popover-item-title">{item.title}</strong>
+                  <strong className="notif-popover-item-title">{formatPopoverTitle(item)}</strong>
                   <span className="notif-popover-item-cat">
                     {NOTIFICATION_CATEGORY_LABELS[item.category] ?? item.category}
                   </span>
                 </div>
-                <p className="notif-popover-item-body">{item.body}</p>
+                <p className="notif-popover-item-body">{formatPopoverBody(item)}</p>
                 <span className="notif-popover-item-time">{formatRelative(item.createdAt)}</span>
               </button>
               {item.link ? (
@@ -158,6 +158,20 @@ export function NotificationsPopover({ open, onClose, items, loading, onChanged 
       </footer>
     </div>
   );
+}
+
+function isAuthLoginNotification(item: Notification): boolean {
+  return item.category === "security" && /вход/i.test(`${item.title} ${item.body}`);
+}
+
+function formatPopoverTitle(item: Notification): string {
+  if (isAuthLoginNotification(item)) return "Новый вход в аккаунт";
+  return item.title;
+}
+
+function formatPopoverBody(item: Notification): string {
+  if (isAuthLoginNotification(item)) return "Вход выполнен.";
+  return item.body;
 }
 
 function formatRelative(iso: string): string {

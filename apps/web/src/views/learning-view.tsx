@@ -590,6 +590,7 @@ function LessonAttachments({ attachments }: { attachments: Array<{ fileId: strin
                 aria-label={`Скачать ${attachment.displayName}`}
               >
                 <Download size={15} />
+                <span>Скачать</span>
               </a>
             ) : (
               <span className="lesson-material-unavailable">Недоступен</span>

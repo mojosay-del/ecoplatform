@@ -1738,7 +1738,8 @@ describe("Auth security notifications", () => {
       orderBy: { createdAt: "desc" },
     });
     expect(note).toBeTruthy();
-    expect(note?.title).toContain("нового устройства");
+    expect(note?.title).toBe("Новый вход в аккаунт");
+    expect(note?.body).toBe("Вход выполнен.");
   });
 
   it("смена пароля: отзывает другие сессии, создаёт уведомление, новый пароль работает", async () => {
