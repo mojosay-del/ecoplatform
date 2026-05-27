@@ -9,6 +9,13 @@ import type { NomenclatureCategoryListItem, NomenclatureListItem, PaginatedRespo
 import { AppShell } from "../components/AppShell";
 import { api } from "../lib/api";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./_shared";
+import {
+  formatIndexWeeklyChange,
+  getIndexAnchorId,
+  getIndexMovementSummary,
+  type IndexMovementRow,
+  type IndexMovementSummary,
+} from "./index-movement-summary";
 
 type IndexPeriod = "2W" | "1M" | "3M" | "6M" | "1Y" | "2Y" | "3Y";
 
@@ -35,6 +42,7 @@ export function IndicesView() {
   const data = page.items;
   const [activeSlug, setActiveSlug] = useState<string | undefined>(undefined);
   const active = data.find((category) => category.slug === activeSlug) ?? data[0];
+  const movementSummary = useMemo(() => getIndexMovementSummary(active?.nomenclatures ?? []), [active?.nomenclatures]);
 
   useEffect(() => {
     if (!activeSlug && data[0]?.slug) {
@@ -78,14 +86,83 @@ export function IndicesView() {
             В этой категории пока нет опубликованных индексов.
           </p>
         ) : (
-          <div className="indices-grid">
-            {active.nomenclatures.map((item) => (
-              <IndexCard key={item.id} item={item} />
-            ))}
-          </div>
+          <>
+            <IndexMovementSummaryTable summary={movementSummary} />
+            <div className="indices-grid">
+              {active.nomenclatures.map((item) => (
+                <IndexCard key={item.id} item={item} />
+              ))}
+            </div>
+          </>
         )}
       </section>
     </AppShell>
+  );
+}
+
+function IndexMovementSummaryTable({ summary }: { summary: IndexMovementSummary }) {
+  const rows: Array<IndexMovementRow & { kind: "rising" | "falling" }> = [
+    ...summary.rising.map((row) => ({ ...row, kind: "rising" as const })),
+    ...summary.falling.map((row) => ({ ...row, kind: "falling" as const })),
+  ];
+
+  return (
+    <section className="index-movement-summary" aria-labelledby="index-movement-title">
+      <div className="index-movement-head">
+        <div>
+          <span className="index-movement-eyebrow">За неделю</span>
+          <h2 id="index-movement-title">Движение индексов</h2>
+        </div>
+        <span className="index-movement-note">Топ-3 рост и падение</span>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="index-movement-empty">За неделю нет заметного роста или снижения.</p>
+      ) : (
+        <div className="index-movement-table-wrap">
+          <table className="index-movement-table">
+            <thead>
+              <tr>
+                <th scope="col">Динамика</th>
+                <th scope="col">Индекс</th>
+                <th scope="col">Цена</th>
+                <th scope="col">Изменение</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const isRising = row.kind === "rising";
+                const currentPrice = Number(row.item.summary?.currentPrice ?? 0);
+
+                return (
+                  <tr key={`${row.kind}-${row.item.id}`}>
+                    <td>
+                      <span className={`index-movement-kind ${isRising ? "positive" : "negative"}`}>
+                        {isRising ? "Рост" : "Снижение"}
+                      </span>
+                    </td>
+                    <td>
+                      <a className="index-movement-link" href={`#${getIndexAnchorId(row.item.id)}`}>
+                        {row.item.name}
+                      </a>
+                      <span className="index-movement-code">{row.item.code}</span>
+                    </td>
+                    <td data-label="Цена">
+                      {formatIndexPrice(currentPrice)} {row.item.unit ?? "₽/т"}
+                    </td>
+                    <td data-label="Изменение">
+                      <strong className={`index-movement-change ${isRising ? "positive" : "negative"}`}>
+                        {formatIndexWeeklyChange(row.weeklyChange)}
+                      </strong>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -107,7 +184,7 @@ function IndexCard({ item }: { item: NomenclatureListItem }) {
   const weeklyChange = Number(item.summary?.weeklyChange ?? 0);
 
   return (
-    <article className="index-card">
+    <article className="index-card" id={getIndexAnchorId(item.id)}>
       <div className="index-card-head">
         <div className="index-card-body">
           <h2 className="index-card-title">{item.name}</h2>

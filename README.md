@@ -91,8 +91,8 @@ docker-compose.yml   локальный Postgres 16 :5433 + Redis 7 :6379
 
 ```bash
 pnpm lint                  # tsc --noEmit во всех пакетах
-pnpm test                  # 90 unit-тестов (shared 7, web 10, api 73)
-pnpm test:integration      # 113 integration-тестов против ecoplatform_test
+pnpm test                  # 100 unit-тестов (shared 7, web 20, api 73)
+pnpm test:integration      # 114 integration-тестов против ecoplatform_test
 pnpm build                 # tsc + next build
 pnpm format:check          # prettier
 ```
@@ -101,8 +101,8 @@ Integration-тесты создают отдельную БД `ecoplatform_test`
 
 ## Demo-доступы после seed
 
-- Админ: `admin@ecoplatform.local` / `Admin123456`
-- Demo-пользователь: `demo@ecoplatform.local` / `Demo123456`
+- Админ: `admin@ecoplatform.local` / `Admin12345`
+- Demo-пользователь: `demo@ecoplatform.local` / `Demo12345`
 
 После seed также создаются 5 placeholder-юр-документов v1.0.0 (privacy/terms/personal-data — обязательные, cookies/offer — опциональные) и админский `ConsentRecord` на обязательные — иначе `auth/me.requiresReConsent` блокирует кабинет.
 

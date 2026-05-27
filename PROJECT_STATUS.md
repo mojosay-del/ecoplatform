@@ -24,7 +24,9 @@
 
 Волна 11.8 закрыта: в `/news` над лентой добавлена onboarding-card для нового demo-пользователя — приветствие по имени, дата окончания demo, быстрые ссылки на новости, индексы и курс «Закупка сырья», плюс скрытие через `localStorage.eco_onboarding_v1_dismissed = '1'`.
 
-Целевой следующий шаг: Волна 11.9 — сводная таблица движений индексов.
+Волна 11.9 закрыта: в `/indices` над графиками добавлена таблица «За неделю» с top-3 ростом и top-3 падением индексов текущей категории, цветными процентами и anchor-ссылками на карточки в сетке.
+
+Целевой следующий шаг: Волна 11.10 — сетка `auto-fit, minmax(...)` для индексов.
 
 ## Что уже сделано
 
@@ -38,7 +40,7 @@
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
 - 114 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 18 в `apps/web`, 73 в `apps/api`.
+- Unit-тесты: 7 в `packages/shared`, 20 в `apps/web`, 73 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
@@ -139,7 +141,7 @@
 
 ### Дальше по плану (`audit/ROADMAP.md`)
 
-- **Волна 11** — UX/дизайн-система: индексы, фильтры новостей, микрокопирайтинг и доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов, докрутка disabled-пунктов сайдбара, регистрация в 2 шага, sticky demo-баннер и onboarding-card закрыты в 11.1–11.8.
+- **Волна 11** — UX/дизайн-система: индексы, фильтры новостей, микрокопирайтинг и доступность. Дизайн-токены, типографическая иерархия, цветовая семантика pill'ов, состояния базовых контролов, докрутка disabled-пунктов сайдбара, регистрация в 2 шага, sticky demo-баннер, onboarding-card и сводная таблица движений индексов закрыты в 11.1–11.9.
 - **Волна 12** — CMS-полишинг и админ-таблицы: плотность, локализация enum-значений, breadcrumbs, скрытие cuid.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
@@ -166,8 +168,8 @@ pnpm dev                                              # api на :4000, web на
 
 Учётки после сида:
 
-- Админ: `admin@ecoplatform.local` / `Admin123456`
-- Demo-пользователь: `demo@ecoplatform.local` / `Demo123456`
+- Админ: `admin@ecoplatform.local` / `Admin12345`
+- Demo-пользователь: `demo@ecoplatform.local` / `Demo12345`
 
 Пользовательская админ-учётка для ручных проверок: `mojosay@icloud.com` (см. `.env.example::PLATFORM_OWNER_EMAIL`) — этого аккаунта нельзя ни деактивировать, ни снять с него роль admin через админ-UI.
 
@@ -175,7 +177,7 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 98 unit-тестов (shared 7, web 18, api 73)
+pnpm test                                             # 100 unit-тестов (shared 7, web 20, api 73)
 pnpm build                                            # tsc + next build
 pnpm test:integration                                 # 114 integration-тестов против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
@@ -184,14 +186,14 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 11.8).
+Дата: 2026-05-27 (после Волны 11.9).
 
 - `pnpm typecheck` — успешно (4/4).
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 18/18, api 73/73.
+- `pnpm test` — успешно: shared 7/7, web 20/20, api 73/73.
 - `pnpm test:integration` — успешно: API integration 114/114.
 - `pnpm build` — успешно (3/3).
-- Browser UI-check — `/news`: demo-пользователь видит onboarding-card над лентой с приветствием, датой demo, 3 быстрыми ссылками и кнопкой «Закрыть»; после закрытия карточка исчезает, горизонтального overflow нет.
+- Browser UI-check — `/indices`: таблица «За неделю» видна над графиками, изменение `-0,6%` окрашено как падение, anchor-ссылка ведёт к карточке «Гофрокартон»; мобильная ширина 390px подтверждает, что новая таблица перестраивается в компактный список. Оставшийся page-level overflow на `/indices` относится к старым карточкам/period-tabs и закрывается следующим пунктом 11.10.
 - `pnpm format:check` — clean.
 - CSS token sanity — прямых `#...`, `rgba(...)`, нетокенизированных `rgb(...)` в `globals.css` нет.
 - `git diff --check` — clean.
