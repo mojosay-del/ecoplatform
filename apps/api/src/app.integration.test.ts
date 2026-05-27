@@ -1838,6 +1838,12 @@ describe("Admin journals", () => {
     expect(blockEntry.payload.before.status).toBe("active");
     expect(blockEntry.payload.after.status).toBe("blocked");
     expect(blockEntry.payload.reasonCode).toBe("policy_violation");
+    expect(blockEntry.entity).toMatchObject({
+      type: "User",
+      typeLabel: "Пользователь",
+      title: "Иван Тестов",
+      subtitle: "user0400001@test.local",
+    });
 
     const byEntity = await ctx.http
       .get("/api/admin/journals?entityType=PlatformSetting")

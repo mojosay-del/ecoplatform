@@ -5,6 +5,7 @@ import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { StatusPill, moderationStatusPillVariant } from "./StatusPill";
+import { formatModerationCaseTitle, formatModerationEntityPreview } from "./admin-entity-display";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -156,8 +157,8 @@ export function AdminModerationView() {
                   <StatusPill variant={moderationStatusPillVariant(item.status)}>
                     {caseStatusLabels[item.status] ?? item.status}
                   </StatusPill>
-                  <strong>{item.entity?.newsPost?.title ?? "Комментарий"}</strong>
-                  <span>{item.entity?.text ?? item.entityId}</span>
+                  <strong>{formatModerationCaseTitle(item)}</strong>
+                  <span>{formatModerationEntityPreview(item)}</span>
                   <small>Жалоб: {item.complaints.length}</small>
                 </button>
               ))}
@@ -167,26 +168,31 @@ export function AdminModerationView() {
                 <p className="page-subtitle">Выберите кейс.</p>
               ) : (
                 <>
-                  <div className="list-row">
+                  <div className="list-row moderation-detail-heading">
                     <div>
                       <StatusPill as="p" variant={moderationStatusPillVariant(selectedCase.status)}>
                         {caseStatusLabels[selectedCase.status] ?? selectedCase.status}
                       </StatusPill>
-                      <h2>{selectedCase.entity?.newsPost?.title ?? "Кейс модерации"}</h2>
+                      <h2>{formatModerationCaseTitle(selectedCase)}</h2>
+                      <p className="admin-table-muted">{formatModerationEntityPreview(selectedCase)}</p>
                     </div>
-                    <div className="auth-actions">
-                      <button
-                        className="button secondary"
-                        onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/lock`)}
-                      >
-                        Взять
-                      </button>
-                      <button
-                        className="button secondary"
-                        onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/release`)}
-                      >
-                        Освободить
-                      </button>
+                    <div className="moderation-detail-side">
+                      <span className="technical-id">ID кейса: {selectedCase.id}</span>
+                      <span className="technical-id">ID сущности: {selectedCase.entityId}</span>
+                      <div className="auth-actions">
+                        <button
+                          className="button secondary"
+                          onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/lock`)}
+                        >
+                          Взять
+                        </button>
+                        <button
+                          className="button secondary"
+                          onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/release`)}
+                        >
+                          Освободить
+                        </button>
+                      </div>
                     </div>
                   </div>
                   {selectedCase.lockedBy ? (

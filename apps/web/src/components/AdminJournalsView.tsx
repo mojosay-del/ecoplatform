@@ -7,6 +7,7 @@ import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
 import { CmsTabs } from "./CmsTabs";
 import { StatusPill } from "./StatusPill";
+import { getJournalEntityDisplay } from "./admin-entity-display";
 import { sortItems, type SortState } from "./admin-table-utils";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -22,7 +23,10 @@ type AdminJournalsViewProps = {
 const journalSortSelectors: Record<JournalSortKey, (item: AdminJournalEntry) => string | number> = {
   createdAt: (item) => Date.parse(item.createdAt),
   action: (item) => item.action,
-  entity: (item) => `${item.entityType} ${item.entityId}`,
+  entity: (item) => {
+    const entity = getJournalEntityDisplay(item);
+    return `${entity.typeLabel} ${entity.title} ${entity.subtitle ?? ""}`;
+  },
   actor: (item) => (item.actor ? formatActor(item.actor) : ""),
 };
 
@@ -208,25 +212,30 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
                 </tr>
               </thead>
               <tbody>
-                {sortedEntries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td>{new Date(entry.createdAt).toLocaleString("ru-RU")}</td>
-                    <td>
-                      <strong>{entry.action}</strong>
-                    </td>
-                    <td>
-                      <div className="admin-table-cell-main">
-                        <strong>{entry.entityType}</strong>
-                        <span className="admin-table-muted">{entry.entityId}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <PayloadView payload={entry.payload} />
-                    </td>
-                    <td>{entry.actor ? formatActor(entry.actor) : "—"}</td>
-                    <td>{entry.comment ? `«${entry.comment}»` : "—"}</td>
-                  </tr>
-                ))}
+                {sortedEntries.map((entry) => {
+                  const entity = getJournalEntityDisplay(entry);
+                  return (
+                    <tr key={entry.id}>
+                      <td>{new Date(entry.createdAt).toLocaleString("ru-RU")}</td>
+                      <td>
+                        <strong>{entry.action}</strong>
+                      </td>
+                      <td>
+                        <div className="admin-table-cell-main">
+                          <strong>{entity.typeLabel}</strong>
+                          <span>{entity.title}</span>
+                          {entity.subtitle ? <span className="admin-table-muted">{entity.subtitle}</span> : null}
+                          <span className="technical-id">ID: {entity.technicalId}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <PayloadView payload={entry.payload} />
+                      </td>
+                      <td>{entry.actor ? formatActor(entry.actor) : "—"}</td>
+                      <td>{entry.comment ? `«${entry.comment}»` : "—"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

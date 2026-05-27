@@ -4384,6 +4384,28 @@ body.news-modal-open .app-shell {
   align-self: start;
 }
 
+.moderation-detail-heading {
+  align-items: flex-start;
+}
+
+.moderation-detail-heading h2 {
+  margin-bottom: 4px;
+}
+
+.moderation-detail-side {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.technical-id {
+  color: var(--text-disabled);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  word-break: break-all;
+}
+
 .admin-filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -5363,6 +5385,16 @@ a.topbar-breadcrumb-current:hover {
 @media (max-width: 720px) {
   .form-grid-2 {
     grid-template-columns: 1fr;
+  }
+
+  .moderation-detail-heading {
+    flex-direction: column;
+  }
+
+  .moderation-detail-side {
+    justify-items: start;
+    min-width: 0;
+    width: 100%;
   }
 }
 

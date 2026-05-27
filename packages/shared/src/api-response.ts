@@ -398,6 +398,13 @@ export type AdminJournalActor = {
   email: string;
 };
 
+export type AdminJournalEntitySummary = {
+  type: string;
+  typeLabel: string;
+  title: string;
+  subtitle?: string | null;
+};
+
 export type AdminJournalEntry = {
   id: string;
   actorId: string;
@@ -405,6 +412,7 @@ export type AdminJournalEntry = {
   action: string;
   entityType: string;
   entityId: string;
+  entity: AdminJournalEntitySummary | null;
   comment: string | null;
   payload: AdminJournalPayload | null;
   createdAt: IsoDateString;

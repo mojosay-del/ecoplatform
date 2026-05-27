@@ -38,7 +38,9 @@
 
 Волна 12.1 закрыта: админские листинги компаний, пользователей, сотрудников и журнала переведены в компактные таблицы с сортировкой и фильтр-барами; список обращений поддержки уплотнён и получил сортировку. Админские разделы собраны в одну «Панель управления»: в сайдбаре остался один служебный пункт, а верхние вкладки теперь ведут в CMS, пользователей, компании, сотрудников, поддержку, подписки, очередь модерации, настройки и журнал.
 
-Целевой следующий шаг: Волна 12.2 — скрыть технические cuid из UI модерации и журналов.
+Волна 12.2 закрыта: `/admin/journals` и `/admin/moderation` больше не показывают технические cuid как основной текст. Журнал получает человекочитаемый `entity` summary от API, а ID остаётся мелкой audit-строкой; модерация показывает заголовки жалоб по автору и времени комментария, ID кейса/сущности вынесены в угол.
+
+Целевой следующий шаг: Волна 12.3 — локализация enum-статусов везде.
 
 ## Что уже сделано
 
@@ -52,7 +54,7 @@
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
 - 114 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 31 в `apps/web`, 73 в `apps/api`.
+- Unit-тесты: 7 в `packages/shared`, 35 в `apps/web`, 75 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
@@ -154,13 +156,13 @@
 ### Дальше по плану (`audit/ROADMAP.md`)
 
 - **Волна 11** — UX/дизайн-система закрыта полностью: токены, типографика, цветовая семантика, состояния контролов, сайдбар, регистрация, demo-баннер, onboarding, индексы, фильтры новостей, микро-копирайтинг, публичные fallback-layouts и доступность.
-- **Волна 12** — CMS-полишинг и админ-таблицы: 12.1 закрыта (компактные админ-таблицы и единая панель управления); дальше — скрытие cuid, локализация enum-значений, breadcrumbs, CMS preview, drag-and-drop, auto-save, preview «как видит пользователь», admin dashboard.
+- **Волна 12** — CMS-полишинг и админ-таблицы: 12.1 закрыта (компактные админ-таблицы и единая панель управления), 12.2 закрыта (скрытие cuid в модерации и журнале); дальше — локализация enum-значений, breadcrumbs, CMS preview, drag-and-drop, auto-save, preview «как видит пользователь», admin dashboard.
 - **Волна 13** — финал MVP: контент 2 курсов, чистка постMVP-модулей из публичной выдачи, прод smoke, бэкапы.
 
 ### Тех-долг, осознанно отложенный
 
 - 3.3 — расщепление `moderation.service.ts` (940 строк). Приватные хелперы тесно переплетены, расщепление создаст cross-service зависимости. Пересмотреть при росте >1500 строк.
-- 5.2 — декомпозиция integration-тестов на доменные файлы (сейчас один файл на 113 тестов).
+- 5.2 — декомпозиция integration-тестов на доменные файлы (сейчас один файл на 114 тестов).
 - 5.3 — OpenAPI/Swagger.
 - 5.4 — pino + LOG_LEVEL (закрыто в Волне 10.1).
 - Реальный визуальный блочный редактор CMS вместо текущего пошагового композитора блоков.
@@ -189,7 +191,7 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 104 unit-теста (shared 7, web 24, api 73)
+pnpm test                                             # 117 unit-тестов (shared 7, web 35, api 75)
 pnpm build                                            # tsc + next build
 pnpm test:integration                                 # 114 integration-тестов против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
@@ -198,14 +200,14 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после Волны 11.13).
+Дата: 2026-05-27 (после Волны 12.2).
 
 - `pnpm typecheck` — успешно (4/4).
 - `pnpm lint` — успешно (4/4).
-- `pnpm test` — успешно: shared 7/7, web 24/24, api 73/73.
+- `pnpm test` — успешно: shared 7/7, web 35/35, api 75/75.
 - `pnpm test:integration` — успешно: API integration 114/114.
 - `pnpm build` — успешно (3/3).
-- Browser UI-check — `/forgot-password` и несуществующий URL: desktop 1280px без `.auth-layout`, с `marketingPageCount=1`, центрированием `cardCenterDelta=0`, footer из 5 ссылок и `documentOverflowX=0`/`bodyOverflowX=0`; mobile 390px также без horizontal overflow. Скриншоты: `/private/tmp/ecoplatform-11-13-forgot-desktop.png`, `/private/tmp/ecoplatform-11-13-404-desktop.png`, `/private/tmp/ecoplatform-11-13-forgot-mobile.png`, `/private/tmp/ecoplatform-11-13-404-mobile.png`.
+- Browser UI-check — `/admin/journals`: человекочитаемые сущности вместо raw cuid, fallback названий удалённых курсов из payload, `overflowX=0`; `/admin/moderation`: живая жалоба показывает «Жалоба на комментарий И.З. от 27.05.2026, 14:09», текст комментария, ID кейса/сущности мелким текстом справа, `overflowX=0`, console errors = 0. Скриншоты: `/private/tmp/ecoplatform-12-2-admin-journals.png`, `/private/tmp/ecoplatform-12-2-admin-moderation.png`.
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.
 - Lighthouse desktop (commit `b8e3101`): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
