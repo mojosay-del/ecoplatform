@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronRight, FileText, FolderOpen, Plus } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
@@ -9,6 +9,7 @@ import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { canAutosaveDraft, useCmsAutosave } from "../lib/cms-autosave";
 import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
 
 type Article = {
@@ -176,42 +177,54 @@ export function AdminKnowledgeView() {
     });
   }
 
+  const buildSaveBody = useCallback(
+    () => ({
+      parentId: draft.parentId,
+      title: draft.title.trim(),
+      subtitle: draft.subtitle.trim() || undefined,
+      coverImageId: draft.coverImageId.trim() || null,
+      iconType: draft.iconType.trim() || undefined,
+      position: draft.position,
+      blocks: draft.blocks,
+    }),
+    [draft],
+  );
+
+  const persistKnowledgeDraft = useCallback(async () => {
+    if (!token) throw new Error("Нет активной сессии.");
+    const body = buildSaveBody();
+
+    if (draft.id) {
+      await apiFetch(`/admin/content/knowledge-base/${draft.id}`, {
+        method: "PATCH",
+        token,
+        body,
+      });
+      if (original && (original.parentId !== draft.parentId || original.position !== draft.position)) {
+        await apiFetch(`/admin/content/knowledge-base/${draft.id}/move`, {
+          method: "PATCH",
+          token,
+          body: { parentId: draft.parentId, position: draft.position },
+        });
+      }
+    } else {
+      await apiFetch("/admin/content/knowledge-base", { method: "POST", token, body });
+    }
+
+    await loadList();
+  }, [buildSaveBody, draft.id, draft.parentId, draft.position, original, token]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
     setSubmitting(true);
     setMessage(null);
     try {
-      const body = {
-        parentId: draft.parentId,
-        title: draft.title.trim(),
-        subtitle: draft.subtitle.trim() || undefined,
-        coverImageId: draft.coverImageId.trim() || null,
-        iconType: draft.iconType.trim() || undefined,
-        position: draft.position,
-        blocks: draft.blocks,
-      };
-
-      if (draft.id) {
-        await apiFetch(`/admin/content/knowledge-base/${draft.id}`, {
-          method: "PATCH",
-          token,
-          body,
-        });
-        const orig = items.find((item) => item.id === draft.id);
-        if (orig && (orig.parentId !== draft.parentId || orig.position !== draft.position)) {
-          await apiFetch(`/admin/content/knowledge-base/${draft.id}/move`, {
-            method: "PATCH",
-            token,
-            body: { parentId: draft.parentId, position: draft.position },
-          });
-        }
-      } else {
-        await apiFetch("/admin/content/knowledge-base", { method: "POST", token, body });
-      }
+      const wasNew = !draft.id;
+      const parentId = draft.parentId;
+      await persistKnowledgeDraft();
       setMessage(draft.id ? "Статья обновлена." : "Статья создана как черновик.");
-      await loadList();
-      if (!draft.id) startNew(draft.parentId);
+      if (wasNew) startNew(parentId);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось сохранить статью.");
     } finally {
@@ -253,6 +266,12 @@ export function AdminKnowledgeView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  const knowledgeAutosave = useCmsAutosave({
+    enabled: canAutosaveDraft(original?.status, draft.id) && !submitting,
+    hasChanges,
+    onSave: persistKnowledgeDraft,
+  });
+
   if (state === "unauthenticated") {
     return (
       <AppShell>
@@ -276,6 +295,12 @@ export function AdminKnowledgeView() {
   }
 
   const isEditingNew = draft.id === null;
+  const autosaveEnabled = canAutosaveDraft(original?.status, draft.id);
+  const saveStatusClass = autosaveEnabled
+    ? `is-${knowledgeAutosave.autosaveState}`
+    : hasChanges
+      ? "has-changes"
+      : "is-saved";
 
   return (
     <AppShell>
@@ -320,7 +345,7 @@ export function AdminKnowledgeView() {
           </div>
 
           <div className="moderation-detail">
-            <form className="form news-form" onSubmit={submit}>
+            <form className="form news-form" onSubmit={submit} onBlur={knowledgeAutosave.handleAutosaveBlur}>
               <div className="news-form-head">
                 <span className="news-form-mode">{isEditingNew ? "Новая статья" : "Редактирование"}</span>
               </div>
@@ -433,14 +458,16 @@ export function AdminKnowledgeView() {
               </fieldset>
 
               <div className="lesson-save-bar">
-                <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>
+                <span className={`lesson-save-bar-status ${saveStatusClass}`}>
                   {submitting
-                    ? "Сохраняю…"
-                    : hasChanges
-                      ? isEditingNew
-                        ? "Новый черновик"
-                        : "Есть несохранённые изменения"
-                      : "Всё сохранено"}
+                    ? "Сохраняется…"
+                    : autosaveEnabled
+                      ? knowledgeAutosave.autosaveLabel
+                      : hasChanges
+                        ? isEditingNew
+                          ? "Новый черновик"
+                          : "Есть несохранённые изменения"
+                        : "Сохранено"}
                 </span>
                 <div className="lesson-save-bar-actions">
                   {!isEditingNew ? (
@@ -453,8 +480,16 @@ export function AdminKnowledgeView() {
                       {original.status === "published" ? "Снять с публикации" : "Опубликовать"}
                     </button>
                   ) : null}
-                  <button className="button" type="submit" disabled={submitting || !hasChanges}>
-                    {submitting ? "Сохраняю…" : isEditingNew ? "Создать черновик" : "Сохранить"}
+                  <button
+                    className="button"
+                    type="submit"
+                    disabled={submitting || knowledgeAutosave.isAutosaving || !hasChanges}
+                  >
+                    {submitting || knowledgeAutosave.isAutosaving
+                      ? "Сохраняется…"
+                      : isEditingNew
+                        ? "Создать черновик"
+                        : "Сохранить"}
                   </button>
                 </div>
               </div>

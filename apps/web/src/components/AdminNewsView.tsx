@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, ImageIcon, Plus, X } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { Block, BlocksEditor, NEWS_BLOCK_KINDS } from "./BlocksEditor";
@@ -9,6 +9,7 @@ import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
+import { canAutosaveDraft, useCmsAutosave } from "../lib/cms-autosave";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { formatNewsDate } from "../views/_shared";
@@ -189,23 +190,10 @@ export function AdminNewsView() {
     setSubmitting(true);
     setMessage(null);
     try {
-      const body = {
-        title: draft.title.trim(),
-        lead: draft.lead.trim(),
-        coverImageId: draft.coverImageId.trim() || null,
-        tags: draft.tags,
-        blocks: draft.blocks,
-      };
-      let saved: NewsDetail;
-      if (draft.id) {
-        saved = (await apiFetch(`/admin/content/news/${draft.id}`, { method: "PATCH", token, body })) as NewsDetail;
-      } else {
-        saved = (await apiFetch("/admin/content/news", { method: "POST", token, body })) as NewsDetail;
-      }
-      setMessage(draft.id ? "Новость обновлена." : "Новость создана как черновик.");
-      setEditingOriginal(saved);
-      newsQuery.reload();
-      if (!draft.id) startNew();
+      const wasNew = !draft.id;
+      await persistNewsDraft();
+      setMessage(wasNew ? "Новость создана как черновик." : "Новость обновлена.");
+      if (wasNew) startNew();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось сохранить новость.");
     } finally {
@@ -249,6 +237,34 @@ export function AdminNewsView() {
     window.open(previewHref(item), "_blank", "noopener,noreferrer");
   }
 
+  const buildSaveBody = useCallback(
+    () => ({
+      title: draft.title.trim(),
+      lead: draft.lead.trim(),
+      coverImageId: draft.coverImageId.trim() || null,
+      tags: draft.tags,
+      blocks: draft.blocks,
+    }),
+    [draft],
+  );
+
+  const persistNewsDraft = useCallback(async () => {
+    if (!token) throw new Error("Нет активной сессии.");
+    const body = buildSaveBody();
+    const saved = draft.id
+      ? ((await apiFetch(`/admin/content/news/${draft.id}`, { method: "PATCH", token, body })) as NewsDetail)
+      : ((await apiFetch("/admin/content/news", { method: "POST", token, body })) as NewsDetail);
+    setEditingOriginal(saved);
+    newsQuery.reload();
+    return saved;
+  }, [buildSaveBody, draft.id, newsQuery, token]);
+
+  const newsAutosave = useCmsAutosave({
+    enabled: canAutosaveDraft(original?.status, draft.id) && !submitting,
+    hasChanges,
+    onSave: persistNewsDraft,
+  });
+
   useEffect(() => {
     void loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,6 +294,12 @@ export function AdminNewsView() {
 
   const isEditingNew = draft.id === null;
   const canOpenSavedPreview = Boolean(original && !hasChanges);
+  const autosaveEnabled = canAutosaveDraft(original?.status, draft.id);
+  const saveStatusClass = autosaveEnabled
+    ? `is-${newsAutosave.autosaveState}`
+    : hasChanges
+      ? "has-changes"
+      : "is-saved";
 
   return (
     <AppShell>
@@ -381,7 +403,7 @@ export function AdminNewsView() {
           </div>
 
           <div className="moderation-detail">
-            <form className="form news-form" onSubmit={submit}>
+            <form className="form news-form" onSubmit={submit} onBlur={newsAutosave.handleAutosaveBlur}>
               <div className="news-form-head">
                 <span className="news-form-mode">{isEditingNew ? "Новая новость" : "Редактирование"}</span>
               </div>
@@ -475,14 +497,16 @@ export function AdminNewsView() {
               </div>
 
               <div className="lesson-save-bar">
-                <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>
+                <span className={`lesson-save-bar-status ${saveStatusClass}`}>
                   {submitting
-                    ? "Сохраняю…"
-                    : hasChanges
-                      ? isEditingNew
-                        ? "Новый черновик"
-                        : "Есть несохранённые изменения"
-                      : "Всё сохранено"}
+                    ? "Сохраняется…"
+                    : autosaveEnabled
+                      ? newsAutosave.autosaveLabel
+                      : hasChanges
+                        ? isEditingNew
+                          ? "Новый черновик"
+                          : "Есть несохранённые изменения"
+                        : "Сохранено"}
                 </span>
                 <div className="lesson-save-bar-actions">
                   {!isEditingNew ? (
@@ -522,8 +546,16 @@ export function AdminNewsView() {
                       Предпросмотр
                     </button>
                   )}
-                  <button className="button" type="submit" disabled={submitting || !hasChanges}>
-                    {submitting ? "Сохраняю…" : isEditingNew ? "Создать черновик" : "Сохранить"}
+                  <button
+                    className="button"
+                    type="submit"
+                    disabled={submitting || newsAutosave.isAutosaving || !hasChanges}
+                  >
+                    {submitting || newsAutosave.isAutosaving
+                      ? "Сохраняется…"
+                      : isEditingNew
+                        ? "Создать черновик"
+                        : "Сохранить"}
                   </button>
                 </div>
               </div>

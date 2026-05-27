@@ -7524,7 +7524,7 @@ li.tree-add-row + li.tree-add-row,
   background: var(--primary-soft);
 }
 
-/* --- Sticky save bar для урока --- */
+/* --- Sticky save bar для CMS-редакторов --- */
 .lesson-save-bar {
   position: sticky;
   bottom: 0;
@@ -7550,18 +7550,54 @@ li.tree-add-row + li.tree-add-row,
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+  transition: color 160ms ease;
 }
 
 .lesson-save-bar-status.has-changes {
   color: var(--primary);
 }
 
-.lesson-save-bar-status.has-changes::before {
+.lesson-save-bar-status::before {
   content: "";
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.lesson-save-bar-status.has-changes::before {
   background: var(--primary);
+}
+
+.lesson-save-bar-status.is-saved {
+  color: var(--success-text);
+}
+
+.lesson-save-bar-status.is-saved::before {
+  background: var(--success);
+  animation: cms-save-pop 240ms ease-out;
+}
+
+.lesson-save-bar-status.is-saving {
+  color: var(--info);
+}
+
+.lesson-save-bar-status.is-saving::before {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+  border: 2px solid rgb(var(--info-rgb) / 0.24);
+  border-top-color: var(--info);
+  animation: cms-save-spin 720ms linear infinite;
+}
+
+.lesson-save-bar-status.is-error {
+  color: var(--danger-text-strong);
+}
+
+.lesson-save-bar-status.is-error::before {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px rgb(var(--danger-rgb) / 0.1);
 }
 
 .lesson-save-bar-actions {
@@ -7574,6 +7610,30 @@ li.tree-add-row + li.tree-add-row,
 
 .lesson-save-bar-actions .button {
   white-space: nowrap;
+}
+
+@keyframes cms-save-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cms-save-pop {
+  0% {
+    transform: scale(0.72);
+    box-shadow: 0 0 0 0 rgb(var(--success-rgb) / 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px rgb(var(--success-rgb) / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-save-bar-status.is-saving::before,
+  .lesson-save-bar-status.is-saved::before {
+    animation: none;
+  }
 }
 
 @media (max-width: 640px) {

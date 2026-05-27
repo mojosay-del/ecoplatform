@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Paperclip, Plus, Trash2 } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
@@ -10,6 +10,7 @@ import { RowKebab, type ActionItem } from "./RowKebab";
 import { StatusPill } from "./StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { canAutosaveDraft, useCmsAutosave } from "../lib/cms-autosave";
 import { CONTENT_STATUS_LABELS, LEARNING_ACCESS_LEVEL_LABELS } from "../lib/display-labels";
 
 type Attachment = { fileId: string; displayName: string };
@@ -942,14 +943,19 @@ function LessonForm({
     setAttachmentsBlockVisible(lesson.attachments.length > 0);
   }, [lesson.id, lesson.title, lesson.blocks, lesson.attachments]);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    await onMutate(`/admin/content/education/lessons/${lesson.id}`, "PATCH", {
+  const persistLessonDraft = useCallback(async () => {
+    const ok = await onMutate(`/admin/content/education/lessons/${lesson.id}`, "PATCH", {
       title: draft.title,
       blocks: draft.blocks,
       attachments: normalizedDraftAttachments,
     });
+    if (!ok) throw new Error("Не удалось сохранить урок.");
+  }, [draft.blocks, draft.title, lesson.id, normalizedDraftAttachments, onMutate]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    await persistLessonDraft().catch(() => undefined);
     setSaving(false);
   }
 
@@ -1000,8 +1006,16 @@ function LessonForm({
     return false;
   }, [draft, lesson, normalizedDraftAttachments]);
 
+  const lessonAutosave = useCmsAutosave({
+    enabled: canAutosaveDraft(lesson.status, lesson.id) && !saving,
+    hasChanges,
+    onSave: persistLessonDraft,
+  });
+  const saveStatusClass =
+    lessonAutosave.autosaveState === "dirty" ? "has-changes" : `is-${lessonAutosave.autosaveState}`;
+
   return (
-    <form className="form lesson-form" onSubmit={submit}>
+    <form className="form lesson-form" onSubmit={submit} onBlur={lessonAutosave.handleAutosaveBlur}>
       <header className="lesson-header">
         <span className={`lesson-header-status${lesson.status === "published" ? " is-published" : ""}`}>
           {CONTENT_STATUS_LABELS[lesson.status]}
@@ -1073,8 +1087,8 @@ function LessonForm({
       ) : null}
 
       <div className="lesson-save-bar">
-        <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>
-          {saving ? "Сохраняю…" : hasChanges ? "Есть несохранённые изменения" : "Всё сохранено"}
+        <span className={`lesson-save-bar-status ${saveStatusClass}`}>
+          {saving ? "Сохраняется…" : lessonAutosave.autosaveLabel}
         </span>
         <div className="lesson-save-bar-actions">
           <button
@@ -1109,8 +1123,8 @@ function LessonForm({
               Предпросмотр
             </button>
           )}
-          <button className="button" type="submit" disabled={saving || !hasChanges}>
-            {saving ? "Сохраняю…" : "Сохранить"}
+          <button className="button" type="submit" disabled={saving || lessonAutosave.isAutosaving || !hasChanges}>
+            {saving || lessonAutosave.isAutosaving ? "Сохраняется…" : "Сохранить"}
           </button>
         </div>
       </div>
