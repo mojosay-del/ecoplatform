@@ -28,7 +28,7 @@ apps/
       redis/         session cache, throttler storage
       scheduler/     hourly billing-check + nightly cleanup-deleted-accounts (advisory-lock)
       common/        CSRF guard, JwtAuthGuard, pagination, sanitize, simple-zip
-      app.integration.test.ts  129 сквозных тестов
+      app.integration.test.ts  131 сквозной тест
   web/               Next.js App Router, Tiptap-редактор, dnd-kit
     app/             публичные и админ-маршруты
       (login,register,forgot-password,news,indices,education,
@@ -96,7 +96,7 @@ docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
 ```bash
 pnpm lint                  # tsc --noEmit во всех пакетах
 pnpm test                  # 138 unit-тестов (shared 7, web 50, api 81)
-pnpm test:integration      # 129 integration-тестов против ecoplatform_test
+pnpm test:integration      # 131 integration-тест против ecoplatform_test
 pnpm build                 # tsc + next build
 pnpm format:check          # prettier
 ```

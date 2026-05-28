@@ -1779,6 +1779,70 @@ describe("Admin companies panel", () => {
 });
 
 describe("Email channel queue (задел)", () => {
+  it("notifications API валидирует query и не отдаёт внутренний payload", async () => {
+    const company = await registerCompany("0699901");
+    const note = await ctx.prisma.inAppNotification.create({
+      data: {
+        userId: company.userId,
+        domainEventId: "audit.notification.payload:1",
+        eventType: "audit.notification.payload",
+        category: "security",
+        title: "Проверка уведомления",
+        body: "Внутренние детали не должны попадать в публичный ответ.",
+        link: "/account",
+        payload: { ipAddress: "127.0.0.1", userAgent: "test-agent", internalId: "secret-case-id" },
+      },
+    });
+
+    const invalid = await ctx.http.get("/api/notifications?limit=abc").set("Authorization", `Bearer ${company.token}`);
+    expect(invalid.status).toBe(400);
+
+    const list = await ctx.http.get("/api/notifications?limit=5").set("Authorization", `Bearer ${company.token}`);
+    expect(list.status).toBe(200);
+    expect(list.body.items).toHaveLength(1);
+    expect(list.body.items[0]).toMatchObject({
+      id: note.id,
+      eventType: "audit.notification.payload",
+      title: "Проверка уведомления",
+    });
+    expect(list.body.items[0]).not.toHaveProperty("payload");
+    expect(list.body.items[0]).not.toHaveProperty("domainEventId");
+    expect(list.body.items[0]).not.toHaveProperty("sourceId");
+    expect(list.body.items[0]).not.toHaveProperty("deliveryId");
+    expect(list.body.items[0]).not.toHaveProperty("userId");
+
+    const read = await ctx.http
+      .post(`/api/notifications/${note.id}/read`)
+      .set("Authorization", `Bearer ${company.token}`);
+    expect(read.status).toBe(201);
+    expect(read.body.readAt).toBeTruthy();
+    expect(read.body).not.toHaveProperty("payload");
+
+    const archive = await ctx.http
+      .post(`/api/notifications/${note.id}/archive`)
+      .set("Authorization", `Bearer ${company.token}`);
+    expect(archive.status).toBe(201);
+    expect(archive.body.archivedAt).toBeTruthy();
+    expect(archive.body).not.toHaveProperty("payload");
+  });
+
+  it("preferences API возвращает только публичные списки категорий", async () => {
+    const company = await registerCompany("0699902");
+
+    const saved = await ctx.http
+      .patch("/api/notifications/preferences")
+      .set("Authorization", `Bearer ${company.token}`)
+      .send({ inAppMutedCategories: ["moderation", "security"], emailMutedCategories: ["support", "billing"] });
+    expect(saved.status).toBe(200);
+    expect(saved.body).toEqual({ inAppMutedCategories: ["moderation"], emailMutedCategories: ["support"] });
+    expect(saved.body).not.toHaveProperty("id");
+    expect(saved.body).not.toHaveProperty("userId");
+
+    const loaded = await ctx.http.get("/api/notifications/preferences").set("Authorization", `Bearer ${company.token}`);
+    expect(loaded.status).toBe(200);
+    expect(loaded.body).toEqual(saved.body);
+  });
+
   it("при логине создаётся не только in_app, но и email-доставка в статусе queued", async () => {
     const company = await registerCompany("0700001");
     const login = await ctx.http

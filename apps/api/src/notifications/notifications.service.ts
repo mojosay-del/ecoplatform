@@ -27,12 +27,26 @@ export type NotificationPreferencesInput = {
   emailMutedCategories: NotificationCategory[];
 };
 
+type NotificationPreferencesOutput = NotificationPreferencesInput;
+
 const MUTABLE_CATEGORIES = new Set<NotificationCategory>([
   NotificationCategory.marketplace,
   NotificationCategory.moderation,
   NotificationCategory.support,
   NotificationCategory.system,
 ]);
+
+const publicNotificationSelect = {
+  id: true,
+  category: true,
+  eventType: true,
+  title: true,
+  body: true,
+  link: true,
+  readAt: true,
+  archivedAt: true,
+  createdAt: true,
+} satisfies Prisma.InAppNotificationSelect;
 
 @Injectable()
 export class NotificationsService {
@@ -42,9 +56,7 @@ export class NotificationsService {
     const prefs = await this.prisma.userNotificationPreferences.findUnique({
       where: { userId: input.userId },
     });
-    if (MUTABLE_CATEGORIES.has(input.category) && prefs?.inAppMutedCategories.includes(input.category)) {
-      return null;
-    }
+    const inAppMuted = MUTABLE_CATEGORIES.has(input.category) && prefs?.inAppMutedCategories.includes(input.category);
 
     const domainEventId =
       input.domainEventId ?? this.buildDomainEventId(input.eventType, input.sourceId ?? input.userId);
@@ -60,27 +72,6 @@ export class NotificationsService {
     const emailAddress = await this.lookupEmailAddress(input.userId);
 
     const notification = await this.prisma.$transaction(async (tx) => {
-      const delivery = await tx.notificationDelivery.upsert({
-        where: {
-          domainEventId_recipientUserId_channel: {
-            domainEventId,
-            recipientUserId: input.userId,
-            channel: NotificationChannel.in_app,
-          },
-        },
-        create: {
-          domainEventId,
-          eventType: input.eventType,
-          recipientUserId: input.userId,
-          channel: NotificationChannel.in_app,
-          address: input.userId,
-          status: NotificationDeliveryStatus.delivered,
-          attempt: 1,
-          finishedAt: now,
-        },
-        update: {},
-      });
-
       if (emailQueued && emailAddress) {
         await tx.notificationDelivery.upsert({
           where: {
@@ -103,6 +94,31 @@ export class NotificationsService {
         });
       }
 
+      if (inAppMuted) {
+        return null;
+      }
+
+      const delivery = await tx.notificationDelivery.upsert({
+        where: {
+          domainEventId_recipientUserId_channel: {
+            domainEventId,
+            recipientUserId: input.userId,
+            channel: NotificationChannel.in_app,
+          },
+        },
+        create: {
+          domainEventId,
+          eventType: input.eventType,
+          recipientUserId: input.userId,
+          channel: NotificationChannel.in_app,
+          address: input.userId,
+          status: NotificationDeliveryStatus.delivered,
+          attempt: 1,
+          finishedAt: now,
+        },
+        update: {},
+      });
+
       return tx.inAppNotification.upsert({
         where: { domainEventId_userId: { domainEventId, userId: input.userId } },
         create: {
@@ -120,7 +136,9 @@ export class NotificationsService {
         update: { deliveryId: delivery.id },
       });
     });
-    recordNotificationSent(input.category, "in_app");
+    if (!inAppMuted) {
+      recordNotificationSent(input.category, "in_app");
+    }
     if (emailQueued && emailAddress) {
       recordNotificationSent(input.category, "email");
     }
@@ -156,6 +174,7 @@ export class NotificationsService {
         orderBy: { createdAt: "desc" },
         take: limit,
         skip: offset,
+        select: publicNotificationSelect,
       }),
     ]);
 
@@ -174,6 +193,7 @@ export class NotificationsService {
     return this.prisma.inAppNotification.update({
       where: { id },
       data: { readAt: new Date() },
+      select: publicNotificationSelect,
     });
   }
 
@@ -190,35 +210,34 @@ export class NotificationsService {
     return this.prisma.inAppNotification.update({
       where: { id },
       data: { archivedAt: new Date(), readAt: new Date() },
+      select: publicNotificationSelect,
     });
   }
 
-  async getPreferences(user: RequestUser) {
+  async getPreferences(user: RequestUser): Promise<NotificationPreferencesOutput> {
     const prefs = await this.prisma.userNotificationPreferences.findUnique({
       where: { userId: user.id },
     });
-    return (
-      prefs ?? {
-        userId: user.id,
-        inAppMutedCategories: [] as NotificationCategory[],
-        emailMutedCategories: [] as NotificationCategory[],
-      }
-    );
+    return this.serializePreferences(prefs);
   }
 
-  async updatePreferences(user: RequestUser, input: NotificationPreferencesInput) {
+  async updatePreferences(
+    user: RequestUser,
+    input: NotificationPreferencesInput,
+  ): Promise<NotificationPreferencesOutput> {
     const inAppMutedCategories = this.keepMutableCategories(input.inAppMutedCategories);
     const emailMutedCategories = this.keepMutableCategories(input.emailMutedCategories);
 
-    return this.prisma.userNotificationPreferences.upsert({
+    const prefs = await this.prisma.userNotificationPreferences.upsert({
       where: { userId: user.id },
       create: { userId: user.id, inAppMutedCategories, emailMutedCategories },
       update: { inAppMutedCategories, emailMutedCategories },
     });
+    return this.serializePreferences(prefs);
   }
 
   private async assertOwnership(id: string, user: RequestUser) {
-    const found = await this.prisma.inAppNotification.findUnique({ where: { id } });
+    const found = await this.prisma.inAppNotification.findUnique({ where: { id }, select: { userId: true } });
     if (!found) {
       throw new NotFoundException("Уведомление не найдено.");
     }
@@ -233,5 +252,14 @@ export class NotificationsService {
 
   private keepMutableCategories(categories: NotificationCategory[]) {
     return [...new Set(categories)].filter((category) => MUTABLE_CATEGORIES.has(category));
+  }
+
+  private serializePreferences(
+    prefs: { inAppMutedCategories: NotificationCategory[]; emailMutedCategories: NotificationCategory[] } | null,
+  ): NotificationPreferencesOutput {
+    return {
+      inAppMutedCategories: prefs?.inAppMutedCategories ?? [],
+      emailMutedCategories: prefs?.emailMutedCategories ?? [],
+    };
   }
 }

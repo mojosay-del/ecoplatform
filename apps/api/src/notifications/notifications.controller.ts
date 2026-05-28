@@ -12,22 +12,28 @@ const preferencesSchema = z.object({
   emailMutedCategories: z.array(z.nativeEnum(NotificationCategory)).default([]),
 });
 
+const listQuerySchema = z.object({
+  archived: z
+    .enum(["true", "false"])
+    .optional()
+    .default("false")
+    .transform((value) => value === "true"),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
 @UseGuards(JwtAuthGuard)
 @Controller("notifications")
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
   @Get()
-  async list(
-    @CurrentUser() user: RequestUser,
-    @Query("archived") archived?: string,
-    @Query("limit") limitRaw?: string,
-    @Query("offset") offsetRaw?: string,
-  ) {
+  async list(@CurrentUser() user: RequestUser, @Query() query: unknown) {
+    const input = parseBody(listQuerySchema, query);
     return this.notifications.list(user, {
-      includeArchived: archived === "true",
-      limit: limitRaw !== undefined ? Number(limitRaw) : undefined,
-      offset: offsetRaw !== undefined ? Number(offsetRaw) : undefined,
+      includeArchived: input.archived,
+      limit: input.limit,
+      offset: input.offset,
     });
   }
 

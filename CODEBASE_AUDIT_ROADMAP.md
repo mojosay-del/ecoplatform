@@ -91,7 +91,7 @@
 | B-FILES | `apps/api/src/files` | `accepted` | B | MIME/extension/size checks, S3 paths, public/private access |
 | B-LEGAL | `apps/api/src/legal` | `accepted` | B | active documents, consent records, re-consent flow |
 | B-MOD | `apps/api/src/moderation` | `accepted` | B | sanctions, report flow, module restrictions, edge cases |
-| B-NOTIF | `apps/api/src/notifications` | `not_started` | B | in-app delivery, read states, privacy of notification payloads |
+| B-NOTIF | `apps/api/src/notifications` | `accepted` | B | in-app delivery, read states, privacy of notification payloads |
 | B-OBS | `apps/api/src/observability` | `not_started` | E | metrics auth, labels, cardinality, Sentry/log filtering |
 | B-REDIS | `apps/api/src/redis` | `not_started` | B/E | session cache invalidation, throttler fallback |
 | B-SCHED | `apps/api/src/scheduler` | `not_started` | B/E | advisory locks, cleanup safety, billing cron idempotency |
@@ -733,6 +733,51 @@
 - `F-20260528-021` закрыт: `reasonCode=other` при снятии санкции требует
   комментарий так же, как остальные moderation-решения.
 
+### B-NOTIF — `apps/api/src/notifications`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `NotificationsController`: list, unread-count, read-all, read, archive и
+  preferences endpoints под `JwtAuthGuard`;
+- `NotificationsService`: создание in-app/email-delivery записей, дедупликация
+  через `domainEventId`, mute preferences, read/archive ownership и list scope;
+- Prisma-модели `InAppNotification`, `NotificationDelivery` и
+  `UserNotificationPreferences`;
+- потребители уведомлений в `auth`, `billing`, `moderation`, `support`, web
+  `NotificationBell`, `NotificationsView` и account notification settings.
+
+Доказательства:
+
+- NestJS docs через Context7: protected endpoints закрываются guard'ами, а
+  invalid input должен отбрасываться на controller boundary до service logic;
+- Zod docs через Context7: `safeParse` даёт явную success/error ветку, а
+  numeric query надо валидировать до передачи в pagination logic;
+- Prisma docs через Context7: upsert по compound unique keys и transaction
+  сверены с `@@unique([domainEventId, userId])` и
+  `@@unique([domainEventId, recipientUserId, channel])`;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe"
+  apps/api/src/notifications` -> совпадений нет;
+- `pnpm --filter @ecoplatform/api test -- notifications` -> 19 files / 81
+  tests passed;
+- `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
+  "notifications|Email channel queue"` -> integration-файл прошёл полностью:
+  131 tests passed.
+
+Решение:
+
+- `apps/api/src/notifications` принят без открытых P0/P1/P2-рисков;
+- `F-20260528-022` закрыт: `GET /api/notifications?limit=abc` теперь
+  валидируется через zod и отдаёт 400, а не молчаливый дефолт pagination;
+- `F-20260528-023` закрыт: публичные ответы notifications API больше не
+  отдают внутренний `payload`, `domainEventId`, `sourceId`, `deliveryId` и
+  `userId`; preferences API возвращает только публичные списки категорий;
+- `F-20260528-024` закрыт: mute in-app канала больше не гасит отдельную
+  email-delivery очередь, если email-канал для категории не отключён.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -760,6 +805,9 @@
 | `F-20260528-019` | `P1` | `apps/api/src/moderation/moderation.service.ts` | Admin-санкция `user_block` могла заблокировать самого администратора или защищённый первый admin-аккаунт, если он был автором модерируемого материала. Это обходило owner-защиту из admin users/staff API. | Исправлено: `user_block` запрещает self-block, `PLATFORM_OWNER_EMAIL` и уже заблокированного пользователя; integration-тест проверяет owner-case через второго admin. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-020` | `P1` | `apps/api/src/moderation/moderation.service.ts` | Снятие `company_block` всегда переводило компанию в `active`, даже если до санкции она была `demo/past_due/suspended`, а снятие одного block могло активировать цель при другой активной block-санкции. | Исправлено: block-санкция сохраняет `previousStatus`, lift восстанавливает прежний статус только если нет другого активного block; integration-тест проверяет возврат компании в `demo`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-021` | `P2` | `apps/api/src/moderation/moderation.schemas.ts` | При снятии санкции `reasonCode=other` не требовал комментарий, в отличие от жалоб, решений и admin-санкций. Журнал мог получить неясную причину пересмотра. | Исправлено: `sanctionLiftInputSchema` теперь требует `comment` для `reasonCode=other`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-022` | `P2` | `apps/api/src/notifications/notifications.controller.ts` | `GET /api/notifications?limit=abc` превращал `limit` в `NaN`, а service молча подставлял дефолт. Клиент получал 200 вместо понятного 400, как в ранее исправленных admin/content list endpoints. | Исправлено: list query валидируется через zod-схему; integration-тест проверяет 400 на нечисловой `limit`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-023` | `P1` | `apps/api/src/notifications/notifications.service.ts` | `/api/notifications`, read и archive возвращали полный Prisma-row: внутренний `payload`, `domainEventId`, `sourceId`, `deliveryId`, `userId`, а preferences endpoints — `id/userId/updatedAt`. В payload уже есть IP/User-Agent login-событий и внутренние ids модерации/поддержки, поэтому публичный API отдавал лишние приватные детали. | Исправлено: публичные notifications responses используют allow-list `select`, preferences сериализуются до двух списков категорий; integration-тест проверяет отсутствие внутренних полей. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-024` | `P2` | `apps/api/src/notifications/notifications.service.ts` | Если пользователь отключал in-app для категории, `createInApp()` возвращал `null` до создания email-delivery. При будущем email-воркере пользователь мог не получить email, хотя отключал только in-app канал. | Исправлено: in-app mute пропускает только `InAppNotification`, но не мешает отдельной email-delivery очереди, если email для категории включён; unit-тест проверяет email-only delivery. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -799,6 +847,9 @@
 | 19 | `F-20260528-019` | `fix(moderation): закрыть риски проверки moderation-api` | `pnpm --filter @ecoplatform/api lint`; `pnpm --filter @ecoplatform/api test -- moderation`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Moderation\\|Admin sanctions\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 20 | `F-20260528-020` | `fix(moderation): закрыть риски проверки moderation-api` | `pnpm --filter @ecoplatform/api lint`; `pnpm --filter @ecoplatform/api test -- moderation`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Moderation\\|Admin sanctions\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 21 | `F-20260528-021` | `fix(moderation): закрыть риски проверки moderation-api` | `pnpm --filter @ecoplatform/api lint`; `pnpm --filter @ecoplatform/api test -- moderation`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Moderation\\|Admin sanctions\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 22 | `F-20260528-022` | `fix(notifications): закрыть риски проверки notifications-api` | `pnpm --filter @ecoplatform/api test -- notifications`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "notifications\\|Email channel queue"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
+| 23 | `F-20260528-023` | `fix(notifications): закрыть риски проверки notifications-api` | `pnpm --filter @ecoplatform/api test -- notifications`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "notifications\\|Email channel queue"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
+| 24 | `F-20260528-024` | `fix(notifications): закрыть риски проверки notifications-api` | `pnpm --filter @ecoplatform/api test -- notifications`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "notifications\\|Email channel queue"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

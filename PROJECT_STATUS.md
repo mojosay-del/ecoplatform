@@ -10,8 +10,8 @@
 
 Отдельный полномасштабный codebase-аудит ведётся по `CODEBASE_AUDIT_ROADMAP.md`.
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
-`B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL` и
-`B-MOD`; следующий модуль проверки — `B-NOTIF`.
+`B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
+`B-MOD` и `B-NOTIF`; следующий модуль проверки — `B-OBS`.
 
 Волна 11.1 закрыта: дизайн-токены вынесены в `apps/web/src/styles/tokens.css`, а `globals.css` переведён с прямых цветов на CSS-переменные.
 
@@ -76,7 +76,7 @@
 - Prisma + PostgreSQL: 25 миграций к 2026-05-26, актуальная схема в `apps/api/prisma/schema.prisma`.
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
-- 129 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
+- 131 integration-тест в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
 - Unit-тесты: 7 в `packages/shared`, 50 в `apps/web`, 81 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service); workflow-token ограничен read-only доступом к коду.
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
@@ -218,19 +218,19 @@ pnpm dev                                              # api на :4000, web на
 pnpm lint                                             # tsc --noEmit во всех пакетах
 pnpm test                                             # 138 unit-тестов (shared 7, web 50, api 81)
 pnpm build                                            # tsc + next build
-pnpm test:integration                                 # 129 integration-тестов против ecoplatform_test
+pnpm test:integration                                 # 131 integration-тест против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
 pnpm format:check                                     # prettier
 ```
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-28 (после проверки `B-MOD` в полном codebase-аудите).
+Дата: 2026-05-28 (после проверки `B-NOTIF` в полном codebase-аудите).
 
 - `pnpm lint` — успешно: 4 tasks.
 - `pnpm test` — успешно: shared 7, web 50, api 81.
 - `pnpm build` — успешно: shared/api/web.
-- `pnpm test:integration` — успешно: 129 integration-тестов.
+- `pnpm test:integration` — успешно: 131 integration-тест.
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.
 - Lighthouse desktop baseline (commit `b8e3101`, без перезапуска в 12.4): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
