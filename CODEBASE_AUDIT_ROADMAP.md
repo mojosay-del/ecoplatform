@@ -87,7 +87,7 @@
 | B-COMMON | `apps/api/src/common` | `accepted` | B | guards, roles, CSRF, pagination, logging filters, sanitizing |
 | B-ADMIN | `apps/api/src/admin` | `accepted` | B | RBAC, audit log, dashboard queries, admin mutations |
 | B-BILLING | `apps/api/src/billing` | `accepted` | B | company profile, subscriptions, manual activation, notifications |
-| B-CONTENT | `apps/api/src/content` | `not_started` | B | CMS validation, publish/preview rules, tags, indices, block payloads |
+| B-CONTENT | `apps/api/src/content` | `accepted` | B | CMS validation, publish/preview rules, tags, indices, block payloads |
 | B-FILES | `apps/api/src/files` | `not_started` | B | MIME/extension/size checks, S3 paths, public/private access |
 | B-LEGAL | `apps/api/src/legal` | `not_started` | B | active documents, consent records, re-consent flow |
 | B-MOD | `apps/api/src/moderation` | `not_started` | B | sanctions, report flow, module restrictions, edge cases |
@@ -495,6 +495,70 @@
 - `F-20260528-010` закрыт: `GET /api/admin/billing/companies` валидирует
   pagination query через zod и отдаёт 400 на нечисловой `limit`.
 
+### B-CONTENT — `apps/api/src/content`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `ContentController`: публичные маршруты `news`, `indices`, `education`,
+  `knowledge-base`, admin-CMS CRUD, publish/unpublish/delete и role guards;
+- `content.schemas.ts`: zod-схемы body/query для новостей, индексов, обучения,
+  базы знаний и pagination query;
+- `NewsService`: публичная выдача, теги, preview, publish/unpublish/delete,
+  лайки и комментарии через `Discussion(news_post, id)`;
+- `IndicesService`: категории, номенклатура, индексы цен, значения индекса,
+  публикация и audit-log;
+- `LearningService`: модули, главы, уроки, preview, publishable-проверки,
+  доступ по подписке и прогресс уроков;
+- `KnowledgeBaseService`: дерево, поиск, CRUD, publish/unpublish, move и
+  ограничение глубины;
+- `ContentCommonService`, shared content-block schemas, sanitizer и
+  `FilesService.assertCoverImageAllowed`.
+
+Доказательства:
+
+- NestJS docs через Context7: controller/method guards и role metadata должны
+  закрывать маршруты до вызова service-кода, а validation должна отклонять
+  плохой input на границе controller;
+- Prisma docs через Context7: Prisma Client безопасен по умолчанию, raw SQL не
+  используется; для связанных write-операций сверялись transaction/upsert/select
+  границы;
+- Zod docs через Context7: query/body проходят через `safeParse`, ошибки
+  превращаются в 400 через `parseBody`;
+- `rg -n "@Controller\\(|@UseGuards|@Roles|@Get\\(|@Post\\(|@Patch\\(|@Delete\\("
+  apps/api/src/content apps/api/src/app.module.ts` -> content controller закрыт
+  class-level `JwtAuthGuard`, admin routes дополнительно закрыты `RolesGuard`;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe"
+  apps/api/src/content packages/shared/src/content-blocks.ts
+  packages/shared/src/sanitize-html.ts` -> совпадений нет;
+- `rg -n "sanitizeParagraphHtml|validateContentBlocks|assertCoverImageAllowed|recordEntityReferences|adminActionLog|newsListQuerySchema|knowledgeTreeQuerySchema|indices.value.create"
+  apps/api/src/content packages/shared/src apps/api/src/files/files.service.ts
+  apps/api/src/app.integration.test.ts` -> HTML sanitizing, block validation,
+  cover-image ownership, FileReference, audit-log и query validation подключены;
+- `pnpm --filter @ecoplatform/api test` -> 19 files / 76 tests passed;
+- `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
+  "Content publish|Content lifecycle: price indices|Discussion|Wave 8.4 pagination contracts"`
+  -> integration-файл прошёл полностью: 123 tests passed;
+- `pnpm lint` -> 4 tasks successful;
+- `pnpm test` -> shared 7, web 50, api 76 tests passed;
+- `pnpm build` -> shared/api/web build successful;
+- `pnpm format:check` -> clean;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/api/src/content` принят без открытых P0/P1/P2-рисков;
+- `F-20260528-011` закрыт: комментарии больше нельзя создать к черновой,
+  отсутствующей новости или как reply к комментарию из другой новости;
+- `F-20260528-012` закрыт: content-листинги валидируют numeric query через zod
+  и отдают 400 вместо молчаливого fallback на дефолтную pagination;
+- `F-20260528-013` закрыт: добавление/обновление значения индекса проверяет
+  существование индекса, отдаёт 404 для несуществующего id и пишет admin audit
+  log.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -511,6 +575,9 @@
 | `F-20260528-008` | `P2` | `apps/api/src/admin/staff/admin-staff.controller.ts` | `GET /api/admin/staff?limit=abc` обходил общую zod-валидацию, превращался в `NaN` и мог падать уже внутри Prisma вместо понятного 400. | Исправлено: staff list query переведён на `adminStaffListQuerySchema` и `resolvePagination`; integration-тест проверяет 400 на нечисловой `limit`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-009` | `P1` | `packages/shared/src/dto.ts` | Ручная активация подписки принимала дату окончания в прошлом. Админ мог случайно сделать компанию `active`, хотя доступ уже должен быть истёкшим; это риск для биллинга и прав доступа. | Исправлено: `manualSubscriptionDtoSchema.endsAt` теперь требует дату в будущем; integration-тест проверяет 400, отсутствие `Subscription` и сохранение статуса `demo`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-010` | `P2` | `apps/api/src/billing/billing.controller.ts` | `GET /api/admin/billing/companies?limit=abc` обходил zod-валидацию, мог превращать limit в `NaN` и падать внутри Prisma вместо понятного 400. | Исправлено: добавлен `adminBillingCompaniesQuerySchema`, controller валидирует query, service использует общий `resolvePagination`; integration-тест проверяет 400 на нечисловой `limit` и рабочий paginated envelope. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-011` | `P1` | `apps/api/src/content/services/news.service.ts` | `POST /api/news/:id/comments` мог создать `Discussion` и комментарий для черновой или несуществующей новости, потому что `Discussion.targetId` не имеет FK на `NewsPost`. Также reply можно было отправить с `parentCommentId` из другой новости. Это риск мусорных данных и чужих reply-цепочек. | Исправлено: перед созданием комментария сервис проверяет существующую опубликованную новость; parent-комментарий должен быть опубликованным комментарием той же `Discussion(news_post, id)`. Integration-тест проверяет черновик, missing news, foreign parent и missing parent без создания Discussion. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-012` | `P2` | `apps/api/src/content/content.controller.ts` | Content-листинги вручную делали `Number(limit)`. `limit=abc` превращался в `NaN`, а общий pagination helper молча подставлял дефолт. Пользователь или админ получал 200 вместо понятного 400, как уже было исправлено в admin/billing API. | Исправлено: добавлены zod query-схемы для public/admin content list endpoints, `news/tags` и `knowledge-base depth`; integration-тест проверяет 400 на нечисловом `limit/depth` для 10 content endpoints. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-013` | `P2` | `apps/api/src/content/services/indices.service.ts` | Добавление значения индекса цены не проверяло существование индекса заранее и не писало admin audit-log. Ошибка по несуществующему id могла уходить как Prisma/FK failure, а изменение цены оставалось без журналируемого следа. | Исправлено: `addPriceValue()` проверяет `PriceIndex`, отдаёт 404, пишет `indices.value.create/update` с before/after price; integration-тест проверяет missing index, create/update и audit log. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -539,6 +606,9 @@
 | 8 | `F-20260528-008` | `fix(admin): валидировать query списка staff` | `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Admin staff panel"`; `pnpm --filter @ecoplatform/api test -- admin`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
 | 9 | `F-20260528-009` | `fix(billing): закрыть риски проверки billing-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Demo gating\\|Billing notifications\\|Company profile"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 10 | `F-20260528-010` | `fix(billing): закрыть риски проверки billing-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Demo gating\\|Billing notifications\\|Company profile"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 11 | `F-20260528-011` | `fix(content): закрыть риски проверки content-api` | `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Content publish\\|Content lifecycle: price indices\\|Discussion\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 12 | `F-20260528-012` | `fix(content): закрыть риски проверки content-api` | `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Content publish\\|Content lifecycle: price indices\\|Discussion\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 13 | `F-20260528-013` | `fix(content): закрыть риски проверки content-api` | `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Content publish\\|Content lifecycle: price indices\\|Discussion\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

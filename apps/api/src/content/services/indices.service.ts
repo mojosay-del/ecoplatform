@@ -248,11 +248,37 @@ export class IndicesService {
   }
 
   async addPriceValue(id: string, input: PriceIndexValueInput, user: RequestUser) {
-    return this.prisma.priceIndexValue.upsert({
-      where: { priceIndexId_date: { priceIndexId: id, date: new Date(input.date) } },
-      update: { price: input.price },
-      create: { priceIndexId: id, date: new Date(input.date), price: input.price, createdById: user.id },
+    const priceIndex = await this.prisma.priceIndex.findUnique({ where: { id }, select: { id: true } });
+    if (!priceIndex) {
+      throw new NotFoundException("Индекс не найден.");
+    }
+
+    const date = new Date(input.date);
+    const existing = await this.prisma.priceIndexValue.findUnique({
+      where: { priceIndexId_date: { priceIndexId: id, date } },
+      select: { id: true, price: true },
     });
+
+    const value = await this.prisma.priceIndexValue.upsert({
+      where: { priceIndexId_date: { priceIndexId: id, date } },
+      update: { price: input.price },
+      create: { priceIndexId: id, date, price: input.price, createdById: user.id },
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: existing ? "indices.value.update" : "indices.value.create",
+      entityType: "PriceIndexValue",
+      entityId: value.id,
+      payload: {
+        priceIndexId: id,
+        date: date.toISOString(),
+        beforePrice: existing?.price.toString() ?? null,
+        afterPrice: value.price.toString(),
+      },
+    });
+
+    return value;
   }
 
   async deletePriceValue(indexId: string, valueId: string, user: RequestUser) {

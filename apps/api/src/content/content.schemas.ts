@@ -1,6 +1,35 @@
 import { z } from "zod";
 import { baseContentBlockSchema, lessonBlockSchema, newsBlockSchema } from "@ecoplatform/shared";
 
+function paginationQuerySchema(maxLimit: number) {
+  return z.object({
+    limit: z.coerce.number().int().min(1).max(maxLimit).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    take: z.coerce.number().int().min(1).max(maxLimit).optional(),
+  });
+}
+
+const stringArrayQueryValueSchema = z.union([z.string(), z.array(z.string())]);
+
+export const newsListQuerySchema = paginationQuerySchema(100).extend({
+  tags: stringArrayQueryValueSchema.optional(),
+  "tags[]": stringArrayQueryValueSchema.optional(),
+});
+
+export const newsTagsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export const publicContentListQuerySchema = paginationQuerySchema(100);
+export const adminNewsListQuerySchema = paginationQuerySchema(100);
+export const adminContentListQuerySchema = paginationQuerySchema(200);
+
+export const knowledgeTreeQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  depth: z.coerce.number().int().min(1).max(3).optional(),
+});
+
 export const newsInputSchema = z.object({
   title: z.string().min(1),
   lead: z.string().min(1),

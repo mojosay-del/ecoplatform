@@ -681,11 +681,35 @@ export class NewsService {
     this.common.assertFunctionalAccess(user);
     await this.moduleAccess.assertModuleAccess(user.id, "comments");
 
+    const post = await this.prisma.newsPost.findUnique({
+      where: { id: newsPostId },
+      select: { id: true, status: true },
+    });
+    if (!post || post.status !== ContentStatus.published) {
+      throw new NotFoundException("Новость не найдена.");
+    }
+
     let parentCommentId = input.parentCommentId;
 
     if (parentCommentId) {
-      const parent = await this.prisma.comment.findUnique({ where: { id: parentCommentId } });
-      parentCommentId = parent?.parentCommentId ?? parentCommentId;
+      const parent = await this.prisma.comment.findUnique({
+        where: { id: parentCommentId },
+        select: {
+          id: true,
+          parentCommentId: true,
+          status: true,
+          discussion: { select: { targetType: true, targetId: true } },
+        },
+      });
+      if (
+        !parent ||
+        parent.status !== CommentStatus.published ||
+        parent.discussion.targetType !== DiscussionTargetType.news_post ||
+        parent.discussion.targetId !== newsPostId
+      ) {
+        throw new NotFoundException("Комментарий не найден.");
+      }
+      parentCommentId = parent.parentCommentId ?? parent.id;
     }
 
     // Discussion для этой новости создаём лениво при первом комментарии.

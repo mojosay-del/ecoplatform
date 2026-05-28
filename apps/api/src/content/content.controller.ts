@@ -8,20 +8,26 @@ import { parseBody } from "../common/zod";
 import {
   categoryInputSchema,
   categoryUpdateInputSchema,
+  adminContentListQuerySchema,
+  adminNewsListQuerySchema,
   chapterInputSchema,
   chapterUpdateInputSchema,
   commentInputSchema,
+  knowledgeTreeQuerySchema,
   knowledgeArticleInputSchema,
   knowledgeMoveInputSchema,
   learningModuleInputSchema,
   learningModuleUpdateInputSchema,
   lessonInputSchema,
   lessonUpdateInputSchema,
+  newsListQuerySchema,
   newsInputSchema,
+  newsTagsQuerySchema,
   nomenclatureInputSchema,
   nomenclatureUpdateInputSchema,
   priceIndexInputSchema,
   priceIndexValueInputSchema,
+  publicContentListQuerySchema,
 } from "./content.schemas";
 import { IndicesService } from "./services/indices.service";
 import { KnowledgeBaseService } from "./services/knowledge-base.service";
@@ -55,22 +61,20 @@ export class ContentController {
   // ── Публичные: новости ──────────────────────────────────────────────────
 
   @Get("news")
-  async listNews(
-    @CurrentUser() user: RequestUser,
-    @Query("limit") limitRaw?: string,
-    @Query("offset") offsetRaw?: string,
-    @Query("tags") tagsRaw?: string | string[],
-    @Query("tags[]") bracketTagsRaw?: string | string[],
-  ) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.news.listNews(user, { limit, offset, tags: parseStringArrayQuery(tagsRaw, bracketTagsRaw) });
+  async listNews(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
+    const input = parseBody(newsListQuerySchema, query);
+    return this.news.listNews(user, {
+      limit: input.limit,
+      offset: input.offset,
+      page: input.page,
+      take: input.take,
+      tags: parseStringArrayQuery(input.tags, input["tags[]"]),
+    });
   }
 
   @Get("news/tags")
-  async newsTags(@CurrentUser() user: RequestUser, @Query("limit") limitRaw?: string) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    return this.news.listNewsTags(user, { limit });
+  async newsTags(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
+    return this.news.listNewsTags(user, parseBody(newsTagsQuerySchema, query));
   }
 
   @Get("news/:slug")
@@ -97,27 +101,15 @@ export class ContentController {
   // ── Публичные: индексы цен ─────────────────────────────────────────────
 
   @Get("indices")
-  async indicesList(
-    @CurrentUser() user: RequestUser,
-    @Query("limit") limitRaw?: string,
-    @Query("offset") offsetRaw?: string,
-  ) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.indices.listIndices(user, { limit, offset });
+  async indicesList(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
+    return this.indices.listIndices(user, parseBody(publicContentListQuerySchema, query));
   }
 
   // ── Публичные: обучение ────────────────────────────────────────────────
 
   @Get("education/modules")
-  async learningModules(
-    @CurrentUser() user: RequestUser,
-    @Query("limit") limitRaw?: string,
-    @Query("offset") offsetRaw?: string,
-  ) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.learning.listLearningModules(user, { limit, offset });
+  async learningModules(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
+    return this.learning.listLearningModules(user, parseBody(publicContentListQuerySchema, query));
   }
 
   @Get("education/modules/:id")
@@ -133,14 +125,8 @@ export class ContentController {
   // ── Публичные: база знаний ─────────────────────────────────────────────
 
   @Get("knowledge-base")
-  async knowledgeTree(
-    @CurrentUser() user: RequestUser,
-    @Query("limit") limitRaw?: string,
-    @Query("depth") depthRaw?: string,
-  ) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    const depth = depthRaw !== undefined ? Number(depthRaw) : undefined;
-    return this.knowledgeBase.knowledgeTree(user, { limit, depth });
+  async knowledgeTree(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
+    return this.knowledgeBase.knowledgeTree(user, parseBody(knowledgeTreeQuerySchema, query));
   }
 
   @Get("knowledge-base/search")
@@ -166,10 +152,8 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/news")
-  async adminListNews(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.news.adminListNews({ limit, offset });
+  async adminListNews(@Query() query: Record<string, unknown>) {
+    return this.news.adminListNews(parseBody(adminNewsListQuerySchema, query));
   }
 
   @UseGuards(RolesGuard)
@@ -229,10 +213,8 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/indices")
-  async adminIndices(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.indices.adminListIndices({ limit, offset });
+  async adminIndices(@Query() query: Record<string, unknown>) {
+    return this.indices.adminListIndices(parseBody(adminContentListQuerySchema, query));
   }
 
   @UseGuards(RolesGuard)
@@ -340,10 +322,8 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/education")
-  async adminEducation(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.learning.adminListLearningModules({ limit, offset });
+  async adminEducation(@Query() query: Record<string, unknown>) {
+    return this.learning.adminListLearningModules(parseBody(adminContentListQuerySchema, query));
   }
 
   @UseGuards(RolesGuard)
@@ -462,10 +442,8 @@ export class ContentController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Get("admin/content/knowledge-base")
-  async adminKnowledge(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.knowledgeBase.adminListKnowledge({ limit, offset });
+  async adminKnowledge(@Query() query: Record<string, unknown>) {
+    return this.knowledgeBase.adminListKnowledge(parseBody(adminContentListQuerySchema, query));
   }
 
   @UseGuards(RolesGuard)

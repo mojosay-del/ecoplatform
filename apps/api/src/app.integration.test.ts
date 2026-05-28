@@ -1089,6 +1089,29 @@ describe("Content publish", () => {
     expect(unlike.status).toBe(201);
     expect(unlike.body).toEqual({ liked: false, likesCount: 0 });
   });
+
+  it("content-листинги валидируют числовые query-параметры", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0000023");
+
+    const endpoints = [
+      [reader.token, "/api/news?limit=abc"],
+      [reader.token, "/api/news/tags?limit=abc"],
+      [reader.token, "/api/indices?limit=abc"],
+      [reader.token, "/api/education/modules?limit=abc"],
+      [reader.token, "/api/knowledge-base?limit=abc"],
+      [reader.token, "/api/knowledge-base?depth=abc"],
+      [adminToken, "/api/admin/content/news?limit=abc"],
+      [adminToken, "/api/admin/content/indices?limit=abc"],
+      [adminToken, "/api/admin/content/education?limit=abc"],
+      [adminToken, "/api/admin/content/knowledge-base?limit=abc"],
+    ] as const;
+
+    for (const [token, path] of endpoints) {
+      const res = await ctx.http.get(path).set("Authorization", `Bearer ${token}`);
+      expect(res.status).toBe(400);
+    }
+  });
 });
 
 describe("Wave 8.4 pagination contracts", () => {
@@ -3023,6 +3046,57 @@ describe("Content lifecycle: price indices", () => {
     expect(found).toBeNull();
   });
 
+  it("add/update значения индекса валидирует индекс и пишет audit log", async () => {
+    const adminToken = await loginAdmin();
+    const category = await ctx.http
+      .post("/api/admin/content/indices/categories")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "Категория audit value", position: 0 });
+    expect(category.status).toBe(201);
+
+    const nomenclature = await ctx.http
+      .post("/api/admin/content/indices/nomenclature")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        categoryId: category.body.id,
+        code: "AUDIT-VALUE",
+        name: "Номенклатура audit value",
+      });
+    expect(nomenclature.status).toBe(201);
+
+    const indexRes = await ctx.http
+      .post("/api/admin/content/indices")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ nomenclatureId: nomenclature.body.id });
+    expect(indexRes.status).toBe(201);
+
+    const missing = await ctx.http
+      .post("/api/admin/content/indices/missing-index/values")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ date: "2026-05-19T00:00:00.000Z", price: 12000 });
+    expect(missing.status).toBe(404);
+
+    const created = await ctx.http
+      .post(`/api/admin/content/indices/${indexRes.body.id}/values`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ date: "2026-05-19T00:00:00.000Z", price: 12000 });
+    expect(created.status).toBe(201);
+
+    const updated = await ctx.http
+      .post(`/api/admin/content/indices/${indexRes.body.id}/values`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ date: "2026-05-19T00:00:00.000Z", price: 13000 });
+    expect(updated.status).toBe(201);
+    expect(updated.body.id).toBe(created.body.id);
+
+    const logs = await ctx.prisma.adminActionLog.findMany({
+      where: { entityId: created.body.id },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(logs.map((log) => log.action)).toEqual(["indices.value.create", "indices.value.update"]);
+    expect(logs[1]?.payload).toMatchObject({ beforePrice: "12000", afterPrice: "13000" });
+  });
+
   it("delete номенклатуры удаляет связанный индекс и всю историю цен", async () => {
     const adminToken = await loginAdmin();
     const { indexId, nomenclatureId } = await createPriceIndexWithValue(adminToken, "cascade-delete");
@@ -3513,5 +3587,63 @@ describe("Discussion (полиморфные обсуждения, Волна 7.
     expect(res.body.comments).toHaveLength(1);
     expect(res.body.comments[0].text).toBe("Видимый комментарий");
     expect(res.body._count.comments).toBe(1);
+  });
+
+  it("POST /news/:id/comments не создаёт Discussion для черновика, отсутствующей новости или чужого parent", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0700004");
+
+    const draft = await ctx.http
+      .post("/api/admin/content/news")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Черновик без комментариев",
+        lead: "Лид",
+        blocks: [{ type: "paragraph", payload: { html: "<p>Тело новости.</p>" } }],
+        tags: [],
+      });
+    expect(draft.status).toBe(201);
+
+    const draftComment = await ctx.http
+      .post(`/api/news/${draft.body.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Комментарий к черновику" });
+    expect(draftComment.status).toBe(404);
+    await expect(
+      ctx.prisma.discussion.count({ where: { targetType: "news_post", targetId: draft.body.id } }),
+    ).resolves.toBe(0);
+
+    const missingComment = await ctx.http
+      .post("/api/news/missing-news-id/comments")
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Комментарий к отсутствующей новости" });
+    expect(missingComment.status).toBe(404);
+    await expect(
+      ctx.prisma.discussion.count({ where: { targetType: "news_post", targetId: "missing-news-id" } }),
+    ).resolves.toBe(0);
+
+    const firstNews = await createPublishedNews(adminToken, "discussion-parent-a");
+    const secondNews = await createPublishedNews(adminToken, "discussion-parent-b");
+    const parent = await ctx.http
+      .post(`/api/news/${firstNews.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Родительский комментарий" });
+    expect(parent.status).toBe(201);
+
+    const foreignParent = await ctx.http
+      .post(`/api/news/${secondNews.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Ответ не в той новости", parentCommentId: parent.body.id });
+    expect(foreignParent.status).toBe(404);
+
+    const missingParent = await ctx.http
+      .post(`/api/news/${secondNews.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Ответ без родителя", parentCommentId: "missing-comment-id" });
+    expect(missingParent.status).toBe(404);
+
+    await expect(
+      ctx.prisma.discussion.count({ where: { targetType: "news_post", targetId: secondNews.id } }),
+    ).resolves.toBe(0);
   });
 });

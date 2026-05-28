@@ -10,8 +10,8 @@
 
 Отдельный полномасштабный codebase-аудит ведётся по `CODEBASE_AUDIT_ROADMAP.md`.
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
-`B-COMMON`, `B-ADMIN` и `B-BILLING`; следующий модуль проверки —
-`B-CONTENT`.
+`B-COMMON`, `B-ADMIN`, `B-BILLING` и `B-CONTENT`; следующий модуль проверки —
+`B-FILES`.
 
 Волна 11.1 закрыта: дизайн-токены вынесены в `apps/web/src/styles/tokens.css`, а `globals.css` переведён с прямых цветов на CSS-переменные.
 
@@ -76,7 +76,7 @@
 - Prisma + PostgreSQL: 25 миграций к 2026-05-26, актуальная схема в `apps/api/prisma/schema.prisma`.
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
-- 120 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
+- 123 integration-теста в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
 - Unit-тесты: 7 в `packages/shared`, 50 в `apps/web`, 76 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service); workflow-token ограничен read-only доступом к коду.
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
@@ -184,7 +184,7 @@
 ### Тех-долг, осознанно отложенный
 
 - 3.3 — расщепление `moderation.service.ts` (940 строк). Приватные хелперы тесно переплетены, расщепление создаст cross-service зависимости. Пересмотреть при росте >1500 строк.
-- 5.2 — декомпозиция integration-тестов на доменные файлы (сейчас один файл на 120 тестов).
+- 5.2 — декомпозиция integration-тестов на доменные файлы (сейчас один файл на 123 теста).
 - 5.3 — OpenAPI/Swagger.
 - 5.4 — pino + LOG_LEVEL (закрыто в Волне 10.1).
 - Реальный визуальный блочный редактор CMS вместо текущего пошагового композитора блоков.
@@ -218,7 +218,7 @@ pnpm dev                                              # api на :4000, web на
 pnpm lint                                             # tsc --noEmit во всех пакетах
 pnpm test                                             # 133 unit-теста (shared 7, web 50, api 76)
 pnpm build                                            # tsc + next build
-pnpm test:integration                                 # 120 integration-тестов против ecoplatform_test
+pnpm test:integration                                 # 123 integration-теста против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
 pnpm format:check                                     # prettier
 ```
