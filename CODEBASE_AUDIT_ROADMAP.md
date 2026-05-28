@@ -100,7 +100,7 @@
 | C-ADMIN | `apps/web/src/components/Admin*` | `accepted` | C | tables, filters, actions, role visibility, overflow |
 | C-AUTH | `apps/web/src/components/AuthForms.tsx` | `accepted` | C | register/login UX, validation, legal consents, password rules |
 | C-SHELL | `apps/web/src/components/AppShell.tsx` | `accepted` | C | navigation, demo banner spacing, account/admin separation |
-| C-CMS | `apps/web/src/components/*Editor*` | `not_started` | C | blocks editor, Tiptap, preview, auto-save, XSS boundaries |
+| C-CMS | `apps/web/src/components/*Editor*` | `accepted` | C | blocks editor, Tiptap, preview, auto-save, XSS boundaries |
 | C-LIBAPI | `apps/web/src/lib/api` | `not_started` | D | typed API client, refresh, CSRF, error handling, downloads |
 | C-AUTHCTX | `apps/web/src/lib/auth.tsx` | `not_started` | C/D | session restore, 401/403 behavior, user state transitions |
 | C-STYLES | `apps/web/src/styles` | `not_started` | C | tokens, contrast, responsive rules, repeated raw colors |
@@ -1211,6 +1211,70 @@
 - мобильный overlay-сайдбар и topbar breadcrumbs работают без горизонтального
   overflow на проверенном breakpoint.
 
+### C-CMS — `apps/web/src/components/*Editor*`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `BlocksEditor.tsx`: допустимые типы блоков, drag-and-drop через `dnd-kit`,
+  inline insertion, gallery/image/video/audio/file/checklist/lesson tasks;
+- `RichTextEditor.tsx`: Tiptap toolbar, links, color/font-size controls and
+  external `value` sync when another CMS entity is selected;
+- `AdminNewsView.tsx`, `AdminEducationView.tsx`, `AdminKnowledgeView.tsx`:
+  preview links, draft-only auto-save, manual save/publish and dirty-state
+  checks;
+- `cms-autosave.ts` and `cms-autosave.test.ts`: interval, blur/window-blur and
+  visible save states;
+- public render boundary in `apps/web/src/views/content-blocks.tsx`;
+- shared/API HTML boundary in `packages/shared/src/sanitize-html.ts` and
+  `apps/api/src/content/services/content-common.service.ts`;
+- backend content schemas in `apps/api/src/content/content.schemas.ts` and
+  `packages/shared/src/content-blocks.ts`.
+
+Доказательства:
+
+- official Tiptap docs: underline formatting is a command-backed extension;
+  текущий `pnpm-lock.yaml` показывает `@tiptap/starter-kit@3.23.6` with
+  `@tiptap/extension-underline@3.23.6`, поэтому toolbar-команда
+  `toggleUnderline()` имеет extension в установленном наборе;
+- official DOMPurify docs and local runtime check confirmed that allowing
+  `style` without an extra hook does not narrow CSS declarations by itself;
+- `F-20260528-034` закрыт: `sanitizeParagraphHtml()` now keeps only CMS editor
+  `color` and `font-size` declarations, strips layout/background CSS and
+  preserves `_blank` links with `noopener noreferrer` while removing `opener`;
+- `rg -n "dangerouslySetInnerHTML|innerHTML|sanitizeParagraphHtml|rutubeEmbedUrl"
+  apps/web/src apps/web/app packages/shared/src` -> raw HTML render is limited
+  to `ContentBlocks` and legal documents, both pass through
+  `sanitizeParagraphHtml`;
+- `rg -n "TODO|FIXME|console\\.log|password\\s*[:=]|token\\s*[:=]|secret\\s*[:=]|dangerouslySetInnerHTML|innerHTML"
+  apps/web/src/components apps/web/src/views apps/web/src/lib
+  packages/shared/src/sanitize-html.ts` -> no production debug/log/secrets in
+  checked CMS editor surface; `dangerouslySetInnerHTML` only at sanitized
+  render points;
+- `pnpm --filter @ecoplatform/shared test` -> 2 files / 10 tests passed;
+- `pnpm --filter @ecoplatform/shared lint` -> clean;
+- `pnpm --filter @ecoplatform/shared build` -> clean;
+- `pnpm lint` -> 4 tasks successful;
+- `pnpm typecheck` -> 4 tasks successful;
+- `pnpm test` -> shared 10 tests, web 50 tests, api 84 tests passed;
+- `pnpm build` -> api/shared/web build clean, Next.js generated 30 app
+  routes;
+- `pnpm format:check` -> clean;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/web/src/components/*Editor*` принят без открытых P0/P1/P2-рисков;
+- block editor, preview links and draft auto-save match the current CMS
+  workflow: existing drafts auto-save, published content stays on manual save;
+- stored rich text is sanitized on the API side and sanitized again before
+  `dangerouslySetInnerHTML`;
+- arbitrary inline CSS no longer reaches public content render through
+  paragraph blocks.
+
 ### Внеплановая dev-runtime правка — `/register`
 
 Дата проверки: 2026-05-28.
@@ -1348,6 +1412,7 @@
 | 31 | `F-20260528-031` | `fix(web): закрыть риски проверки admin-ui` | `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/admin/staff`; `pnpm format:check`; `git diff --check` | `closed` |
 | 32 | `F-20260528-032` | `fix(auth): убрать ИНН из регистрации` | `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "регистрация\\|Auth\\|Company profile"`; `pnpm lint`; `pnpm format:check`; `git diff --check` | `closed` |
 | 33 | `F-20260528-033` | `fix(dev): остановить перезагрузку страницы регистрации` | `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Auth"`; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/register`; browser-check `/legal/privacy`; `pnpm format:check`; `git diff --check` | `closed` |
+| 34 | `F-20260528-034` | `fix(shared): сузить CSS в CMS HTML sanitizer` | `pnpm --filter @ecoplatform/shared test`; `pnpm --filter @ecoplatform/shared lint`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

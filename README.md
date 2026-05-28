@@ -44,7 +44,8 @@ apps/
       lib/auth.tsx   AuthProvider с восстановлением через HttpOnly refresh-cookie
 packages/
   shared/            slug, индексы цен, content-blocks, sanitize-html,
-                     access-правила, DTO для регистрации/legal/profile,
+                     HTML/CSS whitelist, access-правила,
+                     DTO для регистрации/legal/profile,
                      ответы API (NewsListItem, BillingStatus, AuthMeUser и т.д.)
 docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
 ```
