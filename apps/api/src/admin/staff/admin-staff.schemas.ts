@@ -1,7 +1,19 @@
 import { z } from "zod";
 import { MIN_PASSWORD_LENGTH, passwordSchema, userGenders } from "@ecoplatform/shared";
+import { resolvePagination } from "../../common/pagination";
 
 export const platformRoleSchema = z.enum(["admin", "moderator", "content_manager"]);
+
+export const adminStaffListQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    take: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .transform(({ page, take, ...input }) =>
+    resolvePagination({ ...input, page, take }, { defaultLimit: 30, maxLimit: 100 }),
+  );
 
 export const adminStaffCreateInputSchema = z.object({
   email: z.string().trim().email().max(255),

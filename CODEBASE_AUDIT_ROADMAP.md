@@ -85,7 +85,7 @@
 | B-PRISMA | `apps/api/prisma` | `accepted` | B | schema, migrations, indexes, constraints, seed safety |
 | B-AUTH | `apps/api/src/auth` | `accepted` | B | login, refresh, lockout, export data, deletion, password policy |
 | B-COMMON | `apps/api/src/common` | `accepted` | B | guards, roles, CSRF, pagination, logging filters, sanitizing |
-| B-ADMIN | `apps/api/src/admin` | `not_started` | B | RBAC, audit log, dashboard queries, admin mutations |
+| B-ADMIN | `apps/api/src/admin` | `accepted` | B | RBAC, audit log, dashboard queries, admin mutations |
 | B-BILLING | `apps/api/src/billing` | `not_started` | B | company profile, subscriptions, manual activation, notifications |
 | B-CONTENT | `apps/api/src/content` | `not_started` | B | CMS validation, publish/preview rules, tags, indices, block payloads |
 | B-FILES | `apps/api/src/files` | `not_started` | B | MIME/extension/size checks, S3 paths, public/private access |
@@ -378,6 +378,67 @@
   token/password/session и основные PII-поля;
 - новых находок в реестр не добавлено.
 
+### B-ADMIN — `apps/api/src/admin`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `apps/api/src/admin/users`: список/карточка пользователей, block/unblock,
+  управление platform-roles, защита self/last-admin/owner-account;
+- `apps/api/src/admin/companies`: список/карточка компаний, смена статуса,
+  отзыв сессий при блокировке/архивации;
+- `apps/api/src/admin/staff`: список staff, создание платформенных
+  сотрудников, update ролей/активности, политика паролей;
+- `apps/api/src/admin/journals`: фильтры, pagination, actor/entity summaries;
+- `apps/api/src/admin/settings`: allow-list ключей, zod-валидация значений,
+  cache и audit-log;
+- `apps/api/src/admin/dashboard`: KPI, регистрационный график, последние
+  audit-log события;
+- связанные `AdminActionLogService`, `SessionCacheService`, `AppModule`,
+  integration/unit-тесты и shared response types.
+
+Доказательства:
+
+- NestJS docs через Context7: controller/method guards, role metadata через
+  `Reflector`, request-body validation до service calls;
+- Prisma docs через Context7: `select` для чувствительных полей, count/aggregate
+  dashboard-запросы, parameterized `$queryRaw` и транзакции для связанных
+  write-операций;
+- `rg -n "@Controller\\(|@UseGuards|@Roles|@Get\\(|@Post\\(|@Patch\\(|@Delete\\("
+  apps/api/src/admin apps/api/src/billing/billing.controller.ts
+  apps/api/src/legal/admin-legal.controller.ts` -> admin users/companies/staff,
+  journals/settings/dashboard закрыты `JwtAuthGuard + RolesGuard` и `admin`;
+  admin-legal/admin-billing имеют свои роли и уйдут в отдельные модули
+  `B-LEGAL`/`B-BILLING`;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe"
+  apps/api/src/admin apps/api/src/common/admin-action-log.service.ts` ->
+  совпадений нет;
+- `rg -n "passwordHash|refreshTokenHash|providerToken|keyHash"
+  apps/api/src/admin` -> после исправления совпадения только в локальном
+  создании bcrypt-хэша staff-пароля, не в response `select`;
+- `pnpm --filter @ecoplatform/api test -- admin` -> 19 files / 76 tests
+  passed;
+- `pnpm --filter @ecoplatform/api exec vitest run -c
+  vitest.integration.config.ts --testNamePattern
+  "Admin users panel|Admin companies panel|Admin journals|Platform settings|Admin staff panel"`
+  -> 1 file passed, 26 tests passed, 92 skipped.
+
+Решение:
+
+- `apps/api/src/admin` принят без открытых P0/P1/P2-рисков;
+- `F-20260528-006` закрыт: `/api/admin/users/:id/platform-roles` теперь
+  защищает `PLATFORM_OWNER_EMAIL` так же, как staff endpoint;
+- `F-20260528-007` закрыт: `POST /api/admin/staff` больше не возвращает
+  `passwordHash`;
+- `F-20260528-008` закрыт: `GET /api/admin/staff` валидирует query через zod
+  и отдаёт 400 на нечисловой `limit`;
+- audit-log покрывает admin user/company/staff/settings mutations; dashboard
+  использует ограниченные `select` и безопасный parameterized `$queryRaw` для
+  дневного ряда регистраций.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -389,6 +450,9 @@
 | `F-20260528-003` | `P2` | `apps/api/prisma/seed.ts` | Seed создавал dev-admin/demo с паролями прямо из кода и печатал эти пароли в консоль. При случайном запуске не в локальном окружении это могло оставить известные учётки и секреты в логах. | Исправлено: seed требует `SEED_ADMIN_PASSWORD` и `SEED_DEMO_PASSWORD` из env, проверяет минимум 12 символов и placeholder-значения, в stdout пишет только источник пароля. Проверено: seed прошёл с временными env-паролями. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-004` | `P1` | `apps/api/prisma/scripts/promote-first-admin.ts` | Скрипт первого админа по умолчанию был write-mode и мог удалить всех пользователей/компании кроме владельца, если его запустить по инструкции без dry-run. | Исправлено: по умолчанию скрипт теперь dry-run, запись требует `PROMOTE_FIRST_ADMIN_WRITE=1`. Проверено: запуск без флага нашёл owner и показал план без записи, в БД осталось 2 пользователя. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-005` | `P2` | `apps/api/src/auth/auth.controller.ts` | Logout/revoke/logout-all отзывали серверную сессию, но могли не удалить старую HttpOnly refresh-cookie в браузере: cookie выдавалась с `Path=/api/auth`, а очищалась без path. Для пользователя это выглядело бы как «вышел, но браузер всё ещё хранит старую cookie». | Исправлено: выдача и очистка refresh-cookie используют общий набор options с `Path=/api/auth`; integration-тест проверяет `Set-Cookie` при login и logout. Проверено: `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts src/app.integration.test.ts --testNamePattern Auth` -> 20 auth tests passed. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-006` | `P1` | `apps/api/src/admin/users/admin-users.service.ts` | Защищённый первый администратор (`PLATFORM_OWNER_EMAIL`) был защищён в staff endpoint, но не в `/api/admin/users/:id/platform-roles`. Второй admin мог снять с owner роль admin или деактивировать его через другой admin-экран. | Исправлено: `AdminUsersService.updatePlatformRoles()` проверяет owner-email перед снятием admin/деактивацией; integration-тест создаёт второго admin и получает 400 при попытке снять admin у owner. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-007` | `P1` | `apps/api/src/admin/staff/admin-staff.service.ts` | `POST /api/admin/staff` создавал пользователя через Prisma `include`, поэтому ответ admin API мог содержать `passwordHash`. Даже для admin-роута хэш пароля нельзя отдавать наружу. | Исправлено: createStaff возвращает только allow-list полей через `select`, тест проверяет `passwordHash === undefined`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-008` | `P2` | `apps/api/src/admin/staff/admin-staff.controller.ts` | `GET /api/admin/staff?limit=abc` обходил общую zod-валидацию, превращался в `NaN` и мог падать уже внутри Prisma вместо понятного 400. | Исправлено: staff list query переведён на `adminStaffListQuerySchema` и `resolvePagination`; integration-тест проверяет 400 на нечисловой `limit`. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -412,6 +476,9 @@
 | 3 | `F-20260528-003` | `fix(prisma): убрать хардкод seed-паролей` | `prisma validate`; `prisma:migrate`; `seed`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
 | 4 | `F-20260528-004` | `fix(prisma): включить dry-run для первого админа` | `promote-first-admin.ts` без `PROMOTE_FIRST_ADMIN_WRITE`; `postgres-local` user count; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
 | 5 | `F-20260528-005` | `fix(auth): корректно очищать refresh-cookie` | `pnpm --filter @ecoplatform/api test -- auth`; `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts src/app.integration.test.ts --testNamePattern Auth`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
+| 6 | `F-20260528-006` | `fix(admin): защитить owner-аккаунт в users API` | `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Admin users panel"`; `pnpm --filter @ecoplatform/api test -- admin`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
+| 7 | `F-20260528-007` | `fix(admin): не отдавать passwordHash при создании staff` | `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Admin staff panel"`; `pnpm --filter @ecoplatform/api test -- admin`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
+| 8 | `F-20260528-008` | `fix(admin): валидировать query списка staff` | `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Admin staff panel"`; `pnpm --filter @ecoplatform/api test -- admin`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

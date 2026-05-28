@@ -5,7 +5,11 @@ import { Roles } from "../../common/roles.decorator";
 import { RolesGuard } from "../../common/roles.guard";
 import type { RequestUser } from "../../common/request-user";
 import { parseBody } from "../../common/zod";
-import { adminStaffCreateInputSchema, adminStaffUpdateInputSchema } from "./admin-staff.schemas";
+import {
+  adminStaffCreateInputSchema,
+  adminStaffListQuerySchema,
+  adminStaffUpdateInputSchema,
+} from "./admin-staff.schemas";
 import { AdminStaffService } from "./admin-staff.service";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -15,11 +19,8 @@ export class AdminStaffController {
   constructor(private readonly service: AdminStaffService) {}
 
   @Get()
-  async list(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
-    return this.service.listStaff({
-      limit: limitRaw !== undefined ? Number(limitRaw) : undefined,
-      offset: offsetRaw !== undefined ? Number(offsetRaw) : undefined,
-    });
+  async list(@Query() query: Record<string, string>) {
+    return this.service.listStaff(parseBody(adminStaffListQuerySchema, query));
   }
 
   @Post()

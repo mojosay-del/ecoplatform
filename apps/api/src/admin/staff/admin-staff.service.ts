@@ -77,7 +77,27 @@ export class AdminStaffService {
           create: { roles: input.roles, isActive: true },
         },
       },
-      include: { platformStaff: true },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        firstName: true,
+        lastName: true,
+        gender: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        platformStaff: {
+          select: {
+            id: true,
+            userId: true,
+            roles: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
     });
 
     await this.auditLog.record({

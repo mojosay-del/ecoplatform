@@ -1564,6 +1564,30 @@ describe("Admin users panel", () => {
       .send({ roles: ["moderator"] });
     expect(res.status).toBe(400);
   });
+
+  it("нельзя снять admin у PLATFORM_OWNER_EMAIL через users panel", async () => {
+    await withEnv({ PLATFORM_OWNER_EMAIL: "admin@test.local" }, async () => {
+      const adminToken = await loginAdmin();
+      const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+      const second = await registerCompany("0100007");
+      await ctx.http
+        .patch(`/api/admin/users/${second.userId}/platform-roles`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ roles: ["admin"], isActive: true });
+
+      const res = await ctx.http
+        .patch(`/api/admin/users/${me.body.id}/platform-roles`)
+        .set("Authorization", `Bearer ${second.token}`)
+        .send({ roles: ["moderator"], isActive: true });
+      expect(res.status).toBe(400);
+
+      const ownerStaff = await ctx.prisma.platformStaff.findUniqueOrThrow({
+        where: { userId: me.body.id },
+      });
+      expect(ownerStaff.roles).toContain("admin");
+      expect(ownerStaff.isActive).toBe(true);
+    });
+  });
 });
 
 describe("Admin companies panel", () => {
@@ -2111,6 +2135,9 @@ describe("Admin staff panel", () => {
     expect(list.body.items.map((item: { user: { email: string } }) => item.user.email)).toEqual(
       expect.arrayContaining(["admin@test.local", "moderator@test.local"]),
     );
+
+    const invalidLimit = await ctx.http.get("/api/admin/staff?limit=abc").set("Authorization", `Bearer ${adminToken}`);
+    expect(invalidLimit.status).toBe(400);
   });
 
   it("создаёт модератора, который может залогиниться выданным паролем", async () => {
@@ -2131,6 +2158,7 @@ describe("Admin staff panel", () => {
     expect(res.status).toBe(201);
     expect(res.body.gender).toBe("female");
     expect(res.body.platformStaff.roles).toEqual(["moderator"]);
+    expect(res.body.passwordHash).toBeUndefined();
 
     const login = await ctx.http
       .post("/api/auth/login")

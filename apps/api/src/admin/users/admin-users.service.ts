@@ -191,6 +191,11 @@ export class AdminUsersService {
         throw new BadRequestException("Нельзя снять с себя роль admin.");
       }
 
+      const ownerEmail = (process.env.PLATFORM_OWNER_EMAIL ?? "mojosay@icloud.com").toLowerCase();
+      if (user.email.toLowerCase() === ownerEmail) {
+        throw new BadRequestException("Этот аккаунт защищён как первый администратор платформы.");
+      }
+
       const otherAdmins = await this.prisma.platformStaff.count({
         where: {
           isActive: true,
