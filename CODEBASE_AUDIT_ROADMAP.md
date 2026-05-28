@@ -90,7 +90,7 @@
 | B-CONTENT | `apps/api/src/content` | `accepted` | B | CMS validation, publish/preview rules, tags, indices, block payloads |
 | B-FILES | `apps/api/src/files` | `accepted` | B | MIME/extension/size checks, S3 paths, public/private access |
 | B-LEGAL | `apps/api/src/legal` | `accepted` | B | active documents, consent records, re-consent flow |
-| B-MOD | `apps/api/src/moderation` | `not_started` | B | sanctions, report flow, module restrictions, edge cases |
+| B-MOD | `apps/api/src/moderation` | `accepted` | B | sanctions, report flow, module restrictions, edge cases |
 | B-NOTIF | `apps/api/src/notifications` | `not_started` | B | in-app delivery, read states, privacy of notification payloads |
 | B-OBS | `apps/api/src/observability` | `not_started` | E | metrics auth, labels, cardinality, Sentry/log filtering |
 | B-REDIS | `apps/api/src/redis` | `not_started` | B/E | session cache invalidation, throttler fallback |
@@ -669,6 +669,70 @@
   неопубликованные черновики, а неизвестные legal document type в path/query
   возвращают 400 вместо 500 или молчаливой выдачи всех документов.
 
+### B-MOD — `apps/api/src/moderation`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `ModerationController`: создание жалоб, admin/moderator list/detail,
+  lock/release, решения модератора, admin-санкции и снятие санкций;
+- `moderation.schemas.ts`: body/query validation для жалоб, решений,
+  admin-санкций, снятия санкций и pagination списка кейсов;
+- `ModerationService`: дедупликация жалоб, active-case агрегация, lock limits,
+  remove_content / warn_company / escalate_to_admin, user/company/module
+  sanctions, lift flow, уведомления и audit-log;
+- связи с `ModuleAccessService`, `SessionCacheService`, `NotificationsService`,
+  `AdminActionLogService`, Prisma-моделями `ModerationCase`, `Complaint`,
+  `ModerationDecision`, `Sanction`, `UserModuleRestriction`;
+- integration-сценарии жалоб, санкций, ограничений модулей и pagination
+  contract.
+
+Доказательства:
+
+- NestJS docs через Context7: controller/method guards, role metadata через
+  `Reflector`, protected routes и request validation на controller boundary;
+- Prisma docs через Context7: связанные writes внутри transaction, безопасный
+  Prisma Client по умолчанию и запрет unsafe raw SQL со строковой
+  конкатенацией;
+- Zod docs через Context7: `safeParse` и `.superRefine()` для условных полей
+  вроде `reasonCode=other`;
+- `rg -n "@Controller\\(|@UseGuards|@Roles|@Get\\(|@Post\\("
+  apps/api/src/moderation apps/api/src/app.module.ts` -> public complaint route
+  закрыт `JwtAuthGuard`, admin routes закрыты `RolesGuard` и ролями
+  `admin/moderator` или только `admin`;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe"
+  apps/api/src/moderation apps/api/src/common/module-access.service.ts` ->
+  совпадений нет;
+- `pnpm --filter @ecoplatform/api lint` -> clean;
+- `pnpm --filter @ecoplatform/api test -- moderation` -> 19 files / 81 tests
+  passed;
+- `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
+  "Moderation|Admin sanctions|Wave 8.4 pagination contracts"` ->
+  integration-файл прошёл полностью: 129 tests passed.
+- `pnpm lint` -> 4 tasks successful;
+- `pnpm test` -> shared 7, web 50, api 81 tests passed;
+- `pnpm build` -> shared/api/web build successful;
+- `pnpm test:integration` -> 129 integration tests passed;
+- `pnpm format:check` -> clean;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/api/src/moderation` принят без открытых P0/P1/P2-рисков;
+- `F-20260528-017` закрыт: список кейсов модерации валидирует pagination query
+  через zod и отдаёт 400 на нечисловой `limit`;
+- `F-20260528-018` закрыт: user/company block санкции инвалидируют
+  session-cache после принудительного отзыва сессий;
+- `F-20260528-019` закрыт: admin-санкция `user_block` больше не может
+  заблокировать самого администратора или защищённый `PLATFORM_OWNER_EMAIL`;
+- `F-20260528-020` закрыт: снятие user/company block не активирует цель, если
+  есть другой активный block, и для компании возвращает прежний статус;
+- `F-20260528-021` закрыт: `reasonCode=other` при снятии санкции требует
+  комментарий так же, как остальные moderation-решения.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -691,6 +755,11 @@
 | `F-20260528-014` | `P1` | `apps/api/src/files/files.service.ts` | Metadata-only endpoint мог создать публичную запись файла с SVG/HTML/любой MIME-строкой и произвольным storage key без проверки реального upload-контура. Через CMS это могло превратиться в небезопасную или битую публичную ссылку и обход дневной квоты. | Исправлено: metadata-only путь нормализует MIME, блокирует опасные MIME/расширения, применяет лимит 100 МБ, дневную квоту и общий безопасный `storageKey`; unit и integration-тесты проверяют SVG reject и PDF alias normalization. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-015` | `P1` | `apps/api/src/files/files.controller.ts` | Content-manager мог удалить любой неиспользуемый файл по id, даже если файл загрузил другой сотрудник. В CMS это риск потери чужого чернового ассета до публикации. | Исправлено: `DELETE /api/files/:id` передаёт текущего пользователя в service; удалить чужой файл может только admin, content-manager получает 403. Unit и integration-тесты проверяют запрет и сохранение записи. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-016` | `P1` | `apps/api/src/legal` | Публичный route конкретной версии юр-документа мог отдать неопубликованный черновик, если известны type/version. Некорректный type в path давал 500, а некорректный `types` query мог молча превратиться в выдачу всех активных документов. Это риск публикации незавершённого юридического текста и непредсказуемого API-поведения. | Исправлено: detail-route отдаёт только документы с `publishedAt`, неизвестный type в path/query возвращает 400; integration-тест проверяет invalid path type, invalid query filter и 404 для черновика. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-017` | `P2` | `apps/api/src/moderation/moderation.controller.ts` | `GET /api/admin/moderation/cases?limit=abc` обходил zod-валидацию, превращался в `NaN` и молча возвращал дефолтную pagination вместо понятного 400. | Исправлено: добавлен `moderationCaseListQuerySchema`, controller валидирует query через `parseBody`; integration-тест проверяет 400. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-018` | `P1` | `apps/api/src/moderation/moderation.service.ts` | `user_block`/`company_block` через модерацию отзывали сессии в БД, но не чистили Redis session-cache. При включённом Redis старый access-token мог продолжить работать до TTL кеша. | Исправлено: `ModerationService` инвалидирует user/company session-cache после применения и снятия block-санкций; модуль импортирует `RedisModule`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-019` | `P1` | `apps/api/src/moderation/moderation.service.ts` | Admin-санкция `user_block` могла заблокировать самого администратора или защищённый первый admin-аккаунт, если он был автором модерируемого материала. Это обходило owner-защиту из admin users/staff API. | Исправлено: `user_block` запрещает self-block, `PLATFORM_OWNER_EMAIL` и уже заблокированного пользователя; integration-тест проверяет owner-case через второго admin. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-020` | `P1` | `apps/api/src/moderation/moderation.service.ts` | Снятие `company_block` всегда переводило компанию в `active`, даже если до санкции она была `demo/past_due/suspended`, а снятие одного block могло активировать цель при другой активной block-санкции. | Исправлено: block-санкция сохраняет `previousStatus`, lift восстанавливает прежний статус только если нет другого активного block; integration-тест проверяет возврат компании в `demo`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-021` | `P2` | `apps/api/src/moderation/moderation.schemas.ts` | При снятии санкции `reasonCode=other` не требовал комментарий, в отличие от жалоб, решений и admin-санкций. Журнал мог получить неясную причину пересмотра. | Исправлено: `sanctionLiftInputSchema` теперь требует `comment` для `reasonCode=other`. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -725,6 +794,11 @@
 | 14 | `F-20260528-014` | `fix(files): закрыть риски проверки files-api` | `pnpm --filter @ecoplatform/api test -- files`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Files API"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 15 | `F-20260528-015` | `fix(files): закрыть риски проверки files-api` | `pnpm --filter @ecoplatform/api test -- files`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Files API"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 16 | `F-20260528-016` | `fix(legal): закрыть риски проверки legal-api` | `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Legal documents & consents"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 17 | `F-20260528-017` | `fix(moderation): закрыть риски проверки moderation-api` | `pnpm --filter @ecoplatform/api lint`; `pnpm --filter @ecoplatform/api test -- moderation`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Moderation\\|Admin sanctions\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 18 | `F-20260528-018` | `fix(moderation): закрыть риски проверки moderation-api` | `pnpm --filter @ecoplatform/api lint`; `pnpm --filter @ecoplatform/api test -- moderation`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Moderation\\|Admin sanctions\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 19 | `F-20260528-019` | `fix(moderation): закрыть риски проверки moderation-api` | `pnpm --filter @ecoplatform/api lint`; `pnpm --filter @ecoplatform/api test -- moderation`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Moderation\\|Admin sanctions\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 20 | `F-20260528-020` | `fix(moderation): закрыть риски проверки moderation-api` | `pnpm --filter @ecoplatform/api lint`; `pnpm --filter @ecoplatform/api test -- moderation`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Moderation\\|Admin sanctions\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 21 | `F-20260528-021` | `fix(moderation): закрыть риски проверки moderation-api` | `pnpm --filter @ecoplatform/api lint`; `pnpm --filter @ecoplatform/api test -- moderation`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Moderation\\|Admin sanctions\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

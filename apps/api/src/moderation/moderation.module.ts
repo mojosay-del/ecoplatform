@@ -3,11 +3,12 @@ import { AuthModule } from "../auth/auth.module";
 import { AdminActionLogService } from "../common/admin-action-log.service";
 import { ModuleAccessService } from "../common/module-access.service";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { RedisModule } from "../redis/redis.module";
 import { ModerationController } from "./moderation.controller";
 import { ModerationService } from "./moderation.service";
 
 @Module({
-  imports: [AuthModule, NotificationsModule],
+  imports: [AuthModule, NotificationsModule, RedisModule],
   controllers: [ModerationController],
   providers: [ModerationService, AdminActionLogService, ModuleAccessService],
 })

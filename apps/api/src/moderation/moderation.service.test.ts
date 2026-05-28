@@ -1,7 +1,7 @@
 import { ConflictException } from "@nestjs/common";
 import { ModerationCaseStatus } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-import { complaintInputSchema } from "./moderation.schemas";
+import { complaintInputSchema, sanctionLiftInputSchema } from "./moderation.schemas";
 import { ModerationService } from "./moderation.service";
 
 const moderatorUser = {
@@ -28,6 +28,10 @@ function serviceWithPrisma(prisma: Record<string, unknown>) {
         return 0;
       }),
     } as any,
+    {
+      invalidateCompany: vi.fn().mockResolvedValue(undefined),
+      invalidateUser: vi.fn().mockResolvedValue(undefined),
+    } as any,
   );
 }
 
@@ -36,6 +40,14 @@ describe("ModerationService", () => {
     const parsed = complaintInputSchema.safeParse({
       entityType: "news_comment",
       entityId: "comment-1",
+      reasonCode: "other",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects sanction lift reason other without comment", () => {
+    const parsed = sanctionLiftInputSchema.safeParse({
       reasonCode: "other",
     });
 

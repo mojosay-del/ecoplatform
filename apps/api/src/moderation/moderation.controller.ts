@@ -8,6 +8,7 @@ import { parseBody } from "../common/zod";
 import {
   adminSanctionInputSchema,
   complaintInputSchema,
+  moderationCaseListQuerySchema,
   moderationDecisionInputSchema,
   sanctionLiftInputSchema,
 } from "./moderation.schemas";
@@ -26,10 +27,8 @@ export class ModerationController {
   @UseGuards(RolesGuard)
   @Roles("admin", "moderator")
   @Get("admin/moderation/cases")
-  async listCases(@Query("limit") limitRaw?: string, @Query("offset") offsetRaw?: string) {
-    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
-    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.moderation.listCases({ limit, offset });
+  async listCases(@Query() query: Record<string, unknown>) {
+    return this.moderation.listCases(parseBody(moderationCaseListQuerySchema, query));
   }
 
   @UseGuards(RolesGuard)

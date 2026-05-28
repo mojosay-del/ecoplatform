@@ -10,8 +10,8 @@
 
 Отдельный полномасштабный codebase-аудит ведётся по `CODEBASE_AUDIT_ROADMAP.md`.
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
-`B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES` и `B-LEGAL`;
-следующий модуль проверки — `B-MOD`.
+`B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL` и
+`B-MOD`; следующий модуль проверки — `B-NOTIF`.
 
 Волна 11.1 закрыта: дизайн-токены вынесены в `apps/web/src/styles/tokens.css`, а `globals.css` переведён с прямых цветов на CSS-переменные.
 
@@ -76,8 +76,8 @@
 - Prisma + PostgreSQL: 25 миграций к 2026-05-26, актуальная схема в `apps/api/prisma/schema.prisma`.
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
-- 126 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 50 в `apps/web`, 80 в `apps/api`.
+- 129 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
+- Unit-тесты: 7 в `packages/shared`, 50 в `apps/web`, 81 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service); workflow-token ограничен read-only доступом к коду.
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: PostgreSQL 18 на `:5433` + Redis 7 на `:6379`.
@@ -216,26 +216,23 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 137 unit-тестов (shared 7, web 50, api 80)
+pnpm test                                             # 138 unit-тестов (shared 7, web 50, api 81)
 pnpm build                                            # tsc + next build
-pnpm test:integration                                 # 126 integration-тестов против ecoplatform_test
+pnpm test:integration                                 # 129 integration-тестов против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
 pnpm format:check                                     # prettier
 ```
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-27 (после реструктуризации личного кабинета).
+Дата: 2026-05-28 (после проверки `B-MOD` в полном codebase-аудите).
 
-- `pnpm --filter @ecoplatform/web typecheck` — успешно.
-- `pnpm --filter @ecoplatform/web lint` — успешно.
-- `pnpm --filter @ecoplatform/web test` — успешно: web 46/46.
-- `pnpm --filter @ecoplatform/web build` — успешно.
-- Browser UI-check — demo-пользователь: прямые `/account/security`, `/account/data-privacy`, `/account/sessions`, `/account/billing` показывают `aria-label="Навигация личного кабинета"`, активный пункт слева, breadcrumbs `Настройки аккаунта / раздел`, business-группу и `documentOverflowX=0`, `bodyOverflowX=0`; topbar account-menu открывается и подсвечивает активную «Безопасность». Mobile 390px `/account/security`: burger открывает account-меню слева, active «Безопасность», overflow = 0. Platform admin: `/account/billing` редиректит на `/account/profile`, бизнес-пункты скрыты, кнопки поддержки в topbar нет.
-- Скриншоты: `/private/tmp/ecoplatform-account-settings-desktop.png`, `/private/tmp/ecoplatform-account-settings-mobile.png`, `/private/tmp/ecoplatform-account-settings-admin.png`.
-- `pnpm exec prettier --check` по изменённым web/status-файлам — clean.
+- `pnpm lint` — успешно: 4 tasks.
+- `pnpm test` — успешно: shared 7, web 50, api 81.
+- `pnpm build` — успешно: shared/api/web.
+- `pnpm test:integration` — успешно: 129 integration-тестов.
+- `pnpm format:check` — clean.
 - `git diff --check` — clean.
-- Последний полный root bundle до этой web-only правки: 2026-05-27 после Волны 12.4 (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm test:integration`, `pnpm build`, `pnpm format:check`, `git diff --check`).
 - Lighthouse desktop baseline (commit `b8e3101`, без перезапуска в 12.4): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
 
 ## Целевая БД для деплоя

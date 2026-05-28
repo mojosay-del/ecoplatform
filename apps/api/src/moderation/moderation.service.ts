@@ -26,6 +26,7 @@ import type { RequestUser } from "../common/request-user";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { SessionCacheService } from "../redis/session-cache.service";
 import type {
   adminSanctionInputSchema,
   complaintInputSchema,
@@ -93,6 +94,7 @@ export class ModerationService {
     private readonly auditLog: AdminActionLogService,
     private readonly notifications: NotificationsService,
     private readonly settings: PlatformSettingsService,
+    private readonly sessionCache: SessionCacheService,
   ) {}
 
   async createComplaint(input: ComplaintInput, user: RequestUser) {
@@ -412,11 +414,12 @@ export class ModerationService {
       if (input.type === "user_block") {
         const target = await tx.user.findUnique({
           where: { id: targetId },
-          select: { status: true },
+          select: { email: true, status: true },
         });
         if (!target) {
           throw new NotFoundException("Пользователь не найден.");
         }
+        this.assertUserBlockAllowed(targetId, target, user);
         auditBefore.status = target.status;
         await tx.user.update({ where: { id: targetId }, data: { status: UserStatus.blocked } });
         auditAfter.status = UserStatus.blocked;
@@ -431,6 +434,9 @@ export class ModerationService {
         });
         if (!target) {
           throw new NotFoundException("Компания не найдена.");
+        }
+        if (target.status === CompanyStatus.blocked) {
+          throw new BadRequestException("Компания уже заблокирована.");
         }
         auditBefore.status = target.status;
         await tx.company.update({ where: { id: targetId }, data: { status: CompanyStatus.blocked } });
@@ -455,7 +461,7 @@ export class ModerationService {
                   moduleCode: input.moduleCode!,
                   durationDays: input.durationDays!,
                 }
-              : baseParameters,
+              : { ...baseParameters, previousStatus: auditBefore.status as string },
         },
       });
 
@@ -492,6 +498,8 @@ export class ModerationService {
 
       return { sanction, updatedCase, auditBefore, auditAfter };
     });
+
+    await this.invalidateCacheForSanction(result.sanction.type, result.sanction.targetId);
 
     await this.auditLog.recordChange({
       actorId: user.id,
@@ -542,9 +550,17 @@ export class ModerationService {
       });
 
       if (sanction.type === SanctionType.user_block) {
-        await tx.user.update({ where: { id: sanction.targetId }, data: { status: UserStatus.active } });
+        const hasOtherActiveBlock = await this.hasOtherActiveBlock(tx, sanction);
+        const previousStatus = this.previousUserStatus(sanction.parameters);
+        if (!hasOtherActiveBlock && previousStatus !== UserStatus.blocked) {
+          await tx.user.update({ where: { id: sanction.targetId }, data: { status: previousStatus } });
+        }
       } else if (sanction.type === SanctionType.company_block) {
-        await tx.company.update({ where: { id: sanction.targetId }, data: { status: CompanyStatus.active } });
+        const hasOtherActiveBlock = await this.hasOtherActiveBlock(tx, sanction);
+        const previousStatus = this.previousCompanyStatus(sanction.parameters);
+        if (!hasOtherActiveBlock && previousStatus !== CompanyStatus.blocked) {
+          await tx.company.update({ where: { id: sanction.targetId }, data: { status: previousStatus } });
+        }
       } else if (sanction.type === SanctionType.module_restriction) {
         await tx.userModuleRestriction.updateMany({
           where: { sanctionId: id, liftedAt: null },
@@ -552,6 +568,8 @@ export class ModerationService {
         });
       }
     });
+
+    await this.invalidateCacheForSanction(sanction.type, sanction.targetId);
 
     await this.auditLog.record({
       actorId: user.id,
@@ -577,6 +595,67 @@ export class ModerationService {
       return { targetType: "company", targetId: found.entityCompanyId! };
     }
     return { targetType: "user", targetId: found.entityAuthorId! };
+  }
+
+  private assertUserBlockAllowed(targetId: string, target: { email: string; status: UserStatus }, actor: RequestUser) {
+    if (targetId === actor.id) {
+      throw new BadRequestException("Нельзя заблокировать собственную учётную запись.");
+    }
+
+    const ownerEmail = (process.env.PLATFORM_OWNER_EMAIL ?? "mojosay@icloud.com").toLowerCase();
+    if (target.email.toLowerCase() === ownerEmail) {
+      throw new BadRequestException("Этот аккаунт защищён как первый администратор платформы.");
+    }
+
+    if (target.status === UserStatus.blocked) {
+      throw new BadRequestException("Пользователь уже заблокирован.");
+    }
+  }
+
+  private async hasOtherActiveBlock(
+    tx: Prisma.TransactionClient,
+    sanction: { id: string; type: SanctionType; targetType: string; targetId: string },
+  ) {
+    const count = await tx.sanction.count({
+      where: {
+        id: { not: sanction.id },
+        type: sanction.type,
+        targetType: sanction.targetType,
+        targetId: sanction.targetId,
+        liftedAt: null,
+      },
+    });
+    return count > 0;
+  }
+
+  private previousUserStatus(parameters: Prisma.JsonValue | null): UserStatus {
+    const previousStatus = this.parameterString(parameters, "previousStatus");
+    return previousStatus === UserStatus.blocked ? UserStatus.blocked : UserStatus.active;
+  }
+
+  private previousCompanyStatus(parameters: Prisma.JsonValue | null): CompanyStatus {
+    const previousStatus = this.parameterString(parameters, "previousStatus");
+    const allowed = Object.values(CompanyStatus) as string[];
+    return previousStatus && allowed.includes(previousStatus)
+      ? (previousStatus as CompanyStatus)
+      : CompanyStatus.active;
+  }
+
+  private parameterString(parameters: Prisma.JsonValue | null, key: string): string | null {
+    if (!parameters || typeof parameters !== "object" || Array.isArray(parameters)) {
+      return null;
+    }
+
+    const value = parameters[key];
+    return typeof value === "string" ? value : null;
+  }
+
+  private async invalidateCacheForSanction(type: SanctionType, targetId: string) {
+    if (type === SanctionType.user_block) {
+      await this.sessionCache.invalidateUser(targetId);
+    } else if (type === SanctionType.company_block) {
+      await this.sessionCache.invalidateCompany(targetId);
+    }
   }
 
   private async notifyAdminSanction(

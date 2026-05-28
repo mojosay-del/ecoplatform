@@ -1300,6 +1300,16 @@ describe("Moderation", () => {
     expect(release.body.lockedById).toBeNull();
   });
 
+  it("валидирует query списка кейсов модерации", async () => {
+    const moderatorToken = await loginModerator();
+
+    const res = await ctx.http
+      .get("/api/admin/moderation/cases?limit=abc")
+      .set("Authorization", `Bearer ${moderatorToken}`);
+
+    expect(res.status).toBe(400);
+  });
+
   it("remove_content скрывает комментарий из публичной новости и создаёт sanction", async () => {
     const adminToken = await loginAdmin();
     const moderatorToken = await loginModerator();
@@ -2514,6 +2524,46 @@ describe("Admin sanctions", () => {
     expect(res.status).toBe(400);
   });
 
+  it("нельзя заблокировать PLATFORM_OWNER_EMAIL через admin-санкцию", async () => {
+    await withEnv({ PLATFORM_OWNER_EMAIL: "admin@test.local" }, async () => {
+      const adminToken = await loginAdmin();
+      const moderatorToken = await loginModerator();
+      const secondAdmin = await registerCompany("0000074");
+      const reporter = await registerCompany("0000075");
+
+      const grant = await ctx.http
+        .patch(`/api/admin/users/${secondAdmin.userId}/platform-roles`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ roles: ["admin"], isActive: true });
+      expect(grant.status).toBe(200);
+
+      const news = await createPublishedNews(adminToken, "owner-block");
+      await ctx.http
+        .post("/api/moderation/complaints")
+        .set("Authorization", `Bearer ${reporter.token}`)
+        .send({ entityType: "news_post", entityId: news.id, reasonCode: "illegal_content" });
+
+      const list = await ctx.http.get("/api/admin/moderation/cases").set("Authorization", `Bearer ${moderatorToken}`);
+      const caseId = list.body.items[0].id as string;
+      await ctx.http
+        .post(`/api/admin/moderation/cases/${caseId}/lock`)
+        .set("Authorization", `Bearer ${moderatorToken}`);
+      await ctx.http
+        .post(`/api/admin/moderation/cases/${caseId}/decisions`)
+        .set("Authorization", `Bearer ${moderatorToken}`)
+        .send({ type: "escalate_to_admin", reasonCode: "severe_violation" });
+
+      const block = await ctx.http
+        .post(`/api/admin/moderation/cases/${caseId}/admin-sanctions`)
+        .set("Authorization", `Bearer ${secondAdmin.token}`)
+        .send({ type: "user_block", reasonCode: "severe_violation" });
+      expect(block.status).toBe(400);
+
+      const owner = await ctx.prisma.user.findUniqueOrThrow({ where: { email: "admin@test.local" } });
+      expect(owner.status).toBe(UserStatus.active);
+    });
+  });
+
   it("lift user_block разблокирует пользователя и позволяет логин", async () => {
     const adminToken = await loginAdmin();
     const moderatorToken = await loginModerator();
@@ -2539,6 +2589,34 @@ describe("Admin sanctions", () => {
       .post("/api/auth/login")
       .send({ email: "user0000070@test.local", password: "User12345678" });
     expect(relogin.status).toBe(201);
+  });
+
+  it("lift company_block возвращает прежний статус компании", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+    const { caseId, author } = await escalatedCaseAgainstAuthor(adminToken, moderatorToken, "0000076", "0000077");
+
+    const before = await ctx.prisma.company.findUniqueOrThrow({ where: { id: author.companyId } });
+    expect(before.status).toBe(CompanyStatus.demo);
+
+    const applied = await ctx.http
+      .post(`/api/admin/moderation/cases/${caseId}/admin-sanctions`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ type: "company_block", reasonCode: "severe_violation" });
+    expect(applied.status).toBe(201);
+
+    const sanction = await ctx.prisma.sanction.findFirstOrThrow({
+      where: { caseId, type: SanctionType.company_block },
+    });
+
+    const lift = await ctx.http
+      .post(`/api/admin/moderation/sanctions/${sanction.id}/lift`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reasonCode: "unfounded_complaint" });
+    expect(lift.status).toBe(201);
+
+    const restored = await ctx.prisma.company.findUniqueOrThrow({ where: { id: author.companyId } });
+    expect(restored.status).toBe(CompanyStatus.demo);
   });
 
   it("lift module_restriction восстанавливает возможность комментировать", async () => {

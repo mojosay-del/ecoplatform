@@ -21,6 +21,19 @@ export const decisionReasonCodes = [
   "other",
 ] as const;
 
+export const moderationCaseListQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    take: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .transform((input) => ({
+    ...input,
+    limit: input.limit ?? input.take ?? 50,
+    offset: input.offset ?? (input.page ? (input.page - 1) * (input.limit ?? input.take ?? 50) : 0),
+  }));
+
 export const complaintInputSchema = z
   .object({
     entityType: z.enum(moderatedEntityTypes),
@@ -93,7 +106,17 @@ export const adminSanctionInputSchema = z
     }
   });
 
-export const sanctionLiftInputSchema = z.object({
-  reasonCode: z.enum(decisionReasonCodes),
-  comment: z.string().trim().max(1000).optional(),
-});
+export const sanctionLiftInputSchema = z
+  .object({
+    reasonCode: z.enum(decisionReasonCodes),
+    comment: z.string().trim().max(1000).optional(),
+  })
+  .superRefine((input, context) => {
+    if (input.reasonCode === "other" && !input.comment) {
+      context.addIssue({
+        code: "custom",
+        path: ["comment"],
+        message: "Для причины other нужно указать комментарий.",
+      });
+    }
+  });
