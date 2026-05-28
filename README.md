@@ -90,6 +90,10 @@ docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
    ```
 
    API — на http://localhost:4000, web — на http://localhost:3000.
+   Web dev-сервер принудительно запускается на Webpack, чтобы локальная
+   регистрация и ручная приёмка не зависели от нестабильного Turbopack
+   crash-loop. Server-only sanitizer-пакеты для HTML подключаются через
+   отдельный `@ecoplatform/shared/sanitize-html`.
 
 ## Проверки
 

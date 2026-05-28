@@ -4,6 +4,25 @@
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "sanitize-html": [
+        "dist/sanitize-html.d.ts"
+      ]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./sanitize-html": {
+      "types": "./dist/sanitize-html.d.ts",
+      "import": "./dist/sanitize-html.js",
+      "require": "./dist/sanitize-html.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",

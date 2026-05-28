@@ -14,6 +14,13 @@
 `B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED`, `B-SUPPORT`, `C-APP`,
 `C-ADMIN` и `C-AUTH`; следующий модуль проверки — `C-SHELL`.
 
+Внеплановая dev-стабилизация закрыта: локальный `next dev` для web переведён
+на Webpack, потому что Turbopack в текущем окружении уходил в crash-loop на
+`/register`; sanitizer вынесен в отдельный `@ecoplatform/shared/sanitize-html`,
+чтобы общий shared barrel не подтягивал `isomorphic-dompurify/jsdom` в обычные
+страницы; невалидная refresh-cookie теперь очищается при `401 Unauthorized` на
+`/api/auth/refresh`, чтобы браузер не повторял бесполезные refresh-попытки.
+
 Волна 11.1 закрыта: дизайн-токены вынесены в `apps/web/src/styles/tokens.css`, а `globals.css` переведён с прямых цветов на CSS-переменные.
 
 Волна 11.2 закрыта: `h1` приведены к токенам типографики, публичные заголовки выровнены по левому краю, `/news` теперь открывается с заголовком «Новости рынка».

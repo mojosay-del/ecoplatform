@@ -1154,6 +1154,53 @@
   поэтому внешний клиент не может записать реквизиты компании во время
   регистрации в обход продуктового сценария.
 
+### Внеплановая dev-runtime правка — `/register`
+
+Дата проверки: 2026-05-28.
+
+Статус: `fixed`.
+
+Проверено:
+
+- `apps/web/package.json`;
+- `apps/web/next.config.ts`;
+- `packages/shared/package.json`;
+- `packages/shared/src/index.ts`;
+- `apps/web/src/components/LegalDocumentPage.tsx`;
+- `apps/api/src/auth/auth.controller.ts`;
+- `apps/api/src/app.integration.test.ts`;
+- локальный `pnpm --filter @ecoplatform/web dev` на маршруте `/register`;
+- локальный `GET /legal/privacy`;
+- логи API при повторном refresh без валидной сессии.
+
+Доказательства:
+
+- старый web dev-server на Turbopack уходил в crash-loop:
+  `Failed to write app endpoint /_not-found/page`, `Next.js package not found`,
+  после чего браузер постоянно перезагружал `/register`;
+- актуальная документация Next.js 16 подтверждает флаг `next dev --webpack`
+  для явного запуска dev-сервера на Webpack вместо Turbopack;
+- общий barrel `@ecoplatform/shared` подтягивал `sanitize-html` вместе с
+  `isomorphic-dompurify/jsdom` даже на страницах, которым нужен только обычный
+  DTO/константы shared-пакета;
+- для Next.js 16 `serverExternalPackages` является штатным способом не
+  бандлить server-only пакеты, а грузить их через native Node require;
+- `POST /api/auth/refresh` с недействительным refresh-cookie повторялся на
+  каждой перезагрузке и доходил до 429, потому что браузер продолжал хранить
+  старую HttpOnly cookie.
+
+Решение:
+
+- `F-20260528-033` закрывается отдельным bugfix-коммитом: локальный web dev
+  запускается с `--webpack`, а не с падающим Turbopack;
+- `sanitizeParagraphHtml` больше не экспортируется из общего barrel
+  `@ecoplatform/shared`; для HTML-сценариев используется отдельный subpath
+  `@ecoplatform/shared/sanitize-html`, а Next грузит `isomorphic-dompurify` и
+  `jsdom` как серверные external packages;
+- при `401 Unauthorized` на `/api/auth/refresh` API теперь очищает
+  `refreshToken` cookie с тем же `Path=/api/auth`, чтобы битая cookie не
+  вызывала повторные refresh-попытки при следующих загрузках.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -1192,6 +1239,7 @@
 | `F-20260528-030` | `P2` | `apps/web/app/global-error.tsx` | В Next.js App Router `global-error.tsx` заменяет root layout. Файл показывал общий fallback через классы `MarketingShell`, но не импортировал глобальные стили сам; при root-level ошибке пользователь мог увидеть неоформленную аварийную страницу. | Исправлено: `global-error.tsx` импортирует `tokens.css` и `globals.css` напрямую. Проверено: `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-031` | `P2` | `apps/web/src/components/AdminStaffView.tsx` | Форма создания сотрудника показывала временный пароль как обычный текст. На админском экране это риск утечки при демонстрации, записи экрана или скриншоте. | Исправлено: поле временного пароля получило `type="password"`, `autoComplete="new-password"` и явный `aria-label`. Проверено: `rg` по password-полю; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/admin/staff`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-032` | `P2` | `packages/shared/src/dto.ts`, `apps/api/src/auth/auth.service.ts` | UI регистрации уже не показывал ИНН, но API-контракт всё ещё принимал `billingInn` и мог записать реквизит компании при регистрации в обход продуктового сценария. Пользователь должен заполнять ИНН позже в профиле компании. | Исправлено: `registerDtoSchema` отклоняет `billingInn`, `AuthService.register()` больше не пишет ИНН при создании компании, integration-тест проверяет 400 на `billingInn` в `/auth/register`, а `PATCH /api/billing/company` сохраняет ИНН как профильное действие. Проверено: `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "регистрация\|Auth\|Company profile"` -> 132 passed. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-033` | `P1` | `apps/web/package.json`, `apps/web/next.config.ts`, `packages/shared/src/index.ts`, `apps/api/src/auth/auth.controller.ts` | Локальный `/register` мог бесконечно перезагружаться: Next dev на Turbopack падал в crash-loop, общий shared barrel подтягивал `isomorphic-dompurify/jsdom` на страницы без HTML, а старая/битая HttpOnly refresh-cookie повторно била в `/auth/refresh` до 429. Для владельца продукта это блокировало ручную проверку регистрации. | Исправлено: web dev запускается через `next dev --webpack`, sanitizer вынесен в `@ecoplatform/shared/sanitize-html`, Next externalize-ит `isomorphic-dompurify/jsdom`, а `/auth/refresh` очищает refresh-cookie при `401 Unauthorized`. Проверено: API integration -> 133 passed; web lint/test/build; browser-check `/register` 60 секунд без reload; browser-check `/legal/privacy`. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -1242,6 +1290,7 @@
 | 30 | `F-20260528-030` | `fix(web): закрыть риски проверки app-routes` | `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/__missing-c-app-check`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 31 | `F-20260528-031` | `fix(web): закрыть риски проверки admin-ui` | `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/admin/staff`; `pnpm format:check`; `git diff --check` | `closed` |
 | 32 | `F-20260528-032` | `fix(auth): убрать ИНН из регистрации` | `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "регистрация\\|Auth\\|Company profile"`; `pnpm lint`; `pnpm format:check`; `git diff --check` | `closed` |
+| 33 | `F-20260528-033` | `fix(dev): остановить перезагрузку страницы регистрации` | `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Auth"`; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/register`; browser-check `/legal/privacy`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

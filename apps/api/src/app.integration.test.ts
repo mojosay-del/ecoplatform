@@ -418,6 +418,24 @@ describe("Auth", () => {
     expect(ok.body.accessToken).toMatch(/\./);
   });
 
+  it("очищает refresh-cookie, если refresh-токен недействителен", async () => {
+    const csrf = await ctx.rawHttp.get("/api/auth/csrf");
+    const csrfCookie = responseCookiePart(csrf, "csrf-token");
+    expect(csrfCookie).toBeDefined();
+
+    const csrfToken = csrfCookie!.slice("csrf-token=".length);
+    const invalidRefresh = await ctx.rawHttp
+      .post("/api/auth/refresh")
+      .set("Cookie", ["refreshToken=missing-session.invalid-tail", csrfCookie!])
+      .set("X-CSRF-Token", csrfToken);
+
+    expect(invalidRefresh.status).toBe(401);
+    const clearedRefreshCookie = responseCookieFull(invalidRefresh, "refreshToken");
+    expect(clearedRefreshCookie).toContain("refreshToken=");
+    expect(clearedRefreshCookie).toContain("Path=/api/auth");
+    expect(clearedRefreshCookie).toContain("Expires=Thu, 01 Jan 1970");
+  });
+
   it("logout очищает refresh-cookie с тем же path, с которым она была выдана", async () => {
     const login = await ctx.http.post("/api/auth/login").send({ email: "admin@test.local", password: "Admin12345" });
     expect(login.status).toBe(201);

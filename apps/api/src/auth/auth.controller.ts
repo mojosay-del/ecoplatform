@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { CookieOptions, Request, Response } from "express";
 import { changePasswordDtoSchema, loginDtoSchema, registerDtoSchema } from "@ecoplatform/shared";
@@ -59,9 +59,16 @@ export class AuthController {
   @Throttle(AUTH_THROTTLE)
   @Post("refresh")
   async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    const tokens = await this.auth.refresh(request.cookies?.refreshToken as string | undefined);
-    this.setRefreshCookie(response, tokens.refreshToken);
-    return { accessToken: tokens.accessToken };
+    try {
+      const tokens = await this.auth.refresh(request.cookies?.refreshToken as string | undefined);
+      this.setRefreshCookie(response, tokens.refreshToken);
+      return { accessToken: tokens.accessToken };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        this.clearRefreshCookie(response);
+      }
+      throw error;
+    }
   }
 
   @UseGuards(JwtAuthGuard)
