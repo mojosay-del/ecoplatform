@@ -11,7 +11,7 @@ apps/
   api/               NestJS-сервер, Prisma, миграции, integration-тесты
     prisma/
       schema.prisma  модель PostgreSQL (актуальная)
-      migrations/    26 SQL-миграций от 2026-05-20 до 2026-05-26
+      migrations/    25 SQL-миграций от 2026-05-20 до 2026-05-26
       seed.ts        сидер для admin/demo и юр-документов
     src/
       auth/          регистрация, вход, JWT, refresh-cookie, lockout, экспорт данных
@@ -61,6 +61,10 @@ docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
    # Сгенерировать JWT-секреты: openssl rand -hex 32
    ```
 
+   В этом же `.env` задайте локальные пароли `SEED_ADMIN_PASSWORD` и
+   `SEED_DEMO_PASSWORD` для dev-учёток после seed. Реальные пароли не должны
+   попадать в git.
+
 3. Поднять Postgres и Redis локально:
 
    ```bash
@@ -97,10 +101,10 @@ pnpm format:check          # prettier
 
 Integration-тесты создают отдельную БД `ecoplatform_test` в том же Postgres-контейнере и автоматически применяют миграции — локальная dev-БД не затрагивается. GitHub Actions гонит `static-checks` (prettier/lint/test/build) и `integration` (Postgres 18 service) на каждый push в main; workflow-token ограничен read-only доступом к коду.
 
-## Demo-доступы после seed
+## Demo-учётки после seed
 
-- Админ: `admin@ecoplatform.local` / `Admin12345`
-- Demo-пользователь: `demo@ecoplatform.local` / `Demo12345`
+- Админ: `admin@ecoplatform.local`, пароль из `SEED_ADMIN_PASSWORD`.
+- Demo-пользователь: `demo@ecoplatform.local`, пароль из `SEED_DEMO_PASSWORD`.
 
 После seed также создаются 5 placeholder-юр-документов v1.0.0 (privacy/terms/personal-data — обязательные, cookies/offer — опциональные) и админский `ConsentRecord` на обязательные — иначе `auth/me.requiresReConsent` блокирует кабинет.
 

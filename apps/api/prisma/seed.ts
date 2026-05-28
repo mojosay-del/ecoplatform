@@ -15,24 +15,74 @@ import {
   UserGender,
 } from "@prisma/client";
 import { hash } from "bcryptjs";
-import { slugify } from "@ecoplatform/shared";
+import { MIN_PASSWORD_LENGTH, slugify } from "@ecoplatform/shared";
 
 const prisma = new PrismaClient();
 
+const ADMIN_EMAIL = "admin@ecoplatform.local";
+const DEMO_EMAIL = "demo@ecoplatform.local";
+
+type SeedPasswordSource = "env" | "unchanged";
+
+type SeedPasswordResolution = {
+  envName: string;
+  passwordHash?: string;
+  source: SeedPasswordSource;
+};
+
+function readSeedPassword(envName: string) {
+  const value = process.env[envName]?.trim();
+  if (!value) return null;
+  if (value.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`${envName} должен быть не короче ${MIN_PASSWORD_LENGTH} символов.`);
+  }
+  if (/replace-with|change-me|example/i.test(value) || value === "Admin12345" || value === "Demo12345") {
+    throw new Error(`${envName} похож на placeholder. Укажите реальный локальный пароль в .env.`);
+  }
+  return value;
+}
+
+async function resolveSeedPassword(envName: string, email: string): Promise<SeedPasswordResolution> {
+  const password = readSeedPassword(envName);
+  if (password) {
+    return { envName, passwordHash: await hash(password, 12), source: "env" };
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (existingUser) {
+    return { envName, source: "unchanged" };
+  }
+
+  throw new Error(`${envName} обязателен для первого создания ${email}. Задайте его в локальном .env.`);
+}
+
+function requireSeedPasswordHash(resolution: SeedPasswordResolution, email: string) {
+  if (!resolution.passwordHash) {
+    throw new Error(`Не удалось создать ${email}: отсутствует пароль для новой учётки.`);
+  }
+  return resolution.passwordHash;
+}
+
+function printSeedAccount(label: string, email: string, resolution: SeedPasswordResolution) {
+  const source =
+    resolution.source === "env" ? `пароль взят из ${resolution.envName}` : `учётка уже существовала, пароль не менялся`;
+  console.log(`${label}: ${email} (${source})`);
+}
+
 async function main() {
-  const adminPasswordHash = await hash("Admin12345", 12);
-  const userPasswordHash = await hash("Demo12345", 12);
+  const adminPassword = await resolveSeedPassword("SEED_ADMIN_PASSWORD", ADMIN_EMAIL);
+  const demoPassword = await resolveSeedPassword("SEED_DEMO_PASSWORD", DEMO_EMAIL);
 
   const admin = await prisma.user.upsert({
-    where: { email: "admin@ecoplatform.local" },
-    update: {},
+    where: { email: ADMIN_EMAIL },
+    update: adminPassword.passwordHash ? { passwordHash: adminPassword.passwordHash } : {},
     create: {
-      email: "admin@ecoplatform.local",
+      email: ADMIN_EMAIL,
       phone: "+79990000001",
       firstName: "Админ",
       lastName: "Платформы",
       gender: UserGender.male,
-      passwordHash: adminPasswordHash,
+      passwordHash: requireSeedPasswordHash(adminPassword, ADMIN_EMAIL),
       platformStaff: {
         create: {
           roles: [PlatformRole.admin, PlatformRole.content_manager, PlatformRole.moderator],
@@ -65,15 +115,15 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { email: "demo@ecoplatform.local" },
-    update: {},
+    where: { email: DEMO_EMAIL },
+    update: demoPassword.passwordHash ? { passwordHash: demoPassword.passwordHash } : {},
     create: {
-      email: "demo@ecoplatform.local",
+      email: DEMO_EMAIL,
       phone: "+79990000002",
       firstName: "Иван",
       lastName: "Заготовитель",
       gender: UserGender.male,
-      passwordHash: userPasswordHash,
+      passwordHash: requireSeedPasswordHash(demoPassword, DEMO_EMAIL),
       companyId: company.id,
     },
   });
@@ -394,8 +444,8 @@ async function main() {
   await seedLegalDocuments();
 
   console.log("Seed completed");
-  console.log("Admin: admin@ecoplatform.local / Admin12345");
-  console.log("Demo user: demo@ecoplatform.local / Demo12345");
+  printSeedAccount("Admin", ADMIN_EMAIL, adminPassword);
+  printSeedAccount("Demo user", DEMO_EMAIL, demoPassword);
   console.log(`Learning module seeded: ${module.title}`);
 }
 

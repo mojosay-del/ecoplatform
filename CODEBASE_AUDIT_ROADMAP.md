@@ -82,7 +82,7 @@
 | A-ROOT | Root config | `accepted` | A | package scripts, turbo tasks, workspace, tsconfig, docker compose |
 | A-CI | `.github/workflows` | `accepted` | A/E | static checks, integration DB, smoke trigger, secrets boundary |
 | A-OPS | `ops/monitoring` | `accepted` | A/E | alerts, example config, absence of real secrets |
-| B-PRISMA | `apps/api/prisma` | `not_started` | B | schema, migrations, indexes, constraints, seed safety |
+| B-PRISMA | `apps/api/prisma` | `accepted` | B | schema, migrations, indexes, constraints, seed safety |
 | B-AUTH | `apps/api/src/auth` | `not_started` | B | login, refresh, lockout, export data, deletion, password policy |
 | B-COMMON | `apps/api/src/common` | `not_started` | B | guards, roles, CSRF, pagination, logging filters, sanitizing |
 | B-ADMIN | `apps/api/src/admin` | `not_started` | B | RBAC, audit log, dashboard queries, admin mutations |
@@ -210,6 +210,61 @@
   secret references, реальные токены/пароли в репозитории не обнаружены;
 - открытых P0/P1/P2-рисков по `ops/monitoring` нет.
 
+### B-PRISMA — `apps/api/prisma`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `apps/api/prisma/schema.prisma`: модели, enum, индексы, уникальные
+  ограничения, referential actions, Json/Decimal/String[] поля;
+- 25 SQL-миграций в `apps/api/prisma/migrations` и
+  `migration_lock.toml`;
+- `apps/api/prisma/seed.ts`: создание admin/demo, демо-контента и
+  обязательных юридических документов;
+- `apps/api/prisma/scripts/promote-first-admin.ts`: режим dry-run,
+  граница destructive write, перенос авторства и удаление лишних записей;
+- соответствие `README.md`, `PROJECT_STATUS.md` и фактического числа
+  миграций.
+
+Доказательства:
+
+- Prisma docs через Context7: контрольные точки аудита — indexes/unique,
+  `onDelete/onUpdate`, migrations и seed safety;
+- `docker compose ps` -> PostgreSQL 18 контейнер `healthy`;
+- `postgres-local`: PostgreSQL 18.4, после миграций `25` записей в
+  `_prisma_migrations`, `134` public-indexes, `2` seed-пользователя;
+- `env 'DATABASE_URL=...' pnpm --filter @ecoplatform/api exec prisma validate`
+  -> schema valid;
+- `env 'DATABASE_URL=...' pnpm --filter @ecoplatform/api prisma:migrate` ->
+  применены все 25 миграций;
+- `SEED_ADMIN_PASSWORD=$(openssl rand -base64 24)
+  SEED_DEMO_PASSWORD=$(openssl rand -base64 24) pnpm --filter
+  @ecoplatform/api seed` -> seed проходит, пароли в stdout не печатаются;
+- `PROMOTE_FIRST_ADMIN_WRITE` не задан:
+  `pnpm --filter @ecoplatform/api exec ts-node
+  prisma/scripts/promote-first-admin.ts` -> dry-run без записи;
+- `pnpm exec prettier --check README.md PROJECT_STATUS.md
+  CODEBASE_AUDIT_ROADMAP.md apps/api/prisma/seed.ts
+  apps/api/prisma/scripts/promote-first-admin.ts` -> clean;
+- `git diff --check` -> clean; `.env.example` проверен через diff/secret
+  search, потому что Prettier не выбирает parser для env-файлов;
+- `pnpm lint` -> 4 tasks successful;
+- `pnpm --filter @ecoplatform/api test` -> 19 files / 76 tests passed.
+
+Решение:
+
+- schema/migrations/indexes/constraints приняты без открытых P0/P1/P2-рисков;
+- документационный drift по числу миграций исправлен: фактическое число —
+  25, а не 26;
+- `F-20260528-003` закрыт: seed больше не хранит и не печатает пароли
+  admin/demo, а требует `SEED_ADMIN_PASSWORD` и `SEED_DEMO_PASSWORD` из env;
+- `F-20260528-004` закрыт: destructive `promote-first-admin` теперь по
+  умолчанию только показывает план, запись требует явного
+  `PROMOTE_FIRST_ADMIN_WRITE=1`.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -218,6 +273,8 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `F-20260528-001` | `P2` | `docker-compose.yml` | Локальная разработка и integration-тесты могли идти на PostgreSQL 16, а CI и целевой деплой — на PostgreSQL 18. Из-за этого часть SQL/Prisma-проблем могла проявиться только в CI или prod-like среде. | Исправлено: `docker-compose.yml:3` = `postgres:18-alpine`, volume смонтирован в `/var/lib/postgresql`, жёсткие `container_name` убраны. Проверено: `docker compose config`; `docker compose up -d postgres` -> `healthy`; `pnpm --filter @ecoplatform/api prisma:generate`; `pnpm --filter @ecoplatform/api test:integration` -> 116 passed. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-002` | `P2` | `.github/workflows/ci.yml` | CI не фиксировал минимальные права `GITHUB_TOKEN`, поэтому будущие jobs могли случайно получить больше прав, чем нужно для read-only проверок. | Исправлено: добавлен workflow-level `permissions: contents: read`. Проверено: `pnpm exec prettier --check .github/workflows/ci.yml`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-003` | `P2` | `apps/api/prisma/seed.ts` | Seed создавал dev-admin/demo с паролями прямо из кода и печатал эти пароли в консоль. При случайном запуске не в локальном окружении это могло оставить известные учётки и секреты в логах. | Исправлено: seed требует `SEED_ADMIN_PASSWORD` и `SEED_DEMO_PASSWORD` из env, проверяет минимум 12 символов и placeholder-значения, в stdout пишет только источник пароля. Проверено: seed прошёл с временными env-паролями. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-004` | `P1` | `apps/api/prisma/scripts/promote-first-admin.ts` | Скрипт первого админа по умолчанию был write-mode и мог удалить всех пользователей/компании кроме владельца, если его запустить по инструкции без dry-run. | Исправлено: по умолчанию скрипт теперь dry-run, запись требует `PROMOTE_FIRST_ADMIN_WRITE=1`. Проверено: запуск без флага нашёл owner и показал план без записи, в БД осталось 2 пользователя. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -238,6 +295,8 @@
 | --- | --- | --- | --- | --- |
 | 1 | `F-20260528-001` | `chore(root): выровнять локальный Postgres с PostgreSQL 18` | `docker compose config`; `docker compose up -d postgres`; `pnpm --filter @ecoplatform/api prisma:generate`; `pnpm --filter @ecoplatform/api test:integration` | `closed` |
 | 2 | `F-20260528-002` | `ci(github): ограничить права workflow-токена` | `pnpm exec prettier --check .github/workflows/ci.yml`; `pnpm lint`; `git diff --check` | `closed` |
+| 3 | `F-20260528-003` | `fix(prisma): убрать хардкод seed-паролей` | `prisma validate`; `prisma:migrate`; `seed`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
+| 4 | `F-20260528-004` | `fix(prisma): включить dry-run для первого админа` | `promote-first-admin.ts` без `PROMOTE_FIRST_ADMIN_WRITE`; `postgres-local` user count; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

@@ -68,7 +68,7 @@
 - Next.js App Router: лента новостей, индексы цен, обучение, база знаний, кабинет, регистрация/вход, уведомления, юр-страницы.
 - Админ-разделы CMS: новости, индексы, обучение, база знаний, поддержка, биллинг с ручной активацией, пользователи, сотрудники, компании, журналы действий, настройки платформы, модерация (жалобы, санкции, блоки).
 - NestJS API: auth + JWT access + HttpOnly refresh-cookie, RBAC (платформенные роли), demo-доступ, ручная подписка, CMS (4 типа контента), индексы цен, поддержка, файлы-метаданные, in-app уведомления, модерация, юр-документы.
-- Prisma + PostgreSQL: 26 миграций к 2026-05-26, актуальная схема в `apps/api/prisma/schema.prisma`.
+- Prisma + PostgreSQL: 25 миграций к 2026-05-26, актуальная схема в `apps/api/prisma/schema.prisma`.
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
 - 116 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
@@ -197,10 +197,13 @@ pnpm --filter @ecoplatform/api seed
 pnpm dev                                              # api на :4000, web на :3000
 ```
 
+Перед seed задайте в локальном `.env` `SEED_ADMIN_PASSWORD` и
+`SEED_DEMO_PASSWORD`; реальные пароли не хранятся в репозитории.
+
 Учётки после сида:
 
-- Админ: `admin@ecoplatform.local` / `Admin12345`
-- Demo-пользователь: `demo@ecoplatform.local` / `Demo12345`
+- Админ: `admin@ecoplatform.local`, пароль из `SEED_ADMIN_PASSWORD`.
+- Demo-пользователь: `demo@ecoplatform.local`, пароль из `SEED_DEMO_PASSWORD`.
 
 Пользовательская админ-учётка для ручных проверок: `mojosay@icloud.com` (см. `.env.example::PLATFORM_OWNER_EMAIL`) — этого аккаунта нельзя ни деактивировать, ни снять с него роль admin через админ-UI.
 

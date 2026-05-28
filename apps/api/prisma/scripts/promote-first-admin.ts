@@ -9,16 +9,19 @@
 //   4) удаляет компании, у которых после п.3 не осталось ни одного user'а
 //      (кроме компании владельца).
 //
-// Запуск (локально, после `source .env`):
+// Dry-run запуск (локально, после `source .env`):
 //   pnpm --filter @ecoplatform/api exec ts-node prisma/scripts/promote-first-admin.ts
 //
-// Перед использованием на проде — сделайте `pg_dump` и пройдитесь dry-run
-// (DRY_RUN=1) чтобы увидеть план без коммита.
+// Применение с записью:
+//   PROMOTE_FIRST_ADMIN_WRITE=1 pnpm --filter @ecoplatform/api exec ts-node prisma/scripts/promote-first-admin.ts
+//
+// Перед использованием на проде — сделайте `pg_dump`; без явного
+// PROMOTE_FIRST_ADMIN_WRITE=1 скрипт ничего не меняет.
 
 import { PrismaClient } from "@prisma/client";
 
 const OWNER_EMAIL = (process.env.PLATFORM_OWNER_EMAIL ?? "mojosay@icloud.com").toLowerCase();
-const DRY_RUN = process.env.DRY_RUN === "1";
+const DRY_RUN = process.env.PROMOTE_FIRST_ADMIN_WRITE !== "1";
 
 const prisma = new PrismaClient();
 
@@ -61,7 +64,7 @@ async function main() {
   console.log("");
 
   if (DRY_RUN) {
-    console.log("DRY_RUN=1 → ничего не пишем. Снимите флаг, чтобы применить.\n");
+    console.log("DRY-RUN → ничего не пишем. Для применения задайте PROMOTE_FIRST_ADMIN_WRITE=1.\n");
     return;
   }
 
