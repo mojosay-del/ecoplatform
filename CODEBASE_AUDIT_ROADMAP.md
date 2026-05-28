@@ -95,7 +95,7 @@
 | B-OBS | `apps/api/src/observability` | `accepted` | E | metrics auth, labels, cardinality, Sentry/log filtering |
 | B-REDIS | `apps/api/src/redis` | `accepted` | B/E | session cache invalidation, throttler fallback |
 | B-SCHED | `apps/api/src/scheduler` | `accepted` | B/E | advisory locks, cleanup safety, billing cron idempotency |
-| B-SUPPORT | `apps/api/src/support` | `not_started` | B | ticket ownership, admin access, status transitions |
+| B-SUPPORT | `apps/api/src/support` | `accepted` | B | ticket ownership, admin access, status transitions |
 | C-APP | `apps/web/app` | `not_started` | C | route coverage, auth boundaries, loading/error/not-found states |
 | C-ADMIN | `apps/web/src/components/Admin*` | `not_started` | C | tables, filters, actions, role visibility, overflow |
 | C-AUTH | `apps/web/src/components/AuthForms.tsx` | `not_started` | C | register/login UX, validation, legal consents, password rules |
@@ -940,6 +940,51 @@
   `FOR UPDATE` row-lock на кандидатов перед удалением файлов/пользователей,
   чтобы параллельная отмена удаления не могла привести к потере данных.
 
+### B-SUPPORT — `apps/api/src/support`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `SupportController`: клиентские `/support/tickets`, ответы пользователя,
+  admin-only `/admin/support/tickets` и role guards;
+- `SupportService`: создание тикета, списки компании/admin, ответы,
+  статусы `in_progress/awaiting_user` и notifications;
+- shared DTO `supportTicketDtoSchema`, Prisma-модели `SupportTicket` /
+  `SupportTicketMessage`, web-потребители drawer/admin inbox и integration
+  сценарии владения тикетом.
+
+Доказательства:
+
+- NestJS docs через Context7: protected routes закрываются guards до handler
+  logic, role guard читает роли из authenticated request;
+- Prisma docs через Context7: API-ответы должны использовать scoped
+  `select/include`, связанные write-операции — транзакции;
+- Zod docs через Context7: query/body валидируются через schema parse, плохие
+  numeric query должны отклоняться на API-границе;
+- `rg -n "support|Support|ticket|SupportTicket|B-SUPPORT" apps/api/src
+  apps/api/prisma packages/shared/src apps/web/src apps/web/app`;
+- `pnpm --filter @ecoplatform/shared build` -> clean;
+- `pnpm --filter @ecoplatform/api test -- support` -> 20 files / 84 tests
+  passed;
+- `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false` -> clean;
+- `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
+  "Support ownership"` -> integration-файл прошёл полностью: 132 tests
+  passed.
+
+Решение:
+
+- `apps/api/src/support` принят без открытых P0/P1/P2-рисков;
+- компания видит только свои обращения, чужая компания получает 404 при
+  попытке ответа, admin endpoints закрыты `JwtAuthGuard + RolesGuard + admin`;
+- `F-20260528-028` закрыт: пользовательская выдача тикетов и ответ клиента
+  больше не отдают внутренние support-сообщения `isInternal=true` и служебные
+  `authorId/ticketId` сообщений;
+- `F-20260528-029` закрыт: support list query валидируется через zod, пустые
+  после trim тема/ответ отклоняются 400, длина темы/сообщения ограничена.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -973,6 +1018,8 @@
 | `F-20260528-025` | `P1` | `apps/api/src/common/sentry.ts`, `apps/web/sentry.shared.ts` | Sentry privacy-фильтр чистил email/phone/address/bank/inn-поля в object payload, но URL query и строковые сообщения закрывали только token/password/session/email. Если 5xx упал на URL вроде `?inn=...&bankAccount=...` или с сообщением `phone=...`, эти персональные данные могли уйти во внешний Sentry. | Исправлено: URL query и key=value строки теперь используют общий список чувствительных ключей; API/web unit-тесты проверяют `phone`, `inn`, `bankAccount` в URL и сообщениях. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-026` | `P1` | `apps/api/src/redis/redis.service.ts` | Если Redis-команда падала во время инвалидации сессии, сервис возвращал fallback, но мог уже на следующем запросе снова читать Redis. Старый access-token мог пройти по stale session-cache до TTL 60 секунд. | Исправлено: после любой Redis-ошибки сервис временно отключает чтение Redis и переводит auth/throttler в fallback на 60 секунд; unit-тест проверяет, что `getClient()` возвращает `null` до истечения grace-window. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-027` | `P1` | `apps/api/src/scheduler/scheduler.service.ts` | Ночной cleanup удаляемых аккаунтов сначала выбирал кандидатов, а потом удалял файлы и пользователя по сохранённым id. Если пользователь успевал отменить удаление параллельно с cron, cleanup мог удалить уже отменённый аккаунт или его file metadata. | Исправлено: выборка кандидатов идёт внутри транзакции через параметризованный `SELECT ... FOR UPDATE`, поэтому отмена удаления и cron больше не могут незаметно разъехаться. Unit-тест проверяет row-lock, integration cleanup/billing сценарии прошли на тестовой БД. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-028` | `P1` | `apps/api/src/support/support.service.ts` | В модели support-сообщений есть флаг `isInternal`, но пользовательский список тикетов отдавал все сообщения тикета. Если support-команда добавит внутренние заметки, клиент компании смог бы увидеть служебный текст и ids сообщений. | Исправлено: пользовательские выдачи и ответ клиента фильтруют `messages.where.isInternal=false` и используют allow-list `select` без `authorId/ticketId`; admin-выдача сохраняет полный support-thread. Unit и integration-тесты проверяют, что внутренняя заметка не видна компании, но видна admin. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-029` | `P2` | `apps/api/src/support/support.controller.ts`, `packages/shared/src/dto.ts` | `GET /support/tickets?limit=abc` и admin-аналог вручную парсили query и могли передать `NaN` в Prisma вместо понятного 400. Также тема/ответ из пробелов проходили минимальную длину как обычный текст. | Исправлено: support list query валидируется через zod + `resolvePagination`, тема/сообщение trim'ятся и ограничены по длине, пустой после trim текст даёт 400. Integration-тест проверяет bad query, пустую тему и пустой ответ. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -1018,6 +1065,8 @@
 | 25 | `F-20260528-025` | `fix(observability): закрыть риски проверки observability` | `pnpm --filter @ecoplatform/api test -- sentry`; `pnpm --filter @ecoplatform/web test -- sentry`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Prometheus\\|metrics"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 | 26 | `F-20260528-026` | `fix(redis): закрыть риски проверки redis-cache` | `pnpm --filter @ecoplatform/api exec vitest run src/redis/redis.service.test.ts src/redis/session-cache.service.test.ts src/redis/redis-throttler-storage.service.test.ts src/common/jwt-auth.guard.test.ts`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 | 27 | `F-20260528-027` | `fix(scheduler): закрыть риски проверки scheduler` | `pnpm --filter @ecoplatform/api test -- scheduler`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "cleanup-deleted-accounts\\|Billing notifications"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 28 | `F-20260528-028` | `fix(support): закрыть риски проверки support-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test -- support`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Support ownership"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 29 | `F-20260528-029` | `fix(support): закрыть риски проверки support-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test -- support`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Support ownership"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

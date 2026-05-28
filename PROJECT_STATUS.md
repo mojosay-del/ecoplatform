@@ -11,8 +11,8 @@
 Отдельный полномасштабный codebase-аудит ведётся по `CODEBASE_AUDIT_ROADMAP.md`.
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
-`B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS` и `B-SCHED`; следующий модуль
-проверки — `B-SUPPORT`.
+`B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED` и `B-SUPPORT`; следующий
+модуль проверки — `C-APP`.
 
 Волна 11.1 закрыта: дизайн-токены вынесены в `apps/web/src/styles/tokens.css`, а `globals.css` переведён с прямых цветов на CSS-переменные.
 
@@ -229,12 +229,12 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-28 (после проверки `B-SCHED` в полном codebase-аудите).
+Дата: 2026-05-28 (после проверки `B-SUPPORT` в полном codebase-аудите).
 
 - `pnpm lint` — успешно: 4 tasks.
-- `pnpm test` — успешно: shared 7, web 50, api 83.
+- `pnpm test` — успешно: shared 7, web 50, api 84.
 - `pnpm build` — успешно: shared/api/web.
-- `pnpm test:integration` — успешно: 131 integration-тест.
+- `pnpm test:integration` — успешно: 132 integration-теста.
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.
 - Lighthouse desktop baseline (commit `b8e3101`, без перезапуска в 12.4): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.

@@ -1188,6 +1188,7 @@ describe("Wave 8.4 pagination contracts", () => {
 describe("Support ownership", () => {
   it("пользователь видит свой тикет и не видит чужой; чужая компания получает 404 при попытке ответа", async () => {
     const adminToken = await loginAdmin();
+    const adminUser = await ctx.prisma.user.findUniqueOrThrow({ where: { email: "admin@test.local" } });
     const a = await registerCompany("0000030");
     const b = await registerCompany("0000031");
 
@@ -1199,9 +1200,24 @@ describe("Support ownership", () => {
     expect(t.status).toBe(201);
     const ticketId = t.body.id as string;
 
+    await ctx.prisma.supportTicketMessage.create({
+      data: {
+        ticketId,
+        authorId: adminUser.id,
+        authorRole: "admin",
+        text: "Внутренняя заметка поддержки",
+        isInternal: true,
+      },
+    });
+
     // A видит в своём списке
     const listA = await ctx.http.get("/api/support/tickets").set("Authorization", `Bearer ${a.token}`);
     expect(listA.body.items.some((x: { id: string }) => x.id === ticketId)).toBe(true);
+    const ownTicket = listA.body.items.find((x: { id: string }) => x.id === ticketId);
+    expect(ownTicket.messages.some((m: { text: string }) => m.text === "Внутренняя заметка поддержки")).toBe(false);
+    expect(ownTicket.messages.every((m: { authorId?: string; ticketId?: string }) => !m.authorId && !m.ticketId)).toBe(
+      true,
+    );
 
     // B не видит
     const listB = await ctx.http.get("/api/support/tickets").set("Authorization", `Bearer ${b.token}`);
@@ -1214,17 +1230,56 @@ describe("Support ownership", () => {
       .send({ text: "должно быть запрещено" });
     expect(foreign.status).toBe(404);
 
+    const ownReply = await ctx.http
+      .post(`/api/support/tickets/${ticketId}/replies`)
+      .set("Authorization", `Bearer ${a.token}`)
+      .send({ text: "Ответ клиента" });
+    expect(ownReply.status).toBe(201);
+    expect(ownReply.body.messages.some((m: { text: string }) => m.text === "Внутренняя заметка поддержки")).toBe(false);
+
     // Админ может ответить любому
     const adminReply = await ctx.http
       .post(`/api/admin/support/tickets/${ticketId}/replies`)
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ text: "Ответ админа" });
     expect(adminReply.status).toBe(201);
+    expect(adminReply.body.messages.some((m: { isInternal: boolean }) => m.isInternal)).toBe(true);
     expect(
       adminReply.body.messages.some(
         (m: { authorRole: string; text: string }) => m.authorRole === "admin" && m.text === "Ответ админа",
       ),
     ).toBe(true);
+  });
+
+  it("валидирует pagination query и пустые сообщения на границе API", async () => {
+    const adminToken = await loginAdmin();
+    const a = await registerCompany("0000032");
+
+    const badOwnList = await ctx.http.get("/api/support/tickets?limit=abc").set("Authorization", `Bearer ${a.token}`);
+    expect(badOwnList.status).toBe(400);
+
+    const badAdminList = await ctx.http
+      .get("/api/admin/support/tickets?limit=abc")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(badAdminList.status).toBe(400);
+
+    const blankTicket = await ctx.http
+      .post("/api/support/tickets")
+      .set("Authorization", `Bearer ${a.token}`)
+      .send({ category: "technical", subject: "   ", text: "Описание" });
+    expect(blankTicket.status).toBe(400);
+
+    const ticket = await ctx.http
+      .post("/api/support/tickets")
+      .set("Authorization", `Bearer ${a.token}`)
+      .send({ category: "technical", subject: "Тема", text: "Описание" });
+    expect(ticket.status).toBe(201);
+
+    const blankReply = await ctx.http
+      .post(`/api/support/tickets/${ticket.body.id}/replies`)
+      .set("Authorization", `Bearer ${a.token}`)
+      .send({ text: "   " });
+    expect(blankReply.status).toBe(400);
   });
 });
 

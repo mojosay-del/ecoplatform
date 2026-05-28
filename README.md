@@ -28,7 +28,7 @@ apps/
       redis/         session cache, throttler storage
       scheduler/     hourly billing-check + nightly cleanup-deleted-accounts (advisory-lock)
       common/        CSRF guard, JwtAuthGuard, pagination, sanitize, simple-zip
-      app.integration.test.ts  131 сквозной тест
+      app.integration.test.ts  132 сквозных теста
   web/               Next.js App Router, Tiptap-редактор, dnd-kit
     app/             публичные и админ-маршруты
       (login,register,forgot-password,news,indices,education,

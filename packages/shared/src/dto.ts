@@ -94,10 +94,13 @@ export const manualSubscriptionDtoSchema = z.object({
 
 export type ManualSubscriptionDto = z.infer<typeof manualSubscriptionDtoSchema>;
 
+export const SUPPORT_TICKET_SUBJECT_MAX_LENGTH = 160;
+export const SUPPORT_TICKET_MESSAGE_MAX_LENGTH = 4000;
+
 export const supportTicketDtoSchema = z.object({
   category: z.enum(["billing", "moderation_review", "company_management", "technical", "data_deletion", "other"]),
-  subject: z.string().min(3),
-  text: z.string().min(3),
+  subject: z.string().trim().min(3).max(SUPPORT_TICKET_SUBJECT_MAX_LENGTH),
+  text: z.string().trim().min(3).max(SUPPORT_TICKET_MESSAGE_MAX_LENGTH),
 });
 
 export type SupportTicketDto = z.infer<typeof supportTicketDtoSchema>;

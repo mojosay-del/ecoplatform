@@ -1,9 +1,27 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { NotificationCategory, SupportTicketStatus } from "@prisma/client";
+import { NotificationCategory, Prisma, SupportTicketStatus } from "@prisma/client";
 import type { SupportTicketDto } from "@ecoplatform/shared";
+import { paginatedResponse, resolvePagination } from "../common/pagination";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+
+const supportMessageSelect = {
+  id: true,
+  authorRole: true,
+  text: true,
+  isInternal: true,
+  createdAt: true,
+} satisfies Prisma.SupportTicketMessageSelect;
+
+function supportMessages(includeInternal: boolean) {
+  const base = {
+    orderBy: { createdAt: "asc" as const },
+    select: supportMessageSelect,
+  };
+
+  return includeInternal ? base : { ...base, where: { isInternal: false } };
+}
 
 @Injectable()
 export class SupportService {
@@ -30,7 +48,7 @@ export class SupportService {
       include: {
         author: { select: { id: true, firstName: true, lastName: true, email: true } },
         company: { select: { id: true, organizationName: true } },
-        messages: true,
+        messages: supportMessages(false),
       },
     });
 
@@ -40,8 +58,7 @@ export class SupportService {
   }
 
   async listOwn(companyId: string, pagination: { limit?: number; offset?: number } = {}) {
-    const limit = Math.min(Math.max(pagination.limit ?? 50, 1), 200);
-    const offset = Math.max(pagination.offset ?? 0, 0);
+    const { limit, offset } = resolvePagination(pagination, { defaultLimit: 50, maxLimit: 200 });
     const where = { companyId };
 
     const [total, items] = await this.prisma.$transaction([
@@ -53,16 +70,15 @@ export class SupportService {
         skip: offset,
         // Сообщения остаются в выдаче — UI рендерит thread прямо из listing,
         // отдельной /tickets/:id-ручки пока нет (см. PROGRESS.md, 4.1).
-        include: { messages: { orderBy: { createdAt: "asc" } } },
+        include: { messages: supportMessages(false) },
       }),
     ]);
 
-    return { items, total, hasMore: offset + items.length < total };
+    return paginatedResponse(items, total, { limit, offset });
   }
 
   async listAdmin(pagination: { limit?: number; offset?: number } = {}) {
-    const limit = Math.min(Math.max(pagination.limit ?? 50, 1), 200);
-    const offset = Math.max(pagination.offset ?? 0, 0);
+    const { limit, offset } = resolvePagination(pagination, { defaultLimit: 50, maxLimit: 200 });
 
     const [total, items] = await this.prisma.$transaction([
       this.prisma.supportTicket.count(),
@@ -73,12 +89,12 @@ export class SupportService {
         include: {
           company: { select: { id: true, organizationName: true, status: true } },
           author: { select: { id: true, firstName: true, lastName: true, email: true } },
-          messages: { orderBy: { createdAt: "asc" } },
+          messages: supportMessages(true),
         },
       }),
     ]);
 
-    return { items, total, hasMore: offset + items.length < total };
+    return paginatedResponse(items, total, { limit, offset });
   }
 
   async replyAsCompanyUser(ticketId: string, actorId: string, companyId: string, text: string) {
@@ -141,7 +157,7 @@ export class SupportService {
       const ticket = await tx.supportTicket.update({
         where: { id: ticketId },
         data: { status },
-        include: { messages: { orderBy: { createdAt: "asc" } } },
+        include: { messages: supportMessages(actorRole === "admin") },
       });
 
       return { ticket, message };

@@ -1,6 +1,7 @@
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { supportTicketDtoSchema } from "@ecoplatform/shared";
+import { SUPPORT_TICKET_MESSAGE_MAX_LENGTH, supportTicketDtoSchema } from "@ecoplatform/shared";
+import { resolvePagination } from "../common/pagination";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
@@ -9,7 +10,16 @@ import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
 import { SupportService } from "./support.service";
 
-const replySchema = z.object({ text: z.string().min(1) });
+const replySchema = z.object({ text: z.string().trim().min(1).max(SUPPORT_TICKET_MESSAGE_MAX_LENGTH) });
+
+const supportListQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(200).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    take: z.coerce.number().int().min(1).max(200).optional(),
+  })
+  .transform((input) => resolvePagination(input, { defaultLimit: 50, maxLimit: 200 }));
 
 function requireCompany(user: RequestUser): string {
   // У платформенного стаффа companyId=null. Поддержка-для-клиентов — только
@@ -26,11 +36,8 @@ export class SupportController {
   constructor(private readonly support: SupportService) {}
 
   @Get("support/tickets")
-  async ownTickets(@CurrentUser() user: RequestUser, @Query("limit") limit?: string, @Query("offset") offset?: string) {
-    return this.support.listOwn(requireCompany(user), {
-      limit: limit ? Number.parseInt(limit, 10) : undefined,
-      offset: offset ? Number.parseInt(offset, 10) : undefined,
-    });
+  async ownTickets(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
+    return this.support.listOwn(requireCompany(user), parseBody(supportListQuerySchema, query));
   }
 
   @Post("support/tickets")
@@ -48,11 +55,8 @@ export class SupportController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Get("admin/support/tickets")
-  async adminTickets(@Query("limit") limit?: string, @Query("offset") offset?: string) {
-    return this.support.listAdmin({
-      limit: limit ? Number.parseInt(limit, 10) : undefined,
-      offset: offset ? Number.parseInt(offset, 10) : undefined,
-    });
+  async adminTickets(@Query() query: Record<string, unknown>) {
+    return this.support.listAdmin(parseBody(supportListQuerySchema, query));
   }
 
   @UseGuards(RolesGuard)
