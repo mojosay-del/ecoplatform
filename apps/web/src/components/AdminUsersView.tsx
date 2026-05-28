@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
-import { RotateCcw, Search } from "lucide-react";
+import { FormEvent, useEffect, useId, useMemo, useState } from "react";
+import { RotateCcw, Search, Smartphone, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { platformRoles, type PaginatedResponse } from "@ecoplatform/shared";
 import { AdminSortButton } from "./AdminSortButton";
 import { AppShell } from "./AppShell";
@@ -52,6 +53,8 @@ type AdminUserDetail = AdminUserListItem & {
   }>;
 };
 
+type AdminUserSession = AdminUserDetail["recentSessions"][number];
+
 const blockReasonCodes = ["policy_violation", "fraud", "suspicious_activity", "support_request", "other"] as const;
 
 const allRoles = platformRoles;
@@ -73,6 +76,7 @@ type AdminUsersViewProps = {
 export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
   const { token } = useAuth();
   const [selected, setSelected] = useState<AdminUserDetail | null>(null);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -122,6 +126,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
     if (!token) return;
     try {
       const data = await apiFetch<AdminUserDetail>(`/admin/users/${id}`, { token });
+      setSessionsOpen(false);
       setSelected(data);
       setRolesDraft(data.platformStaff?.roles ?? []);
     } catch (error) {
@@ -438,21 +443,17 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
 
                 <section>
                   <h3>Последние сессии</h3>
-                  <div className="stack-list">
-                    {selected.recentSessions.map((session) => (
-                      <article className="checklist-block" key={session.id}>
-                        <strong>{session.userAgent ?? "Без UA"}</strong>
-                        <p>
-                          {session.ipAddress ?? "—"} · {new Date(session.createdAt).toLocaleString("ru-RU")}
-                        </p>
-                        <small>
-                          {session.revokedAt
-                            ? `Отозвана ${new Date(session.revokedAt).toLocaleString("ru-RU")}`
-                            : `Активна до ${new Date(session.expiresAt).toLocaleString("ru-RU")}`}
-                        </small>
-                      </article>
-                    ))}
-                  </div>
+                  {selected.recentSessions.length === 0 ? (
+                    <p className="page-subtitle">Нет данных о входах.</p>
+                  ) : (
+                    <button className="admin-sessions-trigger" onClick={() => setSessionsOpen(true)} type="button">
+                      <Smartphone aria-hidden size={18} />
+                      <span>
+                        <strong>{formatSessionsCount(selected.recentSessions.length)}</strong>
+                        <small>{formatLatestSession(selected.recentSessions[0]!)}</small>
+                      </span>
+                    </button>
+                  )}
                 </section>
 
                 {selected.status === "active" ? (
@@ -485,6 +486,14 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
           </div>
         </div>
       ) : null}
+
+      {selected && sessionsOpen ? (
+        <AdminUserSessionsModal
+          user={selected}
+          sessions={selected.recentSessions}
+          onClose={() => setSessionsOpen(false)}
+        />
+      ) : null}
     </>
   );
 
@@ -495,4 +504,98 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       <section className="page">{content}</section>
     </AppShell>
   );
+}
+
+function AdminUserSessionsModal({
+  user,
+  sessions,
+  onClose,
+}: {
+  user: AdminUserDetail;
+  sessions: AdminUserSession[];
+  onClose: () => void;
+}) {
+  const titleId = useId();
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.body.classList.add("news-modal-open");
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      document.body.classList.remove("news-modal-open");
+    };
+  }, [onClose]);
+
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className="news-modal-backdrop admin-sessions-modal-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      role="dialog"
+      aria-labelledby={titleId}
+      aria-modal="true"
+    >
+      <div className="news-modal admin-sessions-modal">
+        <button className="news-modal-close" onClick={onClose} type="button" aria-label="Закрыть">
+          <X aria-hidden size={20} />
+        </button>
+        <header className="admin-sessions-modal-header">
+          <p className="admin-sessions-modal-kicker">Пользователь</p>
+          <h2 id={titleId}>
+            {user.firstName} {user.lastName}
+          </h2>
+          <p className="page-subtitle">{user.email}</p>
+        </header>
+        <div className="admin-sessions-list">
+          {sessions.map((session) => (
+            <article className="admin-session-card" key={session.id}>
+              <div>
+                <strong>{session.userAgent ?? "Без UA"}</strong>
+                <p>
+                  IP {session.ipAddress ?? "—"} · вход {formatSessionDateTime(session.createdAt)}
+                </p>
+              </div>
+              <StatusPill variant={session.revokedAt ? "neutral" : "success"}>
+                {session.revokedAt ? "Отозвана" : "Активна"}
+              </StatusPill>
+              <small>
+                {session.revokedAt
+                  ? `Отозвана ${formatSessionDateTime(session.revokedAt)}`
+                  : `До ${formatSessionDateTime(session.expiresAt)}`}
+              </small>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function formatSessionDateTime(value: string) {
+  return new Date(value).toLocaleString("ru-RU");
+}
+
+function formatSessionsCount(count: number) {
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+  if (lastDigit === 1 && lastTwoDigits !== 11) return `${count} вход`;
+  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)) return `${count} входа`;
+  return `${count} входов`;
+}
+
+function formatLatestSession(session: AdminUserSession) {
+  const device = session.userAgent ?? "Без UA";
+  return `${device} · ${formatSessionDateTime(session.createdAt)}`;
 }

@@ -5294,6 +5294,136 @@ body.news-modal-open .app-shell {
   align-self: start;
 }
 
+.admin-sessions-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.admin-sessions-trigger svg {
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+
+.admin-sessions-trigger span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-sessions-trigger strong,
+.admin-sessions-trigger small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-sessions-trigger small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.admin-sessions-trigger:hover,
+.admin-sessions-trigger:focus-visible {
+  border-color: var(--primary);
+  background: var(--panel);
+}
+
+.admin-sessions-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.admin-sessions-modal-backdrop {
+  padding: 48px 20px;
+}
+
+.admin-sessions-modal {
+  width: min(720px, 100%);
+}
+
+.admin-sessions-modal-header {
+  display: grid;
+  gap: 4px;
+  padding: 28px 64px 18px 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-sessions-modal-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.admin-sessions-modal-header h2,
+.admin-sessions-modal-header p {
+  margin: 0;
+}
+
+.admin-sessions-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(560px, calc(100vh - 220px));
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.admin-session-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 10px 12px;
+}
+
+.admin-session-card div,
+.admin-session-card strong,
+.admin-session-card p,
+.admin-session-card small {
+  min-width: 0;
+}
+
+.admin-session-card strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-session-card p,
+.admin-session-card small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-session-card small {
+  grid-column: 1 / -1;
+}
+
 .moderation-detail-heading {
   align-items: flex-start;
 }
