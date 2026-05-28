@@ -77,7 +77,7 @@
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
 - Health-check через `@nestjs/terminus`: `/api/health` (liveness), `/api/ready` (Postgres/Redis/S3 readiness), `/api/health/deep` (admin-only диагностика).
-- `Dockerfile` + полный deploy-документ `docs/08-architecture/deploy.md` (env, миграции, SSL, бэкапы, CDN, чек-лист).
+- `Dockerfile` + deploy-решения по env, миграциям, SSL, бэкапам, CDN и первому запуску.
 
 ### Юридический фундамент (Волна 6)
 
@@ -99,7 +99,7 @@
 - Модели `PaymentMethod` (card_tinkoff / bank_invoice) и `Payment` (amount, status, purpose) — лежат под Тинькофф-Кассу, UI пока заглушен.
 - Версионирование content-блоков: каждый блок имеет ключ `v: 1` в payload; миграция `jsonb_set` идемпотентно проставляет версию старым строкам.
 - Модель `ApiKey` (companyId, name, keyHash bcrypt, scopes[], expiresAt) — фундамент под внешний API без UI.
-- `docs/08-architecture/data-model.md` переведён в статус `current` и переписан под все домены и принципы.
+- Модель данных приведена к текущему состоянию всех доменов и принципов MVP.
 
 ### Высоконагрузочная инфраструктура (Волна 8)
 
@@ -125,7 +125,7 @@
 - Защита cover-image: news/learning/knowledge create/update принимают только публичные изображения; content-manager — только свои, admin может ставить чужие публичные.
 - Audit-trail before/after: критические admin-действия пишут `payload.before`, `payload.after`, `payload.diff`; `/admin/journals` показывает diff как «старое → новое» с цветовым разделением.
 - Политика новых паролей: общий `MIN_PASSWORD_LENGTH=12`; регистрация, смена пароля и создание staff проверяют пароль через Have I Been Pwned Pwned Passwords range API по SHA-1 k-anonymity (`/range/{first5}`) без отправки plaintext.
-- Документ политики безопасности: `docs/08-architecture/security.md` фиксирует пароли, токены, CSP/CSRF/HSTS, lockout, 152-ФЗ, файлы, audit trail, операционный чек-лист и responsible disclosure.
+- Политика безопасности зафиксирована на уровне реализации: пароли, токены, CSP/CSRF/HSTS, lockout, 152-ФЗ, файлы, audit trail, операционный чек-лист и responsible disclosure.
 
 ### Наблюдаемость и операции (Волна 10)
 
@@ -164,9 +164,8 @@
   - Before/after подключён к ручной активации подписки, block/unblock пользователей, platform-roles, staff update, настройкам платформы, статусам компаний и admin-санкциям модерации.
   - `/admin/journals` показывает diff старого и нового значения цветами; legacy-payload остаётся JSON.
   - UI проверен локально на смене `moderation.lock_duration_minutes` 15→16→15.
-- **Пункт 9.11 — документ политики безопасности**:
-  - Добавлен `docs/08-architecture/security.md` со статусом `current`.
-  - В `docs/README.md` добавлена ссылка на security-документ.
+- **Пункт 9.11 — политика безопасности**:
+  - Зафиксированы правила паролей, токенов, CSP/CSRF/HSTS, lockout, 152-ФЗ, файлов, audit trail и операционного чек-листа.
   - Responsible disclosure фиксирует канал `security@eco-platform.ru`, состав отчёта, правила безопасного исследования, сроки реакции и порядок публикации.
 
 ## Что осталось
@@ -235,7 +234,7 @@ pnpm format:check                                     # prettier
 
 **Timeweb PostgreSQL 18.** Альтернативы (MySQL, MongoDB, ClickHouse) не подходят: Prisma datasource зафиксирован на `postgresql`, миграции и сидер написаны под PG. Redis вынесен на отдельный сервис.
 
-Подробности по env-переменным, SSL, бэкапам, rollback-runbook, CDN и чек-листу первого деплоя — в `docs/08-architecture/deploy.md`.
+Подробности по env-переменным, SSL, бэкапам, rollback-runbook, CDN и чек-листу первого деплоя вынесены из рабочей копии вместе с расширенной документацией; в репозитории оставлены ключевые решения и текущий статус.
 
 ## Важные решения, которые легко забыть
 

@@ -1,8 +1,8 @@
 # ЭкоПлатформа MVP
 
-Репозиторий содержит продуктовую документацию и рабочую кодовую базу MVP на Turborepo + pnpm.
+Репозиторий содержит рабочую кодовую базу MVP на Turborepo + pnpm.
 
-Текущее состояние MVP — в [PROJECT_STATUS.md](PROJECT_STATUS.md). Архитектурные решения — в [docs/08-architecture/](docs/08-architecture/).
+Текущее состояние MVP — в [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ## Карта проекта
 
@@ -43,7 +43,6 @@ packages/
   shared/            slug, индексы цен, content-blocks, sanitize-html,
                      access-правила, DTO для регистрации/legal/profile,
                      ответы API (NewsListItem, BillingStatus, AuthMeUser и т.д.)
-docs/                продуктовая и архитектурная документация
 docker-compose.yml   локальный Postgres 16 :5433 + Redis 7 :6379
 ```
 
@@ -107,7 +106,7 @@ Integration-тесты создают отдельную БД `ecoplatform_test`
 
 ## Целевая БД для деплоя
 
-Для размещения на Timeweb выбрана **PostgreSQL 18** (см. секцию «Целевая БД для деплоя» в [PROJECT_STATUS.md](PROJECT_STATUS.md) и подробности по env/SSL/бэкапам в [docs/08-architecture/deploy.md](docs/08-architecture/deploy.md)).
+Для размещения на Timeweb выбрана **PostgreSQL 18**. Подробности по целевой БД, env, SSL и бэкапам зафиксированы в [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ## Что есть в проде-готовности
 
