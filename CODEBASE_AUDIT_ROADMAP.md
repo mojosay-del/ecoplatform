@@ -79,7 +79,7 @@
 
 | ID | Модуль | Статус | Волна | Что проверить |
 | --- | --- | --- | --- | --- |
-| A-ROOT | Root config | `not_started` | A | package scripts, turbo tasks, workspace, tsconfig, docker compose |
+| A-ROOT | Root config | `findings` | A | package scripts, turbo tasks, workspace, tsconfig, docker compose |
 | A-CI | `.github/workflows` | `not_started` | A/E | static checks, integration DB, smoke trigger, secrets boundary |
 | A-OPS | `ops/monitoring` | `not_started` | A/E | alerts, example config, absence of real secrets |
 | B-PRISMA | `apps/api/prisma` | `not_started` | B | schema, migrations, indexes, constraints, seed safety |
@@ -108,14 +108,52 @@
 | E-TESTS | Tests and smoke | `not_started` | E | unit/integration/smoke coverage, flaky risks, test DB setup |
 | F-ACCEPT | MVP acceptance scenarios | `not_started` | F | owner-facing flows, browser proof, bugfix queue |
 
+## Журнал проверки модулей
+
+### A-ROOT — Root config
+
+Дата проверки: 2026-05-28.
+
+Статус: `findings`.
+
+Проверено:
+
+- `package.json`, `apps/*/package.json`, `packages/shared/package.json`;
+- `turbo.json`, `pnpm-workspace.yaml`;
+- `tsconfig.base.json`, package-level `tsconfig.json`;
+- `.env.example`, `.gitignore`, `.dockerignore`;
+- `docker-compose.yml`, `apps/api/Dockerfile`, `apps/web/Dockerfile`;
+- сопоставление `README.md`, `PROJECT_STATUS.md` и `.github/workflows/ci.yml`
+  по версии PostgreSQL.
+
+Доказательства:
+
+- `pnpm -v` -> `10.33.0`;
+- `pnpm exec turbo --version` -> `2.9.14`;
+- `pnpm exec turbo run lint --dry-run=json` -> task graph собирает
+  `@ecoplatform/api`, `@ecoplatform/web`, `@ecoplatform/shared`, а `lint`
+  зависит от upstream `build/lint`;
+- `pnpm exec turbo run test:integration --dry-run=json` -> integration task
+  cache отключён, реальный script есть в `@ecoplatform/api`;
+- `pnpm exec turbo run test:smoke --dry-run=json` -> smoke task cache отключён,
+  учитывает `PLAYWRIGHT_TEST_BASE_URL` и `SMOKE_TEST_EMAIL_DOMAIN`;
+- `rg -n "postgres:|Postgres 18|PostgreSQL 18|5433|postgres"
+  docker-compose.yml README.md PROJECT_STATUS.md .github apps packages`.
+
+Решение:
+
+- package scripts, pnpm workspace, TypeScript strict base, Docker ignore и
+  Turborepo task graph приняты без P0/P1-рисков;
+- найдено окруженческое расхождение `F-20260528-001`: локальный Postgres в
+  Docker Compose отстаёт от CI/prod версии.
+
 ## Реестр находок
 
-На старте полномасштабного аудита находок нет. Новые строки добавляются только
-после проверки конкретного кода или сценария.
+Новые строки добавляются только после проверки конкретного кода или сценария.
 
 | Finding ID | Priority | Area | Risk in plain words | Evidence | Status | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
-| - | - | - | - | - | - | - |
+| `F-20260528-001` | `P2` | `docker-compose.yml` | Локальная разработка и integration-тесты могут идти на PostgreSQL 16, а CI и целевой деплой — на PostgreSQL 18. Из-за этого часть SQL/Prisma-проблем может проявиться только в CI или prod-like среде. | `docker-compose.yml:3` = `postgres:16`; `.github/workflows/ci.yml:56` = `postgres:18-alpine`; `README.md:98` и `README.md:109` фиксируют CI/target PostgreSQL 18. | `open` | Отдельным коммитом выровнять локальный Docker Compose под PostgreSQL 18 и проверить запуск Postgres + Prisma/integration path. |
 
 Шаблон новой строки:
 
@@ -134,7 +172,7 @@
 
 | Queue | Finding ID | Commit scope | Verification required | Status |
 | --- | --- | --- | --- | --- |
-| - | - | - | - | - |
+| 1 | `F-20260528-001` | `chore(root): выровнять локальный Postgres с PostgreSQL 18` | `docker compose config`; `docker compose up -d postgres`; `pnpm --filter @ecoplatform/api prisma:generate`; `pnpm --filter @ecoplatform/api test:integration` | `open` |
 
 ## Базовые проверки
 
