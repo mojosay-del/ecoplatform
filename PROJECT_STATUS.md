@@ -73,7 +73,7 @@
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
 - 116 integration-тестов в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
 - Unit-тесты: 7 в `packages/shared`, 50 в `apps/web`, 76 в `apps/api`.
-- GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
+- GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service); workflow-token ограничен read-only доступом к коду.
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: PostgreSQL 18 на `:5433` + Redis 7 на `:6379`.
 - Health-check через `@nestjs/terminus`: `/api/health` (liveness), `/api/ready` (Postgres/Redis/S3 readiness), `/api/health/deep` (admin-only диагностика).

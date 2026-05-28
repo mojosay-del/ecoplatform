@@ -80,7 +80,7 @@
 | ID | Модуль | Статус | Волна | Что проверить |
 | --- | --- | --- | --- | --- |
 | A-ROOT | Root config | `accepted` | A | package scripts, turbo tasks, workspace, tsconfig, docker compose |
-| A-CI | `.github/workflows` | `not_started` | A/E | static checks, integration DB, smoke trigger, secrets boundary |
+| A-CI | `.github/workflows` | `accepted` | A/E | static checks, integration DB, smoke trigger, secrets boundary |
 | A-OPS | `ops/monitoring` | `not_started` | A/E | alerts, example config, absence of real secrets |
 | B-PRISMA | `apps/api/prisma` | `not_started` | B | schema, migrations, indexes, constraints, seed safety |
 | B-AUTH | `apps/api/src/auth` | `not_started` | B | login, refresh, lockout, export data, deletion, password policy |
@@ -147,6 +147,40 @@
 - окруженческое расхождение `F-20260528-001` закрыто: локальный Docker Compose
   теперь использует тот же major PostgreSQL, что CI и целевой деплой.
 
+### A-CI — `.github/workflows`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- единственный workflow `.github/workflows/ci.yml`;
+- triggers `push` в `main`, `pull_request` и `deployment_status`;
+- job `static-checks`: install, Prisma generate, `pnpm format:check`,
+  `pnpm lint`, `pnpm test`, `pnpm build`;
+- job `integration-tests`: PostgreSQL `postgres:18-alpine`, test URL на
+  `localhost:5433`, dummy JWT/S3 env только для CI и
+  `pnpm --filter @ecoplatform/api test:integration`;
+- job `staging-smoke`: запуск только для успешного deployment status окружения
+  `staging`, Playwright Chromium и `PLAYWRIGHT_TEST_BASE_URL` из deployment URL;
+- соответствие scripts в root, `apps/api`, `apps/web` и `packages/shared`.
+
+Доказательства:
+
+- `.github/workflows/ci.yml` теперь задаёт `permissions: contents: read`;
+- `pnpm exec prettier --check .github/workflows/ci.yml` -> clean;
+- `apps/web/playwright.config.ts` требует `PLAYWRIGHT_TEST_BASE_URL`, а
+  `apps/web/tests/smoke.spec.ts` создаёт уникального пользователя и проверяет
+  register -> logout -> login -> `/news` -> `/indices` -> logout;
+- `turbo.json` помечает `test:integration` и `test:smoke` как `cache: false`.
+
+Решение:
+
+- CI-покрытие принято без открытых P0/P1/P2-рисков;
+- найденный hardening-risk `F-20260528-002` закрыт в этом же коммите: GitHub
+  Actions token ограничен read-only доступом к содержимому репозитория.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -154,6 +188,7 @@
 | Finding ID | Priority | Area | Risk in plain words | Evidence | Status | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | `F-20260528-001` | `P2` | `docker-compose.yml` | Локальная разработка и integration-тесты могли идти на PostgreSQL 16, а CI и целевой деплой — на PostgreSQL 18. Из-за этого часть SQL/Prisma-проблем могла проявиться только в CI или prod-like среде. | Исправлено: `docker-compose.yml:3` = `postgres:18-alpine`, volume смонтирован в `/var/lib/postgresql`, жёсткие `container_name` убраны. Проверено: `docker compose config`; `docker compose up -d postgres` -> `healthy`; `pnpm --filter @ecoplatform/api prisma:generate`; `pnpm --filter @ecoplatform/api test:integration` -> 116 passed. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-002` | `P2` | `.github/workflows/ci.yml` | CI не фиксировал минимальные права `GITHUB_TOKEN`, поэтому будущие jobs могли случайно получить больше прав, чем нужно для read-only проверок. | Исправлено: добавлен workflow-level `permissions: contents: read`. Проверено: `pnpm exec prettier --check .github/workflows/ci.yml`. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -173,6 +208,7 @@
 | Queue | Finding ID | Commit scope | Verification required | Status |
 | --- | --- | --- | --- | --- |
 | 1 | `F-20260528-001` | `chore(root): выровнять локальный Postgres с PostgreSQL 18` | `docker compose config`; `docker compose up -d postgres`; `pnpm --filter @ecoplatform/api prisma:generate`; `pnpm --filter @ecoplatform/api test:integration` | `closed` |
+| 2 | `F-20260528-002` | `ci(github): ограничить права workflow-токена` | `pnpm exec prettier --check .github/workflows/ci.yml`; `pnpm lint`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

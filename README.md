@@ -95,7 +95,7 @@ pnpm build                 # tsc + next build
 pnpm format:check          # prettier
 ```
 
-Integration-тесты создают отдельную БД `ecoplatform_test` в том же Postgres-контейнере и автоматически применяют миграции — локальная dev-БД не затрагивается. GitHub Actions гонит `static-checks` (prettier/lint/test/build) и `integration` (Postgres 18 service) на каждый push в main.
+Integration-тесты создают отдельную БД `ecoplatform_test` в том же Postgres-контейнере и автоматически применяют миграции — локальная dev-БД не затрагивается. GitHub Actions гонит `static-checks` (prettier/lint/test/build) и `integration` (Postgres 18 service) на каждый push в main; workflow-token ограничен read-only доступом к коду.
 
 ## Demo-доступы после seed
 
