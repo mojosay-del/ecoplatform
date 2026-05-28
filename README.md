@@ -2,7 +2,7 @@
 
 Репозиторий содержит продуктовую документацию и рабочую кодовую базу MVP на Turborepo + pnpm.
 
-Текущее состояние и ход работы — в [PROJECT_STATUS.md](PROJECT_STATUS.md). История аудита и план волн — в [audit/](audit/). Архитектурные решения — в [docs/08-architecture/](docs/08-architecture/).
+Текущее состояние MVP — в [PROJECT_STATUS.md](PROJECT_STATUS.md). Архитектурные решения — в [docs/08-architecture/](docs/08-architecture/).
 
 ## Карта проекта
 
@@ -44,7 +44,6 @@ packages/
                      access-правила, DTO для регистрации/legal/profile,
                      ответы API (NewsListItem, BillingStatus, AuthMeUser и т.д.)
 docs/                продуктовая и архитектурная документация
-audit/               ROADMAP волн + PROGRESS-журнал + SIDE-FINDINGS + Lighthouse baseline (старые отчёты — в audit/archive/)
 docker-compose.yml   локальный Postgres 16 :5433 + Redis 7 :6379
 ```
 
@@ -123,10 +122,9 @@ Integration-тесты создают отдельную БД `ecoplatform_test`
 - WebP/AVIF варианты cover-изображений через `sharp`.
 - Backup/runbook для Timeweb: daily physical backups, ежедневный `pg_dump` в S3 с retention 90 дней и безопасная процедура отката Prisma-миграций.
 - Алерты: Sentry rule для 5xx/render errors, Prometheus rules для 5xx, p95 latency, session-cache hit rate и Postgres-соединений.
-- Lighthouse baseline зафиксирован: см. [audit/lighthouse-baseline.md](audit/lighthouse-baseline.md).
+- Lighthouse baseline: `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
 
 ## Как читать код без опыта разработки
 
 - Русские комментарии стоят рядом с неочевидной бизнес-логикой: demo-доступ, закрытие функциональных разделов после истечения demo и в статусе `pending_deletion`, права поддержки, публикация контента, расчёт индексов и структура блоков, lockout, идемпотентность ручной активации.
-- Pre-MVP-модули (форум, торговая площадка, магазин решений) уже отмечены в enum'ах и сайдбаре, но без UI — это сделано осознанно как «фундамент на вырост», чтобы не двигать миграции с реальными платежами на проде позже. Описание подхода — в `audit/ROADMAP.md` (Волна 7).
-- Журнал работы по каждой задаче — в `audit/PROGRESS.md`. Там по датам видно, кто и что закрыл.
+- Pre-MVP-модули (форум, торговая площадка, магазин решений) уже отмечены в enum'ах и сайдбаре, но без UI — это сделано осознанно как «фундамент на вырост», чтобы не двигать миграции с реальными платежами на проде позже.

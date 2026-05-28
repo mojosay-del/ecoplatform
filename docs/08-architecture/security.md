@@ -2,7 +2,7 @@
 title: Политика безопасности
 status: current
 updated: 2026-05-26
-source: audit/ROADMAP.md#9.11
+source: PROJECT_STATUS.md
 ---
 
 # Политика безопасности ЭкоПлатформы
