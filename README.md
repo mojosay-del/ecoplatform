@@ -73,7 +73,12 @@ docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
    docker compose up -d
    ```
 
-   Контейнеры слушают `:5433` (Postgres) и `:6379` (Redis). `DATABASE_URL` и `REDIS_URL` в `.env.example` уже настроены. Если Redis недоступен, API продолжает работать через БД и in-memory throttler.
+   Контейнеры слушают `:5433` (Postgres) и `:6379` (Redis). Ожидаемые
+   контейнеры текущего проекта: `ecoplatform-postgres-1` и
+   `ecoplatform-redis-1`. Старый compose-проект `ecoplatform_v10crm` больше не
+   используется: его данные перенесены в текущий PostgreSQL 18.
+   `DATABASE_URL` и `REDIS_URL` в `.env.example` уже настроены. Если Redis
+   недоступен, API продолжает работать через БД и in-memory throttler.
 
 4. Подготовить базу:
 
