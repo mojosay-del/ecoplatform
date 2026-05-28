@@ -11,7 +11,7 @@
 Отдельный полномасштабный codebase-аудит ведётся по `CODEBASE_AUDIT_ROADMAP.md`.
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
-`B-MOD` и `B-NOTIF`; следующий модуль проверки — `B-OBS`.
+`B-MOD`, `B-NOTIF` и `B-OBS`; следующий модуль проверки — `B-REDIS`.
 
 Волна 11.1 закрыта: дизайн-токены вынесены в `apps/web/src/styles/tokens.css`, а `globals.css` переведён с прямых цветов на CSS-переменные.
 
@@ -140,7 +140,7 @@
 - `traceId` берётся из безопасного `X-Request-Id` или генерируется заново и возвращается в ответе как `X-Request-Id`.
 - Authorization/cookie/CSRF и token/password-поля редактируются перед записью в лог.
 - Sentry error tracking подключён на API и web: API отправляет только 5xx и process-level сбои, web ловит App Router/server/client render errors через `@sentry/nextjs`.
-- Sentry `beforeSend` на обеих сторонах вычищает Authorization/cookie/CSRF, token/password/session, email/phone/address/bank-поля и оставляет только безопасный `user.id`.
+- Sentry `beforeSend` на обеих сторонах вычищает Authorization/cookie/CSRF, token/password/session, email/phone/address/bank-поля в payload, URL query и строковых сообщениях, а в `user` оставляет только безопасный `id`.
 - Sentry build-plugin и sourcemap upload включаются только при заданных CI-переменных `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + project, runtime-capture работает и без них при наличии DSN.
 - Prometheus endpoint `/api/metrics` на API отдаёт text format через `prom-client`: default Node.js/process metrics, HTTP histogram, Prisma query histogram, auth cache hit/miss counters и бизнес-метрики регистраций, активных подписок и уведомлений.
 - `/api/metrics` также отдаёт `db_connections{state="used|max"}` для контроля занятости Postgres-соединений.

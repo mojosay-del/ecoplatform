@@ -10,8 +10,9 @@ describe("web sentry helpers", () => {
 
   it("redacts secrets and personal fields before sending events", () => {
     const event = sanitizeSentryEvent({
+      message: "browser error phone=+70000000000",
       request: {
-        url: "https://app.test/account?email=user@example.test&token=abc",
+        url: "https://app.test/account?email=user@example.test&token=abc&phone=+70000000000&inn=1234567890&bankAccount=40702810900000000001&visible=ok",
         headers: {
           authorization: "Bearer abc",
           cookie: "csrf=abc",
@@ -23,7 +24,10 @@ describe("web sentry helpers", () => {
       extra: { phone: "+70000000000", visible: "yes" },
     } as unknown as ErrorEvent);
 
-    expect(event.request?.url).toBe("https://app.test/account?email=[Filtered]&token=[Filtered]");
+    expect(event.message).toBe("browser error phone=[Filtered]");
+    expect(event.request?.url).toBe(
+      "https://app.test/account?email=[Filtered]&token=[Filtered]&phone=[Filtered]&inn=[Filtered]&bankAccount=[Filtered]&visible=ok",
+    );
     expect(event.request?.headers?.authorization).toBe("[Filtered]");
     expect(event.request?.headers?.cookie).toBe("[Filtered]");
     expect(event.request?.headers?.["x-request-id"]).toBe("trace-1");

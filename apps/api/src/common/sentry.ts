@@ -9,8 +9,10 @@ const FILTERED = "[Filtered]";
 const DEFAULT_TRACES_SAMPLE_RATE = 0;
 const MAX_SANITIZE_DEPTH = 8;
 
-const SENSITIVE_KEY_PATTERN =
-  /password|token|secret|authorization|cookie|csrf|session|email|phone|address|inn|kpp|ogrn|bank|account|providerToken|keyHash|refreshTokenHash|accessToken|refreshToken/i;
+const SENSITIVE_KEY_SOURCE =
+  "password|token|secret|authorization|cookie|csrf|session|email|phone|address|inn|kpp|ogrn|bank|account|providerToken|keyHash|refreshTokenHash|accessToken|refreshToken";
+const SENSITIVE_KEY_PATTERN = new RegExp(SENSITIVE_KEY_SOURCE, "i");
+const SENSITIVE_KEY_VALUE_PATTERN = new RegExp(`\\b([^\\s=&?]*(${SENSITIVE_KEY_SOURCE})[^\\s=&?]*)=([^&\\s]+)`, "gi");
 
 type EnvLike = Partial<
   Record<"SENTRY_DSN_API" | "SENTRY_ENVIRONMENT" | "SENTRY_TRACES_SAMPLE_RATE" | "GIT_SHA" | "NODE_ENV", string>
@@ -178,13 +180,16 @@ function redactValue(value: unknown, depth = 0): unknown {
 function redactString(value: string | undefined): string | undefined {
   if (!value) return value;
   return value
-    .replace(/(password|token|secret|authorization|cookie|csrf|session)=([^&\s]+)/gi, `$1=${FILTERED}`)
+    .replace(SENSITIVE_KEY_VALUE_PATTERN, `$1=${FILTERED}`)
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, `Bearer ${FILTERED}`);
 }
 
 function redactUrl(value: string | undefined): string | undefined {
   if (!value) return value;
-  return value.replace(/([?&](?:token|password|secret|csrf|session|email)=)[^&]+/gi, `$1${FILTERED}`);
+  return value.replace(/([?&])([^=&#]+)=([^&#]*)/g, (match, prefix: string, rawKey: string) => {
+    const key = safeDecodeQueryPart(rawKey);
+    return SENSITIVE_KEY_PATTERN.test(key) ? `${prefix}${rawKey}=${FILTERED}` : match;
+  });
 }
 
 function requestPath(request: Pick<Request, "originalUrl" | "path" | "url">): string {
@@ -196,6 +201,14 @@ function normalizeOptionalString(value: unknown): string | null {
   if (value === undefined || value === null) return null;
   const result = String(value);
   return result.length > 0 ? result : null;
+}
+
+function safeDecodeQueryPart(value: string): string {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, " "));
+  } catch {
+    return value;
+  }
 }
 
 function isRecord(value: unknown): value is UnknownRecord {

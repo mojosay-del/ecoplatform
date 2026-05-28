@@ -13,9 +13,9 @@ describe("api sentry helpers", () => {
 
   it("redacts secrets and personal fields before sending events", () => {
     const event = sanitizeSentryEvent({
-      message: "failed token=abc",
+      message: "failed token=abc phone=+70000000000",
       request: {
-        url: "https://api.test/auth?email=user@example.test&token=abc",
+        url: "https://api.test/auth?email=user@example.test&token=abc&phone=+70000000000&inn=1234567890&bankAccount=40702810900000000001&visible=ok",
         headers: {
           authorization: "Bearer abc",
           cookie: "refresh=abc",
@@ -33,8 +33,10 @@ describe("api sentry helpers", () => {
       breadcrumbs: [{ message: "Bearer abc", data: { csrf: "token", visible: "yes" } }],
     } as ErrorEvent);
 
-    expect(event.message).toBe("failed token=[Filtered]");
-    expect(event.request?.url).toBe("https://api.test/auth?email=[Filtered]&token=[Filtered]");
+    expect(event.message).toBe("failed token=[Filtered] phone=[Filtered]");
+    expect(event.request?.url).toBe(
+      "https://api.test/auth?email=[Filtered]&token=[Filtered]&phone=[Filtered]&inn=[Filtered]&bankAccount=[Filtered]&visible=ok",
+    );
     expect(event.request?.headers?.authorization).toBe("[Filtered]");
     expect(event.request?.headers?.cookie).toBe("[Filtered]");
     expect(event.request?.headers?.["x-request-id"]).toBe("trace-1");

@@ -92,7 +92,7 @@
 | B-LEGAL | `apps/api/src/legal` | `accepted` | B | active documents, consent records, re-consent flow |
 | B-MOD | `apps/api/src/moderation` | `accepted` | B | sanctions, report flow, module restrictions, edge cases |
 | B-NOTIF | `apps/api/src/notifications` | `accepted` | B | in-app delivery, read states, privacy of notification payloads |
-| B-OBS | `apps/api/src/observability` | `not_started` | E | metrics auth, labels, cardinality, Sentry/log filtering |
+| B-OBS | `apps/api/src/observability` | `accepted` | E | metrics auth, labels, cardinality, Sentry/log filtering |
 | B-REDIS | `apps/api/src/redis` | `not_started` | B/E | session cache invalidation, throttler fallback |
 | B-SCHED | `apps/api/src/scheduler` | `not_started` | B/E | advisory locks, cleanup safety, billing cron idempotency |
 | B-SUPPORT | `apps/api/src/support` | `not_started` | B | ticket ownership, admin access, status transitions |
@@ -778,6 +778,65 @@
 - `F-20260528-024` закрыт: mute in-app канала больше не гасит отдельную
   email-delivery очередь, если email-канал для категории не отключён.
 
+### B-OBS — `apps/api/src/observability`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `MetricsController`, `metrics-auth.ts`, `MetricsService`: `/api/metrics`,
+  Basic Auth в production, `Content-Type`, `Cache-Control: no-store` и
+  поведение при отсутствующих credentials;
+- `metrics.registry.ts`, `MetricsMiddleware`, `BusinessMetricsCollector`:
+  Prometheus registry, default metrics, HTTP/Prisma histograms, auth-cache
+  counters, business counters, `subscriptions_active` и `db_connections`;
+- `apps/api/src/common/logging.ts`, `global-exception.filter.ts`,
+  `sentry.ts`: traceId, pino redaction, 4xx/5xx handling, Sentry filtering;
+- web Sentry helpers в `apps/web/sentry.shared.ts` и Sentry config-файлы,
+  потому что privacy-фильтр общий по смыслу для API и web;
+- связи с `AppModule`, `main.ts`, `PrismaService`, `JwtAuthGuard`,
+  `NotificationsService`, `README.md` и `PROJECT_STATUS.md`.
+
+Доказательства:
+
+- Prom-client docs через Context7: custom registry, `collectDefaultMetrics`,
+  `registry.contentType`, async `Gauge.collect()` и стабильные label names;
+- Sentry JavaScript docs через Context7: `beforeSend` может менять или
+  отбрасывать event, `sendDefaultPii: false` отключает PII по умолчанию,
+  `setUser` должен получать только безопасный `id`;
+- NestJS docs через Context7: `@Res({ passthrough: true })` позволяет ставить
+  headers и вернуть строку через стандартную обработку Nest;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe|password\\s*[:=]|token\\s*[:=]|secret\\s*[:=]|Authorization|cookie|csrf|session|email|phone|address|inn|kpp|ogrn|bank|account" apps/api/src/observability apps/api/src/common/sentry.ts apps/api/src/common/logging.ts apps/api/src/common/global-exception.filter.ts apps/web/sentry.shared.ts apps/web/sentry.*.config.ts apps/web/instrumentation*.ts` -> совпадения только в auth/redaction/test/config местах, без production `console.log`, TODO/FIXME и unsafe raw SQL;
+- `pnpm --filter @ecoplatform/api test -- sentry` -> 19 files / 81 tests
+  passed;
+- `pnpm --filter @ecoplatform/web test -- sentry` -> 14 files / 50 tests
+  passed;
+- `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
+  "Prometheus|metrics"` -> integration-файл прошёл полностью: 131 tests
+  passed;
+- `pnpm lint` -> 4 tasks successful;
+- `pnpm test` -> shared 7, web 50, api 81 tests passed;
+- `pnpm build` -> shared/api/web build successful;
+- `pnpm test:integration` -> 131 integration tests passed;
+- `pnpm format:check` -> clean;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/api/src/observability` принят без открытых P0/P1/P2-рисков;
+- `/api/metrics` в production закрыт Basic Auth и при отсутствии credentials
+  отдаёт 503 вместо раскрытия метрик;
+- metric labels ограничены стабильными значениями: method, route pattern,
+  status, Prisma target, notification category/channel и `db_connections`
+  state `used|max`;
+- Sentry и pino не отправляют Authorization/cookie/CSRF, token/password/session
+  и основные PII-поля; 4xx события отбрасываются, 5xx попадают в Sentry после
+  redaction;
+- `F-20260528-025` закрыт: Sentry privacy-фильтр теперь чистит чувствительные
+  поля не только в body/extra, но и в URL query и строковых сообщениях.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -808,6 +867,7 @@
 | `F-20260528-022` | `P2` | `apps/api/src/notifications/notifications.controller.ts` | `GET /api/notifications?limit=abc` превращал `limit` в `NaN`, а service молча подставлял дефолт. Клиент получал 200 вместо понятного 400, как в ранее исправленных admin/content list endpoints. | Исправлено: list query валидируется через zod-схему; integration-тест проверяет 400 на нечисловой `limit`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-023` | `P1` | `apps/api/src/notifications/notifications.service.ts` | `/api/notifications`, read и archive возвращали полный Prisma-row: внутренний `payload`, `domainEventId`, `sourceId`, `deliveryId`, `userId`, а preferences endpoints — `id/userId/updatedAt`. В payload уже есть IP/User-Agent login-событий и внутренние ids модерации/поддержки, поэтому публичный API отдавал лишние приватные детали. | Исправлено: публичные notifications responses используют allow-list `select`, preferences сериализуются до двух списков категорий; integration-тест проверяет отсутствие внутренних полей. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-024` | `P2` | `apps/api/src/notifications/notifications.service.ts` | Если пользователь отключал in-app для категории, `createInApp()` возвращал `null` до создания email-delivery. При будущем email-воркере пользователь мог не получить email, хотя отключал только in-app канал. | Исправлено: in-app mute пропускает только `InAppNotification`, но не мешает отдельной email-delivery очереди, если email для категории включён; unit-тест проверяет email-only delivery. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-025` | `P1` | `apps/api/src/common/sentry.ts`, `apps/web/sentry.shared.ts` | Sentry privacy-фильтр чистил email/phone/address/bank/inn-поля в object payload, но URL query и строковые сообщения закрывали только token/password/session/email. Если 5xx упал на URL вроде `?inn=...&bankAccount=...` или с сообщением `phone=...`, эти персональные данные могли уйти во внешний Sentry. | Исправлено: URL query и key=value строки теперь используют общий список чувствительных ключей; API/web unit-тесты проверяют `phone`, `inn`, `bankAccount` в URL и сообщениях. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -850,6 +910,7 @@
 | 22 | `F-20260528-022` | `fix(notifications): закрыть риски проверки notifications-api` | `pnpm --filter @ecoplatform/api test -- notifications`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "notifications\\|Email channel queue"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 | 23 | `F-20260528-023` | `fix(notifications): закрыть риски проверки notifications-api` | `pnpm --filter @ecoplatform/api test -- notifications`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "notifications\\|Email channel queue"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 | 24 | `F-20260528-024` | `fix(notifications): закрыть риски проверки notifications-api` | `pnpm --filter @ecoplatform/api test -- notifications`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "notifications\\|Email channel queue"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
+| 25 | `F-20260528-025` | `fix(observability): закрыть риски проверки observability` | `pnpm --filter @ecoplatform/api test -- sentry`; `pnpm --filter @ecoplatform/web test -- sentry`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Prometheus\\|metrics"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 
