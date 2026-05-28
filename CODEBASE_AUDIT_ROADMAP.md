@@ -102,7 +102,7 @@
 | C-SHELL | `apps/web/src/components/AppShell.tsx` | `accepted` | C | navigation, demo banner spacing, account/admin separation |
 | C-CMS | `apps/web/src/components/*Editor*` | `accepted` | C | blocks editor, Tiptap, preview, auto-save, XSS boundaries |
 | C-LIBAPI | `apps/web/src/lib/api` | `accepted` | D | typed API client, refresh, CSRF, error handling, downloads |
-| C-AUTHCTX | `apps/web/src/lib/auth.tsx` | `not_started` | C/D | session restore, 401/403 behavior, user state transitions |
+| C-AUTHCTX | `apps/web/src/lib/auth.tsx` | `accepted` | C/D | session restore, 401/403 behavior, user state transitions |
 | C-STYLES | `apps/web/src/styles` | `not_started` | C | tokens, contrast, responsive rules, repeated raw colors |
 | D-SHARED | `packages/shared/src` | `not_started` | D | DTOs, access rules, sanitize, content-block schemas |
 | E-TESTS | Tests and smoke | `not_started` | E | unit/integration/smoke coverage, flaky risks, test DB setup |
@@ -1328,6 +1328,69 @@
 - `apiDownload()` корректно используется для ZIP-экспорта данных, читает
   filename из `Content-Disposition` и не пишет архив в постоянное хранилище
   браузера.
+
+### C-AUTHCTX — `apps/web/src/lib/auth.tsx`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `AuthProvider`: `AuthContext`, `token/user/ready` state,
+  `subscribeAccessToken`, восстановление сессии через `tryRestoreSession()`,
+  загрузка `/auth/me`, `login()`, `register()`, `logout()` и `refreshMe()`;
+- `apps/web/app/layout.tsx`: глобальный `<AuthProvider>` вокруг App Router;
+- `apps/web/src/components/AppShell.tsx`: ожидание `ready`, редирект гостя на
+  `/login`, role-aware navigation, account menu, demo banner и notification
+  consumers;
+- потребители `useAuth()` в `NewsView`, `AccountView`, `AdminHomeView`,
+  `useApiQuery`, `useInfiniteApiQuery`, `NotificationBell`,
+  `NotificationsPopover`, `FileUploadField` и CMS/admin views;
+- shared-контракт `AuthMeUser` в `packages/shared/src/api-response.ts` и
+  backend-ответ `AuthService.me()`;
+- зависимый auth boundary в `apps/web/src/lib/api/core.ts`: in-memory access
+  token, CSRF для refresh, centralized `401` handling и отсутствие
+  browser-storage для access-token.
+
+Доказательства:
+
+- React docs через Context7: async `useEffect` с сетевым запросом должен
+  защищаться cleanup-флагом от записи state после unmount/race; `AuthProvider`
+  использует `cancelled` в restore-effect, а query-hooks используют
+  `isActive/requestSeq`;
+- Next.js docs через Context7: App Router root layout принимает `children`, а
+  `useRouter`/`router.replace()` используются в Client Components; root layout
+  оборачивает приложение в client `AuthProvider`, а `AppShell` редиректит
+  только после `ready=true`;
+- `rg -n "TODO|FIXME|console\\.|localStorage|sessionStorage|dangerouslySetInnerHTML|innerHTML|password\\s*[:=]\\s*['\\\"]|token\\s*[:=]\\s*['\\\"]|secret\\s*[:=]\\s*['\\\"]|AKIA|ASIA|BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY"
+  apps/web/src/lib/auth.tsx apps/web/src/lib/api/core.ts
+  apps/web/app/layout.tsx apps/web/src/components/AppShell.tsx` -> нет
+  production debug, raw HTML, hardcoded secrets или записи access-token в
+  storage; `localStorage` используется только для UI-свёртки сайдбара;
+- `rg -n "clearAccessToken\\(|setAccessToken\\(|tryRestoreSession\\(|subscribeAccessToken\\(|getAccessToken\\("
+  apps/web/src apps/web/app --glob '*.ts' --glob '*.tsx'` -> переходы
+  access-token сосредоточены в `auth.tsx`, `api/core.ts` и явных account
+  session actions;
+- `rg -n "AuthProvider|useAuth\\(" apps/web/app apps/web/src --glob '*.tsx'`
+  -> единственный provider стоит в root layout, а потребители находятся внутри
+  этого дерева;
+- `pnpm --filter @ecoplatform/web lint` -> clean;
+- `pnpm --filter @ecoplatform/web test -- api` -> 14 files / 50 tests passed.
+
+Решение:
+
+- `apps/web/src/lib/auth.tsx` принят без открытых P0/P1/P2-рисков;
+- access-token остаётся только в памяти модуля, а reload восстанавливается
+  через HttpOnly refresh-cookie и последующий `/auth/me`;
+- `ready=false` защищает залогиненного пользователя от ложного redirect на
+  `/login` во время первичного restore;
+- `user` в web не дублирует локальный shape, а напрямую использует shared
+  `AuthMeUser`; `requiresReConsent`, `platformRoles`,
+  `deletionRequestedAt/deletionScheduledFor`, company snapshot и avatar URL
+  проходят из backend shared-контракта;
+- `401` и `403` не смешиваются: `401` очищает сессию/ведёт на login, а `403`
+  остаётся состоянием закрытого доступа в query/view слоях.
 
 ### Внеплановая dev-runtime правка — `/register`
 

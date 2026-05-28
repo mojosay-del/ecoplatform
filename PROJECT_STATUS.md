@@ -12,13 +12,19 @@
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
 `B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED`, `B-SUPPORT`, `C-APP`,
-`C-ADMIN`, `C-AUTH`, `C-SHELL`, `C-CMS` и `C-LIBAPI`; следующий модуль
-проверки — `C-AUTHCTX`.
+`C-ADMIN`, `C-AUTH`, `C-SHELL`, `C-CMS`, `C-LIBAPI` и `C-AUTHCTX`; следующий
+модуль проверки — `C-STYLES`.
 
 Проверка `C-LIBAPI` подтвердила единый frontend API-слой: access-token хранится
 только в памяти, CSRF-заголовки добавляются централизованно, `401` проходит
 через refresh/retry, а ZIP-экспорт данных использует `apiDownload()` без записи
 архива в постоянное хранилище браузера.
+
+Проверка `C-AUTHCTX` подтвердила auth-контекст web: `AuthProvider` ждёт
+попытку восстановления через HttpOnly refresh-cookie перед `ready=true`,
+загружает пользователя через shared `AuthMeUser`, не хранит access-token в
+browser storage и сохраняет разделение `401` как истёкшей сессии и `403` как
+закрытого доступа.
 
 Внеплановая dev-стабилизация закрыта: локальный `next dev` для web переведён
 на Webpack, потому что Turbopack в текущем окружении уходил в crash-loop на
