@@ -99,7 +99,7 @@
 | C-APP | `apps/web/app` | `accepted` | C | route coverage, auth boundaries, loading/error/not-found states |
 | C-ADMIN | `apps/web/src/components/Admin*` | `accepted` | C | tables, filters, actions, role visibility, overflow |
 | C-AUTH | `apps/web/src/components/AuthForms.tsx` | `accepted` | C | register/login UX, validation, legal consents, password rules |
-| C-SHELL | `apps/web/src/components/AppShell.tsx` | `not_started` | C | navigation, demo banner spacing, account/admin separation |
+| C-SHELL | `apps/web/src/components/AppShell.tsx` | `accepted` | C | navigation, demo banner spacing, account/admin separation |
 | C-CMS | `apps/web/src/components/*Editor*` | `not_started` | C | blocks editor, Tiptap, preview, auto-save, XSS boundaries |
 | C-LIBAPI | `apps/web/src/lib/api` | `not_started` | D | typed API client, refresh, CSRF, error handling, downloads |
 | C-AUTHCTX | `apps/web/src/lib/auth.tsx` | `not_started` | C/D | session restore, 401/403 behavior, user state transitions |
@@ -1153,6 +1153,63 @@
 - `F-20260528-032` закрыт: `/auth/register` больше не принимает `billingInn`,
   поэтому внешний клиент не может записать реквизиты компании во время
   регистрации в обход продуктового сценария.
+
+### C-SHELL — `apps/web/src/components/AppShell.tsx`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `AppShell.tsx`: auth-guard, desktop/mobile sidebar, topbar, account menu,
+  support drawer mount point, footer and admin-panel back link;
+- `app-shell-nav.ts`: main navigation, disabled future sections, account
+  settings navigation, legacy `/account?tab=...` redirects and breadcrumbs;
+- `DemoBanner.tsx` и `demo-banner-state.ts`: countdown, critical state,
+  hiding on `/admin`;
+- route consumers under `apps/web/app/account` and `apps/web/app/admin`;
+- shell-related styles in `apps/web/src/styles/globals.css`.
+
+Доказательства:
+
+- official Next.js docs: `usePathname` is a Client Component hook for reading
+  the current pathname; `AppShell.tsx` is marked `"use client"` and keeps
+  route-aware navigation in client state;
+- official React docs: effects that subscribe to external systems must clean
+  up subscriptions; `AppShell.tsx` and `DemoBanner.tsx` remove
+  `support:open`, document/window listeners and interval timers;
+- `app-shell-nav.test.ts` covers future disabled items, single admin panel
+  entry, account sidebar composition, breadcrumbs and legacy account-tab
+  redirects;
+- `DemoBanner.test.ts` covers visible demo state, critical countdown and
+  hiding on admin routes;
+- `pnpm --filter @ecoplatform/web test -- app-shell-nav DemoBanner` -> clean
+  (14 files, 50 tests);
+- `pnpm --filter @ecoplatform/web lint` -> clean;
+- `curl http://localhost:4000/api/health` -> `200 OK`;
+- `curl http://localhost:4000/api/ready` -> `200 OK`;
+- browser-check `/admin` desktop 1280x720 -> no horizontal overflow, no demo
+  banner, admin hub is reachable;
+- browser-check `/admin/staff` desktop 1280x720 -> breadcrumb
+  `Панель управления / Сотрудники`, back link `← Панель управления`, no user
+  support drawer button, no horizontal overflow;
+- browser-check `/account/profile` desktop 1280x720 as platform staff ->
+  account settings sidebar is used, business links are hidden, no support
+  drawer button, no horizontal overflow;
+- browser-check `/account/profile` mobile 390x844 -> menu button opens sidebar,
+  close button/backdrop are present, no horizontal overflow;
+- browser console errors during checked routes -> none.
+
+Решение:
+
+- `apps/web/src/components/AppShell.tsx` принят без открытых P0/P1/P2-рисков;
+- глобальная навигация, account-settings навигация и admin hub разделены
+  предсказуемо, без дублирования личного кабинета в основном сайдбаре;
+- demo-баннер не попадает в admin routes и имеет отдельное покрытие формата
+  countdown;
+- мобильный overlay-сайдбар и topbar breadcrumbs работают без горизонтального
+  overflow на проверенном breakpoint.
 
 ### Внеплановая dev-runtime правка — `/register`
 

@@ -12,7 +12,7 @@
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
 `B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED`, `B-SUPPORT`, `C-APP`,
-`C-ADMIN` и `C-AUTH`; следующий модуль проверки — `C-SHELL`.
+`C-ADMIN`, `C-AUTH` и `C-SHELL`; следующий модуль проверки — `C-CMS`.
 
 Внеплановая dev-стабилизация закрыта: локальный `next dev` для web переведён
 на Webpack, потому что Turbopack в текущем окружении уходил в crash-loop на

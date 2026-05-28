@@ -34,8 +34,9 @@ apps/
       (login,register,forgot-password,news,indices,education,
        knowledge-base,account,notifications,legal,admin)
     src/
-      components/    AppShell, AuthForms, BlocksEditor, RichTextEditor, CookieConsent,
-                     NotificationBell, UserSupportDrawer, Admin*View, FileUploadField
+      components/    AppShell + app-shell-nav, AuthForms, BlocksEditor,
+                     RichTextEditor, CookieConsent, NotificationBell,
+                     UserSupportDrawer, Admin*View, FileUploadField
       views/         публичные view-страницы (news/indices/learning/knowledge-base/account)
                      + content-blocks для рендеринга блоков
       lib/api/       типизированный namespace `api.news.list()` / `api.billing.updateCompanyProfile()`
