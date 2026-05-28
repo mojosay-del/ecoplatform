@@ -3,6 +3,8 @@
 Репозиторий содержит рабочую кодовую базу MVP на Turborepo + pnpm.
 
 Текущее состояние MVP — в [PROJECT_STATUS.md](PROJECT_STATUS.md).
+Рабочая карта полного аудита кода — в
+[CODEBASE_AUDIT_ROADMAP.md](CODEBASE_AUDIT_ROADMAP.md).
 
 ## Карта проекта
 

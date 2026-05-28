@@ -84,7 +84,7 @@
 | A-OPS | `ops/monitoring` | `accepted` | A/E | alerts, example config, absence of real secrets |
 | B-PRISMA | `apps/api/prisma` | `accepted` | B | schema, migrations, indexes, constraints, seed safety |
 | B-AUTH | `apps/api/src/auth` | `accepted` | B | login, refresh, lockout, export data, deletion, password policy |
-| B-COMMON | `apps/api/src/common` | `not_started` | B | guards, roles, CSRF, pagination, logging filters, sanitizing |
+| B-COMMON | `apps/api/src/common` | `accepted` | B | guards, roles, CSRF, pagination, logging filters, sanitizing |
 | B-ADMIN | `apps/api/src/admin` | `not_started` | B | RBAC, audit log, dashboard queries, admin mutations |
 | B-BILLING | `apps/api/src/billing` | `not_started` | B | company profile, subscriptions, manual activation, notifications |
 | B-CONTENT | `apps/api/src/content` | `not_started` | B | CMS validation, publish/preview rules, tags, indices, block payloads |
@@ -321,6 +321,62 @@
 - открытых P0/P1/P2-рисков по `apps/api/src/auth` нет;
 - `F-20260528-005` закрыт: refresh-cookie теперь очищается с тем же
   `Path=/api/auth`, с которым выдаётся.
+
+### B-COMMON — `apps/api/src/common`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `apps/api/src/common/jwt-auth.guard.ts`: Bearer-token, session lookup,
+  session-cache, blocked user/company boundaries и request.user snapshot;
+- `apps/api/src/common/roles.guard.ts` и `roles.decorator.ts`: role metadata
+  через `Reflector.getAllAndOverride`, class/method override и 403 для роли без
+  доступа;
+- `apps/api/src/common/csrf.guard.ts` вместе с `apps/api/src/main.ts` и
+  `apps/api/src/test/test-app.ts`: cookie-parser -> CSRF cookie middleware ->
+  global CSRF guard, safe methods и исключения только для login/register;
+- `apps/api/src/common/pagination.ts` и потребители в content/admin/moderation:
+  clamping `limit/offset/page/take`, общий `PaginatedResponse`;
+- `apps/api/src/common/logging.ts`,
+  `apps/api/src/common/global-exception.filter.ts` и
+  `apps/api/src/common/sentry.ts`: traceId, actorRole, 4xx/5xx handling,
+  redaction токенов/cookie/CSRF/PII;
+- `apps/api/src/common/admin-action-log.service.ts`,
+  `module-access.service.ts`, `zod.ts`, `sanitize-html.ts`,
+  `simple-zip.ts` и связанные unit/integration-тесты.
+
+Доказательства:
+
+- NestJS docs через Context7: guards, global guard registration через DI,
+  metadata/Reflector для ролей и request-scoped authorization;
+- Express docs через Context7: middleware выполняется в порядке регистрации,
+  cookie handling сверялся с текущей цепочкой `cookieParser()` ->
+  `csrfCookieMiddleware`;
+- `rg -n "@UseGuards|JwtAuthGuard|RolesGuard|@Roles|SkipThrottle|Throttle|csrf|CSRF" apps/api/src --glob '*.ts'` -> admin/content/moderation/support/files/health маршруты используют ожидаемые guard boundaries;
+- `rg -n "resolvePagination|paginatedResponse|limit|offset|page|take" apps/api/src --glob '*.ts'` -> общий helper используется в новых admin/content/moderation листингах, старые локальные clamp-паттерны остаются в доменных сервисах без P0/P1 риска;
+- `rg -n "sanitizeParagraphHtml|sanitize|dangerously|html" apps/api/src apps/web/src packages/shared/src --glob '*.ts' --glob '*.tsx'` -> API и web используют общий `@ecoplatform/shared` sanitizer перед сохранением/рендером HTML;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe|password\\s*[:=]|token\\s*[:=]|secret\\s*[:=]|Authorization|cookie|csrf|session|email|phone|address|inn|kpp|ogrn|bank|account" apps/api/src/common apps/api/src/main.ts apps/api/src/app.module.ts` -> без production `console.log`, TODO/FIXME, raw SQL и хардкод-секретов; совпадения находятся в redaction/test/type местах;
+- `pnpm --filter @ecoplatform/api test -- common` -> 19 files / 76 tests
+  passed;
+- `pnpm --filter @ecoplatform/api exec vitest run -c
+  vitest.integration.config.ts --testNamePattern
+  "CSRF|csrf|401|403|только admin|обычный пользователь|прав"` -> 1 file
+  passed, 13 tests passed, 104 skipped.
+
+Решение:
+
+- `apps/api/src/common` принят без открытых P0/P1/P2-рисков;
+- CSRF double-submit применён ко всем mutating routes кроме login/register,
+  refresh дополнительно проверяется integration-тестом;
+- RBAC строится поверх `JwtAuthGuard`: `RolesGuard` не выдаёт доступ без
+  `request.user.platformRoles`, admin-only и 403-сценарии покрыты
+  integration-тестами;
+- логирование и Sentry не отправляют наружу Authorization/cookie/CSRF,
+  token/password/session и основные PII-поля;
+- новых находок в реестр не добавлено.
 
 ## Реестр находок
 
