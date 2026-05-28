@@ -75,7 +75,7 @@
 - Unit-тесты: 7 в `packages/shared`, 50 в `apps/web`, 76 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service).
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
-- Локальный `docker-compose.yml`: Postgres 16 на `:5433` + Redis 7 на `:6379`.
+- Локальный `docker-compose.yml`: PostgreSQL 18 на `:5433` + Redis 7 на `:6379`.
 - Health-check через `@nestjs/terminus`: `/api/health` (liveness), `/api/ready` (Postgres/Redis/S3 readiness), `/api/health/deep` (admin-only диагностика).
 - `Dockerfile` + deploy-решения по env, миграциям, SSL, бэкапам, CDN и первому запуску.
 

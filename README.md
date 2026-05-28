@@ -43,7 +43,7 @@ packages/
   shared/            slug, индексы цен, content-blocks, sanitize-html,
                      access-правила, DTO для регистрации/legal/profile,
                      ответы API (NewsListItem, BillingStatus, AuthMeUser и т.д.)
-docker-compose.yml   локальный Postgres 16 :5433 + Redis 7 :6379
+docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
 ```
 
 ## Локальный запуск

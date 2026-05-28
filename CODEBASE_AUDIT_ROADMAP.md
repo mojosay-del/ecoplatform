@@ -79,7 +79,7 @@
 
 | ID | Модуль | Статус | Волна | Что проверить |
 | --- | --- | --- | --- | --- |
-| A-ROOT | Root config | `findings` | A | package scripts, turbo tasks, workspace, tsconfig, docker compose |
+| A-ROOT | Root config | `accepted` | A | package scripts, turbo tasks, workspace, tsconfig, docker compose |
 | A-CI | `.github/workflows` | `not_started` | A/E | static checks, integration DB, smoke trigger, secrets boundary |
 | A-OPS | `ops/monitoring` | `not_started` | A/E | alerts, example config, absence of real secrets |
 | B-PRISMA | `apps/api/prisma` | `not_started` | B | schema, migrations, indexes, constraints, seed safety |
@@ -114,7 +114,7 @@
 
 Дата проверки: 2026-05-28.
 
-Статус: `findings`.
+Статус: `accepted`.
 
 Проверено:
 
@@ -144,8 +144,8 @@
 
 - package scripts, pnpm workspace, TypeScript strict base, Docker ignore и
   Turborepo task graph приняты без P0/P1-рисков;
-- найдено окруженческое расхождение `F-20260528-001`: локальный Postgres в
-  Docker Compose отстаёт от CI/prod версии.
+- окруженческое расхождение `F-20260528-001` закрыто: локальный Docker Compose
+  теперь использует тот же major PostgreSQL, что CI и целевой деплой.
 
 ## Реестр находок
 
@@ -153,7 +153,7 @@
 
 | Finding ID | Priority | Area | Risk in plain words | Evidence | Status | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
-| `F-20260528-001` | `P2` | `docker-compose.yml` | Локальная разработка и integration-тесты могут идти на PostgreSQL 16, а CI и целевой деплой — на PostgreSQL 18. Из-за этого часть SQL/Prisma-проблем может проявиться только в CI или prod-like среде. | `docker-compose.yml:3` = `postgres:16`; `.github/workflows/ci.yml:56` = `postgres:18-alpine`; `README.md:98` и `README.md:109` фиксируют CI/target PostgreSQL 18. | `open` | Отдельным коммитом выровнять локальный Docker Compose под PostgreSQL 18 и проверить запуск Postgres + Prisma/integration path. |
+| `F-20260528-001` | `P2` | `docker-compose.yml` | Локальная разработка и integration-тесты могли идти на PostgreSQL 16, а CI и целевой деплой — на PostgreSQL 18. Из-за этого часть SQL/Prisma-проблем могла проявиться только в CI или prod-like среде. | Исправлено: `docker-compose.yml:3` = `postgres:18-alpine`, volume смонтирован в `/var/lib/postgresql`, жёсткие `container_name` убраны. Проверено: `docker compose config`; `docker compose up -d postgres` -> `healthy`; `pnpm --filter @ecoplatform/api prisma:generate`; `pnpm --filter @ecoplatform/api test:integration` -> 116 passed. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -172,7 +172,7 @@
 
 | Queue | Finding ID | Commit scope | Verification required | Status |
 | --- | --- | --- | --- | --- |
-| 1 | `F-20260528-001` | `chore(root): выровнять локальный Postgres с PostgreSQL 18` | `docker compose config`; `docker compose up -d postgres`; `pnpm --filter @ecoplatform/api prisma:generate`; `pnpm --filter @ecoplatform/api test:integration` | `open` |
+| 1 | `F-20260528-001` | `chore(root): выровнять локальный Postgres с PostgreSQL 18` | `docker compose config`; `docker compose up -d postgres`; `pnpm --filter @ecoplatform/api prisma:generate`; `pnpm --filter @ecoplatform/api test:integration` | `closed` |
 
 ## Базовые проверки
 
