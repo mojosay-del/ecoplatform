@@ -11,8 +11,8 @@
 Отдельный полномасштабный codebase-аудит ведётся по `CODEBASE_AUDIT_ROADMAP.md`.
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
-`B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED`, `B-SUPPORT` и `C-APP`;
-следующий модуль проверки — `C-ADMIN`.
+`B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED`, `B-SUPPORT`, `C-APP` и
+`C-ADMIN`; следующий модуль проверки — `C-AUTH`.
 
 Волна 11.1 закрыта: дизайн-токены вынесены в `apps/web/src/styles/tokens.css`, а `globals.css` переведён с прямых цветов на CSS-переменные.
 

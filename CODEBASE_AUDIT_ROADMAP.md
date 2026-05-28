@@ -97,7 +97,7 @@
 | B-SCHED | `apps/api/src/scheduler` | `accepted` | B/E | advisory locks, cleanup safety, billing cron idempotency |
 | B-SUPPORT | `apps/api/src/support` | `accepted` | B | ticket ownership, admin access, status transitions |
 | C-APP | `apps/web/app` | `accepted` | C | route coverage, auth boundaries, loading/error/not-found states |
-| C-ADMIN | `apps/web/src/components/Admin*` | `not_started` | C | tables, filters, actions, role visibility, overflow |
+| C-ADMIN | `apps/web/src/components/Admin*` | `accepted` | C | tables, filters, actions, role visibility, overflow |
 | C-AUTH | `apps/web/src/components/AuthForms.tsx` | `not_started` | C | register/login UX, validation, legal consents, password rules |
 | C-SHELL | `apps/web/src/components/AppShell.tsx` | `not_started` | C | navigation, demo banner spacing, account/admin separation |
 | C-CMS | `apps/web/src/components/*Editor*` | `not_started` | C | blocks editor, Tiptap, preview, auto-save, XSS boundaries |
@@ -1044,6 +1044,66 @@
   `tokens.css` и `globals.css`, поэтому root-level fallback не зависит от
   заменённого root layout.
 
+### C-ADMIN — `apps/web/src/components/Admin*`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- 13 admin view-компонентов `Admin*View.tsx`: dashboard, users, companies,
+  staff, support, billing, moderation, journals, settings и CMS-разделы;
+- helper-компоненты и утилиты `AdminSortButton`,
+  `admin-table-utils`, `admin-entity-display`, `admin-panel-tabs`;
+- фильтры, сортировки, infinite scroll, master-detail таблицы, action-формы
+  и пустые/ошибочные состояния;
+- role-aware навигация `/admin` для `admin`, `content_manager` и `moderator`;
+- route-boundary для единственного admin-компонента с `useSearchParams`
+  (`AdminSupportView`).
+
+Доказательства:
+
+- Next.js docs через Context7: `useSearchParams` в App Router должен быть
+  client-only и обёрнут ближайшим `Suspense` для prerendered route; проверено,
+  что `AdminSupportView` подключён через `apps/web/app/admin/support/page.tsx`
+  внутри `<Suspense>`;
+- React docs через Context7: формы проверялись как controlled inputs с явными
+  submit handlers и без отправки side effects через лишние `useEffect`;
+- `wc -l apps/web/src/components/Admin*.tsx
+  apps/web/src/components/admin-table-utils.ts
+  apps/web/src/components/admin-entity-display.ts` -> 6603 строки admin UI;
+- `rg -n "TODO|FIXME|console\\.log|dangerouslySetInnerHTML|innerHTML|\\$queryRawUnsafe|\\$executeRawUnsafe|password\\s*[:=]|token\\s*[:=]|secret\\s*[:=]"
+  apps/web/src/components/Admin* apps/web/src/components/admin-*.ts
+  apps/web/app/admin` -> production TODO/FIXME/logs, raw HTML, unsafe raw SQL
+  и хардкод-секреты не найдены; совпадения по `password` находятся только в
+  локальном controlled state staff-формы;
+- `rg -n "type=\"password\"|autoComplete=\"new-password\"|Временный пароль"
+  apps/web/src/components/AdminStaffView.tsx` -> временный пароль сотрудника
+  теперь скрывается браузером и помечен как новый пароль;
+- `admin-panel-tabs.test.ts` покрывает видимость admin home-ссылок для
+  `admin`, `content_manager` и `moderator`;
+- `admin-table-utils.test.ts` покрывает immutable-сортировку таблиц и
+  переключение sort state;
+- `admin-entity-display.test.ts` покрывает человекочитаемые подписи журнала и
+  модерации;
+- `pnpm --filter @ecoplatform/web lint`;
+- `pnpm --filter @ecoplatform/web test`;
+- `pnpm --filter @ecoplatform/web build`;
+- browser-check `/admin/staff`: desktop/mobile, форма создания сотрудника,
+  password input type, отсутствие очевидного горизонтального overflow.
+
+Решение:
+
+- `apps/web/src/components/Admin*` принят без открытых P0/P1/P2-рисков;
+- админские таблицы имеют локальную сортировку, scroll-shell и empty/error
+  состояния без небезопасного HTML-рендера;
+- `/admin` quick links и дочерние admin views сохраняют role visibility:
+  `content_manager` видит CMS-разделы, `moderator` — очередь модерации, admin —
+  полный набор;
+- `F-20260528-031` закрыт: временный пароль при создании platform-staff больше
+  не отображается обычным текстом в браузере.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -1080,6 +1140,7 @@
 | `F-20260528-028` | `P1` | `apps/api/src/support/support.service.ts` | В модели support-сообщений есть флаг `isInternal`, но пользовательский список тикетов отдавал все сообщения тикета. Если support-команда добавит внутренние заметки, клиент компании смог бы увидеть служебный текст и ids сообщений. | Исправлено: пользовательские выдачи и ответ клиента фильтруют `messages.where.isInternal=false` и используют allow-list `select` без `authorId/ticketId`; admin-выдача сохраняет полный support-thread. Unit и integration-тесты проверяют, что внутренняя заметка не видна компании, но видна admin. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-029` | `P2` | `apps/api/src/support/support.controller.ts`, `packages/shared/src/dto.ts` | `GET /support/tickets?limit=abc` и admin-аналог вручную парсили query и могли передать `NaN` в Prisma вместо понятного 400. Также тема/ответ из пробелов проходили минимальную длину как обычный текст. | Исправлено: support list query валидируется через zod + `resolvePagination`, тема/сообщение trim'ятся и ограничены по длине, пустой после trim текст даёт 400. Integration-тест проверяет bad query, пустую тему и пустой ответ. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-030` | `P2` | `apps/web/app/global-error.tsx` | В Next.js App Router `global-error.tsx` заменяет root layout. Файл показывал общий fallback через классы `MarketingShell`, но не импортировал глобальные стили сам; при root-level ошибке пользователь мог увидеть неоформленную аварийную страницу. | Исправлено: `global-error.tsx` импортирует `tokens.css` и `globals.css` напрямую. Проверено: `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-031` | `P2` | `apps/web/src/components/AdminStaffView.tsx` | Форма создания сотрудника показывала временный пароль как обычный текст. На админском экране это риск утечки при демонстрации, записи экрана или скриншоте. | Исправлено: поле временного пароля получило `type="password"`, `autoComplete="new-password"` и явный `aria-label`. Проверено: `rg` по password-полю; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/admin/staff`. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -1128,6 +1189,7 @@
 | 28 | `F-20260528-028` | `fix(support): закрыть риски проверки support-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test -- support`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Support ownership"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 29 | `F-20260528-029` | `fix(support): закрыть риски проверки support-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test -- support`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Support ownership"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 30 | `F-20260528-030` | `fix(web): закрыть риски проверки app-routes` | `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/__missing-c-app-check`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 31 | `F-20260528-031` | `fix(web): закрыть риски проверки admin-ui` | `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/admin/staff`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

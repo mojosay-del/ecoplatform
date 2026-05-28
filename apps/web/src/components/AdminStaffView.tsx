@@ -236,11 +236,14 @@ export function AdminStaffView() {
               </select>
             </label>
             <input
+              aria-label="Временный пароль"
+              autoComplete="new-password"
               className="input"
               minLength={MIN_PASSWORD_LENGTH}
               onChange={(event) => setCreateForm((form) => ({ ...form, password: event.target.value }))}
               placeholder={`Временный пароль (>= ${MIN_PASSWORD_LENGTH} символов)`}
               required
+              type="password"
               value={createForm.password}
             />
             <div className="auth-actions">
