@@ -13,14 +13,7 @@ export const passwordSchema = z
 export const registerDtoSchema = z.object({
   organizationName: z.string().trim().min(2),
   companyType: z.enum(companyTypes),
-  billingInn: z.preprocess(
-    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-    z
-      .string()
-      .trim()
-      .regex(/^\d{10}(\d{2})?$/, "ИНН должен состоять из 10 или 12 цифр.")
-      .optional(),
-  ),
+  billingInn: z.never({ error: "ИНН заполняется в профиле компании после регистрации." }).optional(),
   firstName: z.string().trim().min(1),
   lastName: z.string().trim().min(1),
   gender: z.enum(userGenders),

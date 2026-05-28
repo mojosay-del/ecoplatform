@@ -462,7 +462,6 @@ describe("Auth", () => {
     const res = await ctx.http.post("/api/auth/register").send({
       organizationName: "ООО Трейд Жен",
       companyType: "trader",
-      billingInn: "7707083893",
       firstName: "Анна",
       lastName: "Тестова",
       gender: "female",
@@ -480,7 +479,7 @@ describe("Auth", () => {
     expect(me.body.company.organizationName).toBe("ООО Трейд Жен");
     expect(me.body.avatarUrl).toBe("/avatars/company/twoman.png");
     const company = await ctx.prisma.company.findUniqueOrThrow({ where: { id: me.body.company.id } });
-    expect(company.billingInn).toBe("7707083893");
+    expect(company.billingInn).toBeNull();
   });
 
   it("повторная регистрация с тем же email отбивается 409", async () => {
@@ -488,7 +487,6 @@ describe("Auth", () => {
     const dup = await ctx.http.post("/api/auth/register").send({
       organizationName: "ООО Дубль",
       companyType: "collector",
-      billingInn: "7707083893",
       firstName: "А",
       lastName: "Б",
       gender: "male",
@@ -500,11 +498,11 @@ describe("Auth", () => {
     expect(dup.status).toBe(409);
   });
 
-  it("регистрация с некорректным ИНН отбивается 400", async () => {
+  it("регистрация не принимает ИНН: реквизиты заполняются в профиле компании", async () => {
     const res = await ctx.http.post("/api/auth/register").send({
-      organizationName: "ООО Ошибка ИНН",
+      organizationName: "ООО ИНН Потом",
       companyType: "collector",
-      billingInn: "12345",
+      billingInn: "7707083893",
       firstName: "Иван",
       lastName: "Тестов",
       gender: "male",
@@ -515,7 +513,7 @@ describe("Auth", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toContain("ИНН");
+    expect(res.body.message).toContain("ИНН заполняется в профиле компании");
   });
 
   it("login с неверным паролем возвращает 401", async () => {

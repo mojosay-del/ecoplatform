@@ -98,7 +98,7 @@
 | B-SUPPORT | `apps/api/src/support` | `accepted` | B | ticket ownership, admin access, status transitions |
 | C-APP | `apps/web/app` | `accepted` | C | route coverage, auth boundaries, loading/error/not-found states |
 | C-ADMIN | `apps/web/src/components/Admin*` | `accepted` | C | tables, filters, actions, role visibility, overflow |
-| C-AUTH | `apps/web/src/components/AuthForms.tsx` | `not_started` | C | register/login UX, validation, legal consents, password rules |
+| C-AUTH | `apps/web/src/components/AuthForms.tsx` | `accepted` | C | register/login UX, validation, legal consents, password rules |
 | C-SHELL | `apps/web/src/components/AppShell.tsx` | `not_started` | C | navigation, demo banner spacing, account/admin separation |
 | C-CMS | `apps/web/src/components/*Editor*` | `not_started` | C | blocks editor, Tiptap, preview, auto-save, XSS boundaries |
 | C-LIBAPI | `apps/web/src/lib/api` | `not_started` | D | typed API client, refresh, CSRF, error handling, downloads |
@@ -1104,6 +1104,56 @@
 - `F-20260528-031` закрыт: временный пароль при создании platform-staff больше
   не отображается обычным текстом в браузере.
 
+### C-AUTH — `apps/web/src/components/AuthForms.tsx`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `AuthForms.tsx`: login/register shell, двухшаговая регистрация,
+  controlled inputs, phone-country selector, password visibility toggle,
+  password strength meter, legal consent list и submit-flow;
+- `apps/web/src/lib/auth.tsx`: `login()`, `register()`, access-token state и
+  загрузка `/auth/me` после входа/регистрации;
+- `apps/web/src/lib/api/core.ts` и `endpoints.ts`: CSRF headers,
+  auto-refresh, `api.legal.list()` и auth endpoints;
+- `packages/shared/src/dto.ts`: `registerDtoSchema`, `loginDtoSchema`,
+  `passwordSchema` и company-profile schema для последующего заполнения ИНН;
+- `apps/api/src/auth` и auth integration-сценарии, потому что web-регистрация
+  должна совпадать с API-контрактом.
+
+Доказательства:
+
+- React docs через Context7: controlled inputs должны держать `value` и
+  `onChange` в state; `AuthForms.tsx` использует этот паттерн для
+  двухшаговой формы, телефона, email и пароля;
+- Zod docs через Context7: shared string/schema validation проверяется на
+  API-границе; web только помогает пользователю, но не заменяет backend
+  validation;
+- `rg -n "billingInn|name=\"billingInn\"|ИНН" apps/web/src/components/AuthForms.tsx
+  apps/web/app/register/page.tsx apps/web/src/views/account-view.tsx` -> в
+  регистрации ИНН отсутствует, поле остаётся только в профиле компании;
+- `pnpm --filter @ecoplatform/shared lint` -> clean;
+- `pnpm --filter @ecoplatform/shared build` -> shared contract пересобран;
+- `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false` -> clean;
+- `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
+  "регистрация|Auth|Company profile"` -> integration-файл прошёл полностью:
+  132 tests passed.
+
+Решение:
+
+- `apps/web/src/components/AuthForms.tsx` принят без открытых P0/P1/P2-рисков;
+- login показывает серверные причины отказа без утечки пароля/token details;
+- registration загружает активные юридические документы, требует обязательные
+  согласия и отправляет только фактические поля регистрации;
+- ИНН остаётся отдельным действием после входа в профиле компании через
+  `PATCH /api/billing/company`;
+- `F-20260528-032` закрыт: `/auth/register` больше не принимает `billingInn`,
+  поэтому внешний клиент не может записать реквизиты компании во время
+  регистрации в обход продуктового сценария.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -1141,6 +1191,7 @@
 | `F-20260528-029` | `P2` | `apps/api/src/support/support.controller.ts`, `packages/shared/src/dto.ts` | `GET /support/tickets?limit=abc` и admin-аналог вручную парсили query и могли передать `NaN` в Prisma вместо понятного 400. Также тема/ответ из пробелов проходили минимальную длину как обычный текст. | Исправлено: support list query валидируется через zod + `resolvePagination`, тема/сообщение trim'ятся и ограничены по длине, пустой после trim текст даёт 400. Integration-тест проверяет bad query, пустую тему и пустой ответ. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-030` | `P2` | `apps/web/app/global-error.tsx` | В Next.js App Router `global-error.tsx` заменяет root layout. Файл показывал общий fallback через классы `MarketingShell`, но не импортировал глобальные стили сам; при root-level ошибке пользователь мог увидеть неоформленную аварийную страницу. | Исправлено: `global-error.tsx` импортирует `tokens.css` и `globals.css` напрямую. Проверено: `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-031` | `P2` | `apps/web/src/components/AdminStaffView.tsx` | Форма создания сотрудника показывала временный пароль как обычный текст. На админском экране это риск утечки при демонстрации, записи экрана или скриншоте. | Исправлено: поле временного пароля получило `type="password"`, `autoComplete="new-password"` и явный `aria-label`. Проверено: `rg` по password-полю; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/admin/staff`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-032` | `P2` | `packages/shared/src/dto.ts`, `apps/api/src/auth/auth.service.ts` | UI регистрации уже не показывал ИНН, но API-контракт всё ещё принимал `billingInn` и мог записать реквизит компании при регистрации в обход продуктового сценария. Пользователь должен заполнять ИНН позже в профиле компании. | Исправлено: `registerDtoSchema` отклоняет `billingInn`, `AuthService.register()` больше не пишет ИНН при создании компании, integration-тест проверяет 400 на `billingInn` в `/auth/register`, а `PATCH /api/billing/company` сохраняет ИНН как профильное действие. Проверено: `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "регистрация\|Auth\|Company profile"` -> 132 passed. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -1190,6 +1241,7 @@
 | 29 | `F-20260528-029` | `fix(support): закрыть риски проверки support-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test -- support`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Support ownership"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 30 | `F-20260528-030` | `fix(web): закрыть риски проверки app-routes` | `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/__missing-c-app-check`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 31 | `F-20260528-031` | `fix(web): закрыть риски проверки admin-ui` | `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/admin/staff`; `pnpm format:check`; `git diff --check` | `closed` |
+| 32 | `F-20260528-032` | `fix(auth): убрать ИНН из регистрации` | `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "регистрация\\|Auth\\|Company profile"`; `pnpm lint`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 
