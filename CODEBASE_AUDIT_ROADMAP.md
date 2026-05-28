@@ -105,7 +105,7 @@
 | C-AUTHCTX | `apps/web/src/lib/auth.tsx` | `accepted` | C/D | session restore, 401/403 behavior, user state transitions |
 | C-STYLES | `apps/web/src/styles` | `accepted` | C | tokens, contrast, responsive rules, repeated raw colors |
 | D-SHARED | `packages/shared/src` | `accepted` | D | DTOs, access rules, sanitize, content-block schemas |
-| E-TESTS | Tests and smoke | `not_started` | E | unit/integration/smoke coverage, flaky risks, test DB setup |
+| E-TESTS | Tests and smoke | `accepted` | E | unit/integration/smoke coverage, flaky risks, test DB setup |
 | F-ACCEPT | MVP acceptance scenarios | `not_started` | F | owner-facing flows, browser proof, bugfix queue |
 
 ## Журнал проверки модулей
@@ -1516,6 +1516,72 @@
   blocks, lesson не принимает audio/file/checklist, knowledge-base использует
   общий base block set.
 
+### E-TESTS — Tests and smoke
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- root scripts `lint`, `test`, `test:integration`, `test:smoke`, `build`,
+  `typecheck`, `format:check`;
+- `turbo.json`: task graph, `dependsOn`, `cache: false` для integration/smoke
+  и env allow-list для Playwright smoke;
+- `apps/api/vitest.config.ts` и `apps/api/vitest.integration.config.ts`;
+- `apps/api/src/test/integration-global-setup.ts`,
+  `apps/api/src/test/integration-setup.ts`, `apps/api/src/test/test-app.ts`;
+- `apps/web/vitest.config.ts`, `apps/web/playwright.config.ts`,
+  `apps/web/tests/smoke.spec.ts`;
+- `.github/workflows/ci.yml`: `static-checks`, `integration-tests`,
+  `staging-smoke`;
+- локальная готовность Postgres/Redis и seed-данных, нужных для smoke.
+
+Доказательства:
+
+- Vitest docs через Context7: проверены include/exclude patterns, отдельный
+  integration config, global setup/setup files и CLI-фильтрация;
+- Playwright docs через Context7: проверены `baseURL`, retries/workers,
+  artifacts на failure и явное требование `PLAYWRIGHT_TEST_BASE_URL`;
+- Turborepo docs через Context7: task dependencies и `cache: false` для
+  неидемпотентных integration/smoke задач соответствуют текущему `turbo.json`;
+- `docker compose ps` -> `ecoplatform-postgres-1` и `ecoplatform-redis-1`
+  healthy;
+- `psql ...` -> в dev-БД есть 5 активных legal documents, 9 published news,
+  4 published price indices для smoke-сценария;
+- `rg -n "test\\.only|describe\\.only|it\\.only|test\\.skip|describe\\.skip|it\\.skip" apps packages`
+  -> совпадений нет;
+- `pnpm exec turbo run test --dry-run=json` -> unit test tasks запускаются в
+  `@ecoplatform/shared`, `@ecoplatform/api`, `@ecoplatform/web`, shared build
+  идёт upstream dependency;
+- `pnpm exec turbo run test:integration --dry-run=json` -> реально исполняется
+  только `@ecoplatform/api#test:integration`, task cache отключён;
+- `pnpm exec turbo run test:smoke --dry-run=json` -> реально исполняется
+  `@ecoplatform/web#test:smoke`, task cache отключён, env ограничен
+  `PLAYWRIGHT_TEST_BASE_URL` и `SMOKE_TEST_EMAIL_DOMAIN`;
+- `pnpm test` -> shared 10, web 50, api 84 unit tests passed;
+- `pnpm test:integration` -> 133 integration tests passed против
+  `ecoplatform_test`, pending migrations нет;
+- первый локальный `PLAYWRIGHT_TEST_BASE_URL=http://localhost:3000 pnpm --filter
+  @ecoplatform/web test:smoke` нашёл устаревший selector logout-кнопки в smoke;
+- после исправления `apps/web/tests/smoke.spec.ts` повторный smoke -> 1 passed:
+  register -> logout -> login -> `/news` -> `/indices` -> logout;
+- `apps/web/playwright.config.ts` сохраняет screenshot/video/trace на failure,
+  что подтвердилось на первом падении.
+
+Решение:
+
+- `E-TESTS` принят без открытых P0/P1/P2-рисков;
+- unit/integration/smoke цепочка проверяет MVP-риск по слоям: shared/web/api
+  unit tests, отдельная Postgres-backed integration DB и browser smoke;
+- integration setup защищён от случайного запуска против dev-БД проверкой
+  `DATABASE_URL.includes("_test")`, а cron/throttler/pwned-passwords отключены
+  только в тестовом окружении;
+- smoke не стартует без явного `PLAYWRIGHT_TEST_BASE_URL`, поэтому локальные и
+  staging-прогоны не бьют случайный URL;
+- `F-20260528-036` закрыт: smoke-тест снова открывает актуальное меню аккаунта
+  по доступному имени «Открыть настройки аккаунта».
+
 ### Внеплановая dev-runtime правка — `/register`
 
 Дата проверки: 2026-05-28.
@@ -1603,6 +1669,7 @@
 | `F-20260528-032` | `P2` | `packages/shared/src/dto.ts`, `apps/api/src/auth/auth.service.ts` | UI регистрации уже не показывал ИНН, но API-контракт всё ещё принимал `billingInn` и мог записать реквизит компании при регистрации в обход продуктового сценария. Пользователь должен заполнять ИНН позже в профиле компании. | Исправлено: `registerDtoSchema` отклоняет `billingInn`, `AuthService.register()` больше не пишет ИНН при создании компании, integration-тест проверяет 400 на `billingInn` в `/auth/register`, а `PATCH /api/billing/company` сохраняет ИНН как профильное действие. Проверено: `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "регистрация\|Auth\|Company profile"` -> 132 passed. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-033` | `P1` | `apps/web/package.json`, `apps/web/next.config.ts`, `packages/shared/src/index.ts`, `apps/api/src/auth/auth.controller.ts` | Локальный `/register` мог бесконечно перезагружаться: Next dev на Turbopack падал в crash-loop, общий shared barrel подтягивал `isomorphic-dompurify/jsdom` на страницы без HTML, а старая/битая HttpOnly refresh-cookie повторно била в `/auth/refresh` до 429. Для владельца продукта это блокировало ручную проверку регистрации. | Исправлено: web dev запускается через `next dev --webpack`, sanitizer вынесен в `@ecoplatform/shared/sanitize-html`, Next externalize-ит `isomorphic-dompurify/jsdom`, а `/auth/refresh` очищает refresh-cookie при `401 Unauthorized`. Проверено: API integration -> 133 passed; web lint/test/build; browser-check `/register` 60 секунд без reload; browser-check `/legal/privacy`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-035` | `P3` | `apps/web/src/styles/globals.css` | Часть заголовков, labels и compact UI использовала ненулевой или отрицательный `letter-spacing`. На узких контейнерах это могло сжимать текст и давать визуальную дрожь между разными поверхностями. | Исправлено: все `letter-spacing` в `globals.css` приведены к `0`, брендовый оранжевый сохранён прежним. Проверено: `rg` по tracking/font-size/CSS URL; web lint/test/build; browser-check `/login` desktop/mobile без overflow. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-036` | `P2` | `apps/web/tests/smoke.spec.ts` | Playwright smoke-тест искал старый `aria-label` меню аккаунта и падал уже после успешной регистрации. Это давало ложный красный smoke на рабочем UI и могло скрыть реальные проблемы следующих шагов `/news`, `/indices` и logout. | Исправлено: logout helper открывает меню по актуальному доступному имени «Открыть настройки аккаунта». Проверено: первый smoke упал на старом selector; повторный `PLAYWRIGHT_TEST_BASE_URL=http://localhost:3000 pnpm --filter @ecoplatform/web test:smoke` -> 1 passed. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -1656,6 +1723,7 @@
 | 33 | `F-20260528-033` | `fix(dev): остановить перезагрузку страницы регистрации` | `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Auth"`; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/register`; browser-check `/legal/privacy`; `pnpm format:check`; `git diff --check` | `closed` |
 | 34 | `F-20260528-034` | `fix(shared): сузить CSS в CMS HTML sanitizer` | `pnpm --filter @ecoplatform/shared test`; `pnpm --filter @ecoplatform/shared lint`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 35 | `F-20260528-035` | `fix(web): закрыть риски проверки styles` | `pnpm exec prettier --check apps/web/src/styles/tokens.css apps/web/src/styles/globals.css`; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/login`; `git diff --check` | `closed` |
+| 36 | `F-20260528-036` | `fix(test): обновить smoke logout selector` | `PLAYWRIGHT_TEST_BASE_URL=http://localhost:3000 pnpm --filter @ecoplatform/web test:smoke`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

@@ -97,7 +97,7 @@ async function expectIndices(page: Page) {
 }
 
 async function logout(page: Page) {
-  const accountMenuButton = page.locator("button[aria-label^='Открыть меню аккаунта:']");
+  const accountMenuButton = page.getByRole("button", { name: "Открыть настройки аккаунта" });
   await expect(accountMenuButton).toBeVisible();
   await accountMenuButton.click();
   await page.getByRole("menuitem", { name: "Выйти" }).click();

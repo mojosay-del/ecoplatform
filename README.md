@@ -5,8 +5,8 @@
 Текущее состояние MVP — в [PROJECT_STATUS.md](PROJECT_STATUS.md).
 Рабочая карта полного аудита кода — в
 [CODEBASE_AUDIT_ROADMAP.md](CODEBASE_AUDIT_ROADMAP.md).
-На 2026-05-28 полный codebase-аудит принят до `D-SHARED`; следующий модуль
-проверки — `E-TESTS`.
+На 2026-05-28 полный codebase-аудит принят до `E-TESTS`; следующий модуль
+проверки — `F-ACCEPT`.
 
 ## Карта проекта
 
@@ -30,7 +30,7 @@ apps/
       redis/         session cache, throttler storage
       scheduler/     hourly billing-check + nightly cleanup-deleted-accounts (advisory-lock)
       common/        CSRF guard, JwtAuthGuard, pagination, sanitize, simple-zip
-      app.integration.test.ts  132 сквозных теста
+      app.integration.test.ts  133 сквозных теста
   web/               Next.js App Router, Tiptap-редактор, dnd-kit
     app/             публичные и админ-маршруты
       (login,register,forgot-password,news,indices,education,
@@ -108,8 +108,8 @@ docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
 
 ```bash
 pnpm lint                  # tsc --noEmit во всех пакетах
-pnpm test                  # 140 unit-тестов (shared 7, web 50, api 83)
-pnpm test:integration      # 131 integration-тест против ecoplatform_test
+pnpm test                  # 144 unit-теста (shared 10, web 50, api 84)
+pnpm test:integration      # 133 integration-теста против ecoplatform_test
 pnpm build                 # tsc + next build
 pnpm format:check          # prettier
 ```

@@ -13,7 +13,7 @@
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
 `B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED`, `B-SUPPORT`, `C-APP`,
 `C-ADMIN`, `C-AUTH`, `C-SHELL`, `C-CMS`, `C-LIBAPI`, `C-AUTHCTX` и
-`C-STYLES`, `D-SHARED`; следующий модуль проверки — `E-TESTS`.
+`C-STYLES`, `D-SHARED`, `E-TESTS`; следующий модуль проверки — `F-ACCEPT`.
 
 Проверка `C-LIBAPI` подтвердила единый frontend API-слой: access-token хранится
 только в памяти, CSRF-заголовки добавляются централизованно, `401` проходит
@@ -38,6 +38,12 @@ browser-review `/login`.
 envelope; HTML-sanitizer остаётся отдельным subpath
 `@ecoplatform/shared/sanitize-html`, а обычный shared barrel не подтягивает
 DOMPurify/jsdom.
+
+Проверка `E-TESTS` подтвердила тестовый контур MVP: `pnpm test` даёт 144
+unit-теста, `pnpm test:integration` — 133 сквозных сценария против отдельной
+`ecoplatform_test`, а Playwright smoke проходит регистрацию, logout/login,
+`/news`, `/indices` и финальный logout. Устаревший selector logout в smoke
+исправлен на актуальное доступное имя кнопки меню аккаунта.
 
 Внеплановая dev-стабилизация закрыта: локальный `next dev` для web переведён
 на Webpack, потому что Turbopack в текущем окружении уходил в crash-loop на
@@ -117,8 +123,8 @@ volume и сеть `ecoplatform_v10crm` удалены; в локальном Do
 - Prisma + PostgreSQL: 25 миграций к 2026-05-26, актуальная схема в `apps/api/prisma/schema.prisma`.
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
-- 131 integration-тест в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 50 в `apps/web`, 83 в `apps/api`.
+- 133 integration-теста в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
+- Unit-тесты: 10 в `packages/shared`, 50 в `apps/web`, 84 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service); workflow-token ограничен read-only доступом к коду.
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: PostgreSQL 18 на `:5433` + Redis 7 на `:6379`.
@@ -228,7 +234,7 @@ volume и сеть `ecoplatform_v10crm` удалены; в локальном Do
 ### Тех-долг, осознанно отложенный
 
 - 3.3 — расщепление `moderation.service.ts` (940 строк). Приватные хелперы тесно переплетены, расщепление создаст cross-service зависимости. Пересмотреть при росте >1500 строк.
-- 5.2 — декомпозиция integration-тестов на доменные файлы (сейчас один файл на 126 тестов).
+- 5.2 — декомпозиция integration-тестов на доменные файлы (сейчас один файл на 133 теста).
 - 5.3 — OpenAPI/Swagger.
 - 5.4 — pino + LOG_LEVEL (закрыто в Волне 10.1).
 - Реальный визуальный блочный редактор CMS вместо текущего пошагового композитора блоков.
@@ -260,21 +266,22 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 140 unit-тестов (shared 7, web 50, api 83)
+pnpm test                                             # 144 unit-теста (shared 10, web 50, api 84)
 pnpm build                                            # tsc + next build
-pnpm test:integration                                 # 131 integration-тест против ecoplatform_test
+pnpm test:integration                                 # 133 integration-теста против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
 pnpm format:check                                     # prettier
 ```
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-28 (после проверки `B-SUPPORT` в полном codebase-аудите).
+Дата: 2026-05-28 (после проверки `E-TESTS` в полном codebase-аудите).
 
 - `pnpm lint` — успешно: 4 tasks.
-- `pnpm test` — успешно: shared 7, web 50, api 84.
+- `pnpm test` — успешно: shared 10, web 50, api 84.
 - `pnpm build` — успешно: shared/api/web.
-- `pnpm test:integration` — успешно: 132 integration-теста.
+- `pnpm test:integration` — успешно: 133 integration-теста.
+- `PLAYWRIGHT_TEST_BASE_URL=http://localhost:3000 pnpm --filter @ecoplatform/web test:smoke` — успешно: 1 browser-сценарий.
 - `pnpm format:check` — clean.
 - `git diff --check` — clean.
 - Lighthouse desktop baseline (commit `b8e3101`, без перезапуска в 12.4): `/login` 93/96/96/100, `/news` 82/92/100/100, `/education` 86/92/100/100.
