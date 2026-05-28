@@ -95,7 +95,7 @@ docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
 
 ```bash
 pnpm lint                  # tsc --noEmit во всех пакетах
-pnpm test                  # 139 unit-тестов (shared 7, web 50, api 82)
+pnpm test                  # 140 unit-тестов (shared 7, web 50, api 83)
 pnpm test:integration      # 131 integration-тест против ecoplatform_test
 pnpm build                 # tsc + next build
 pnpm format:check          # prettier

@@ -94,7 +94,7 @@
 | B-NOTIF | `apps/api/src/notifications` | `accepted` | B | in-app delivery, read states, privacy of notification payloads |
 | B-OBS | `apps/api/src/observability` | `accepted` | E | metrics auth, labels, cardinality, Sentry/log filtering |
 | B-REDIS | `apps/api/src/redis` | `accepted` | B/E | session cache invalidation, throttler fallback |
-| B-SCHED | `apps/api/src/scheduler` | `not_started` | B/E | advisory locks, cleanup safety, billing cron idempotency |
+| B-SCHED | `apps/api/src/scheduler` | `accepted` | B/E | advisory locks, cleanup safety, billing cron idempotency |
 | B-SUPPORT | `apps/api/src/support` | `not_started` | B | ticket ownership, admin access, status transitions |
 | C-APP | `apps/web/app` | `not_started` | C | route coverage, auth boundaries, loading/error/not-found states |
 | C-ADMIN | `apps/web/src/components/Admin*` | `not_started` | C | tables, filters, actions, role visibility, overflow |
@@ -889,6 +889,57 @@
   доверяет Redis и уходит в fallback на время TTL session-cache, чтобы
   не читать потенциально старую сессию после неудачной инвалидации.
 
+### B-SCHED — `apps/api/src/scheduler`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `SchedulerService`: hourly `billing-hourly-check`, nightly
+  `cleanup-deleted-accounts`, `SCHEDULER_DISABLED`, named cron jobs и
+  PostgreSQL advisory-lock через `pg_try_advisory_xact_lock`;
+- `cleanupDeletedAccounts()`: 30-дневный grace-period, batch-limit,
+  транзакционная очистка user/file/company/address данных и восстановление
+  статуса компании при отменённых/оставшихся пользователях;
+- `BillingNotificationsService`: demo/subscription expiring/expired ветки,
+  перевод статусов и дедупликация уведомлений через `domainEventId`;
+- Prisma-связи `User`, `Company`, `Subscription`, `FileAsset`,
+  `FileReference`, `Address`, а также integration-сценарии удаления аккаунта и
+  billing notifications.
+
+Доказательства:
+
+- NestJS Schedule docs через Context7: `@Cron` принимает cron expression,
+  job `name`, `disabled`/concurrency options; текущие jobs названы и
+  дополнительно пропускаются через `SCHEDULER_DISABLED`;
+- Prisma docs через Context7: raw SQL должен идти через параметризованный
+  `$queryRaw` tagged template; advisory-lock и row-lock запросы используют
+  параметры, без string-concat и без `$queryRawUnsafe`;
+- `rg -n "Cron|Scheduler|scheduler|billing-hourly-check|cleanup-deleted-accounts|pg_try_advisory_xact_lock|\\$transaction|deleteMany|deletionRequestedAt|Idempotency|advisory" apps/api/src apps/api/prisma/schema.prisma packages/shared/src --glob '*.ts' --glob '*.prisma'`;
+- `pnpm --filter @ecoplatform/api test -- scheduler` -> 20 files / 83 tests
+  passed;
+- `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
+  "cleanup-deleted-accounts|Billing notifications"` -> integration-файл прошёл
+  полностью: 131 tests passed;
+- `pnpm lint` -> 4 tasks successful;
+- `pnpm test` -> shared 7, web 50, api 83 tests passed;
+- `pnpm build` -> shared/api/web build successful;
+- `pnpm format:check` -> clean;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/api/src/scheduler` принят без открытых P0/P1/P2-рисков;
+- scheduler можно отключить через `SCHEDULER_DISABLED=1`, а штатные cron jobs
+  не дублируются между репликами из-за PostgreSQL advisory-lock;
+- billing-cron остаётся идемпотентным по статусам и уведомлениям: повторные
+  запуски не создают дублирующие notifications;
+- `F-20260528-027` закрыт: nightly account-deletion cleanup теперь берёт
+  `FOR UPDATE` row-lock на кандидатов перед удалением файлов/пользователей,
+  чтобы параллельная отмена удаления не могла привести к потере данных.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -921,6 +972,7 @@
 | `F-20260528-024` | `P2` | `apps/api/src/notifications/notifications.service.ts` | Если пользователь отключал in-app для категории, `createInApp()` возвращал `null` до создания email-delivery. При будущем email-воркере пользователь мог не получить email, хотя отключал только in-app канал. | Исправлено: in-app mute пропускает только `InAppNotification`, но не мешает отдельной email-delivery очереди, если email для категории включён; unit-тест проверяет email-only delivery. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-025` | `P1` | `apps/api/src/common/sentry.ts`, `apps/web/sentry.shared.ts` | Sentry privacy-фильтр чистил email/phone/address/bank/inn-поля в object payload, но URL query и строковые сообщения закрывали только token/password/session/email. Если 5xx упал на URL вроде `?inn=...&bankAccount=...` или с сообщением `phone=...`, эти персональные данные могли уйти во внешний Sentry. | Исправлено: URL query и key=value строки теперь используют общий список чувствительных ключей; API/web unit-тесты проверяют `phone`, `inn`, `bankAccount` в URL и сообщениях. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-026` | `P1` | `apps/api/src/redis/redis.service.ts` | Если Redis-команда падала во время инвалидации сессии, сервис возвращал fallback, но мог уже на следующем запросе снова читать Redis. Старый access-token мог пройти по stale session-cache до TTL 60 секунд. | Исправлено: после любой Redis-ошибки сервис временно отключает чтение Redis и переводит auth/throttler в fallback на 60 секунд; unit-тест проверяет, что `getClient()` возвращает `null` до истечения grace-window. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-027` | `P1` | `apps/api/src/scheduler/scheduler.service.ts` | Ночной cleanup удаляемых аккаунтов сначала выбирал кандидатов, а потом удалял файлы и пользователя по сохранённым id. Если пользователь успевал отменить удаление параллельно с cron, cleanup мог удалить уже отменённый аккаунт или его file metadata. | Исправлено: выборка кандидатов идёт внутри транзакции через параметризованный `SELECT ... FOR UPDATE`, поэтому отмена удаления и cron больше не могут незаметно разъехаться. Unit-тест проверяет row-lock, integration cleanup/billing сценарии прошли на тестовой БД. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -965,6 +1017,7 @@
 | 24 | `F-20260528-024` | `fix(notifications): закрыть риски проверки notifications-api` | `pnpm --filter @ecoplatform/api test -- notifications`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "notifications\\|Email channel queue"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 | 25 | `F-20260528-025` | `fix(observability): закрыть риски проверки observability` | `pnpm --filter @ecoplatform/api test -- sentry`; `pnpm --filter @ecoplatform/web test -- sentry`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Prometheus\\|metrics"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 | 26 | `F-20260528-026` | `fix(redis): закрыть риски проверки redis-cache` | `pnpm --filter @ecoplatform/api exec vitest run src/redis/redis.service.test.ts src/redis/session-cache.service.test.ts src/redis/redis-throttler-storage.service.test.ts src/common/jwt-auth.guard.test.ts`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
+| 27 | `F-20260528-027` | `fix(scheduler): закрыть риски проверки scheduler` | `pnpm --filter @ecoplatform/api test -- scheduler`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "cleanup-deleted-accounts\\|Billing notifications"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

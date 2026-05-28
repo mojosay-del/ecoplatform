@@ -8,9 +8,15 @@ const BILLING_HOURLY_LOCK_KEY = "cron:billing-hourly-check";
 const ACCOUNT_DELETION_CLEANUP_LOCK_KEY = "cron:cleanup-deleted-accounts";
 const CRON_LOCK_TRANSACTION_TIMEOUT_MS = 15 * 60 * 1000;
 const ACCOUNT_DELETION_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
+const ACCOUNT_DELETION_BATCH_SIZE = 500;
 
 type AdvisoryLockRow = {
   ok: boolean;
+};
+
+type AccountDeletionCandidate = {
+  id: string;
+  companyId: string | null;
 };
 
 type AccountDeletionCleanupResult = {
@@ -73,12 +79,15 @@ export class SchedulerService {
     now: Date,
   ): Promise<AccountDeletionCleanupResult> {
     const cutoff = new Date(now.getTime() - ACCOUNT_DELETION_GRACE_MS);
-    const candidates = await tx.user.findMany({
-      where: { deletionRequestedAt: { lt: cutoff } },
-      select: { id: true, companyId: true },
-      take: 500,
-      orderBy: { deletionRequestedAt: "asc" },
-    });
+    // Row lock закрывает гонку с одновременной отменой удаления аккаунта.
+    const candidates = await tx.$queryRaw<AccountDeletionCandidate[]>`
+      SELECT id, "companyId"
+      FROM "User"
+      WHERE "deletionRequestedAt" < ${cutoff}
+      ORDER BY "deletionRequestedAt" ASC
+      LIMIT ${ACCOUNT_DELETION_BATCH_SIZE}
+      FOR UPDATE
+    `;
 
     if (candidates.length === 0) {
       return { deletedUsers: 0, deletedCompanies: 0 };

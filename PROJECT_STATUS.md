@@ -11,8 +11,8 @@
 Отдельный полномасштабный codebase-аудит ведётся по `CODEBASE_AUDIT_ROADMAP.md`.
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
-`B-MOD`, `B-NOTIF`, `B-OBS` и `B-REDIS`; следующий модуль проверки —
-`B-SCHED`.
+`B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS` и `B-SCHED`; следующий модуль
+проверки — `B-SUPPORT`.
 
 Волна 11.1 закрыта: дизайн-токены вынесены в `apps/web/src/styles/tokens.css`, а `globals.css` переведён с прямых цветов на CSS-переменные.
 
@@ -78,7 +78,7 @@
 - Перфоманс-индексы: 13 составных индексов на NewsPost/Comment/SupportTicket/Subscription/LearningModule и др.
 - Пагинация envelope `{ items, total, hasMore }` на всех листингах публичной части и админки.
 - 131 integration-тест в `apps/api/src/app.integration.test.ts` + автоматический setup тестовой БД `ecoplatform_test`.
-- Unit-тесты: 7 в `packages/shared`, 50 в `apps/web`, 82 в `apps/api`.
+- Unit-тесты: 7 в `packages/shared`, 50 в `apps/web`, 83 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service); workflow-token ограничен read-only доступом к коду.
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
 - Локальный `docker-compose.yml`: PostgreSQL 18 на `:5433` + Redis 7 на `:6379`.
@@ -220,7 +220,7 @@ pnpm dev                                              # api на :4000, web на
 
 ```bash
 pnpm lint                                             # tsc --noEmit во всех пакетах
-pnpm test                                             # 139 unit-тестов (shared 7, web 50, api 82)
+pnpm test                                             # 140 unit-тестов (shared 7, web 50, api 83)
 pnpm build                                            # tsc + next build
 pnpm test:integration                                 # 131 integration-тест против ecoplatform_test
 pnpm test:smoke                                       # Playwright smoke против PLAYWRIGHT_TEST_BASE_URL
@@ -229,10 +229,10 @@ pnpm format:check                                     # prettier
 
 ## Последняя зелёная проверка
 
-Дата: 2026-05-28 (после проверки `B-REDIS` в полном codebase-аудите).
+Дата: 2026-05-28 (после проверки `B-SCHED` в полном codebase-аудите).
 
 - `pnpm lint` — успешно: 4 tasks.
-- `pnpm test` — успешно: shared 7, web 50, api 82.
+- `pnpm test` — успешно: shared 7, web 50, api 83.
 - `pnpm build` — успешно: shared/api/web.
 - `pnpm test:integration` — успешно: 131 integration-тест.
 - `pnpm format:check` — clean.
