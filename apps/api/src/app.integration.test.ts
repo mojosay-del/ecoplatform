@@ -3208,6 +3208,28 @@ describe("Legal documents & consents", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("публичные legal endpoints отклоняют неизвестный тип и не отдают черновик", async () => {
+    const invalidType = await ctx.http.get("/api/legal/documents/unknown_policy/1.0.0");
+    expect(invalidType.status).toBe(400);
+
+    const invalidFilter = await ctx.http.get("/api/legal/documents?types=privacy_policy,unknown_policy");
+    expect(invalidFilter.status).toBe(400);
+
+    await ctx.prisma.legalDocument.create({
+      data: {
+        type: LegalDocumentType.cookie_policy,
+        version: "8.9.9",
+        title: "Черновик cookies",
+        body: "<p>Ещё не опубликовано</p>",
+        isRequired: false,
+        isActive: false,
+      },
+    });
+
+    const draft = await ctx.http.get("/api/legal/documents/cookie_policy/8.9.9");
+    expect(draft.status).toBe(404);
+  });
+
   it("POST /consents записывает согласие в БД с IP и user-agent", async () => {
     const doc = await createActiveDoc(LegalDocumentType.cookie_policy, "9.0.0", false);
     const { token, userId } = await registerCompany("0000200");

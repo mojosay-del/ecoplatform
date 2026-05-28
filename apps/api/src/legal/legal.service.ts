@@ -42,7 +42,7 @@ export class LegalService {
     const document = await this.prisma.legalDocument.findUnique({
       where: { type_version: { type, version } },
     });
-    if (!document) {
+    if (!document || !document.publishedAt) {
       throw new NotFoundException("Документ не найден.");
     }
     return toDetail(document);

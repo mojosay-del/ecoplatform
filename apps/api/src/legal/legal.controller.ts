@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { SkipThrottle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { LegalDocumentType, consentSubmitDtoSchema, legalDocumentTypes } from "@ecoplatform/shared";
@@ -50,7 +50,7 @@ export class LegalController {
 
 function parseType(value: string): LegalDocumentType {
   if (!legalDocumentTypes.includes(value as LegalDocumentType)) {
-    throw new Error("Неизвестный тип документа");
+    throw new BadRequestException("Неизвестный тип документа.");
   }
   return value as LegalDocumentType;
 }
@@ -60,8 +60,15 @@ function parseTypesQuery(value?: string): LegalDocumentType[] | undefined {
   const parts = value
     .split(",")
     .map((p) => p.trim())
-    .filter((p): p is LegalDocumentType => legalDocumentTypes.includes(p as LegalDocumentType));
-  return parts.length ? parts : undefined;
+    .filter(Boolean);
+  if (!parts.length) return undefined;
+
+  const invalid = parts.filter((p) => !legalDocumentTypes.includes(p as LegalDocumentType));
+  if (invalid.length) {
+    throw new BadRequestException(`Неизвестный тип документа: ${invalid.join(", ")}.`);
+  }
+
+  return Array.from(new Set(parts as LegalDocumentType[]));
 }
 
 function extractIp(request: Request): string | null {

@@ -89,7 +89,7 @@
 | B-BILLING | `apps/api/src/billing` | `accepted` | B | company profile, subscriptions, manual activation, notifications |
 | B-CONTENT | `apps/api/src/content` | `accepted` | B | CMS validation, publish/preview rules, tags, indices, block payloads |
 | B-FILES | `apps/api/src/files` | `accepted` | B | MIME/extension/size checks, S3 paths, public/private access |
-| B-LEGAL | `apps/api/src/legal` | `not_started` | B | active documents, consent records, re-consent flow |
+| B-LEGAL | `apps/api/src/legal` | `accepted` | B | active documents, consent records, re-consent flow |
 | B-MOD | `apps/api/src/moderation` | `not_started` | B | sanctions, report flow, module restrictions, edge cases |
 | B-NOTIF | `apps/api/src/notifications` | `not_started` | B | in-app delivery, read states, privacy of notification payloads |
 | B-OBS | `apps/api/src/observability` | `not_started` | E | metrics auth, labels, cardinality, Sentry/log filtering |
@@ -599,7 +599,7 @@
 - `pnpm --filter @ecoplatform/api test -- files` -> 19 files / 80 tests
   passed;
 - `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
-  "Files API"` -> integration-файл прошёл полностью: 125 tests passed;
+  "Files API"` -> integration-файл прошёл полностью;
 - `pnpm --filter @ecoplatform/api lint` -> clean;
 - `pnpm exec prettier --check apps/api/src/files/files.controller.ts
   apps/api/src/files/files.service.ts apps/api/src/files/files.service.test.ts
@@ -615,6 +615,59 @@
 - `F-20260528-015` закрыт: content-manager больше не может удалить чужой
   неиспользуемый файл через `/api/files/:id`; удаление чужих файлов оставлено
   только для admin.
+
+### B-LEGAL — `apps/api/src/legal`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `LegalController`: публичные документы, фильтр `types`, detail-route,
+  авторизованные consent endpoints;
+- `AdminLegalController`: guards, роли `admin/content_manager`, создание и
+  публикация версий, audit-log;
+- `LegalService`: active/published boundaries, запись `ConsentRecord`,
+  re-consent по активным обязательным документам, idempotent createMany;
+- связи с `AuthService.register()` и `/auth/me.requiresReConsent`;
+- Prisma-модели `LegalDocument` и `ConsentRecord`, shared DTO/response types,
+  web-формы регистрации и cookie-consent.
+
+Доказательства:
+
+- NestJS docs через Context7: protected routes должны закрываться guards, роли
+  проверяются через metadata/guard, а плохой input должен отбрасываться на
+  controller boundary;
+- Prisma docs через Context7: publish/deactivate сверялся с transaction,
+  `@@unique([type, version])`, `createMany({ skipDuplicates: true })` и
+  ограниченными `select/include`;
+- `rg -n "LegalDocument|ConsentRecord|acceptedDocumentIds|requiresReConsent|legal|consent"
+  apps/api/src apps/web/src apps/web/app packages/shared/src
+  apps/api/prisma/schema.prisma apps/api/prisma/seed.ts` -> найдены и
+  проверены все основные потребители legal/consent flow;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe"
+  apps/api/src/legal packages/shared/src/dto.ts packages/shared/src/api-response.ts`
+  -> совпадений нет;
+- `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
+  "Legal documents & consents"` -> integration-файл прошёл полностью:
+  126 tests passed;
+- `pnpm lint` -> 4 tasks successful;
+- `pnpm test` -> shared 7, web 50, api 80 tests passed;
+- `pnpm build` -> shared/api/web build successful;
+- `pnpm format:check` -> clean;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/api/src/legal` принят без открытых P0/P1/P2-рисков;
+- регистрация и re-consent проверяют активные обязательные документы и пишут
+  `ConsentRecord` с source/ip/user-agent;
+- публикация новой версии документа деактивирует старую версию в транзакции и
+  пишет admin audit-log;
+- `F-20260528-016` закрыт: публичный detail-route больше не отдаёт
+  неопубликованные черновики, а неизвестные legal document type в path/query
+  возвращают 400 вместо 500 или молчаливой выдачи всех документов.
 
 ## Реестр находок
 
@@ -637,6 +690,7 @@
 | `F-20260528-013` | `P2` | `apps/api/src/content/services/indices.service.ts` | Добавление значения индекса цены не проверяло существование индекса заранее и не писало admin audit-log. Ошибка по несуществующему id могла уходить как Prisma/FK failure, а изменение цены оставалось без журналируемого следа. | Исправлено: `addPriceValue()` проверяет `PriceIndex`, отдаёт 404, пишет `indices.value.create/update` с before/after price; integration-тест проверяет missing index, create/update и audit log. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-014` | `P1` | `apps/api/src/files/files.service.ts` | Metadata-only endpoint мог создать публичную запись файла с SVG/HTML/любой MIME-строкой и произвольным storage key без проверки реального upload-контура. Через CMS это могло превратиться в небезопасную или битую публичную ссылку и обход дневной квоты. | Исправлено: metadata-only путь нормализует MIME, блокирует опасные MIME/расширения, применяет лимит 100 МБ, дневную квоту и общий безопасный `storageKey`; unit и integration-тесты проверяют SVG reject и PDF alias normalization. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-015` | `P1` | `apps/api/src/files/files.controller.ts` | Content-manager мог удалить любой неиспользуемый файл по id, даже если файл загрузил другой сотрудник. В CMS это риск потери чужого чернового ассета до публикации. | Исправлено: `DELETE /api/files/:id` передаёт текущего пользователя в service; удалить чужой файл может только admin, content-manager получает 403. Unit и integration-тесты проверяют запрет и сохранение записи. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-016` | `P1` | `apps/api/src/legal` | Публичный route конкретной версии юр-документа мог отдать неопубликованный черновик, если известны type/version. Некорректный type в path давал 500, а некорректный `types` query мог молча превратиться в выдачу всех активных документов. Это риск публикации незавершённого юридического текста и непредсказуемого API-поведения. | Исправлено: detail-route отдаёт только документы с `publishedAt`, неизвестный type в path/query возвращает 400; integration-тест проверяет invalid path type, invalid query filter и 404 для черновика. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -670,6 +724,7 @@
 | 13 | `F-20260528-013` | `fix(content): закрыть риски проверки content-api` | `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Content publish\\|Content lifecycle: price indices\\|Discussion\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 14 | `F-20260528-014` | `fix(files): закрыть риски проверки files-api` | `pnpm --filter @ecoplatform/api test -- files`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Files API"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 15 | `F-20260528-015` | `fix(files): закрыть риски проверки files-api` | `pnpm --filter @ecoplatform/api test -- files`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Files API"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 16 | `F-20260528-016` | `fix(legal): закрыть риски проверки legal-api` | `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Legal documents & consents"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 
