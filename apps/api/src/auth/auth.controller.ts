@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
-import type { Request, Response } from "express";
+import type { CookieOptions, Request, Response } from "express";
 import { changePasswordDtoSchema, loginDtoSchema, registerDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import type { RequestWithCsrf } from "../common/csrf.guard";
@@ -13,6 +13,18 @@ import { AuthService } from "./auth.service";
 // Жёсткое окно «10 запросов в минуту на IP» именно для login/register/refresh —
 // чтобы перебор паролей и массовая регистрация ботов сразу натыкались на 429.
 const AUTH_THROTTLE = { auth: { limit: 10, ttl: 60_000 } };
+const REFRESH_COOKIE_NAME = "refreshToken";
+const REFRESH_COOKIE_PATH = "/api/auth";
+const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function refreshCookieOptions(): CookieOptions {
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: REFRESH_COOKIE_PATH,
+  };
+}
 
 @Controller("auth")
 export class AuthController {
@@ -55,7 +67,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post("logout")
   async logout(@CurrentUser() user: RequestUser, @Res({ passthrough: true }) response: Response) {
-    response.clearCookie("refreshToken");
+    this.clearRefreshCookie(response);
     return this.auth.logout(user.sessionId);
   }
 
@@ -74,7 +86,7 @@ export class AuthController {
   ) {
     const result = await this.auth.revokeSession(user.id, user.sessionId, id);
     if (result.revokedCurrent) {
-      response.clearCookie("refreshToken");
+      this.clearRefreshCookie(response);
     }
     return result;
   }
@@ -82,7 +94,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post("sessions/logout-all")
   async logoutAll(@CurrentUser() user: RequestUser, @Res({ passthrough: true }) response: Response) {
-    response.clearCookie("refreshToken");
+    this.clearRefreshCookie(response);
     return this.auth.logoutAllSessions(user.id);
   }
 
@@ -123,13 +135,14 @@ export class AuthController {
   }
 
   private setRefreshCookie(response: Response, refreshToken: string) {
-    response.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/api/auth",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+    response.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+      ...refreshCookieOptions(),
+      maxAge: REFRESH_COOKIE_MAX_AGE_MS,
     });
+  }
+
+  private clearRefreshCookie(response: Response) {
+    response.clearCookie(REFRESH_COOKIE_NAME, refreshCookieOptions());
   }
 
   private meta(request: Request) {

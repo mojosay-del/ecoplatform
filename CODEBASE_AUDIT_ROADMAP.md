@@ -83,7 +83,7 @@
 | A-CI | `.github/workflows` | `accepted` | A/E | static checks, integration DB, smoke trigger, secrets boundary |
 | A-OPS | `ops/monitoring` | `accepted` | A/E | alerts, example config, absence of real secrets |
 | B-PRISMA | `apps/api/prisma` | `accepted` | B | schema, migrations, indexes, constraints, seed safety |
-| B-AUTH | `apps/api/src/auth` | `not_started` | B | login, refresh, lockout, export data, deletion, password policy |
+| B-AUTH | `apps/api/src/auth` | `accepted` | B | login, refresh, lockout, export data, deletion, password policy |
 | B-COMMON | `apps/api/src/common` | `not_started` | B | guards, roles, CSRF, pagination, logging filters, sanitizing |
 | B-ADMIN | `apps/api/src/admin` | `not_started` | B | RBAC, audit log, dashboard queries, admin mutations |
 | B-BILLING | `apps/api/src/billing` | `not_started` | B | company profile, subscriptions, manual activation, notifications |
@@ -265,6 +265,63 @@
   умолчанию только показывает план, запись требует явного
   `PROMOTE_FIRST_ADMIN_WRITE=1`.
 
+### B-AUTH — `apps/api/src/auth`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `apps/api/src/auth/auth.controller.ts`: login/register/refresh/logout,
+  sessions, `/auth/me`, смена пароля, export-data и request/cancel deletion;
+- `apps/api/src/auth/auth.service.ts`: bcrypt-пароли, dummy compare,
+  lockout, session refresh rotation, revoke/logout-all, re-consent,
+  удаление аккаунта и уведомления безопасности;
+- `apps/api/src/auth/auth-data-export.service.ts`: состав ZIP-экспорта и
+  исключение `passwordHash`/`refreshTokenHash`/`providerToken`/`keyHash`;
+- `apps/api/src/auth/password-policy.service.ts`: единый минимум пароля и
+  Have I Been Pwned range API без отправки plaintext-пароля;
+- связанные границы `apps/api/src/common/jwt-auth.guard.ts`,
+  `apps/api/src/common/csrf.guard.ts`, `apps/api/src/app.module.ts`,
+  `packages/shared/src/dto.ts`, `packages/shared/src/api-response.ts`,
+  `apps/api/prisma/schema.prisma` и auth-блок integration-тестов.
+
+Доказательства:
+
+- NestJS docs через Context7: protected routes должны идти через guards,
+  а пользователь добавляется в request после проверки JWT;
+- Prisma docs через Context7: multi-step writes и auth-связанные операции
+  сверялись с `$transaction`, `select` для чувствительных полей и
+  relation/cascade boundaries;
+- Express docs через Context7: `res.clearCookie()` должен получать тот же
+  `path`, что и исходный `res.cookie()`;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe|password\\s*[:=]|token\\s*[:=]|secret\\s*[:=]|refreshTokenHash|passwordHash" apps/api/src/auth apps/api/src/common/jwt-auth.guard.ts apps/api/src/common/csrf.guard.ts apps/api/prisma/schema.prisma packages/shared/src/dto.ts packages/shared/src/api-response.ts` ->
+  без production-логов, TODO, raw SQL и хардкод-секретов; совпадения по
+  `passwordHash`/`refreshTokenHash` находятся только в ожидаемых местах
+  хеширования, проверки, schema и тестах;
+- `pnpm --filter @ecoplatform/api test -- auth` -> 19 files / 76 tests
+  passed;
+- `pnpm --filter @ecoplatform/api exec vitest run -c
+  vitest.integration.config.ts src/app.integration.test.ts
+  --testNamePattern Auth` -> 1 file passed, 20 auth tests passed, 97 skipped;
+- `pnpm exec prettier --check apps/api/src/auth/auth.controller.ts
+  apps/api/src/app.integration.test.ts CODEBASE_AUDIT_ROADMAP.md`;
+- `pnpm --filter @ecoplatform/api lint`;
+- `git diff --check`.
+
+Решение:
+
+- auth endpoints защищены JWT guard там, где нужна авторизация; refresh
+  дополнительно проходит CSRF double-submit;
+- password/refresh-token hashes не возвращаются наружу, export-data отдаёт
+  ZIP с `Cache-Control: no-store`;
+- lockout, refresh rotation, revoke/logout-all, смена пароля и удаление
+  аккаунта покрыты unit/integration-тестами;
+- открытых P0/P1/P2-рисков по `apps/api/src/auth` нет;
+- `F-20260528-005` закрыт: refresh-cookie теперь очищается с тем же
+  `Path=/api/auth`, с которым выдаётся.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -275,6 +332,7 @@
 | `F-20260528-002` | `P2` | `.github/workflows/ci.yml` | CI не фиксировал минимальные права `GITHUB_TOKEN`, поэтому будущие jobs могли случайно получить больше прав, чем нужно для read-only проверок. | Исправлено: добавлен workflow-level `permissions: contents: read`. Проверено: `pnpm exec prettier --check .github/workflows/ci.yml`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-003` | `P2` | `apps/api/prisma/seed.ts` | Seed создавал dev-admin/demo с паролями прямо из кода и печатал эти пароли в консоль. При случайном запуске не в локальном окружении это могло оставить известные учётки и секреты в логах. | Исправлено: seed требует `SEED_ADMIN_PASSWORD` и `SEED_DEMO_PASSWORD` из env, проверяет минимум 12 символов и placeholder-значения, в stdout пишет только источник пароля. Проверено: seed прошёл с временными env-паролями. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-004` | `P1` | `apps/api/prisma/scripts/promote-first-admin.ts` | Скрипт первого админа по умолчанию был write-mode и мог удалить всех пользователей/компании кроме владельца, если его запустить по инструкции без dry-run. | Исправлено: по умолчанию скрипт теперь dry-run, запись требует `PROMOTE_FIRST_ADMIN_WRITE=1`. Проверено: запуск без флага нашёл owner и показал план без записи, в БД осталось 2 пользователя. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-005` | `P2` | `apps/api/src/auth/auth.controller.ts` | Logout/revoke/logout-all отзывали серверную сессию, но могли не удалить старую HttpOnly refresh-cookie в браузере: cookie выдавалась с `Path=/api/auth`, а очищалась без path. Для пользователя это выглядело бы как «вышел, но браузер всё ещё хранит старую cookie». | Исправлено: выдача и очистка refresh-cookie используют общий набор options с `Path=/api/auth`; integration-тест проверяет `Set-Cookie` при login и logout. Проверено: `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts src/app.integration.test.ts --testNamePattern Auth` -> 20 auth tests passed. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -297,6 +355,7 @@
 | 2 | `F-20260528-002` | `ci(github): ограничить права workflow-токена` | `pnpm exec prettier --check .github/workflows/ci.yml`; `pnpm lint`; `git diff --check` | `closed` |
 | 3 | `F-20260528-003` | `fix(prisma): убрать хардкод seed-паролей` | `prisma validate`; `prisma:migrate`; `seed`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
 | 4 | `F-20260528-004` | `fix(prisma): включить dry-run для первого админа` | `promote-first-admin.ts` без `PROMOTE_FIRST_ADMIN_WRITE`; `postgres-local` user count; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
+| 5 | `F-20260528-005` | `fix(auth): корректно очищать refresh-cookie` | `pnpm --filter @ecoplatform/api test -- auth`; `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts src/app.integration.test.ts --testNamePattern Auth`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

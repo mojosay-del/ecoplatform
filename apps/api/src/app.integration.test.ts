@@ -271,6 +271,12 @@ function responseCookiePart(response: { headers: Record<string, string | string[
   return responseCookieParts(response).find((cookie) => cookie.startsWith(`${name}=`));
 }
 
+function responseCookieFull(response: { headers: Record<string, string | string[] | undefined> }, name: string) {
+  const setCookie = response.headers["set-cookie"];
+  const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+  return cookies.find((cookie) => cookie.startsWith(`${name}=`));
+}
+
 function restoreEnv(name: string, value: string | undefined) {
   if (value === undefined) {
     delete process.env[name];
@@ -410,6 +416,23 @@ describe("Auth", () => {
 
     expect(ok.status).toBe(201);
     expect(ok.body.accessToken).toMatch(/\./);
+  });
+
+  it("logout очищает refresh-cookie с тем же path, с которым она была выдана", async () => {
+    const login = await ctx.http.post("/api/auth/login").send({ email: "admin@test.local", password: "Admin12345" });
+    expect(login.status).toBe(201);
+
+    const loginRefreshCookie = responseCookieFull(login, "refreshToken");
+    expect(loginRefreshCookie).toContain("Path=/api/auth");
+    expect(loginRefreshCookie).toContain("HttpOnly");
+
+    const logout = await ctx.http.post("/api/auth/logout").set("Authorization", `Bearer ${login.body.accessToken}`);
+    expect(logout.status).toBe(201);
+
+    const clearedRefreshCookie = responseCookieFull(logout, "refreshToken");
+    expect(clearedRefreshCookie).toContain("refreshToken=");
+    expect(clearedRefreshCookie).toContain("Path=/api/auth");
+    expect(clearedRefreshCookie).toContain("Expires=Thu, 01 Jan 1970");
   });
 
   it("регистрация создаёт компанию в demo-статусе и возвращает access-токен", async () => {
