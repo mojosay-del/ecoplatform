@@ -96,7 +96,7 @@
 | B-REDIS | `apps/api/src/redis` | `accepted` | B/E | session cache invalidation, throttler fallback |
 | B-SCHED | `apps/api/src/scheduler` | `accepted` | B/E | advisory locks, cleanup safety, billing cron idempotency |
 | B-SUPPORT | `apps/api/src/support` | `accepted` | B | ticket ownership, admin access, status transitions |
-| C-APP | `apps/web/app` | `not_started` | C | route coverage, auth boundaries, loading/error/not-found states |
+| C-APP | `apps/web/app` | `accepted` | C | route coverage, auth boundaries, loading/error/not-found states |
 | C-ADMIN | `apps/web/src/components/Admin*` | `not_started` | C | tables, filters, actions, role visibility, overflow |
 | C-AUTH | `apps/web/src/components/AuthForms.tsx` | `not_started` | C | register/login UX, validation, legal consents, password rules |
 | C-SHELL | `apps/web/src/components/AppShell.tsx` | `not_started` | C | navigation, demo banner spacing, account/admin separation |
@@ -985,6 +985,65 @@
 - `F-20260528-029` закрыт: support list query валидируется через zod, пустые
   после trim тема/ответ отклоняются 400, длина темы/сообщения ограничена.
 
+### C-APP — `apps/web/app`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- 33 `page.tsx` route entrypoint: публичные страницы, auth-страницы,
+  `account`, `notifications`, `legal`, `admin` и динамические маршруты
+  `news/[slug]`, `education/[moduleId]`, `education/[moduleId]/[lessonId]`,
+  `knowledge-base/[slug]`, `account/[section]`;
+- `layout.tsx`, `/` redirect, legacy `/account?tab=...` redirect,
+  `not-found.tsx`, `error.tsx`, `global-error.tsx`;
+- `loading.tsx` для `news`, `indices`, `education`, `knowledge-base`,
+  `account`;
+- `legal/layout.tsx` как публичный shell без auth/sidebar;
+- `Suspense`-границы для route entrypoints, где client view использует
+  `useSearchParams`;
+- auth-boundary через `AuthProvider` + `AppShell` для защищённых route views и
+  role-aware `/admin` navigation.
+
+Доказательства:
+
+- Next.js docs через Context7: App Router dynamic `params/searchParams` в
+  Next 16 приходят как `Promise`, `loading.tsx` создаёт fallback UI,
+  `useSearchParams` в prerendered route требует ближайший `Suspense`, а
+  `global-error.tsx` заменяет root layout и должен сам включать `<html>`,
+  `<body>` и нужные глобальные стили;
+- `find apps/web/app -type f -name 'page.tsx' | wc -l` -> 33 route page;
+- route-list через Node по `apps/web/app` -> `/`, `/news`, `/news/:param`,
+  `/indices`, `/education`, `/education/:param`,
+  `/education/:param/:param`, `/knowledge-base`,
+  `/knowledge-base/:param`, `/account`, `/account/:param`,
+  `/notifications`, `/admin` + 11 admin-дочерних route и 5 `/legal/*` route;
+- `rg -n "useSearchParams\\(" apps/web/src apps/web/app` -> только
+  `NewsView` и `AdminSupportView`; оба подключены из route page внутри
+  `<Suspense>`;
+- `rg -n "TODO|FIXME|console\\.log|dangerouslySetInnerHTML|password\\s*[:=]|token\\s*[:=]|secret\\s*[:=]" apps/web/app`
+  -> production TODO/FIXME/logs, raw HTML и хардкод-секреты не найдены;
+- `pnpm --filter @ecoplatform/web lint` -> clean;
+- `pnpm --filter @ecoplatform/web test` -> 14 files / 50 tests passed;
+- `pnpm --filter @ecoplatform/web build` -> Next.js 16.2.6 production build
+  successful, 30 static pages generated;
+- browser-check `/__missing-c-app-check` на production server -> HTTP 404,
+  security headers сохранены, 404 fallback визуально отрисован со стилями
+  (`/private/tmp/ecoplatform-c-app-404.png`).
+
+Решение:
+
+- `apps/web/app` принят без открытых P0/P1/P2-рисков;
+- route coverage совпадает с навигацией `AppShell`, account/admin deep-links и
+  публичными legal links;
+- защищённые страницы попадают в `AppShell`, который ждёт восстановления
+  refresh-cookie и только потом отправляет гостя на `/login`;
+- `F-20260528-030` закрыт: `global-error.tsx` теперь сам импортирует
+  `tokens.css` и `globals.css`, поэтому root-level fallback не зависит от
+  заменённого root layout.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -1020,6 +1079,7 @@
 | `F-20260528-027` | `P1` | `apps/api/src/scheduler/scheduler.service.ts` | Ночной cleanup удаляемых аккаунтов сначала выбирал кандидатов, а потом удалял файлы и пользователя по сохранённым id. Если пользователь успевал отменить удаление параллельно с cron, cleanup мог удалить уже отменённый аккаунт или его file metadata. | Исправлено: выборка кандидатов идёт внутри транзакции через параметризованный `SELECT ... FOR UPDATE`, поэтому отмена удаления и cron больше не могут незаметно разъехаться. Unit-тест проверяет row-lock, integration cleanup/billing сценарии прошли на тестовой БД. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-028` | `P1` | `apps/api/src/support/support.service.ts` | В модели support-сообщений есть флаг `isInternal`, но пользовательский список тикетов отдавал все сообщения тикета. Если support-команда добавит внутренние заметки, клиент компании смог бы увидеть служебный текст и ids сообщений. | Исправлено: пользовательские выдачи и ответ клиента фильтруют `messages.where.isInternal=false` и используют allow-list `select` без `authorId/ticketId`; admin-выдача сохраняет полный support-thread. Unit и integration-тесты проверяют, что внутренняя заметка не видна компании, но видна admin. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-029` | `P2` | `apps/api/src/support/support.controller.ts`, `packages/shared/src/dto.ts` | `GET /support/tickets?limit=abc` и admin-аналог вручную парсили query и могли передать `NaN` в Prisma вместо понятного 400. Также тема/ответ из пробелов проходили минимальную длину как обычный текст. | Исправлено: support list query валидируется через zod + `resolvePagination`, тема/сообщение trim'ятся и ограничены по длине, пустой после trim текст даёт 400. Integration-тест проверяет bad query, пустую тему и пустой ответ. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-030` | `P2` | `apps/web/app/global-error.tsx` | В Next.js App Router `global-error.tsx` заменяет root layout. Файл показывал общий fallback через классы `MarketingShell`, но не импортировал глобальные стили сам; при root-level ошибке пользователь мог увидеть неоформленную аварийную страницу. | Исправлено: `global-error.tsx` импортирует `tokens.css` и `globals.css` напрямую. Проверено: `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -1067,6 +1127,7 @@
 | 27 | `F-20260528-027` | `fix(scheduler): закрыть риски проверки scheduler` | `pnpm --filter @ecoplatform/api test -- scheduler`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "cleanup-deleted-accounts\\|Billing notifications"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 28 | `F-20260528-028` | `fix(support): закрыть риски проверки support-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test -- support`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Support ownership"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 29 | `F-20260528-029` | `fix(support): закрыть риски проверки support-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test -- support`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Support ownership"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 30 | `F-20260528-030` | `fix(web): закрыть риски проверки app-routes` | `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/__missing-c-app-check`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

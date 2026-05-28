@@ -4,6 +4,8 @@ import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 import { MarketingShell } from "../src/components/MarketingShell";
 import { StatusPill } from "../src/components/StatusPill";
+import "../src/styles/tokens.css";
+import "../src/styles/globals.css";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
