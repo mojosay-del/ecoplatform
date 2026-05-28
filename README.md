@@ -2,11 +2,9 @@
 
 Репозиторий содержит рабочую кодовую базу MVP на Turborepo + pnpm.
 
-Текущее состояние MVP — в [PROJECT_STATUS.md](PROJECT_STATUS.md).
-Рабочая карта полного аудита кода — в
-[CODEBASE_AUDIT_ROADMAP.md](CODEBASE_AUDIT_ROADMAP.md).
-На 2026-05-28 полный codebase-аудит принят до `E-TESTS`; следующий модуль
-проверки — `F-ACCEPT`.
+Текущее состояние MVP и следующий этап — в [PROJECT_STATUS.md](PROJECT_STATUS.md).
+На 2026-05-28 полный технический codebase-аудит завершён; дальше идёт ручная
+приёмка MVP владельцем продукта.
 
 ## Карта проекта
 
