@@ -103,7 +103,7 @@
 | C-CMS | `apps/web/src/components/*Editor*` | `accepted` | C | blocks editor, Tiptap, preview, auto-save, XSS boundaries |
 | C-LIBAPI | `apps/web/src/lib/api` | `accepted` | D | typed API client, refresh, CSRF, error handling, downloads |
 | C-AUTHCTX | `apps/web/src/lib/auth.tsx` | `accepted` | C/D | session restore, 401/403 behavior, user state transitions |
-| C-STYLES | `apps/web/src/styles` | `not_started` | C | tokens, contrast, responsive rules, repeated raw colors |
+| C-STYLES | `apps/web/src/styles` | `accepted` | C | tokens, contrast, responsive rules, repeated raw colors |
 | D-SHARED | `packages/shared/src` | `not_started` | D | DTOs, access rules, sanitize, content-block schemas |
 | E-TESTS | Tests and smoke | `not_started` | E | unit/integration/smoke coverage, flaky risks, test DB setup |
 | F-ACCEPT | MVP acceptance scenarios | `not_started` | F | owner-facing flows, browser proof, bugfix queue |
@@ -1392,6 +1392,62 @@
 - `401` и `403` не смешиваются: `401` очищает сессию/ведёт на login, а `403`
   остаётся состоянием закрытого доступа в query/view слоях.
 
+### C-STYLES — `apps/web/src/styles`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `apps/web/src/styles/tokens.css`: палитра, semantic/status tokens,
+  typography, radius, shadows, focus/button/field states и legacy aliases;
+- `apps/web/src/styles/globals.css`: global reset, `AppShell`, auth/marketing
+  layouts, public pages, admin tables, CMS editors, account/support views,
+  responsive breakpoints and reduced-motion rules;
+- raw color usage in styles: design-token values in `tokens.css` and
+  hardcoded country-flag miniatures in `.phone-flag-*`;
+- focus/disabled states for buttons, inputs, checkbox, nav links, editor
+  controls and account/support actions;
+- desktop/mobile `/login` as the real route affected by brand/auth styles.
+
+Доказательства:
+
+- `pnpm exec prettier --check apps/web/src/styles/tokens.css
+  apps/web/src/styles/globals.css` -> clean;
+- `rg -n "letter-spacing:\\s*-|letter-spacing:\\s*0\\.[0-9]|letter-spacing:\\s*[1-9]|font-size:\\s*.*vw|url\\(javascript:|expression\\("
+  apps/web/src/styles/globals.css apps/web/src/styles/tokens.css` -> нет
+  отрицательного/ненулевого tracking, viewport-based font-size и опасных CSS
+  URL/expression;
+- contrast spot-check для основных текстовых/status-токенов: `text/surface`
+  15.05, `muted/surface` 4.60, `subtle/white` 4.97,
+  `disabled/white` 5.01, `danger/white` 5.44, `success/white` 5.39,
+  `warning/white` 5.43; брендовый оранжевый оставлен прежним после
+  browser-review продукта;
+- browser-check `/login`: 1280x720 и 390x844, `overflowX=false`, console
+  errors отсутствуют, primary button background восстановлен как
+  `rgb(245, 119, 62)`;
+- screenshots:
+  `/private/tmp/ecoplatform-c-styles-login-restored-desktop.png` и
+  `/private/tmp/ecoplatform-c-styles-login-restored-mobile.png`;
+- `pnpm --filter @ecoplatform/web lint` -> clean;
+- `pnpm --filter @ecoplatform/web test` -> 14 files / 50 tests passed;
+- `pnpm --filter @ecoplatform/web build` -> Next.js 16.2.6 production build
+  successful, 30 static pages generated;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/web/src/styles` принят без открытых P0/P1/P2-рисков;
+- style tokens остаются единой точкой для палитры, typography, состояний
+  контролов и совместимых legacy aliases;
+- responsive CSS содержит явные breakpoint-ветки для публичных страниц,
+  AppShell/sidebar, CMS/admin/account/support поверхностей;
+- raw HEX вне `tokens.css` в style-layer ограничены флагами стран в
+  phone-selector, где это не theme-token, а мини-иллюстрация;
+- `F-20260528-035` закрыт: `letter-spacing` в global styles приведён к `0`,
+  чтобы заголовки, labels и compact UI не сжимали текст на узких контейнерах.
+
 ### Внеплановая dev-runtime правка — `/register`
 
 Дата проверки: 2026-05-28.
@@ -1478,6 +1534,7 @@
 | `F-20260528-031` | `P2` | `apps/web/src/components/AdminStaffView.tsx` | Форма создания сотрудника показывала временный пароль как обычный текст. На админском экране это риск утечки при демонстрации, записи экрана или скриншоте. | Исправлено: поле временного пароля получило `type="password"`, `autoComplete="new-password"` и явный `aria-label`. Проверено: `rg` по password-полю; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/admin/staff`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-032` | `P2` | `packages/shared/src/dto.ts`, `apps/api/src/auth/auth.service.ts` | UI регистрации уже не показывал ИНН, но API-контракт всё ещё принимал `billingInn` и мог записать реквизит компании при регистрации в обход продуктового сценария. Пользователь должен заполнять ИНН позже в профиле компании. | Исправлено: `registerDtoSchema` отклоняет `billingInn`, `AuthService.register()` больше не пишет ИНН при создании компании, integration-тест проверяет 400 на `billingInn` в `/auth/register`, а `PATCH /api/billing/company` сохраняет ИНН как профильное действие. Проверено: `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "регистрация\|Auth\|Company profile"` -> 132 passed. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-033` | `P1` | `apps/web/package.json`, `apps/web/next.config.ts`, `packages/shared/src/index.ts`, `apps/api/src/auth/auth.controller.ts` | Локальный `/register` мог бесконечно перезагружаться: Next dev на Turbopack падал в crash-loop, общий shared barrel подтягивал `isomorphic-dompurify/jsdom` на страницы без HTML, а старая/битая HttpOnly refresh-cookie повторно била в `/auth/refresh` до 429. Для владельца продукта это блокировало ручную проверку регистрации. | Исправлено: web dev запускается через `next dev --webpack`, sanitizer вынесен в `@ecoplatform/shared/sanitize-html`, Next externalize-ит `isomorphic-dompurify/jsdom`, а `/auth/refresh` очищает refresh-cookie при `401 Unauthorized`. Проверено: API integration -> 133 passed; web lint/test/build; browser-check `/register` 60 секунд без reload; browser-check `/legal/privacy`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-035` | `P3` | `apps/web/src/styles/globals.css` | Часть заголовков, labels и compact UI использовала ненулевой или отрицательный `letter-spacing`. На узких контейнерах это могло сжимать текст и давать визуальную дрожь между разными поверхностями. | Исправлено: все `letter-spacing` в `globals.css` приведены к `0`, брендовый оранжевый сохранён прежним. Проверено: `rg` по tracking/font-size/CSS URL; web lint/test/build; browser-check `/login` desktop/mobile без overflow. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -1530,6 +1587,7 @@
 | 32 | `F-20260528-032` | `fix(auth): убрать ИНН из регистрации` | `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "регистрация\\|Auth\\|Company profile"`; `pnpm lint`; `pnpm format:check`; `git diff --check` | `closed` |
 | 33 | `F-20260528-033` | `fix(dev): остановить перезагрузку страницы регистрации` | `pnpm --filter @ecoplatform/shared lint`; `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Auth"`; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/register`; browser-check `/legal/privacy`; `pnpm format:check`; `git diff --check` | `closed` |
 | 34 | `F-20260528-034` | `fix(shared): сузить CSS в CMS HTML sanitizer` | `pnpm --filter @ecoplatform/shared test`; `pnpm --filter @ecoplatform/shared lint`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 35 | `F-20260528-035` | `fix(web): закрыть риски проверки styles` | `pnpm exec prettier --check apps/web/src/styles/tokens.css apps/web/src/styles/globals.css`; `pnpm --filter @ecoplatform/web lint`; `pnpm --filter @ecoplatform/web test`; `pnpm --filter @ecoplatform/web build`; browser-check `/login`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

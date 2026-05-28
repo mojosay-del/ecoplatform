@@ -12,8 +12,8 @@
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
 `B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED`, `B-SUPPORT`, `C-APP`,
-`C-ADMIN`, `C-AUTH`, `C-SHELL`, `C-CMS`, `C-LIBAPI` и `C-AUTHCTX`; следующий
-модуль проверки — `C-STYLES`.
+`C-ADMIN`, `C-AUTH`, `C-SHELL`, `C-CMS`, `C-LIBAPI`, `C-AUTHCTX` и
+`C-STYLES`; следующий модуль проверки — `D-SHARED`.
 
 Проверка `C-LIBAPI` подтвердила единый frontend API-слой: access-token хранится
 только в памяти, CSRF-заголовки добавляются централизованно, `401` проходит
@@ -25,6 +25,13 @@
 загружает пользователя через shared `AuthMeUser`, не хранит access-token в
 browser storage и сохраняет разделение `401` как истёкшей сессии и `403` как
 закрытого доступа.
+
+Проверка `C-STYLES` подтвердила style-layer web: токены остаются единой точкой
+палитры, typography и состояний контролов; responsive-ветки покрывают
+публичные, shell, CMS/admin/account/support поверхности; сырые HEX вне токенов
+остаются только в мини-флагах выбора телефона. Ненулевой `letter-spacing`
+убран из `globals.css`, фирменный оранжевый возвращён без затемнения после
+browser-review `/login`.
 
 Внеплановая dev-стабилизация закрыта: локальный `next dev` для web переведён
 на Webpack, потому что Turbopack в текущем окружении уходил в crash-loop на

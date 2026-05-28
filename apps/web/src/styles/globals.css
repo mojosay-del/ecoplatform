@@ -148,7 +148,7 @@ input[type="checkbox"]:focus-visible {
   margin-bottom: 28px;
   font-weight: 800;
   font-size: 18px;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   color: var(--text);
 }
 
@@ -178,7 +178,7 @@ input[type="checkbox"]:focus-visible {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .nav-entry {
@@ -588,7 +588,7 @@ input[type="checkbox"]:focus-visible {
   color: var(--text-subtle);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -842,7 +842,7 @@ input[type="checkbox"]:focus-visible {
   color: var(--white);
   font-size: 22px;
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   opacity: 0;
   pointer-events: none;
   transition: opacity 160ms ease;
@@ -2213,7 +2213,7 @@ input[type="checkbox"]:focus-visible {
 .index-current-price strong {
   font-size: 26px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   color: var(--text);
 }
 
@@ -2232,7 +2232,7 @@ input[type="checkbox"]:focus-visible {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   color: var(--text);
   overflow-wrap: anywhere;
 }
@@ -2438,7 +2438,7 @@ input[type="checkbox"]:focus-visible {
 
 .lesson-side-card-header {
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   font-size: 11px;
   font-weight: 700;
   color: var(--muted);
@@ -3083,7 +3083,7 @@ body.news-modal-open .app-shell {
   z-index: 1;
   font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   color: var(--white);
   opacity: 0.92;
   justify-self: start;
@@ -3377,7 +3377,7 @@ body.news-modal-open .app-shell {
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .phone-input-wrap {
@@ -3949,7 +3949,7 @@ body.news-modal-open .app-shell {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -4915,7 +4915,7 @@ body.news-modal-open .app-shell {
   margin: 2px 0 0;
   font-size: 22px;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .comments-kicker {
@@ -4923,7 +4923,7 @@ body.news-modal-open .app-shell {
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -4966,7 +4966,7 @@ body.news-modal-open .app-shell {
   color: var(--primary-hover);
   font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   box-shadow: inset 0 0 0 1px rgb(var(--brand-rgb) / 0.12);
 }
 
@@ -6302,7 +6302,7 @@ body.news-modal-open .app-shell {
 .news-form-mode {
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -6315,7 +6315,7 @@ body.news-modal-open .app-shell {
   font-size: 26px;
   line-height: 1.2;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   color: var(--text);
   padding: 4px 0;
   border-bottom: 1px solid transparent;
@@ -6543,7 +6543,7 @@ body.news-modal-open .app-shell {
 .indices-summary-grid span {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -6666,7 +6666,7 @@ body.news-modal-open .app-shell {
   align-self: flex-start;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
   padding: 4px 10px;
   border-radius: var(--radius-chip);
@@ -6791,7 +6791,7 @@ body.news-modal-open .app-shell {
 .module-chapters-title {
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--muted);
   margin: 0;
@@ -6837,7 +6837,7 @@ body.news-modal-open .app-shell {
   color: var(--primary-hover);
   font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   flex-shrink: 0;
 }
 
@@ -6851,7 +6851,7 @@ body.news-modal-open .app-shell {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .chapter-card-meta {
@@ -6953,7 +6953,7 @@ body.news-modal-open .app-shell {
 .education-tree-title {
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -7694,7 +7694,7 @@ li.tree-add-row + li.tree-add-row,
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--muted);
   padding: 4px 10px;
@@ -7726,7 +7726,7 @@ li.tree-add-row + li.tree-add-row,
   min-width: 240px;
   font-size: 26px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   background: transparent;
   border: none;
   padding: 4px 6px;
@@ -7753,7 +7753,7 @@ li.tree-add-row + li.tree-add-row,
 .lesson-section-title {
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--muted);
   margin: 0;
@@ -8189,7 +8189,7 @@ li.tree-add-row + li.tree-add-row,
   font-size: 22px;
   font-weight: 700;
   margin: 1em 0 0.4em;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .rich-text-content h3 {
@@ -8321,7 +8321,7 @@ li.tree-add-row + li.tree-add-row,
 .form-legend {
   font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--muted);
   padding: 0 8px;
@@ -9106,7 +9106,7 @@ li.tree-add-row + li.tree-add-row,
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .account-form-grid-2 {
@@ -9587,7 +9587,7 @@ li.tree-add-row + li.tree-add-row,
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .support-inbox-message p {
