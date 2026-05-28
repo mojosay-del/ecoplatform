@@ -149,6 +149,52 @@ describe("FilesService cleanup", () => {
 
     expect(prisma.fileAsset.delete).not.toHaveBeenCalled();
   });
+
+  it("запрещает content manager удалять чужой неиспользуемый файл", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "file-1",
+          storageKey: "uploads/2026-05-22/file.webp",
+          uploadedById: "other-user",
+        }),
+        aggregate: vi.fn(),
+        delete: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      service.deleteIfUnreferenced(["file-1"], {
+        id: "content-manager-1",
+        platformRoles: ["content_manager"],
+      } as any),
+    ).rejects.toThrow("Можно удалить только файл, загруженный вами.");
+
+    expect(prisma.fileAsset.delete).not.toHaveBeenCalled();
+  });
+
+  it("разрешает админу удалить чужой неиспользуемый файл", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "file-1",
+          storageKey: "uploads/2026-05-22/file.webp",
+          uploadedById: "other-user",
+        }),
+        aggregate: vi.fn(),
+        delete: vi.fn().mockResolvedValue({}),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await service.deleteIfUnreferenced(["file-1"], {
+      id: "admin-1",
+      platformRoles: ["admin"],
+    } as any);
+
+    expect(prisma.fileAsset.delete).toHaveBeenCalledWith({ where: { id: "file-1" } });
+  });
 });
 
 describe("FilesService file listing", () => {
@@ -176,6 +222,79 @@ describe("FilesService file listing", () => {
 });
 
 describe("FilesService upload validation", () => {
+  it("применяет safe-type проверки и квоту к metadata-only файлам", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
+        create: vi.fn().mockImplementation(({ data }) =>
+          Promise.resolve({
+            id: "file-pdf",
+            createdAt: new Date("2026-05-25T00:00:00.000Z"),
+            variants: null,
+            ...data,
+          }),
+        ),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    const result = await service.createMetadata(
+      {
+        originalName: "report final.pdf",
+        mimeType: "application/x-pdf",
+        sizeBytes: 1024,
+        accessLevel: FileAccessLevel.authenticated,
+      },
+      "user-1",
+    );
+
+    expect(prisma.fileAsset.aggregate).toHaveBeenCalledWith({
+      where: {
+        uploadedById: { in: ["user-1"] },
+        createdAt: { gte: expect.any(Date) },
+      },
+      _sum: { sizeBytes: true },
+    });
+    expect(prisma.fileAsset.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        originalName: "report final.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1024,
+        storageKey: expect.stringMatching(/^uploads\/\d{4}-\d{2}-\d{2}\/.+-report-final\.pdf$/),
+        uploadedById: "user-1",
+      }),
+    });
+    expect(result.mimeType).toBe("application/pdf");
+  });
+
+  it("отклоняет metadata-only SVG так же, как настоящий upload", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
+        create: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      service.createMetadata(
+        {
+          originalName: "vector.svg",
+          mimeType: "image/svg+xml",
+          sizeBytes: 512,
+          accessLevel: FileAccessLevel.public,
+        },
+        "user-1",
+      ),
+    ).rejects.toThrow("Формат файла не поддерживается.");
+
+    expect(prisma.fileAsset.create).not.toHaveBeenCalled();
+  });
+
   it("отклоняет HTML, даже если multipart-заголовок притворяется картинкой", async () => {
     const prisma = referencePrisma();
     const service = serviceWithPrisma(prisma);

@@ -391,6 +391,16 @@ export class FilesService {
     return (mimeType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
   }
 
+  private canonicalMimeType(mimeType: string): string {
+    for (const [canonical, aliases] of Object.entries(MIME_ALIASES)) {
+      if (mimeType === canonical || aliases.includes(mimeType)) {
+        return canonical;
+      }
+    }
+
+    return mimeType;
+  }
+
   private isAllowedDetectedMime(mimeType: string): boolean {
     return ALLOWED_DETECTED_MIME_TYPES.has(mimeType) || mimeType.startsWith("audio/") || mimeType.startsWith("video/");
   }
@@ -457,6 +467,35 @@ export class FilesService {
       extension: undefined,
       mimeType: detectedMime,
       contentDisposition: this.contentDisposition(detectedMime, file.originalname),
+    };
+  }
+
+  private validateMetadataInput(input: {
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+    accessLevel?: FileAccessLevel;
+  }) {
+    const declaredMime = this.normalizeMimeType(input.mimeType);
+    const mimeType = this.canonicalMimeType(declaredMime);
+
+    if (
+      !mimeType ||
+      GENERIC_DECLARED_MIME_TYPES.has(mimeType) ||
+      BLOCKED_UPLOAD_MIME_TYPES.has(mimeType) ||
+      this.hasBlockedExtension(input.originalName) ||
+      !this.isAllowedDetectedMime(mimeType)
+    ) {
+      throw new BadRequestException("Формат файла не поддерживается.");
+    }
+
+    if (input.sizeBytes > MAX_UPLOAD_BYTES) {
+      throw new BadRequestException("Файл больше 100 МБ.");
+    }
+
+    return {
+      ...input,
+      mimeType,
     };
   }
 
@@ -551,13 +590,16 @@ export class FilesService {
     input: { originalName: string; mimeType: string; sizeBytes: number; accessLevel?: FileAccessLevel },
     userId: string,
   ) {
+    const metadata = this.validateMetadataInput(input);
+    await this.assertDailyUploadQuota(userId, metadata.sizeBytes);
+
     const asset = await this.prisma.fileAsset.create({
       data: {
-        originalName: input.originalName,
-        mimeType: input.mimeType,
-        sizeBytes: input.sizeBytes,
-        accessLevel: input.accessLevel ?? FileAccessLevel.authenticated,
-        storageKey: `dev/${Date.now()}-${input.originalName}`,
+        originalName: metadata.originalName,
+        mimeType: metadata.mimeType,
+        sizeBytes: metadata.sizeBytes,
+        accessLevel: metadata.accessLevel ?? FileAccessLevel.authenticated,
+        storageKey: this.storageKey(metadata.originalName),
         uploadedById: userId,
       },
     });
@@ -690,7 +732,15 @@ export class FilesService {
     return blockGroups.some((blocks) => blocks.some((block) => this.payloadContainsFileId(block.payload, fileId)));
   }
 
-  async deleteIfUnreferenced(fileIds: string[]) {
+  private canDeleteAsset(asset: FileAsset, actor?: RequestUser): boolean {
+    if (!actor) {
+      return true;
+    }
+
+    return actor.platformRoles.includes("admin") || asset.uploadedById === actor.id;
+  }
+
+  async deleteIfUnreferenced(fileIds: string[], actor?: RequestUser) {
     const uniqueIds = Array.from(new Set(fileIds.filter(Boolean)));
 
     for (const fileId of uniqueIds) {
@@ -703,6 +753,10 @@ export class FilesService {
 
       if (!asset || referenceCount > 0 || hasStructuredReference || hasBlockReference) {
         continue;
+      }
+
+      if (!this.canDeleteAsset(asset, actor)) {
+        throw new ForbiddenException("Можно удалить только файл, загруженный вами.");
       }
 
       const config = this.getS3Config();

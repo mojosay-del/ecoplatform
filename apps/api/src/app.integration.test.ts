@@ -871,6 +871,45 @@ describe("Demo gating", () => {
   });
 });
 
+describe("Files API", () => {
+  it("metadata-only endpoint применяет safe-type проверку и нормализует MIME", async () => {
+    const managerToken = await loginContentManager();
+
+    const svg = await ctx.http.post("/api/files/metadata").set("Authorization", `Bearer ${managerToken}`).send({
+      originalName: "vector.svg",
+      mimeType: "image/svg+xml",
+      sizeBytes: 512,
+      accessLevel: "public",
+    });
+    expect(svg.status).toBe(400);
+    expect(svg.body.message).toContain("Формат файла не поддерживается");
+
+    const pdf = await ctx.http.post("/api/files/metadata").set("Authorization", `Bearer ${managerToken}`).send({
+      originalName: "report final.pdf",
+      mimeType: "application/x-pdf",
+      sizeBytes: 1024,
+      accessLevel: "authenticated",
+    });
+    expect(pdf.status).toBe(201);
+    expect(pdf.body.mimeType).toBe("application/pdf");
+    expect(pdf.body.storageKey).toMatch(/^uploads\/\d{4}-\d{2}-\d{2}\/.+-report-final\.pdf$/);
+  });
+
+  it("content manager не может удалить чужой неиспользуемый файл", async () => {
+    const managerToken = await loginContentManager();
+    const admin = await ctx.prisma.user.findUniqueOrThrow({ where: { email: "admin@test.local" } });
+    const asset = await createCoverAsset(admin.id, "foreign-unreferenced-file");
+
+    const forbidden = await ctx.http.delete(`/api/files/${asset.id}`).set("Authorization", `Bearer ${managerToken}`);
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.message).toContain("загруженный вами");
+
+    await expect(ctx.prisma.fileAsset.findUnique({ where: { id: asset.id } })).resolves.toMatchObject({
+      id: asset.id,
+    });
+  });
+});
+
 describe("Content publish", () => {
   it("админ создаёт черновик новости и публикует — она появляется в публичном /api/news", async () => {
     const adminToken = await loginAdmin();

@@ -23,9 +23,13 @@ import { parseBody } from "../common/zod";
 import { FilesService, type UploadedMemoryFile } from "./files.service";
 
 const fileMetadataSchema = z.object({
-  originalName: z.string().min(1),
-  mimeType: z.string().min(1),
-  sizeBytes: z.number().int().positive(),
+  originalName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(120),
+  sizeBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(100 * 1024 * 1024),
   accessLevel: z.nativeEnum(FileAccessLevel).optional(),
 });
 const FILE_UPLOAD_THROTTLE = {
@@ -79,8 +83,8 @@ export class FilesController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Delete(":id")
-  async deleteIfUnreferenced(@Param("id") id: string) {
-    await this.files.deleteIfUnreferenced([id]);
+  async deleteIfUnreferenced(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    await this.files.deleteIfUnreferenced([id], user);
     return { ok: true };
   }
 }

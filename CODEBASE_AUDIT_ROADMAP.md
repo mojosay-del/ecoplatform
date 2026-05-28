@@ -88,7 +88,7 @@
 | B-ADMIN | `apps/api/src/admin` | `accepted` | B | RBAC, audit log, dashboard queries, admin mutations |
 | B-BILLING | `apps/api/src/billing` | `accepted` | B | company profile, subscriptions, manual activation, notifications |
 | B-CONTENT | `apps/api/src/content` | `accepted` | B | CMS validation, publish/preview rules, tags, indices, block payloads |
-| B-FILES | `apps/api/src/files` | `not_started` | B | MIME/extension/size checks, S3 paths, public/private access |
+| B-FILES | `apps/api/src/files` | `accepted` | B | MIME/extension/size checks, S3 paths, public/private access |
 | B-LEGAL | `apps/api/src/legal` | `not_started` | B | active documents, consent records, re-consent flow |
 | B-MOD | `apps/api/src/moderation` | `not_started` | B | sanctions, report flow, module restrictions, edge cases |
 | B-NOTIF | `apps/api/src/notifications` | `not_started` | B | in-app delivery, read states, privacy of notification payloads |
@@ -559,6 +559,63 @@
   существование индекса, отдаёт 404 для несуществующего id и пишет admin audit
   log.
 
+### B-FILES — `apps/api/src/files`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `FilesController`: список публичных файлов по id, metadata-only создание,
+  multipart upload, role guards и удаление неиспользуемых файлов;
+- `FilesService`: S3 config/health, magic-number MIME detection, блок-лист
+  опасных MIME/расширений, лимиты размера, дневная квота, storage key,
+  public/private URL, WebP/AVIF варианты, FileReference и cleanup;
+- `image-presets.ts`: обработка cover-изображений через `sharp`;
+- `FileAsset`/`FileReference` в Prisma schema, связи с content-сервисами,
+  `FileUploadField` и web API upload/delete helpers.
+
+Доказательства:
+
+- NestJS docs через Context7: file upload строится через
+  `FileInterceptor`, protected routes закрываются guards до вызова handler, а
+  file/body validation должна отбрасывать плохой input на границе API;
+- Prisma docs через Context7: Prisma Client безопасен по умолчанию, raw SQL в
+  этом модуле не используется, связанные writes/cleanup сверены с transaction и
+  relation-boundaries;
+- file-type docs через Context7: тип файла надо определять по magic numbers;
+  неизвестный тип возвращается как `undefined`, поэтому клиентскому
+  `Content-Type` нельзя доверять как единственному источнику правды;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe"
+  apps/api/src/files apps/api/src/health/health-dependency.indicator.ts
+  apps/web/src/components/FileUploadField.tsx apps/web/src/lib/api/core.ts` ->
+  совпадений нет;
+- `rg -n "validateMetadataInput|validateUpload|BLOCKED_UPLOAD|ALLOWED_DETECTED|assertDailyUploadQuota|canDeleteAsset|deleteIfUnreferenced|FileReference|assertCoverImageAllowed|processCoverImage"
+  apps/api/src/files apps/api/src/app.integration.test.ts
+  apps/api/prisma/schema.prisma apps/api/src/content` -> safe-type validation,
+  quota, owner/admin-delete boundary, FileReference и cover ownership
+  подключены;
+- `pnpm --filter @ecoplatform/api test -- files` -> 19 files / 80 tests
+  passed;
+- `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern
+  "Files API"` -> integration-файл прошёл полностью: 125 tests passed;
+- `pnpm --filter @ecoplatform/api lint` -> clean;
+- `pnpm exec prettier --check apps/api/src/files/files.controller.ts
+  apps/api/src/files/files.service.ts apps/api/src/files/files.service.test.ts
+  apps/api/src/app.integration.test.ts` -> clean после форматирования;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/api/src/files` принят без открытых P0/P1/P2-рисков;
+- `F-20260528-014` закрыт: metadata-only endpoint больше не обходит
+  safe-type проверки, лимит размера, дневную квоту и безопасную генерацию
+  storage key;
+- `F-20260528-015` закрыт: content-manager больше не может удалить чужой
+  неиспользуемый файл через `/api/files/:id`; удаление чужих файлов оставлено
+  только для admin.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -578,6 +635,8 @@
 | `F-20260528-011` | `P1` | `apps/api/src/content/services/news.service.ts` | `POST /api/news/:id/comments` мог создать `Discussion` и комментарий для черновой или несуществующей новости, потому что `Discussion.targetId` не имеет FK на `NewsPost`. Также reply можно было отправить с `parentCommentId` из другой новости. Это риск мусорных данных и чужих reply-цепочек. | Исправлено: перед созданием комментария сервис проверяет существующую опубликованную новость; parent-комментарий должен быть опубликованным комментарием той же `Discussion(news_post, id)`. Integration-тест проверяет черновик, missing news, foreign parent и missing parent без создания Discussion. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-012` | `P2` | `apps/api/src/content/content.controller.ts` | Content-листинги вручную делали `Number(limit)`. `limit=abc` превращался в `NaN`, а общий pagination helper молча подставлял дефолт. Пользователь или админ получал 200 вместо понятного 400, как уже было исправлено в admin/billing API. | Исправлено: добавлены zod query-схемы для public/admin content list endpoints, `news/tags` и `knowledge-base depth`; integration-тест проверяет 400 на нечисловом `limit/depth` для 10 content endpoints. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-013` | `P2` | `apps/api/src/content/services/indices.service.ts` | Добавление значения индекса цены не проверяло существование индекса заранее и не писало admin audit-log. Ошибка по несуществующему id могла уходить как Prisma/FK failure, а изменение цены оставалось без журналируемого следа. | Исправлено: `addPriceValue()` проверяет `PriceIndex`, отдаёт 404, пишет `indices.value.create/update` с before/after price; integration-тест проверяет missing index, create/update и audit log. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-014` | `P1` | `apps/api/src/files/files.service.ts` | Metadata-only endpoint мог создать публичную запись файла с SVG/HTML/любой MIME-строкой и произвольным storage key без проверки реального upload-контура. Через CMS это могло превратиться в небезопасную или битую публичную ссылку и обход дневной квоты. | Исправлено: metadata-only путь нормализует MIME, блокирует опасные MIME/расширения, применяет лимит 100 МБ, дневную квоту и общий безопасный `storageKey`; unit и integration-тесты проверяют SVG reject и PDF alias normalization. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-015` | `P1` | `apps/api/src/files/files.controller.ts` | Content-manager мог удалить любой неиспользуемый файл по id, даже если файл загрузил другой сотрудник. В CMS это риск потери чужого чернового ассета до публикации. | Исправлено: `DELETE /api/files/:id` передаёт текущего пользователя в service; удалить чужой файл может только admin, content-manager получает 403. Unit и integration-тесты проверяют запрет и сохранение записи. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -609,6 +668,8 @@
 | 11 | `F-20260528-011` | `fix(content): закрыть риски проверки content-api` | `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Content publish\\|Content lifecycle: price indices\\|Discussion\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 12 | `F-20260528-012` | `fix(content): закрыть риски проверки content-api` | `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Content publish\\|Content lifecycle: price indices\\|Discussion\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 | 13 | `F-20260528-013` | `fix(content): закрыть риски проверки content-api` | `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Content publish\\|Content lifecycle: price indices\\|Discussion\\|Wave 8.4 pagination contracts"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 14 | `F-20260528-014` | `fix(files): закрыть риски проверки files-api` | `pnpm --filter @ecoplatform/api test -- files`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Files API"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 15 | `F-20260528-015` | `fix(files): закрыть риски проверки files-api` | `pnpm --filter @ecoplatform/api test -- files`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Files API"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 
