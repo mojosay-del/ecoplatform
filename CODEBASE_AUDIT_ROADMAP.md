@@ -101,7 +101,7 @@
 | C-AUTH | `apps/web/src/components/AuthForms.tsx` | `accepted` | C | register/login UX, validation, legal consents, password rules |
 | C-SHELL | `apps/web/src/components/AppShell.tsx` | `accepted` | C | navigation, demo banner spacing, account/admin separation |
 | C-CMS | `apps/web/src/components/*Editor*` | `accepted` | C | blocks editor, Tiptap, preview, auto-save, XSS boundaries |
-| C-LIBAPI | `apps/web/src/lib/api` | `not_started` | D | typed API client, refresh, CSRF, error handling, downloads |
+| C-LIBAPI | `apps/web/src/lib/api` | `accepted` | D | typed API client, refresh, CSRF, error handling, downloads |
 | C-AUTHCTX | `apps/web/src/lib/auth.tsx` | `not_started` | C/D | session restore, 401/403 behavior, user state transitions |
 | C-STYLES | `apps/web/src/styles` | `not_started` | C | tokens, contrast, responsive rules, repeated raw colors |
 | D-SHARED | `packages/shared/src` | `not_started` | D | DTOs, access rules, sanitize, content-block schemas |
@@ -1274,6 +1274,60 @@
   `dangerouslySetInnerHTML`;
 - arbitrary inline CSS no longer reaches public content render through
   paragraph blocks.
+
+### C-LIBAPI — `apps/web/src/lib/api`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `apps/web/src/lib/api/core.ts`: in-memory access token, auto-refresh,
+  CSRF-заголовки, централизованная обработка `401`, JSON errors, download,
+  upload и delete helpers;
+- `apps/web/src/lib/api/endpoints.ts`: typed namespace для публичных маршрутов,
+  кабинета, auth/session/data-export, уведомлений, поддержки, admin dashboard,
+  CMS news, moderation, files и legal;
+- `apps/web/src/lib/api/index.ts`: compatibility re-export после переезда
+  `api.ts` в папку `api/`;
+- `apps/web/src/lib/api/core.test.ts` и `apps/web/src/lib/api.test.ts`:
+  bearer-token, JSON body, CSRF bootstrap, expired-token refresh и session
+  restore через HttpOnly refresh-cookie;
+- потребители в `apps/web/src/lib/auth.tsx`, `apps/web/src/views/_shared.tsx`,
+  `apps/web/src/lib/use-infinite-api-query.ts`, `apps/web/src/views/account-view.tsx`
+  и `apps/web/src/components/FileUploadField.tsx`;
+- backend download boundary `apps/api/src/auth/auth.controller.ts` для
+  `POST /api/auth/me/export-data`.
+
+Доказательства:
+
+- `rg -n "fetch\\(" apps/web/src apps/web/app -g '*.ts' -g '*.tsx'` -> прямой
+  client-side `fetch` ограничен низкоуровневым API core; отдельный server fetch
+  есть только в публичной `LegalDocumentPage` без проброса auth-cookie;
+- `rg -n "apiFetch|apiDownload|apiUploadFile|apiDeleteFile|api\\.|from
+  \"../lib/api\"|from \"./api\"" apps/web/src apps/web/app -g '*.ts' -g
+  '*.tsx'` -> views/components используют общий API слой, поэтому refresh, CSRF
+  и `ApiError` проходят через одну границу;
+- `rg -n "TODO|FIXME|console\\.|localStorage|sessionStorage|dangerouslySetInnerHTML|password\\s*[:=]|token\\s*[:=]|secret\\s*[:=]|AKIA|ASIA|BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY"
+  apps/web/src/lib/api apps/web/src/lib/auth.tsx` -> нет production debug,
+  hardcoded secrets или записи access-token в browser storage; совпадения
+  относятся к типам/комментариям и параметрам функций;
+- `pnpm --filter @ecoplatform/web test -- api` -> 14 files / 50 tests passed;
+- `pnpm --filter @ecoplatform/web lint` -> clean.
+
+Решение:
+
+- `apps/web/src/lib/api` принят без открытых P0/P1/P2-рисков;
+- access-token хранится только в памяти модуля, а восстановление после reload
+  идёт через HttpOnly refresh-cookie;
+- небезопасные методы получают CSRF header до основного запроса, включая
+  `/auth/refresh`;
+- `401` на защищённых маршрутах сначала делает refresh/retry, а при неуспехе
+  централизованно очищает token и ведёт пользователя на `/login`;
+- `apiDownload()` корректно используется для ZIP-экспорта данных, читает
+  filename из `Content-Disposition` и не пишет архив в постоянное хранилище
+  браузера.
 
 ### Внеплановая dev-runtime правка — `/register`
 

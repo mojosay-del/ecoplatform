@@ -12,13 +12,13 @@
 На 2026-05-28 приняты `A-ROOT`, `A-CI`, `A-OPS`, `B-PRISMA`, `B-AUTH`,
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
 `B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED`, `B-SUPPORT`, `C-APP`,
-`C-ADMIN`, `C-AUTH`, `C-SHELL` и `C-CMS`; следующий модуль проверки —
-`C-LIBAPI`.
+`C-ADMIN`, `C-AUTH`, `C-SHELL`, `C-CMS` и `C-LIBAPI`; следующий модуль
+проверки — `C-AUTHCTX`.
 
-Проверка `C-CMS` закрыла XSS-границу блочного редактора: общий
-`sanitizeParagraphHtml()` теперь пропускает только безопасные CSS-свойства
-редактора (`color`, `font-size`) и не даёт произвольным inline-style попадать
-в публичный HTML.
+Проверка `C-LIBAPI` подтвердила единый frontend API-слой: access-token хранится
+только в памяти, CSRF-заголовки добавляются централизованно, `401` проходит
+через refresh/retry, а ZIP-экспорт данных использует `apiDownload()` без записи
+архива в постоянное хранилище браузера.
 
 Внеплановая dev-стабилизация закрыта: локальный `next dev` для web переведён
 на Webpack, потому что Turbopack в текущем окружении уходил в crash-loop на
