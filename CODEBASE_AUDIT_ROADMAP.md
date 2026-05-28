@@ -81,7 +81,7 @@
 | --- | --- | --- | --- | --- |
 | A-ROOT | Root config | `accepted` | A | package scripts, turbo tasks, workspace, tsconfig, docker compose |
 | A-CI | `.github/workflows` | `accepted` | A/E | static checks, integration DB, smoke trigger, secrets boundary |
-| A-OPS | `ops/monitoring` | `not_started` | A/E | alerts, example config, absence of real secrets |
+| A-OPS | `ops/monitoring` | `accepted` | A/E | alerts, example config, absence of real secrets |
 | B-PRISMA | `apps/api/prisma` | `not_started` | B | schema, migrations, indexes, constraints, seed safety |
 | B-AUTH | `apps/api/src/auth` | `not_started` | B | login, refresh, lockout, export data, deletion, password policy |
 | B-COMMON | `apps/api/src/common` | `not_started` | B | guards, roles, CSRF, pagination, logging filters, sanitizing |
@@ -180,6 +180,35 @@
 - CI-покрытие принято без открытых P0/P1/P2-рисков;
 - найденный hardening-risk `F-20260528-002` закрыт в этом же коммите: GitHub
   Actions token ограничен read-only доступом к содержимому репозитория.
+
+### A-OPS — `ops/monitoring`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `ops/monitoring/ecoplatform-alerts.yml`;
+- `ops/monitoring/alertmanager.example.yml`;
+- соответствие alert rules метрикам в `apps/api/src/observability`;
+- отсутствие реальных секретов в monitoring examples.
+
+Доказательства:
+
+- `ruby -e 'require "yaml"; ARGV.each { |file| YAML.load_file(file); puts "OK #{file}" }' ops/monitoring/ecoplatform-alerts.yml ops/monitoring/alertmanager.example.yml` -> оба YAML-файла парсятся;
+- `pnpm exec prettier --check ops/monitoring/ecoplatform-alerts.yml ops/monitoring/alertmanager.example.yml` -> clean;
+- `rg -n "(?i)(AKIA|ASIA|BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|password\\s*[:=]\\s*['\\\"]?[^\\s'\\\"]{8,}|token\\s*[:=]\\s*['\\\"]?[^\\s'\\\"]{8,}|secret\\s*[:=]\\s*['\\\"]?[^\\s'\\\"]{8,})" ops/monitoring` -> совпадений нет;
+- `rg -n "http_request_duration_seconds|auth_cache_|db_connections|metrics" apps/api/src README.md PROJECT_STATUS.md ops/monitoring` -> alert rules используют реально объявленные API-метрики;
+- `promtool` и `amtool` локально не установлены, поэтому строгая проверка Prometheus/Alertmanager CLI не выполнялась; YAML-структура дополнительно сверена с актуальной официальной схемой Alertmanager.
+
+Решение:
+
+- Prometheus rules покрывают API 5xx, p95 latency, session-cache hit rate и
+  занятость Postgres-соединений без расхождения с текущими metric names;
+- `alertmanager.example.yml` хранит SMTP/Telegram secrets через file-based
+  secret references, реальные токены/пароли в репозитории не обнаружены;
+- открытых P0/P1/P2-рисков по `ops/monitoring` нет.
 
 ## Реестр находок
 
