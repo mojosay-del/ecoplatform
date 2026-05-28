@@ -95,7 +95,7 @@ docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
 
 ```bash
 pnpm lint                  # tsc --noEmit во всех пакетах
-pnpm test                  # 138 unit-тестов (shared 7, web 50, api 81)
+pnpm test                  # 139 unit-тестов (shared 7, web 50, api 82)
 pnpm test:integration      # 131 integration-тест против ecoplatform_test
 pnpm build                 # tsc + next build
 pnpm format:check          # prettier
@@ -120,7 +120,8 @@ Integration-тесты создают отдельную БД `ecoplatform_test`
 - Docker: multi-stage `Dockerfile` для api и web, Next.js `output: standalone`, Prisma `binaryTargets` под musl и debian.
 - Graceful shutdown (`app.enableShutdownHooks()`), `trust proxy`, CORS с `maxAge`, gzip/Brotli compression.
 - Helmet security headers + CSP report-only на web; CSRF double-submit; lockout по 10 неудачным логинам.
-- Redis: session-cache (60 сек), Redis-backed throttler с in-memory fallback.
+- Redis: session-cache (60 сек), Redis-backed throttler с in-memory fallback;
+  после Redis-ошибки API на 60 секунд не доверяет Redis-кешу.
 - Distributed cron через `pg_try_advisory_xact_lock` — несколько реплик API не дублируют job'ы.
 - Prisma connection pooling (`connection_limit=20` по умолчанию).
 - CDN cache headers на `/brand/*` и `/avatars/*` (immutable, max-age=1 год).

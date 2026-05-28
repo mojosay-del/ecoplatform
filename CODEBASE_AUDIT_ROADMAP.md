@@ -93,7 +93,7 @@
 | B-MOD | `apps/api/src/moderation` | `accepted` | B | sanctions, report flow, module restrictions, edge cases |
 | B-NOTIF | `apps/api/src/notifications` | `accepted` | B | in-app delivery, read states, privacy of notification payloads |
 | B-OBS | `apps/api/src/observability` | `accepted` | E | metrics auth, labels, cardinality, Sentry/log filtering |
-| B-REDIS | `apps/api/src/redis` | `not_started` | B/E | session cache invalidation, throttler fallback |
+| B-REDIS | `apps/api/src/redis` | `accepted` | B/E | session cache invalidation, throttler fallback |
 | B-SCHED | `apps/api/src/scheduler` | `not_started` | B/E | advisory locks, cleanup safety, billing cron idempotency |
 | B-SUPPORT | `apps/api/src/support` | `not_started` | B | ticket ownership, admin access, status transitions |
 | C-APP | `apps/web/app` | `not_started` | C | route coverage, auth boundaries, loading/error/not-found states |
@@ -837,6 +837,58 @@
 - `F-20260528-025` закрыт: Sentry privacy-фильтр теперь чистит чувствительные
   поля не только в body/extra, но и в URL query и строковых сообщениях.
 
+### B-REDIS — `apps/api/src/redis`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `RedisService`: lifecycle ioredis, `lazyConnect`, отключённая offline queue,
+  command timeout, fallback-режим, JSON get/set, set-indexes, `del`,
+  `smembers`, `ping` и shutdown;
+- `SessionCacheService`: 60-секундный кеш `RequestUser`, индексы сессий по
+  user/company и инвалидация session/user/company;
+- `RedisThrottlerStorageService`: Lua-backed счётчик, block key,
+  fallback на `ThrottlerStorageService` и формат ответа `@nestjs/throttler`;
+- связи с `JwtAuthGuard`, auth/logout/refresh/revoke/logout-all, admin
+  user/company/staff changes, moderation block sanctions, health readiness и
+  Prometheus auth-cache counters.
+
+Доказательства:
+
+- ioredis docs через Context7: проверены connection lifecycle,
+  `enableOfflineQueue`, `maxRetriesPerRequest`, command errors, expiration,
+  set membership, multi-key `del` и graceful shutdown;
+- NestJS Throttler docs через Context7: custom storage сверен с
+  `increment(key, ttl, limit, blockDuration, throttlerName)` и response
+  `{ totalHits, timeToExpire, isBlocked, timeToBlockExpire }`;
+- installed `@nestjs/throttler@6.5.0` source: `seconds()` возвращает
+  milliseconds, default storage возвращает `timeToExpire` в секундах;
+- `rg -n "sessionCache\\.|invalidateSession|invalidateUser|invalidateCompany|SessionCacheService" apps/api/src --glob '*.ts'` -> logout/refresh/revoke/logout-all, admin user/company/staff и moderation block paths инвалидируют кеш;
+- `pnpm --filter @ecoplatform/api exec vitest run
+  src/redis/redis.service.test.ts src/redis/session-cache.service.test.ts
+  src/redis/redis-throttler-storage.service.test.ts
+  src/common/jwt-auth.guard.test.ts` -> 4 files / 7 tests passed;
+- `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false` -> clean;
+- `pnpm lint` -> 4 tasks successful;
+- `pnpm test` -> shared 7, web 50, api 82 tests passed;
+- `pnpm build` -> shared/api/web build successful;
+- `pnpm test:integration` -> 131 integration tests passed;
+- `pnpm format:check` -> clean;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/api/src/redis` принят без открытых P0/P1/P2-рисков;
+- Redis остаётся optional-зависимостью: если он не настроен или недоступен,
+  auth идёт в БД, throttler — в in-memory storage, readiness честно показывает
+  fallback/down state;
+- `F-20260528-026` закрыт: после любой ошибки Redis-команды API временно не
+  доверяет Redis и уходит в fallback на время TTL session-cache, чтобы
+  не читать потенциально старую сессию после неудачной инвалидации.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -868,6 +920,7 @@
 | `F-20260528-023` | `P1` | `apps/api/src/notifications/notifications.service.ts` | `/api/notifications`, read и archive возвращали полный Prisma-row: внутренний `payload`, `domainEventId`, `sourceId`, `deliveryId`, `userId`, а preferences endpoints — `id/userId/updatedAt`. В payload уже есть IP/User-Agent login-событий и внутренние ids модерации/поддержки, поэтому публичный API отдавал лишние приватные детали. | Исправлено: публичные notifications responses используют allow-list `select`, preferences сериализуются до двух списков категорий; integration-тест проверяет отсутствие внутренних полей. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-024` | `P2` | `apps/api/src/notifications/notifications.service.ts` | Если пользователь отключал in-app для категории, `createInApp()` возвращал `null` до создания email-delivery. При будущем email-воркере пользователь мог не получить email, хотя отключал только in-app канал. | Исправлено: in-app mute пропускает только `InAppNotification`, но не мешает отдельной email-delivery очереди, если email для категории включён; unit-тест проверяет email-only delivery. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-025` | `P1` | `apps/api/src/common/sentry.ts`, `apps/web/sentry.shared.ts` | Sentry privacy-фильтр чистил email/phone/address/bank/inn-поля в object payload, но URL query и строковые сообщения закрывали только token/password/session/email. Если 5xx упал на URL вроде `?inn=...&bankAccount=...` или с сообщением `phone=...`, эти персональные данные могли уйти во внешний Sentry. | Исправлено: URL query и key=value строки теперь используют общий список чувствительных ключей; API/web unit-тесты проверяют `phone`, `inn`, `bankAccount` в URL и сообщениях. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-026` | `P1` | `apps/api/src/redis/redis.service.ts` | Если Redis-команда падала во время инвалидации сессии, сервис возвращал fallback, но мог уже на следующем запросе снова читать Redis. Старый access-token мог пройти по stale session-cache до TTL 60 секунд. | Исправлено: после любой Redis-ошибки сервис временно отключает чтение Redis и переводит auth/throttler в fallback на 60 секунд; unit-тест проверяет, что `getClient()` возвращает `null` до истечения grace-window. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -911,6 +964,7 @@
 | 23 | `F-20260528-023` | `fix(notifications): закрыть риски проверки notifications-api` | `pnpm --filter @ecoplatform/api test -- notifications`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "notifications\\|Email channel queue"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 | 24 | `F-20260528-024` | `fix(notifications): закрыть риски проверки notifications-api` | `pnpm --filter @ecoplatform/api test -- notifications`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "notifications\\|Email channel queue"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 | 25 | `F-20260528-025` | `fix(observability): закрыть риски проверки observability` | `pnpm --filter @ecoplatform/api test -- sentry`; `pnpm --filter @ecoplatform/web test -- sentry`; `pnpm --filter @ecoplatform/api test:integration -- --testNamePattern "Prometheus\\|metrics"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
+| 26 | `F-20260528-026` | `fix(redis): закрыть риски проверки redis-cache` | `pnpm --filter @ecoplatform/api exec vitest run src/redis/redis.service.test.ts src/redis/session-cache.service.test.ts src/redis/redis-throttler-storage.service.test.ts src/common/jwt-auth.guard.test.ts`; `pnpm --filter @ecoplatform/api exec tsc --noEmit --pretty false`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm test:integration`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

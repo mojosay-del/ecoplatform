@@ -2,21 +2,25 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/commo
 import Redis from "ioredis";
 import type { Redis as RedisClient } from "ioredis";
 
+const REDIS_FALLBACK_GRACE_MS = 60_000;
+
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private client: RedisClient | null = null;
   private warnedUnavailable = false;
+  private fallbackUntil = 0;
 
   get isConfigured(): boolean {
     return Boolean(process.env.REDIS_URL);
   }
 
   get isReady(): boolean {
-    return this.client?.status === "ready";
+    return this.client?.status === "ready" && !this.isFallbackSuspended;
   }
 
   get status(): string {
+    if (this.isFallbackSuspended) return "fallback";
     return this.client?.status ?? "not_configured";
   }
 
@@ -35,12 +39,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     this.client.on("ready", () => {
       this.warnedUnavailable = false;
+      this.fallbackUntil = 0;
       this.logger.log("Redis connected.");
     });
     this.client.on("close", () => {
+      this.enterFallbackMode();
       this.logger.warn("Redis connection closed. Falling back to direct DB/in-memory paths until it reconnects.");
     });
     this.client.on("error", (error) => {
+      this.enterFallbackMode();
       if (!this.warnedUnavailable) {
         this.warnedUnavailable = true;
         this.logger.warn(`Redis unavailable: ${error.message}`);
@@ -49,6 +56,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     void this.client.connect().catch((error) => {
       this.warnedUnavailable = true;
+      this.enterFallbackMode();
       this.logger.warn(`Redis initial connection failed: ${messageOf(error)}. Fallback mode is active.`);
     });
   }
@@ -112,12 +120,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     try {
       return await operation(client);
     } catch (error) {
+      this.enterFallbackMode();
       if (!this.warnedUnavailable) {
         this.warnedUnavailable = true;
         this.logger.warn(`Redis command failed: ${messageOf(error)}. Fallback mode is active.`);
       }
       return fallback;
     }
+  }
+
+  private get isFallbackSuspended(): boolean {
+    return Date.now() < this.fallbackUntil;
+  }
+
+  private enterFallbackMode(): void {
+    this.fallbackUntil = Date.now() + REDIS_FALLBACK_GRACE_MS;
   }
 }
 
