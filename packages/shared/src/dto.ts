@@ -74,10 +74,21 @@ export const changePasswordDtoSchema = z.object({
 
 export type ChangePasswordDto = z.infer<typeof changePasswordDtoSchema>;
 
+const futureDateTimeSchema = z
+  .string()
+  .datetime()
+  .refine(
+    (value) => {
+      const timestamp = Date.parse(value);
+      return Number.isFinite(timestamp) && timestamp > Date.now();
+    },
+    { message: "Дата окончания подписки должна быть в будущем." },
+  );
+
 export const manualSubscriptionDtoSchema = z.object({
   companyId: z.string().min(1),
   plan: z.enum(["basic", "extended"]),
-  endsAt: z.string().datetime(),
+  endsAt: futureDateTimeSchema,
   reason: z.string().min(3),
 });
 

@@ -771,6 +771,23 @@ describe("Demo gating", () => {
     expect(news.status).toBe(200);
   });
 
+  it("ручная активация подписки с датой в прошлом отклоняется без записи", async () => {
+    const { companyId } = await registerCompany("0000014");
+    const adminToken = await loginAdmin();
+    const pastEndsAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const res = await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", `manual-past-date-${companyId}`)
+      .send({ companyId, plan: "basic", endsAt: pastEndsAt, reason: "past-date-test" });
+
+    expect(res.status).toBe(400);
+    await expect(ctx.prisma.subscription.count({ where: { companyId } })).resolves.toBe(0);
+    const company = await ctx.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    expect(company.status).toBe(CompanyStatus.demo);
+  });
+
   it("ручная активация подписки идемпотентна по Idempotency-Key", async () => {
     const { companyId, userId } = await registerCompany("0000013");
     const adminToken = await loginAdmin();
@@ -834,6 +851,23 @@ describe("Demo gating", () => {
     expect(auditPayload.diff.status).toEqual({ before: "demo", after: "active" });
     expect(auditPayload.diff.subscriptionPlan.after).toBe("extended");
     expect(auditPayload.subscriptionId).toBe(subscriptions[0].id);
+  });
+
+  it("админский список billing-компаний валидирует pagination query", async () => {
+    const adminToken = await loginAdmin();
+    await registerCompany("0000015");
+
+    const bad = await ctx.http
+      .get("/api/admin/billing/companies?limit=abc")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(bad.status).toBe(400);
+
+    const good = await ctx.http
+      .get("/api/admin/billing/companies?limit=1&offset=0")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(good.status).toBe(200);
+    expectPaginatedEnvelope(good.body);
+    expect(good.body.items).toHaveLength(1);
   });
 });
 

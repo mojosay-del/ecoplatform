@@ -6,6 +6,7 @@ import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
 import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
+import { adminBillingCompaniesQuerySchema } from "./billing.schemas";
 import { BillingService } from "./billing.service";
 
 @UseGuards(JwtAuthGuard)
@@ -35,11 +36,8 @@ export class BillingController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Get("admin/billing/companies")
-  async companies(@Query("limit") limit?: string, @Query("offset") offset?: string) {
-    return this.billing.listCompanies({
-      limit: limit ? Number.parseInt(limit, 10) : undefined,
-      offset: offset ? Number.parseInt(offset, 10) : undefined,
-    });
+  async companies(@Query() query: Record<string, string>) {
+    return this.billing.listCompanies(parseBody(adminBillingCompaniesQuerySchema, query));
   }
 
   @UseGuards(RolesGuard)

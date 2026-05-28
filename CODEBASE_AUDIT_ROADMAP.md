@@ -86,7 +86,7 @@
 | B-AUTH | `apps/api/src/auth` | `accepted` | B | login, refresh, lockout, export data, deletion, password policy |
 | B-COMMON | `apps/api/src/common` | `accepted` | B | guards, roles, CSRF, pagination, logging filters, sanitizing |
 | B-ADMIN | `apps/api/src/admin` | `accepted` | B | RBAC, audit log, dashboard queries, admin mutations |
-| B-BILLING | `apps/api/src/billing` | `not_started` | B | company profile, subscriptions, manual activation, notifications |
+| B-BILLING | `apps/api/src/billing` | `accepted` | B | company profile, subscriptions, manual activation, notifications |
 | B-CONTENT | `apps/api/src/content` | `not_started` | B | CMS validation, publish/preview rules, tags, indices, block payloads |
 | B-FILES | `apps/api/src/files` | `not_started` | B | MIME/extension/size checks, S3 paths, public/private access |
 | B-LEGAL | `apps/api/src/legal` | `not_started` | B | active documents, consent records, re-consent flow |
@@ -439,6 +439,62 @@
   использует ограниченные `select` и безопасный parameterized `$queryRaw` для
   дневного ряда регистраций.
 
+### B-BILLING — `apps/api/src/billing`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `BillingController`: пользовательский `/billing/status`, обновление профиля
+  компании, admin-only список компаний и ручная активация подписки;
+- `BillingService`: транзакционное сохранение реквизитов/адресов,
+  pagination списка компаний, idempotency-key ручной активации, audit-log и
+  уведомление пользователей компании;
+- `BillingNotificationsService`: hourly demo/subscription expiring/expired
+  проверки, перевод статусов и дедупликация уведомлений;
+- shared DTO/API-типы для billing, `AdminBillingView`, Prisma-модели
+  `Company`, `Subscription`, `IdempotencyKey`, `InAppNotification` и
+  `NotificationDelivery`.
+
+Доказательства:
+
+- NestJS docs через Context7: guards закрывают доступ до controller method,
+  pipes/DTO-валидация должны отклонять плохой query/body до service calls;
+- Prisma docs через Context7: для связанных write-операций нужны транзакции,
+  для response — явный `select`/ограниченный `include`, raw SQL должен быть
+  параметризованным;
+- `rg -n "@Controller\\(|@UseGuards|@Roles|@Get\\(|@Post\\(|@Patch\\("
+  apps/api/src/billing apps/api/src/app.module.ts` -> пользовательские billing
+  routes закрыты `JwtAuthGuard`, admin billing routes дополнительно закрыты
+  `RolesGuard + admin`;
+- `rg -n "TODO|FIXME|console\\.log|\\$queryRawUnsafe|\\$executeRawUnsafe"
+  apps/api/src/billing packages/shared/src/dto.ts` -> совпадений нет;
+- `rg -n "idempotencyKey|adminActionLog|subscription\\.create|subscription\\.updateMany|company\\.update|createInApp|manualSubscriptionDtoSchema|adminBillingCompaniesQuerySchema"
+  apps/api/src/billing packages/shared/src/dto.ts apps/api/src/app.integration.test.ts`
+  -> ручная активация использует idempotency-key, audit-log, уведомления и
+  regression-тесты;
+- `pnpm --filter @ecoplatform/shared build` -> clean;
+- `pnpm --filter @ecoplatform/api exec vitest run -c
+  vitest.integration.config.ts --testNamePattern
+  "Demo gating|Billing notifications|Company profile"` -> 15 passed, 105
+  skipped, 120 total.
+- `pnpm lint` -> 4 tasks successful;
+- `pnpm test` -> shared 7, web 50, api 76 tests passed;
+- `pnpm build` -> shared/api/web build successful;
+- `pnpm format:check` -> clean;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `apps/api/src/billing` принят без открытых P0/P1/P2-рисков;
+- `F-20260528-009` закрыт: ручная активация подписки больше не принимает
+  `endsAt` в прошлом и не может поставить компанию в `active` с уже истёкшей
+  подпиской;
+- `F-20260528-010` закрыт: `GET /api/admin/billing/companies` валидирует
+  pagination query через zod и отдаёт 400 на нечисловой `limit`.
+
 ## Реестр находок
 
 Новые строки добавляются только после проверки конкретного кода или сценария.
@@ -453,6 +509,8 @@
 | `F-20260528-006` | `P1` | `apps/api/src/admin/users/admin-users.service.ts` | Защищённый первый администратор (`PLATFORM_OWNER_EMAIL`) был защищён в staff endpoint, но не в `/api/admin/users/:id/platform-roles`. Второй admin мог снять с owner роль admin или деактивировать его через другой admin-экран. | Исправлено: `AdminUsersService.updatePlatformRoles()` проверяет owner-email перед снятием admin/деактивацией; integration-тест создаёт второго admin и получает 400 при попытке снять admin у owner. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-007` | `P1` | `apps/api/src/admin/staff/admin-staff.service.ts` | `POST /api/admin/staff` создавал пользователя через Prisma `include`, поэтому ответ admin API мог содержать `passwordHash`. Даже для admin-роута хэш пароля нельзя отдавать наружу. | Исправлено: createStaff возвращает только allow-list полей через `select`, тест проверяет `passwordHash === undefined`. | `closed` | Закрыто коммитом этого исправления. |
 | `F-20260528-008` | `P2` | `apps/api/src/admin/staff/admin-staff.controller.ts` | `GET /api/admin/staff?limit=abc` обходил общую zod-валидацию, превращался в `NaN` и мог падать уже внутри Prisma вместо понятного 400. | Исправлено: staff list query переведён на `adminStaffListQuerySchema` и `resolvePagination`; integration-тест проверяет 400 на нечисловой `limit`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-009` | `P1` | `packages/shared/src/dto.ts` | Ручная активация подписки принимала дату окончания в прошлом. Админ мог случайно сделать компанию `active`, хотя доступ уже должен быть истёкшим; это риск для биллинга и прав доступа. | Исправлено: `manualSubscriptionDtoSchema.endsAt` теперь требует дату в будущем; integration-тест проверяет 400, отсутствие `Subscription` и сохранение статуса `demo`. | `closed` | Закрыто коммитом этого исправления. |
+| `F-20260528-010` | `P2` | `apps/api/src/billing/billing.controller.ts` | `GET /api/admin/billing/companies?limit=abc` обходил zod-валидацию, мог превращать limit в `NaN` и падать внутри Prisma вместо понятного 400. | Исправлено: добавлен `adminBillingCompaniesQuerySchema`, controller валидирует query, service использует общий `resolvePagination`; integration-тест проверяет 400 на нечисловой `limit` и рабочий paginated envelope. | `closed` | Закрыто коммитом этого исправления. |
 
 Шаблон новой строки:
 
@@ -479,6 +537,8 @@
 | 6 | `F-20260528-006` | `fix(admin): защитить owner-аккаунт в users API` | `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Admin users panel"`; `pnpm --filter @ecoplatform/api test -- admin`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
 | 7 | `F-20260528-007` | `fix(admin): не отдавать passwordHash при создании staff` | `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Admin staff panel"`; `pnpm --filter @ecoplatform/api test -- admin`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
 | 8 | `F-20260528-008` | `fix(admin): валидировать query списка staff` | `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Admin staff panel"`; `pnpm --filter @ecoplatform/api test -- admin`; `pnpm --filter @ecoplatform/api lint`; `prettier --check`; `git diff --check` | `closed` |
+| 9 | `F-20260528-009` | `fix(billing): закрыть риски проверки billing-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Demo gating\\|Billing notifications\\|Company profile"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
+| 10 | `F-20260528-010` | `fix(billing): закрыть риски проверки billing-api` | `pnpm --filter @ecoplatform/shared build`; `pnpm --filter @ecoplatform/api exec vitest run -c vitest.integration.config.ts --testNamePattern "Demo gating\\|Billing notifications\\|Company profile"`; `pnpm lint`; `pnpm test`; `pnpm build`; `pnpm format:check`; `git diff --check` | `closed` |
 
 ## Базовые проверки
 

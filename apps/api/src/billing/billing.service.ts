@@ -4,6 +4,7 @@ import { CompanyStatus, NotificationCategory, Prisma, SubscriptionStatus } from 
 import type { Company, Subscription } from "@prisma/client";
 import type { AddressDto, CompanyProfileUpdateDto, ManualSubscriptionDto } from "@ecoplatform/shared";
 import { computeDiff } from "../common/admin-action-log.service";
+import { paginatedResponse, resolvePagination, type PaginationInput } from "../common/pagination";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -115,16 +116,15 @@ export class BillingService {
     });
   }
 
-  async listCompanies(pagination: { limit?: number; offset?: number } = {}) {
-    const limit = Math.min(Math.max(pagination.limit ?? 50, 1), 200);
-    const offset = Math.max(pagination.offset ?? 0, 0);
+  async listCompanies(paginationInput: PaginationInput = {}) {
+    const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 200 });
 
     const [total, items] = await this.prisma.$transaction([
       this.prisma.company.count(),
       this.prisma.company.findMany({
         orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: offset,
+        take: pagination.limit,
+        skip: pagination.offset,
         include: {
           // `include: { users: true }` тянул бы passwordHash в админ-ответ —
           // явный select оставляет только то, что нужно списку.
@@ -144,7 +144,7 @@ export class BillingService {
       }),
     ]);
 
-    return { items, total, hasMore: offset + items.length < total };
+    return paginatedResponse(items, total, pagination);
   }
 
   async activateManually(
