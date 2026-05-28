@@ -130,7 +130,8 @@ export function AdminSupportView() {
       setResult("Сначала войдите как администратор.");
       return;
     }
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const text = String(form.get("text") ?? "").trim();
     if (!text) return;
     setSending(true);
@@ -141,7 +142,7 @@ export function AdminSupportView() {
         token,
         body: { text },
       });
-      event.currentTarget.reset();
+      formElement.reset();
       ticketsQuery.reload();
     } catch (error) {
       setResult(error instanceof Error ? error.message : "Не удалось отправить ответ.");

@@ -83,7 +83,8 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setSubmitting(true);
     setMessage(null);
     try {
@@ -96,7 +97,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
           text: String(form.get("text")),
         },
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage("Обращение создано. Мы ответим в ближайшее время.");
       // Переключаемся на список, чтобы пользователь увидел свежий тикет.
       ticketsQuery.reload();
