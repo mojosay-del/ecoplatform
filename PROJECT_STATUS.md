@@ -13,7 +13,7 @@
 `B-COMMON`, `B-ADMIN`, `B-BILLING`, `B-CONTENT`, `B-FILES`, `B-LEGAL`,
 `B-MOD`, `B-NOTIF`, `B-OBS`, `B-REDIS`, `B-SCHED`, `B-SUPPORT`, `C-APP`,
 `C-ADMIN`, `C-AUTH`, `C-SHELL`, `C-CMS`, `C-LIBAPI`, `C-AUTHCTX` и
-`C-STYLES`; следующий модуль проверки — `D-SHARED`.
+`C-STYLES`, `D-SHARED`; следующий модуль проверки — `E-TESTS`.
 
 Проверка `C-LIBAPI` подтвердила единый frontend API-слой: access-token хранится
 только в памяти, CSRF-заголовки добавляются централизованно, `401` проходит
@@ -32,6 +32,12 @@ browser storage и сохраняет разделение `401` как истё
 остаются только в мини-флагах выбора телефона. Ненулевой `letter-spacing`
 убран из `globals.css`, фирменный оранжевый возвращён без затемнения после
 browser-review `/login`.
+
+Проверка `D-SHARED` подтвердила общий contract-layer: API и web используют
+единые DTO, enum constants, access helpers, response types и pagination
+envelope; HTML-sanitizer остаётся отдельным subpath
+`@ecoplatform/shared/sanitize-html`, а обычный shared barrel не подтягивает
+DOMPurify/jsdom.
 
 Внеплановая dev-стабилизация закрыта: локальный `next dev` для web переведён
 на Webpack, потому что Turbopack в текущем окружении уходил в crash-loop на

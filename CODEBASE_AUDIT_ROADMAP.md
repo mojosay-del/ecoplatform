@@ -104,7 +104,7 @@
 | C-LIBAPI | `apps/web/src/lib/api` | `accepted` | D | typed API client, refresh, CSRF, error handling, downloads |
 | C-AUTHCTX | `apps/web/src/lib/auth.tsx` | `accepted` | C/D | session restore, 401/403 behavior, user state transitions |
 | C-STYLES | `apps/web/src/styles` | `accepted` | C | tokens, contrast, responsive rules, repeated raw colors |
-| D-SHARED | `packages/shared/src` | `not_started` | D | DTOs, access rules, sanitize, content-block schemas |
+| D-SHARED | `packages/shared/src` | `accepted` | D | DTOs, access rules, sanitize, content-block schemas |
 | E-TESTS | Tests and smoke | `not_started` | E | unit/integration/smoke coverage, flaky risks, test DB setup |
 | F-ACCEPT | MVP acceptance scenarios | `not_started` | F | owner-facing flows, browser proof, bugfix queue |
 
@@ -1447,6 +1447,74 @@
   phone-selector, где это не theme-token, а мини-иллюстрация;
 - `F-20260528-035` закрыт: `letter-spacing` в global styles приведён к `0`,
   чтобы заголовки, labels и compact UI не сжимали текст на узких контейнерах.
+
+### D-SHARED — `packages/shared/src`
+
+Дата проверки: 2026-05-28.
+
+Статус: `accepted`.
+
+Проверено:
+
+- `packages/shared/src/domain.ts`: доменные enum-like constants и типы для
+  company/user/platform/content/legal/support;
+- `packages/shared/src/dto.ts`: zod-схемы регистрации, входа, смены пароля,
+  ручной подписки, юридических документов, согласий, поддержки и профиля
+  компании;
+- `packages/shared/src/api-response.ts`: response DTO для публичных страниц,
+  кабинета, auth/me, legal, admin journals и admin dashboard;
+- `packages/shared/src/access.ts`: demo/subscription gating, effective plan и
+  доступ к уровням обучения;
+- `packages/shared/src/content-blocks.ts`: block kind registry, zod-схемы
+  news/lesson/knowledge blocks и validator helpers;
+- `packages/shared/src/sanitize-html.ts`: единый DOMPurify whitelist, URI
+  allow-list, link hardening и style sanitizer;
+- `packages/shared/src/price-index.ts`, `packages/shared/src/slug.ts`,
+  `packages/shared/src/index.ts` и `packages/shared/package.json`;
+- потребители shared-контрактов в `apps/api` и `apps/web`.
+
+Доказательства:
+
+- Zod v4 docs через Context7: `z.enum` поддерживает enum-like inputs, а
+  `z.discriminatedUnion`, `.refine()` и `.safeParse()` остаются штатными
+  механизмами для таких shared DTO/validator-схем;
+- isomorphic-dompurify docs через Context7: `sanitize()` принимает config с
+  allow-list tags/attrs, а `afterSanitizeAttributes` hook подходит для
+  принудительного `rel="noopener noreferrer"` и чистки атрибутов;
+- `pnpm --filter @ecoplatform/shared lint` -> clean;
+- `pnpm --filter @ecoplatform/shared test` -> 2 files / 10 tests passed;
+- `pnpm --filter @ecoplatform/shared build` -> clean;
+- `rg -n "@ecoplatform/shared" apps packages --glob '*.ts' --glob '*.tsx'`
+  -> API и web используют shared DTO, enum constants, access helpers,
+  pagination envelope и response types без локального дубля в ключевых
+  auth/billing/content/legal/support/admin сценариях;
+- `rg -n "sanitizeParagraphHtml|validateNewsBlocks|validateLessonBlocks|baseContentBlockSchema|registerDtoSchema|manualSubscriptionDtoSchema|companyProfileUpdateDtoSchema|canAccessLearningLevel|canOpenFunctionalSections|summarizePriceIndex|slugify" apps packages --glob '*.ts' --glob '*.tsx'`
+  -> shared helpers реально подключены в API validation/business logic и web
+  rendering;
+- `rg -n "TODO|FIXME|console\\.|dangerouslySetInnerHTML|innerHTML|localStorage|sessionStorage|password\\s*[:=]\\s*['\\\"]|token\\s*[:=]\\s*['\\\"]|secret\\s*[:=]\\s*['\\\"]|AKIA|ASIA|BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|eval\\(|new Function" packages/shared/src packages/shared/test`
+  -> нет production debug, storage access, hardcoded secrets или dynamic code
+  execution; единственное совпадение — поясняющий комментарий про
+  `dangerouslySetInnerHTML` в sanitizer-файле;
+- `pnpm lint` -> clean;
+- `pnpm format:check` -> clean;
+- `git diff --check` -> clean.
+
+Решение:
+
+- `packages/shared/src` принят без открытых P0/P1/P2-рисков;
+- общий barrel `@ecoplatform/shared` экспортирует DTO/domain/access/response
+  helpers, но не экспортирует `sanitize-html`, поэтому обычные API/web импорты
+  не подтягивают DOMPurify/jsdom;
+- HTML проходит через один shared sanitizer на сервере и клиенте: разрешены
+  только нужные CMS-теги/атрибуты, `javascript:` URI удаляются, а ссылки
+  `target="_blank"` получают `noopener noreferrer`;
+- `registerDtoSchema` продолжает явно отклонять legacy `billingInn`, чтобы ИНН
+  не возвращался в регистрацию и заполнялся только в профиле компании;
+- `AuthMeUser`, billing/legal/news/learning/knowledge/support/admin response
+  DTO остаются общей точкой для frontend API-клиента и backend service shapes;
+- content block schemas централизуют ограничения: news не принимает file/task
+  blocks, lesson не принимает audio/file/checklist, knowledge-base использует
+  общий base block set.
 
 ### Внеплановая dev-runtime правка — `/register`
 

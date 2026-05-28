@@ -5,8 +5,8 @@
 Текущее состояние MVP — в [PROJECT_STATUS.md](PROJECT_STATUS.md).
 Рабочая карта полного аудита кода — в
 [CODEBASE_AUDIT_ROADMAP.md](CODEBASE_AUDIT_ROADMAP.md).
-На 2026-05-28 полный codebase-аудит принят до `C-STYLES`; следующий модуль
-проверки — `D-SHARED`.
+На 2026-05-28 полный codebase-аудит принят до `D-SHARED`; следующий модуль
+проверки — `E-TESTS`.
 
 ## Карта проекта
 
