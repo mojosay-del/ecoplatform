@@ -79,7 +79,8 @@ EXPOSE 4000
 # без него graceful shutdown в Nest может не сработать.
 ENTRYPOINT ["/sbin/tini", "--"]
 
-# При старте контейнера сначала прокатываем миграции (idempotent),
-# потом запускаем сервер. Можно поставить `prisma migrate deploy` в init-job
-# и тут запускать только `node dist/main.js` — выбираем как удобнее в Timeweb.
-CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/main.js"]
+# При старте контейнера сначала прокатываем миграции (idempotent), потом сервер.
+# Запускаем prisma НАПРЯМУЮ бинарём, НЕ через pnpm: `pnpm exec` под non-root
+# пользователем триггерит "проверку зависимостей" → pnpm install → запись в /app
+# → EACCES и креш-луп. Прямой бинарь этого не делает.
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main.js"]
