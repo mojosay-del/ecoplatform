@@ -8,7 +8,11 @@ import {
 } from "@nestjs/common";
 import { DeleteObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
-import { fromBuffer } from "file-type";
+// file-type ≥17 поставляется только как ESM. apps/api собирается в CommonJS:
+// tsc эмитит require("file-type"), который Node ≥20 грузит синхронно через
+// условие экспорта "module-sync" (стабильно на нашем Node 24). В vitest swc
+// оставляет ESM-import. Типы tsc берёт из index.d.ts в корне пакета.
+import { fileTypeFromBuffer } from "file-type";
 import { randomUUID } from "crypto";
 import { extname } from "path";
 import type { RequestUser } from "../common/request-user";
@@ -435,7 +439,7 @@ export class FilesService {
 
   private async detectUploadMime(buffer: Buffer): Promise<string | null> {
     try {
-      return this.normalizeMimeType((await fromBuffer(buffer))?.mime);
+      return this.normalizeMimeType((await fileTypeFromBuffer(buffer))?.mime);
     } catch {
       return null;
     }
