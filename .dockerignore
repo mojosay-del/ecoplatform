@@ -5,8 +5,10 @@
 **/coverage
 .pnpm-store
 .git
-.env
-.env.local
+# Никакие env-файлы (реальные и примеры) не должны попадать в образ —
+# секреты прокидываются через docker compose env_file/args в рантайме.
+**/.env
+**/.env.*
 .DS_Store
 **/*.tsbuildinfo
 audit/

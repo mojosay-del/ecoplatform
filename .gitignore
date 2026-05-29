@@ -9,6 +9,8 @@ blob-report
 .playwright-mcp
 .env
 .env.local
+.env.prod
+**/.env.prod
 .DS_Store
 *.tsbuildinfo
 .pnpm-store

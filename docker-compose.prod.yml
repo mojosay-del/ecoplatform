@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────
+# Прод-запуск ЭкоПлатформы на ОДНОМ сервере Ubuntu (Timeweb «Облачные серверы»).
+#
+# Контейнеры:
+#   • api   — NestJS-бэкенд        (порт 4000, только внутренняя сеть)
+#   • web   — Next.js-сайт         (порт 3000, только внутренняя сеть)
+#   • caddy — приём трафика из интернета + автоматический HTTPS (порты 80/443)
+#   • redis — кэш сессий и лимитов (необязателен — можно удалить блок)
+#
+# База данных (Timeweb Managed PostgreSQL) и S3 — ВНЕШНИЕ, их здесь нет:
+# адреса и ключи берутся из deploy/.env.prod.
+#
+# Запуск ИЗ КОРНЯ репозитория на сервере:
+#   docker compose -f docker-compose.prod.yml --env-file deploy/.env.prod up -d --build
+#
+# Контекст сборки = корень репозитория (так требуют оба Dockerfile).
+# ─────────────────────────────────────────────────────────────────────────
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    # Все рантайм-переменные (БД, JWT, S3 …) — из этого файла.
+    env_file: deploy/.env.prod
+    # Наружу не публикуем: к API ходит только caddy по внутренней сети.
+    expose:
+      - "4000"
+    depends_on:
+      - redis
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # ВАЖНО: адрес API «зашивается» в сайт на ЭТАПЕ СБОРКИ, не в рантайме.
+        # Значение берётся из deploy/.env.prod (через --env-file при запуске).
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    env_file: deploy/.env.prod
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # Единственный контейнер, открытый в интернет.
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # здесь caddy хранит выпущенные TLS-сертификаты
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+
+  # Необязательный кэш. Приложение работает и без него (деградирует мягко).
+  # Чтобы отключить — удалите этот блок и очистите REDIS_URL в .env.prod.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    # Портов наружу нет: redis доступен только другим контейнерам.
+
+volumes:
+  caddy_data:
+  caddy_config:

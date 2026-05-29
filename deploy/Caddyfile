@@ -1,0 +1,29 @@
+# ЭкоПлатформа — единая точка входа из интернета.
+# Caddy сам получает и продлевает БЕСПЛАТНЫЙ HTTPS-сертификат (Let's Encrypt) —
+# ничего вручную выпускать не нужно.
+#
+# Если домен не ecoplatform.pro — замените его в двух местах ниже.
+
+{
+	# Email для Let's Encrypt (уведомления об истечении сертификата).
+	email mojosay@icloud.com
+}
+
+ecoplatform.pro {
+	encode zstd gzip
+
+	# Всё, что начинается с /api/ — отправляем в бэкенд (NestJS, контейнер api).
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	# Всё остальное — на сайт (Next.js, контейнер web).
+	handle {
+		reverse_proxy web:3000
+	}
+}
+
+# Заходящих на www.ecoplatform.pro мягко переводим на адрес без www.
+www.ecoplatform.pro {
+	redir https://ecoplatform.pro{uri} permanent
+}
