@@ -1,5 +1,6 @@
 # CI для PR/push в main. Запускает lint + prettier-check + unit-тесты + сборку.
 # Integration-тесты выполняются отдельным job с поднятым Postgres.
+# Security-audit (pnpm audit) — отдельный job, падает только на high/critical.
 name: CI
 
 on:
@@ -100,6 +101,31 @@ jobs:
 
       - name: Integration tests
         run: pnpm --filter @ecoplatform/api test:integration
+
+  security-audit:
+    name: security audit (pnpm audit)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'deployment_status'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Падаем только на high/critical: low/moderate-advisories часто шумят и
+      # нередко неустранимы в транзитивных зависимостях. `pnpm audit` читает
+      # pnpm-lock.yaml — установка зависимостей не нужна, поэтому job быстрый.
+      # Точечно заглушить конкретную advisory: auditConfig.ignoreGhsas /
+      # ignoreCves в pnpm-workspace.yaml. `--ignore-unfixable` убрал бы CVE без
+      # доступного фикса. Чтобы сделать шаг информационным (не блокировать CI) —
+      # добавить `continue-on-error: true` к этому job.
+      - name: pnpm audit (high+ severity)
+        run: pnpm audit --audit-level high
 
   staging-smoke:
     name: staging smoke (Playwright)
