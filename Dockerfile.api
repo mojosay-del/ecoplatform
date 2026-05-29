@@ -52,8 +52,12 @@ RUN pnpm --filter @ecoplatform/api... build
 # ────────────────── Stage 3: runtime ──────────────────
 FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS runtime
 RUN sed -i 's#dl-cdn.alpinelinux.org/alpine#mirror.yandex.ru/mirrors/alpine#g' /etc/apk/repositories && apk add --no-cache libc6-compat openssl tini
-# pnpm нужен только для `pnpm prisma migrate deploy` при старте.
-RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+# CLI prisma и ts-node ставим ГЛОБАЛЬНО (в PATH). В pnpm-раскладке их бинарей
+# нет в корневом node_modules/.bin (это devDeps пакета api), а pnpm в рантайме
+# триггерит install под non-root → EACCES. Глобальные бинари решают обе беды.
+# Версия prisma совпадает со сгенерированным @prisma/client (6.19.3).
+# Запуск миграций и seed/promote использует именно эти глобальные бинари.
+RUN npm install -g prisma@6.19.3 ts-node typescript
 WORKDIR /app
 
 ENV NODE_ENV=production \
@@ -79,8 +83,6 @@ EXPOSE 4000
 # без него graceful shutdown в Nest может не сработать.
 ENTRYPOINT ["/sbin/tini", "--"]
 
-# При старте контейнера сначала прокатываем миграции (idempotent), потом сервер.
-# Запускаем prisma НАПРЯМУЮ бинарём, НЕ через pnpm: `pnpm exec` под non-root
-# пользователем триггерит "проверку зависимостей" → pnpm install → запись в /app
-# → EACCES и креш-луп. Прямой бинарь этого не делает.
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main.js"]
+# При старте: миграции (idempotent), потом сервер. prisma — ГЛОБАЛЬНЫЙ бинарь
+# (в PATH): читает prisma/schema.prisma из cwd и DATABASE_URL из окружения.
+CMD ["sh", "-c", "prisma migrate deploy && node dist/main.js"]
