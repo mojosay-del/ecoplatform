@@ -5,6 +5,8 @@
 #   /api/* → api:4000,  остальное → web:3000.
 #
 # Контекст сборки — КОРЕНЬ репозитория (так задано в docker-compose.yml).
-FROM caddy:2-alpine
+# Реестр по умолчанию — Docker Hub; на Timeweb переопределяется на их зеркало.
+ARG IMAGE_REGISTRY=docker.io/library
+FROM ${IMAGE_REGISTRY}/caddy:2-alpine
 COPY deploy/proxy/Caddyfile /etc/caddy/Caddyfile
 EXPOSE 8080

@@ -3,9 +3,13 @@
 # Сборка из КОРНЯ репозитория: `docker build -f apps/web/Dockerfile .`
 
 ARG NODE_VERSION=24
+# Реестр базовых образов. По умолчанию — обычный Docker Hub (работает везде).
+# На Timeweb App Platform переопределяется на их зеркало через build-arg в
+# docker-compose.yml (Docker Hub из РФ режется по скорости до ~25 КБ/с).
+ARG IMAGE_REGISTRY=docker.io/library
 
 # ────────────────── Stage 1: deps ──────────────────
-FROM node:${NODE_VERSION}-alpine AS deps
+FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS deps
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /repo
@@ -17,7 +21,7 @@ COPY packages/shared/package.json ./packages/shared/
 RUN pnpm install --frozen-lockfile
 
 # ────────────────── Stage 2: build ──────────────────
-FROM node:${NODE_VERSION}-alpine AS build
+FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS build
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /repo
@@ -33,7 +37,7 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 RUN pnpm --filter @ecoplatform/web... build
 
 # ────────────────── Stage 3: runtime ──────────────────
-FROM node:${NODE_VERSION}-alpine AS runtime
+FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS runtime
 RUN apk add --no-cache libc6-compat tini
 WORKDIR /app
 

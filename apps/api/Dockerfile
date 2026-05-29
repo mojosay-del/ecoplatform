@@ -3,11 +3,15 @@
 # Сборка идёт из КОРНЯ репозитория: `docker build -f apps/api/Dockerfile .`
 
 ARG NODE_VERSION=24
+# Реестр базовых образов. По умолчанию — обычный Docker Hub (работает везде).
+# На Timeweb App Platform переопределяется на их зеркало через build-arg в
+# docker-compose.yml (Docker Hub из РФ режется по скорости до ~25 КБ/с).
+ARG IMAGE_REGISTRY=docker.io/library
 
 # ────────────────── Stage 1: deps ──────────────────
 # Ставим зависимости один раз и кешируем слой. Дальше остальные стадии
 # берут готовый node_modules без повторной установки.
-FROM node:${NODE_VERSION}-alpine AS deps
+FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
 # pnpm берём через corepack — версию задаём такую же, как в корневом package.json.
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
@@ -24,7 +28,7 @@ COPY packages/shared/package.json ./packages/shared/
 RUN pnpm install --frozen-lockfile
 
 # ────────────────── Stage 2: build ──────────────────
-FROM node:${NODE_VERSION}-alpine AS build
+FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS build
 RUN apk add --no-cache libc6-compat openssl
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /repo
@@ -40,7 +44,7 @@ RUN pnpm --filter @ecoplatform/api prisma generate
 RUN pnpm --filter @ecoplatform/api... build
 
 # ────────────────── Stage 3: runtime ──────────────────
-FROM node:${NODE_VERSION}-alpine AS runtime
+FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS runtime
 RUN apk add --no-cache libc6-compat openssl tini
 # pnpm нужен только для `pnpm prisma migrate deploy` при старте.
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate

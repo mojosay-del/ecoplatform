@@ -25,6 +25,9 @@ services:
     build:
       context: .
       dockerfile: deploy/proxy/Dockerfile
+      args:
+        # Зеркало Docker Hub от Timeweb — прямой Docker Hub из РФ режется до ~25 КБ/с.
+        IMAGE_REGISTRY: dockerhub.timeweb.cloud/library
     restart: unless-stopped
     expose:
       - "8080"
@@ -39,6 +42,8 @@ services:
       args:
         # Адрес API «зашивается» в сайт на этапе сборки. Один домен → /api.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        # Зеркало Docker Hub от Timeweb (быстрая загрузка базовых образов).
+        IMAGE_REGISTRY: dockerhub.timeweb.cloud/library
     restart: unless-stopped
     expose:
       - "3000"
@@ -47,6 +52,9 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        # Зеркало Docker Hub от Timeweb (быстрая загрузка базовых образов).
+        IMAGE_REGISTRY: dockerhub.timeweb.cloud/library
     restart: unless-stopped
     # Перечисляем явно, чтобы переменные из панели гарантированно попали в контейнер.
     environment:
