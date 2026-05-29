@@ -42,7 +42,9 @@ COPY --from=deps /repo ./
 COPY . .
 
 # Prisma engine генерируется под linux-musl-* (см. binaryTargets в schema.prisma).
-RUN pnpm --filter @ecoplatform/api prisma generate
+# Скрипт называется prisma:generate (с двоеточием); `pnpm ... prisma generate`
+# pnpm трактует как запуск несуществующего скрипта "prisma" → падает.
+RUN pnpm --filter @ecoplatform/api prisma:generate
 
 # shared собирается первым через turbo dependsOn `^build`.
 RUN pnpm --filter @ecoplatform/api... build
@@ -80,4 +82,4 @@ ENTRYPOINT ["/sbin/tini", "--"]
 # При старте контейнера сначала прокатываем миграции (idempotent),
 # потом запускаем сервер. Можно поставить `prisma migrate deploy` в init-job
 # и тут запускать только `node dist/main.js` — выбираем как удобнее в Timeweb.
-CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/main.js"]
