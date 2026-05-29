@@ -9,15 +9,22 @@ function buildService(lockAcquired = true) {
   };
   const prisma = {
     $transaction: vi.fn((callback: (txArg: typeof tx) => Promise<unknown>) => callback(tx)),
+    fileAsset: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   };
   const billing = {
     runHourlyCheck: vi.fn().mockResolvedValue({}),
   };
+  const files = {
+    deleteIfUnreferenced: vi.fn().mockResolvedValue(0),
+  };
 
   return {
     billing,
+    files,
     prisma,
-    service: new SchedulerService(billing as any, prisma as any),
+    service: new SchedulerService(billing as any, prisma as any, files as any),
     tx,
   };
 }
@@ -100,7 +107,10 @@ describe("SchedulerService", () => {
     const billing = {
       runHourlyCheck: vi.fn(),
     };
-    const service = new SchedulerService(billing as any, prisma as any);
+    const files = {
+      deleteIfUnreferenced: vi.fn(),
+    };
+    const service = new SchedulerService(billing as any, prisma as any, files as any);
 
     const result = await service.cleanupDeletedAccounts(now);
 
@@ -117,5 +127,68 @@ describe("SchedulerService", () => {
     });
     expect(tx.user.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ["user-1"] } } });
     expect(result).toEqual({ deletedUsers: 1, deletedCompanies: 1 });
+  });
+
+  it("находит файлы без ссылок старше суток и отдаёт их в deleteIfUnreferenced", async () => {
+    const now = new Date("2026-05-29T03:30:00.000Z");
+    const prisma = {
+      fileAsset: {
+        findMany: vi.fn().mockResolvedValue([{ id: "orphan-1" }, { id: "orphan-2" }]),
+      },
+    };
+    const files = {
+      deleteIfUnreferenced: vi.fn().mockResolvedValue(2),
+    };
+    const service = new SchedulerService({ runHourlyCheck: vi.fn() } as any, prisma as any, files as any);
+
+    const result = await service.cleanupOrphanFiles(now);
+
+    const where = prisma.fileAsset.findMany.mock.calls[0][0].where;
+    expect(where.references).toEqual({ none: {} });
+    // грейс ровно сутки: cutoff = now - 24h
+    expect(where.createdAt.lt).toEqual(new Date("2026-05-28T03:30:00.000Z"));
+    expect(files.deleteIfUnreferenced).toHaveBeenCalledWith(["orphan-1", "orphan-2"]);
+    expect(result).toEqual({ scanned: 2, deleted: 2 });
+  });
+
+  it("не вызывает deleteIfUnreferenced, когда осиротевших файлов нет", async () => {
+    const prisma = {
+      fileAsset: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const files = { deleteIfUnreferenced: vi.fn() };
+    const service = new SchedulerService({ runHourlyCheck: vi.fn() } as any, prisma as any, files as any);
+
+    const result = await service.cleanupOrphanFiles(new Date());
+
+    expect(files.deleteIfUnreferenced).not.toHaveBeenCalled();
+    expect(result).toEqual({ scanned: 0, deleted: 0 });
+  });
+
+  it("запускает orphan-cleanup только под Postgres advisory lock", async () => {
+    const { files, service, tx } = buildService(true);
+
+    await service.handleOrphanFileCleanup();
+
+    expect(tx.$queryRaw.mock.calls[0][1]).toBe("cron:cleanup-orphan-files");
+    // findMany вернул [], поэтому до удаления дело не дошло
+    expect(files.deleteIfUnreferenced).not.toHaveBeenCalled();
+  });
+
+  it("пропускает orphan-cleanup, если advisory lock держит другая реплика", async () => {
+    const { files, service } = buildService(false);
+
+    await service.handleOrphanFileCleanup();
+
+    expect(files.deleteIfUnreferenced).not.toHaveBeenCalled();
+  });
+
+  it("не трогает файлы, когда scheduler отключён переменной окружения", async () => {
+    vi.stubEnv("SCHEDULER_DISABLED", "1");
+    const { files, prisma, service } = buildService(true);
+
+    await service.handleOrphanFileCleanup();
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(files.deleteIfUnreferenced).not.toHaveBeenCalled();
   });
 });

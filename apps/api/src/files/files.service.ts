@@ -744,8 +744,9 @@ export class FilesService {
     return actor.platformRoles.includes("admin") || asset.uploadedById === actor.id;
   }
 
-  async deleteIfUnreferenced(fileIds: string[], actor?: RequestUser) {
+  async deleteIfUnreferenced(fileIds: string[], actor?: RequestUser): Promise<number> {
     const uniqueIds = Array.from(new Set(fileIds.filter(Boolean)));
+    let deleted = 0;
 
     for (const fileId of uniqueIds) {
       const [asset, referenceCount, hasStructuredReference, hasBlockReference] = await Promise.all([
@@ -778,6 +779,9 @@ export class FilesService {
       }
 
       await this.prisma.fileAsset.delete({ where: { id: fileId } });
+      deleted += 1;
     }
+
+    return deleted;
   }
 }

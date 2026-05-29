@@ -2,13 +2,22 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { CompanyStatus, Prisma } from "@prisma/client";
 import { BillingNotificationsService } from "../billing/billing-notifications.service";
+import { FilesService } from "../files/files.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 const BILLING_HOURLY_LOCK_KEY = "cron:billing-hourly-check";
 const ACCOUNT_DELETION_CLEANUP_LOCK_KEY = "cron:cleanup-deleted-accounts";
+const ORPHAN_FILE_CLEANUP_LOCK_KEY = "cron:cleanup-orphan-files";
 const CRON_LOCK_TRANSACTION_TIMEOUT_MS = 15 * 60 * 1000;
 const ACCOUNT_DELETION_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
 const ACCOUNT_DELETION_BATCH_SIZE = 500;
+// Файл считается «осиротевшим» только спустя сутки после загрузки — грейс
+// защищает свежие незавершённые черновики (залили картинку, ещё не сохранили).
+const ORPHAN_FILE_GRACE_MS = 24 * 60 * 60 * 1000;
+// За один прогон чистим ограниченную пачку: проверка ссылок на файл тяжёлая
+// (сканирует payload всех блоков), а задача суточная — backlog растворится за
+// несколько дней без риска упереться в таймаут lock-транзакции.
+const ORPHAN_FILE_BATCH_SIZE = 100;
 
 type AdvisoryLockRow = {
   ok: boolean;
@@ -25,11 +34,11 @@ type AccountDeletionCleanupResult = {
 };
 
 /**
- * Координатор регулярных фоновых задач.
- *
- * Сейчас на нём висит одна задача: раз в час BillingNotificationsService
- * проверяет компании и отправляет уведомления о скором/случившемся
- * истечении демо и подписки.
+ * Координатор регулярных фоновых задач:
+ *  - раз в час BillingNotificationsService проверяет компании и шлёт
+ *    уведомления о скором/случившемся истечении демо и подписки;
+ *  - ночью чистятся аккаунты, прошедшие грейс удаления;
+ *  - ночью удаляются осиротевшие загрузки (файлы без единой ссылки).
  *
  * Запуск задач можно полностью отключить переменной SCHEDULER_DISABLED=1
  * (актуально для integration-тестов — для биллинг-логики используется
@@ -42,6 +51,7 @@ export class SchedulerService {
   constructor(
     private readonly billing: BillingNotificationsService,
     private readonly prisma: PrismaService,
+    private readonly files: FilesService,
   ) {}
 
   private get disabled(): boolean {
@@ -72,6 +82,50 @@ export class SchedulerService {
 
   async cleanupDeletedAccounts(now = new Date()): Promise<AccountDeletionCleanupResult> {
     return this.prisma.$transaction((tx) => this.cleanupDeletedAccountsInTransaction(tx, now));
+  }
+
+  @Cron("30 3 * * *", { name: "cleanup-orphan-files" })
+  async handleOrphanFileCleanup() {
+    if (this.disabled) return;
+    try {
+      // Advisory lock держится до конца прогона: вторая реплика просто
+      // пропустит свой tick и не будет удалять те же файлы параллельно.
+      await this.runWithPostgresAdvisoryLock(ORPHAN_FILE_CLEANUP_LOCK_KEY, () => this.cleanupOrphanFiles());
+    } catch (error) {
+      this.logger.error("Orphan file cleanup failed", error as Error);
+    }
+  }
+
+  /**
+   * Удаляет «осиротевшие» загрузки — FileAsset без единой FileReference,
+   * созданные больше суток назад. Это файлы, которые залили в редактор, но
+   * так и не сохранили в контент (закрыли черновик): ссылок на них нет и
+   * больше не появится, поэтому штатные триггеры удаления (замена обложки,
+   * правка блоков, удаление сущности) их не трогают.
+   *
+   * Делегируем удаление в files.deleteIfUnreferenced: он ещё раз перепроверяет
+   * ВСЕ виды ссылок (FileReference + обложки/вложения + payload блоков) и
+   * физически стирает объект из S3 только если на файл реально никто не
+   * ссылается. Поэтому фильтр `references: none` здесь — лишь дешёвый
+   * предотбор кандидатов, а не финальное решение: добавление новых типов
+   * ссылок в будущем не приведёт к потере нужных файлов.
+   */
+  async cleanupOrphanFiles(now = new Date()): Promise<{ scanned: number; deleted: number }> {
+    const cutoff = new Date(now.getTime() - ORPHAN_FILE_GRACE_MS);
+    const candidates = await this.prisma.fileAsset.findMany({
+      where: { createdAt: { lt: cutoff }, references: { none: {} } },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+      take: ORPHAN_FILE_BATCH_SIZE,
+    });
+
+    if (candidates.length === 0) {
+      return { scanned: 0, deleted: 0 };
+    }
+
+    const deleted = await this.files.deleteIfUnreferenced(candidates.map((candidate) => candidate.id));
+    this.logger.log(`Orphan file cleanup: scanned ${candidates.length}, deleted ${deleted}`);
+    return { scanned: candidates.length, deleted };
   }
 
   private async cleanupDeletedAccountsInTransaction(
