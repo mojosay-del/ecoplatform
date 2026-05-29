@@ -30,7 +30,13 @@ export function isSubscriptionActive(
     return false;
   }
 
-  return new Date(company.subscriptionEndsAt).getTime() > now.getTime() || company.status === "past_due";
+  // `past_due` сам по себе НЕ продлевает доступ: компания сохраняет
+  // функциональные разделы только пока подписка реально не истекла
+  // (`subscriptionEndsAt` в будущем). После истечения hourly-cron переводит
+  // компанию в `past_due`, и доступ закрывается — симметрично истёкшему demo.
+  // Раньше здесь был `|| company.status === "past_due"`, из-за чего компания
+  // с истёкшей платной подпиской сохраняла функциональный доступ бессрочно.
+  return new Date(company.subscriptionEndsAt).getTime() > now.getTime();
 }
 
 export function canOpenFunctionalSections(company: CompanyAccessSnapshot, now = new Date()): boolean {

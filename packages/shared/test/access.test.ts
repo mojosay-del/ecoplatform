@@ -3,6 +3,7 @@ import {
   canAccessLearningLevel,
   canOpenFunctionalSections,
   demoEndsAt,
+  effectivePlan,
   summarizePriceIndex,
   slugify,
   validateLessonBlocks,
@@ -34,6 +35,51 @@ describe("MVP access rules", () => {
     };
 
     expect(canOpenFunctionalSections(company, now)).toBe(false);
+  });
+
+  it("keeps access while a paid subscription is still in the future", () => {
+    const now = new Date("2026-05-20T10:00:00.000Z");
+    const company = {
+      status: "active" as const,
+      demoEndsAt: null,
+      subscriptionPlan: "basic" as const,
+      subscriptionEndsAt: new Date("2026-06-20T10:00:00.000Z"),
+    };
+
+    expect(canOpenFunctionalSections(company, now)).toBe(true);
+    expect(effectivePlan(company, now)).toBe("basic");
+  });
+
+  // Регрессия: истёкшая платная подписка (компания переведена hourly-cron'ом
+  // в past_due) НЕ должна сохранять функциональный доступ. До фикса
+  // `isSubscriptionActive` короткозамыкался на `status === "past_due"` и
+  // оставлял доступ открытым бессрочно.
+  it("closes functional sections after a paid subscription expires (past_due)", () => {
+    const now = new Date("2026-05-20T10:00:00.000Z");
+    const company = {
+      status: "past_due" as const,
+      demoEndsAt: null,
+      subscriptionPlan: "basic" as const,
+      subscriptionEndsAt: new Date("2026-05-20T09:59:59.000Z"),
+    };
+
+    expect(canOpenFunctionalSections(company, now)).toBe(false);
+    expect(effectivePlan(company, now)).toBe(null);
+  });
+
+  // Граничный случай: admin вручную выставил past_due, но подписка ещё
+  // действует — доступ сохраняется по дате окончания, а не по статусу.
+  it("honours a still-valid subscription even when status is past_due", () => {
+    const now = new Date("2026-05-20T10:00:00.000Z");
+    const company = {
+      status: "past_due" as const,
+      demoEndsAt: null,
+      subscriptionPlan: "extended" as const,
+      subscriptionEndsAt: new Date("2026-06-20T10:00:00.000Z"),
+    };
+
+    expect(canOpenFunctionalSections(company, now)).toBe(true);
+    expect(effectivePlan(company, now)).toBe("extended");
   });
 });
 
