@@ -12,7 +12,7 @@ ARG IMAGE_REGISTRY=docker.io/library
 # Ставим зависимости один раз и кешируем слой. Дальше остальные стадии
 # берут готовый node_modules без повторной установки.
 FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS deps
-RUN apk add --no-cache libc6-compat openssl
+RUN sed -i 's#dl-cdn.alpinelinux.org/alpine#mirror.yandex.ru/mirrors/alpine#g' /etc/apk/repositories && apk add --no-cache libc6-compat openssl
 # pnpm берём через corepack — версию задаём такую же, как в корневом package.json.
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /repo
@@ -29,7 +29,7 @@ RUN pnpm install --frozen-lockfile
 
 # ────────────────── Stage 2: build ──────────────────
 FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS build
-RUN apk add --no-cache libc6-compat openssl
+RUN sed -i 's#dl-cdn.alpinelinux.org/alpine#mirror.yandex.ru/mirrors/alpine#g' /etc/apk/repositories && apk add --no-cache libc6-compat openssl
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /repo
 
@@ -51,7 +51,7 @@ RUN pnpm --filter @ecoplatform/api... build
 
 # ────────────────── Stage 3: runtime ──────────────────
 FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS runtime
-RUN apk add --no-cache libc6-compat openssl tini
+RUN sed -i 's#dl-cdn.alpinelinux.org/alpine#mirror.yandex.ru/mirrors/alpine#g' /etc/apk/repositories && apk add --no-cache libc6-compat openssl tini
 # pnpm нужен только для `pnpm prisma migrate deploy` при старте.
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
