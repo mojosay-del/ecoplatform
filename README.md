@@ -47,7 +47,8 @@ packages/
                      HTML/CSS whitelist, access-правила,
                      DTO для регистрации/legal/profile,
                      ответы API (NewsListItem, BillingStatus, AuthMeUser и т.д.)
-docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
+docker-compose.dev.yml локальный PostgreSQL 18 :5433 + Redis 7 :6379
+docker-compose.yml     прод для Timeweb App Platform (proxy + web + api)
 ```
 
 ## Локальный запуск
@@ -72,7 +73,7 @@ docker-compose.yml   локальный PostgreSQL 18 :5433 + Redis 7 :6379
 3. Поднять Postgres и Redis локально:
 
    ```bash
-   docker compose up -d
+   docker compose -f docker-compose.dev.yml up -d
    ```
 
    Контейнеры слушают `:5433` (Postgres) и `:6379` (Redis). Ожидаемые

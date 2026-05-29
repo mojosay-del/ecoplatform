@@ -92,7 +92,7 @@ volume и сеть `ecoplatform_v10crm` удалены; в локальном Do
 - Unit-тесты: 10 в `packages/shared`, 50 в `apps/web`, 84 в `apps/api`.
 - GitHub Actions CI: `static-checks` (prettier-check + lint + test + build) и `integration` (Postgres 18 service); workflow-token ограничен read-only доступом к коду.
 - Docker: multi-stage `Dockerfile` для api и web, `output: standalone` в Next.js, `binaryTargets` в Prisma под musl и debian.
-- Локальный `docker-compose.yml`: PostgreSQL 18 на `:5433` + Redis 7 на `:6379`.
+- Локальный `docker-compose.dev.yml`: PostgreSQL 18 на `:5433` + Redis 7 на `:6379` (корневой `docker-compose.yml` — прод для Timeweb App Platform: proxy + web + api).
 - Health-check через `@nestjs/terminus`: `/api/health` (liveness), `/api/ready` (Postgres/Redis/S3 readiness), `/api/health/deep` (admin-only диагностика).
 - `Dockerfile` + deploy-решения по env, миграциям, SSL, бэкапам, CDN и первому запуску.
 
@@ -210,7 +210,7 @@ volume и сеть `ecoplatform_v10crm` удалены; в локальном Do
 ```bash
 pnpm install
 cp .env.example .env
-docker compose up -d                                  # Postgres :5433 + Redis :6379
+docker compose -f docker-compose.dev.yml up -d        # Postgres :5433 + Redis :6379
 pnpm --filter @ecoplatform/api prisma:generate
 pnpm --filter @ecoplatform/api prisma:migrate         # migrate deploy
 pnpm --filter @ecoplatform/api seed
