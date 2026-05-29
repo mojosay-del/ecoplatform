@@ -12,5 +12,7 @@ blob-report
 .DS_Store
 *.tsbuildinfo
 .pnpm-store
+# Локальные дампы БД (pg_dump перед миграциями и т.п.) — никогда не в git.
+.db-backups
 apps/api/generated
 ops/monitoring/alertmanager.yml
