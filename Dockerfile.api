@@ -67,20 +67,23 @@ ENV NODE_ENV=production \
 # Не-root пользователь — стандартная защита.
 RUN addgroup -S nodeapp && adduser -S nodeapp -G nodeapp
 
-# Только то, что нужно для запуска:
-COPY --from=build --chown=nodeapp:nodeapp /repo/apps/api/dist ./dist
-COPY --from=build --chown=nodeapp:nodeapp /repo/apps/api/package.json ./package.json
-COPY --from=build --chown=nodeapp:nodeapp /repo/apps/api/prisma ./prisma
-COPY --from=build --chown=nodeapp:nodeapp /repo/packages/shared/dist ./node_modules/@ecoplatform/shared/dist
-COPY --from=build --chown=nodeapp:nodeapp /repo/packages/shared/package.json ./node_modules/@ecoplatform/shared/package.json
+# Переносим РАБОЧЕЕ дерево из build с СОХРАНЕНИЕМ структуры pnpm: стор
+# node_modules/.pnpm + per-package node_modules (симлинки apps/api/node_modules,
+# packages/shared/node_modules → ../../node_modules/.pnpm). Если скопировать
+# только корневой node_modules, app не найдёт свои зависимости (reflect-metadata,
+# @nestjs/*) — они симлинкованы в apps/api/node_modules, а не в корне.
 COPY --from=build --chown=nodeapp:nodeapp /repo/node_modules ./node_modules
-COPY --from=build --chown=nodeapp:nodeapp /repo/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=build --chown=nodeapp:nodeapp /repo/apps/api ./apps/api
+COPY --from=build --chown=nodeapp:nodeapp /repo/packages/shared ./packages/shared
+COPY --from=build --chown=nodeapp:nodeapp /repo/package.json /repo/pnpm-workspace.yaml /repo/tsconfig.base.json ./
 
 USER nodeapp
+# Рабочая директория — пакет api: отсюда резолвятся его node_modules-симлинки,
+# а ts-node (seed/promote) находит apps/api/tsconfig.json.
+WORKDIR /app/apps/api
 EXPOSE 4000
 
-# tini корректно обрабатывает SIGTERM и форвардит сигналы Node-процессу —
-# без него graceful shutdown в Nest может не сработать.
+# tini корректно обрабатывает SIGTERM и форвардит сигналы Node-процессу.
 ENTRYPOINT ["/sbin/tini", "--"]
 
 # При старте: миграции (idempotent), потом сервер. prisma — ГЛОБАЛЬНЫЙ бинарь
