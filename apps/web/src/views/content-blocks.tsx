@@ -245,7 +245,10 @@ function MissingAsset() {
 function rutubeEmbedUrl(url: string) {
   try {
     const parsed = new URL(url);
-    if (!parsed.hostname.includes("rutube.ru")) {
+    const host = parsed.hostname.toLowerCase();
+    // Строгая проверка: точный хост или его поддомен. `includes` пропускал бы
+    // подделки вроде `evil-rutube.ru` / `rutube.ru.attacker.com`.
+    if (host !== "rutube.ru" && !host.endsWith(".rutube.ru")) {
       return null;
     }
 
