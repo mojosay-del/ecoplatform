@@ -129,7 +129,7 @@ describe("SchedulerService", () => {
     expect(result).toEqual({ deletedUsers: 1, deletedCompanies: 1 });
   });
 
-  it("находит файлы без ссылок старше суток и отдаёт их в deleteIfUnreferenced", async () => {
+  it("находит файлы без ссылок старше недели и отдаёт их в deleteIfUnreferenced", async () => {
     const now = new Date("2026-05-29T03:30:00.000Z");
     const prisma = {
       fileAsset: {
@@ -145,8 +145,8 @@ describe("SchedulerService", () => {
 
     const where = prisma.fileAsset.findMany.mock.calls[0][0].where;
     expect(where.references).toEqual({ none: {} });
-    // грейс ровно сутки: cutoff = now - 24h
-    expect(where.createdAt.lt).toEqual(new Date("2026-05-28T03:30:00.000Z"));
+    // грейс ровно неделя: cutoff = now - 7d
+    expect(where.createdAt.lt).toEqual(new Date("2026-05-22T03:30:00.000Z"));
     expect(files.deleteIfUnreferenced).toHaveBeenCalledWith(["orphan-1", "orphan-2"]);
     expect(result).toEqual({ scanned: 2, deleted: 2 });
   });
