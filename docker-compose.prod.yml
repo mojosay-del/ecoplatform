@@ -19,7 +19,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: Dockerfile.api
     restart: unless-stopped
     # Все рантайм-переменные (БД, JWT, S3 …) — из этого файла.
     env_file: deploy/.env.prod
@@ -32,7 +32,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: Dockerfile.web
       args:
         # ВАЖНО: адрес API «зашивается» в сайт на ЭТАПЕ СБОРКИ, не в рантайме.
         # Значение берётся из deploy/.env.prod (через --env-file при запуске).
