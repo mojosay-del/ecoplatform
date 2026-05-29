@@ -26,7 +26,9 @@ RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /repo
 
-COPY --from=deps /repo/node_modules ./node_modules
+# Тянем из deps ВСЁ дерево с node_modules (включая per-package симлинки pnpm),
+# иначе shared не найдёт zod/isomorphic-dompurify. Затем накладываем исходники.
+COPY --from=deps /repo ./
 COPY . .
 
 # NEXT_PUBLIC_* читаются на build-time — пробрасываем как build-arg.

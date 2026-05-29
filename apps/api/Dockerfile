@@ -33,8 +33,12 @@ RUN apk add --no-cache libc6-compat openssl
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /repo
 
-# Тянем готовые node_modules и реальные исходники.
-COPY --from=deps /repo/node_modules ./node_modules
+# Тянем из deps ВСЁ дерево с node_modules. pnpm раскладывает зависимости не
+# только в корневой node_modules, но и в per-package (симлинки
+# packages/*/node_modules, apps/*/node_modules). Если скопировать лишь корневой,
+# shared не найдёт zod/isomorphic-dompurify. Затем накладываем исходники сверху
+# (node_modules в build-контексте нет — он в .dockerignore, симлинки уцелеют).
+COPY --from=deps /repo ./
 COPY . .
 
 # Prisma engine генерируется под linux-musl-* (см. binaryTargets в schema.prisma).
