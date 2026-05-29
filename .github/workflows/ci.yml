@@ -99,6 +99,13 @@ jobs:
       - name: Prisma generate
         run: pnpm --filter @ecoplatform/api prisma:generate
 
+      # integration-тесты импортируют @ecoplatform/shared, который резолвится
+      # в dist (см. exports в его package.json). Эта job зовёт test:integration
+      # напрямую, минуя turbo c `^build`, поэтому dist надо собрать явно — иначе
+      # vitest падает: "Failed to resolve entry for package @ecoplatform/shared".
+      - name: Build @ecoplatform/shared (его dist нужен для резолва в тестах)
+        run: pnpm --filter @ecoplatform/shared build
+
       - name: Integration tests
         run: pnpm --filter @ecoplatform/api test:integration
 
