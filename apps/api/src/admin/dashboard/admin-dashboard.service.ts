@@ -1,12 +1,21 @@
 import { Injectable } from "@nestjs/common";
-import { ModerationCaseStatus, SubscriptionPlan, SubscriptionStatus, SupportTicketStatus } from "@prisma/client";
-import type { AdminDashboardSummary } from "@ecoplatform/shared";
+import {
+  CompanyStatus,
+  ModerationCaseStatus,
+  SubscriptionPlan,
+  SubscriptionStatus,
+  SupportTicketStatus,
+} from "@prisma/client";
+import type { AdminDashboardSummary, AdminHealthStatus } from "@ecoplatform/shared";
+import { HealthDependencyIndicator } from "../../health/health-dependency.indicator";
 import { PrismaService } from "../../prisma/prisma.service";
 
 type RegistrationRow = {
   day: Date | string;
   count: number | bigint;
 };
+
+type HealthCheckDetails = Record<string, { configured?: boolean; required?: boolean; status?: string }>;
 
 const ACTIVE_MODERATION_STATUSES = [
   ModerationCaseStatus.open,
@@ -40,7 +49,10 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
 
 @Injectable()
 export class AdminDashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly health: HealthDependencyIndicator,
+  ) {}
 
   async getSummary(): Promise<AdminDashboardSummary> {
     const now = new Date();
@@ -59,6 +71,8 @@ export class AdminDashboardService {
       registrationRows,
       recentAuditEvents,
       business,
+      operations,
+      systemHealth,
     ] = await Promise.all([
       this.prisma.session.findMany({
         where: {
@@ -96,6 +110,8 @@ export class AdminDashboardService {
       this.registrationSeries(chartStart, todayStart),
       this.recentAuditEvents(),
       this.businessSummary(now),
+      this.operationsSummary(now),
+      this.systemHealthSummary(),
     ]);
 
     return {
@@ -109,6 +125,8 @@ export class AdminDashboardService {
         activeSupportTickets,
       },
       business,
+      operations,
+      systemHealth,
       registrationSeries: registrationRows,
       recentAuditEvents,
     };
@@ -117,8 +135,8 @@ export class AdminDashboardService {
   private async businessSummary(now: Date): Promise<AdminDashboardSummary["business"]> {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [totalCompanies, convertedCompanies, newSubscriptionsThisMonth, planGroups, statusGroups] =
-      await Promise.all([
+    const [totalCompanies, convertedCompanies, newSubscriptionsThisMonth, planGroups, statusGroups] = await Promise.all(
+      [
         this.prisma.company.count(),
         // «Сконвертировались» = у компании есть хотя бы одна подписка (демо
         // подписку не создаёт, ручная активация — создаёт).
@@ -130,7 +148,8 @@ export class AdminDashboardService {
           _count: true,
         }),
         this.prisma.company.groupBy({ by: ["status"], _count: true }),
-      ]);
+      ],
+    );
 
     const planCount = (plan: SubscriptionPlan) => planGroups.find((group) => group.plan === plan)?._count ?? 0;
 
@@ -149,6 +168,39 @@ export class AdminDashboardService {
         .map((group) => ({ status: group.status as string, count: group._count }))
         .sort((a, b) => b.count - a.count),
     };
+  }
+
+  private async operationsSummary(now: Date): Promise<AdminDashboardSummary["operations"]> {
+    const [pendingDeletionRequests, pastDueCompanies, lockedAccounts] = await Promise.all([
+      this.prisma.user.count({ where: { deletionRequestedAt: { not: null } } }),
+      this.prisma.company.count({ where: { status: CompanyStatus.past_due } }),
+      this.prisma.user.count({ where: { lockedUntil: { gt: now } } }),
+    ]);
+
+    return {
+      pendingDeletionRequests,
+      pastDueCompanies,
+      lockedAccounts,
+    };
+  }
+
+  private async systemHealthSummary(): Promise<AdminDashboardSummary["systemHealth"]> {
+    const [database, redis, storage] = await Promise.all([
+      this.health
+        .database("database")
+        .then((result) => mapHealthStatus(result, "database"))
+        .catch(() => "down" as const),
+      this.health
+        .redisCache("redis")
+        .then((result) => mapHealthStatus(result, "redis"))
+        .catch(() => "down" as const),
+      this.health
+        .objectStorage("s3")
+        .then((result) => mapHealthStatus(result, "s3"))
+        .catch(() => "down" as const),
+    ]);
+
+    return { database, redis, storage };
   }
 
   private async registrationSeries(chartStart: Date, todayStart: Date) {
@@ -215,4 +267,17 @@ function addDays(date: Date, days: number) {
 function formatIsoDate(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
   return date.toISOString().slice(0, 10);
+}
+
+function mapHealthStatus(result: HealthCheckDetails, key: string): AdminHealthStatus {
+  const details = result[key];
+  if (!details || details.status === "down") {
+    return "down";
+  }
+
+  if (details.configured === false && details.required !== true) {
+    return "disabled";
+  }
+
+  return details.status === "up" ? "ok" : "down";
 }

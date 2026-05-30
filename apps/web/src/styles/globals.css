@@ -1582,6 +1582,161 @@ input[type="checkbox"]:focus-visible {
   line-height: 1.35;
 }
 
+.admin-ops-health-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  gap: 14px;
+}
+
+.admin-operations-panel,
+.admin-health-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+}
+
+.admin-operation-list,
+.admin-health-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.admin-operation-row,
+.admin-health-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+}
+
+.admin-operation-row:first-child,
+.admin-health-row:first-child {
+  border-top: none;
+}
+
+.admin-operation-row {
+  transition:
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.admin-operation-row:hover {
+  color: var(--brand-active);
+  transform: translateX(2px);
+}
+
+.admin-operation-row:focus-visible {
+  border-radius: 6px;
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.admin-operation-row-icon,
+.admin-health-row-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.admin-operation-row.is-attention .admin-operation-row-icon {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.admin-operation-row-copy,
+.admin-health-row-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.admin-operation-row-copy strong,
+.admin-health-row-copy strong {
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+  line-height: 1.25;
+}
+
+.admin-operation-row-copy small,
+.admin-health-row-copy small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.admin-operation-row-value {
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.admin-operation-row.is-attention .admin-operation-row-value {
+  color: var(--warning-text);
+}
+
+.admin-health-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-health-row dt {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-health-row dd {
+  margin: 0;
+}
+
+.admin-health-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.admin-health-status-ok {
+  border-color: var(--success-border);
+  background: var(--success-soft);
+  color: var(--success-text-strong);
+}
+
+.admin-health-status-down {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger-text-strong);
+}
+
+.admin-health-status-disabled {
+  border-color: var(--border-subtle);
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
 .admin-business-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1974,6 +2129,29 @@ input[type="checkbox"]:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .admin-ops-health-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-operation-row,
+  .admin-health-row dt {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .admin-health-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-operation-row-value {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .admin-health-row dd {
+    justify-self: start;
+    margin-left: 46px;
+  }
+
   .admin-dashboard-panel-head {
     align-items: stretch;
     flex-direction: column;
@@ -2012,6 +2190,7 @@ input[type="checkbox"]:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .admin-kpi-card,
   .admin-chart-bar,
+  .admin-operation-row,
   .admin-kpi-card-skeleton .admin-kpi-card-icon::after,
   .admin-skeleton-line::after {
     animation: none;
@@ -2019,6 +2198,7 @@ input[type="checkbox"]:focus-visible {
 
   .admin-kpi-card,
   .admin-kpi-card:hover,
+  .admin-operation-row:hover,
   .admin-chart-bar-tooltip {
     transform: none;
   }

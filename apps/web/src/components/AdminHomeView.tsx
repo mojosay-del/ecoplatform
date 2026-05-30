@@ -9,9 +9,14 @@ import {
   ArrowRight,
   CalendarClock,
   CreditCard,
+  Database,
+  HardDrive,
   Headphones,
+  LockKeyhole,
   ScrollText,
+  Server,
   ShieldAlert,
+  Trash2,
   UserPlus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -23,6 +28,8 @@ import { StatusPill } from "./StatusPill";
 import { visibleAdminHomeGroups } from "./admin-panel-tabs";
 
 type KpiKey = keyof AdminDashboardSummary["kpis"];
+type OperationKey = keyof AdminDashboardSummary["operations"];
+type HealthKey = keyof AdminDashboardSummary["systemHealth"];
 type KpiTone = "info" | "success" | "warning" | "danger" | "brand";
 
 const KPI_CARDS: Array<{
@@ -81,6 +88,47 @@ const KPI_CARDS: Array<{
     tone: "warning",
     icon: Headphones,
   },
+];
+
+const OPERATION_CARDS: Array<{
+  key: OperationKey;
+  label: string;
+  hint: string;
+  href: string;
+  icon: LucideIcon;
+}> = [
+  {
+    key: "pendingDeletionRequests",
+    label: "Запросы на удаление",
+    hint: "Пользователи ждут обработки",
+    href: "/admin/users",
+    icon: Trash2,
+  },
+  {
+    key: "pastDueCompanies",
+    label: "Просрочка оплаты",
+    hint: "Компании в статусе past due",
+    href: "/admin/companies",
+    icon: CalendarClock,
+  },
+  {
+    key: "lockedAccounts",
+    label: "Временные блокировки",
+    hint: "Аккаунты после неудачных входов",
+    href: "/admin/users",
+    icon: LockKeyhole,
+  },
+];
+
+const HEALTH_DEPENDENCIES: Array<{
+  key: HealthKey;
+  label: string;
+  hint: string;
+  icon: LucideIcon;
+}> = [
+  { key: "database", label: "Postgres", hint: "Основная база данных", icon: Database },
+  { key: "redis", label: "Redis", hint: "Кэш сессий и лимитов", icon: Server },
+  { key: "storage", label: "S3", hint: "Файлы и изображения", icon: HardDrive },
 ];
 
 const ACTION_LABELS: Record<string, string> = {
@@ -272,6 +320,8 @@ function AdminDashboard({
         })}
       </div>
 
+      <AdminOperationsPanels operations={dashboard.operations} systemHealth={dashboard.systemHealth} />
+
       <AdminBusinessPanels business={dashboard.business} />
 
       <div className="admin-dashboard-main">
@@ -341,6 +391,82 @@ function AdminDashboard({
           )}
         </section>
       </div>
+    </section>
+  );
+}
+
+function AdminOperationsPanels({
+  operations,
+  systemHealth,
+}: {
+  operations: AdminDashboardSummary["operations"];
+  systemHealth: AdminDashboardSummary["systemHealth"];
+}) {
+  return (
+    <section className="admin-ops-health-grid" aria-label="Операции и здоровье системы">
+      <section className="admin-operations-panel">
+        <header className="admin-dashboard-panel-head">
+          <div>
+            <h2>Требует внимания</h2>
+            <p>Операционные сигналы, которые лучше не пропускать</p>
+          </div>
+        </header>
+        <div className="admin-operation-list">
+          {OPERATION_CARDS.map((item) => {
+            const Icon = item.icon;
+            const value = operations[item.key];
+            return (
+              <Link
+                className={`admin-operation-row${value > 0 ? " is-attention" : ""}`}
+                href={item.href}
+                key={item.key}
+              >
+                <span className="admin-operation-row-icon" aria-hidden>
+                  <Icon size={18} />
+                </span>
+                <span className="admin-operation-row-copy">
+                  <strong>{item.label}</strong>
+                  <small>{item.hint}</small>
+                </span>
+                <span className="admin-operation-row-value">{formatNumber(value)}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="admin-health-panel">
+        <header className="admin-dashboard-panel-head">
+          <div>
+            <h2>Здоровье системы</h2>
+            <p>Короткий статус ключевых зависимостей</p>
+          </div>
+        </header>
+        <dl className="admin-health-list">
+          {HEALTH_DEPENDENCIES.map((item) => {
+            const Icon = item.icon;
+            const status = systemHealth[item.key];
+            return (
+              <div className={`admin-health-row admin-health-row-${status}`} key={item.key}>
+                <dt>
+                  <span className="admin-health-row-icon" aria-hidden>
+                    <Icon size={18} />
+                  </span>
+                  <span className="admin-health-row-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.hint}</small>
+                  </span>
+                </dt>
+                <dd>
+                  <span className={`admin-health-status admin-health-status-${status}`}>
+                    {formatHealthStatus(status)}
+                  </span>
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </section>
     </section>
   );
 }
@@ -474,4 +600,10 @@ function formatActor(actor: AdminJournalActor | null) {
     .filter(Boolean)
     .join(" ");
   return name || actor.email;
+}
+
+function formatHealthStatus(status: AdminDashboardSummary["systemHealth"][HealthKey]) {
+  if (status === "ok") return "В порядке";
+  if (status === "disabled") return "Не настроено";
+  return "Нужна проверка";
 }

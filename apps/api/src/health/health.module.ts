@@ -11,5 +11,6 @@ import { HealthDependencyIndicator } from "./health-dependency.indicator";
   imports: [TerminusModule, PrismaModule, RedisModule, FilesModule, AuthModule],
   controllers: [HealthController, ReadyController],
   providers: [HealthDependencyIndicator],
+  exports: [HealthDependencyIndicator],
 })
 export class HealthModule {}

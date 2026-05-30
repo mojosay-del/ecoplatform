@@ -418,6 +418,8 @@ export type AdminJournalEntry = {
   createdAt: IsoDateString;
 };
 
+export type AdminHealthStatus = "ok" | "down" | "disabled";
+
 export type AdminDashboardSummary = {
   generatedAt: IsoDateString;
   kpis: {
@@ -440,6 +442,16 @@ export type AdminDashboardSummary = {
     };
     newSubscriptionsThisMonth: number;
     companiesByStatus: Array<{ status: string; count: number }>;
+  };
+  operations: {
+    pendingDeletionRequests: number;
+    pastDueCompanies: number;
+    lockedAccounts: number;
+  };
+  systemHealth: {
+    database: AdminHealthStatus;
+    redis: AdminHealthStatus;
+    storage: AdminHealthStatus;
   };
   registrationSeries: Array<{
     date: IsoDateString;

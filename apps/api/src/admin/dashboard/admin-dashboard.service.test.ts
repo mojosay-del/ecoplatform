@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminDashboardService } from "./admin-dashboard.service";
+import type { HealthDependencyIndicator } from "../../health/health-dependency.indicator";
 import type { PrismaService } from "../../prisma/prisma.service";
 
 describe("AdminDashboardService", () => {
@@ -11,7 +12,8 @@ describe("AdminDashboardService", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-27T09:15:00.000Z"));
     const prisma = createPrismaMock();
-    const service = new AdminDashboardService(prisma);
+    const health = createHealthMock();
+    const service = new AdminDashboardService(prisma, health);
 
     const result = await service.getSummary();
 
@@ -32,6 +34,16 @@ describe("AdminDashboardService", () => {
         { status: "active", count: 3 },
         { status: "blocked", count: 1 },
       ],
+    });
+    expect(result.operations).toEqual({
+      pendingDeletionRequests: 7,
+      pastDueCompanies: 5,
+      lockedAccounts: 2,
+    });
+    expect(result.systemHealth).toEqual({
+      database: "ok",
+      redis: "disabled",
+      storage: "disabled",
     });
     expect(result.registrationSeries).toEqual([
       { date: "2026-05-26", count: 1 },
@@ -81,7 +93,11 @@ function createPrismaMock() {
       findMany: vi.fn().mockResolvedValue([{ userId: "user-1" }, { userId: "user-2" }]),
     },
     user: {
-      count: vi.fn().mockResolvedValue(4),
+      count: vi.fn((args?: { where?: Record<string, unknown> }) => {
+        if (args?.where && "deletionRequestedAt" in args.where) return Promise.resolve(7);
+        if (args?.where && "lockedUntil" in args.where) return Promise.resolve(2);
+        return Promise.resolve(4);
+      }),
       findMany: vi
         .fn()
         .mockResolvedValue([{ id: "admin-1", firstName: "Админ", lastName: "Платформы", email: "admin@example.com" }]),
@@ -94,7 +110,11 @@ function createPrismaMock() {
       ]),
     },
     company: {
-      count: vi.fn().mockResolvedValueOnce(10).mockResolvedValueOnce(3),
+      count: vi.fn((args?: { where?: Record<string, unknown> }) => {
+        if (args?.where && "status" in args.where) return Promise.resolve(5);
+        if (args?.where && "subscriptions" in args.where) return Promise.resolve(3);
+        return Promise.resolve(10);
+      }),
       groupBy: vi.fn().mockResolvedValue([
         { status: "active", _count: 3 },
         { status: "demo", _count: 6 },
@@ -136,4 +156,12 @@ function createPrismaMock() {
     adminActionLog: { findMany: ReturnType<typeof vi.fn> };
     $queryRaw: ReturnType<typeof vi.fn>;
   };
+}
+
+function createHealthMock() {
+  return {
+    database: vi.fn().mockResolvedValue({ database: { status: "up" } }),
+    redisCache: vi.fn().mockResolvedValue({ redis: { status: "up", configured: false, mode: "fallback" } }),
+    objectStorage: vi.fn().mockResolvedValue({ s3: { status: "up", configured: false, required: false } }),
+  } as unknown as HealthDependencyIndicator;
 }

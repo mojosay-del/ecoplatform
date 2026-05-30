@@ -384,6 +384,72 @@ describe("Observability", () => {
   });
 });
 
+describe("Admin dashboard", () => {
+  it("отдаёт операционные сигналы и здоровье системы только админу", async () => {
+    await withEnv(
+      {
+        NODE_ENV: "test",
+        REDIS_URL: undefined,
+        S3_ENDPOINT: undefined,
+        S3_REGION: undefined,
+        S3_BUCKET: undefined,
+        S3_ACCESS_KEY_ID: undefined,
+        S3_SECRET_ACCESS_KEY: undefined,
+        S3_PUBLIC_BASE_URL: undefined,
+      },
+      async () => {
+        const adminToken = await loginAdmin();
+        const moderatorToken = await loginModerator();
+        const passwordHash = await hash("User12345678", 4);
+
+        await ctx.prisma.company.create({
+          data: {
+            organizationName: "ООО Просрочка",
+            status: CompanyStatus.past_due,
+            subscriptionEndsAt: new Date(Date.now() - 60_000),
+          },
+        });
+        await ctx.prisma.user.createMany({
+          data: [
+            {
+              email: "delete-me@test.local",
+              firstName: "Удаление",
+              lastName: "Аккаунта",
+              phone: "+70000000991",
+              passwordHash,
+              deletionRequestedAt: new Date(),
+            },
+            {
+              email: "locked@test.local",
+              firstName: "Временная",
+              lastName: "Блокировка",
+              phone: "+70000000992",
+              passwordHash,
+              lockedUntil: new Date(Date.now() + 15 * 60_000),
+            },
+          ],
+        });
+
+        const forbidden = await ctx.http.get("/api/admin/dashboard").set("Authorization", `Bearer ${moderatorToken}`);
+        expect(forbidden.status).toBe(403);
+
+        const res = await ctx.http.get("/api/admin/dashboard").set("Authorization", `Bearer ${adminToken}`);
+        expect(res.status).toBe(200);
+        expect(res.body.operations).toEqual({
+          pendingDeletionRequests: 1,
+          pastDueCompanies: 1,
+          lockedAccounts: 1,
+        });
+        expect(res.body.systemHealth).toEqual({
+          database: "ok",
+          redis: "disabled",
+          storage: "disabled",
+        });
+      },
+    );
+  });
+});
+
 describe("Auth", () => {
   it("выдаёт csrf-token cookie для double-submit защиты", async () => {
     const res = await ctx.rawHttp.get("/api/auth/csrf");
