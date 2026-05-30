@@ -138,3 +138,46 @@ curl -s localhost:4000/api/ready                              # readiness (БД/
 - **api в `Restarting`** → смотри `logs api`: ошибка БД (`P1001`/SSL) или модуль не найден.
 - **Нет HTTPS** → DNS не указывает на сервер или закрыты порты 80/443.
 - **Пустые согласия / нет регистрации** → не выполнен `seed`.
+- **Сайт стоит, вход → «Внутренняя ошибка сервера» (500), контейнеры `Up`** →
+  в `logs api` видно `permission denied for table ...` (PostgreSQL `42501`).
+  Это **сброс прав пользователя БД** на стороне Timeweb (см. ниже).
+
+---
+
+## ⚠️ Инцидент: сброс прав БД и авто-восстановление
+
+**Симптом.** Все контейнеры `Up`, диск/память в норме, но любой запрос к базе
+падает с 500, в логах `api`: `permission denied for table User/Session/...`
+(код `42501`). Происходит **без деплоя** (например, ночью).
+
+**Причина.** На управляемой БД Timeweb у пользователя `gen_user` снимаются права
+на таблицы (`REVOKE ALL` где-то на стороне провайдера). В каталоге PostgreSQL у
+таблиц `relacl` становится `{}` (права обнулены даже у владельца) вместо `NULL`
+(владелец имеет всё по умолчанию). Источник — не код и не VPS (проверено: в репо
+нет `REVOKE`, на сервере нет cron/истории с такими командами).
+
+**Ручное восстановление** (gen_user — владелец таблиц, поэтому может выдать права
+сам себе; данные/схему не трогает):
+```bash
+cd /root/ecoplatform
+DBURL=$(grep '^DATABASE_URL=' deploy/.env.prod | cut -d= -f2-)
+CLEAN="${DBURL%%\?*}?sslmode=require"
+docker run --rm -i --network host postgres:16-alpine psql "$CLEAN" <<'SQL'
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO gen_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO gen_user;
+SQL
+```
+
+**Авто-восстановление (установлено).** На сервере стоит cron-задача, которая
+каждые 2 минуты проверяет доступ и при сбросе прав возвращает их — сайт чинится
+сам за пару минут. Скрипт: [`deploy/ensure-grants.sh`](ensure-grants.sh) +
+[`deploy/ensure-grants.sql`](ensure-grants.sql) (идемпотентны).
+```bash
+# проверить статус последней проверки:
+cat /root/ensure-grants.last        # OK / REPAIRED / ERROR + время
+cat /root/ensure-grants.log         # история починок (если права снова снимали)
+crontab -l                          # должна быть строка с ensure-grants.sh
+```
+Если в `ensure-grants.log` появляются записи `REPAIRED` — права снимаются
+регулярно; стоит написать в поддержку Timeweb (приложить лог), чтобы выяснить,
+что на стороне кластера сбрасывает привилегии `gen_user`.
