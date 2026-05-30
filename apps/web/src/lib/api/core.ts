@@ -307,12 +307,66 @@ function filenameFromContentDisposition(value: string | null): string | null {
   return ascii?.[1] ?? null;
 }
 
+// Обложка на сервере всё равно ужимается до 1200px, поэтому грузить тяжёлый
+// оригинал (фото с телефона на 5–10 МБ) бессмысленно: на обычном канале это
+// 30+ секунд, соединение обрывается и пользователь видит «Load failed».
+// Ужимаем картинку прямо в браузере перед отправкой — тело запроса становится
+// в десятки раз легче, и загрузка проходит мгновенно.
+const COVER_CLIENT_MAX_DIMENSION = 1600;
+const COVER_CLIENT_JPEG_QUALITY = 0.85;
+const CLIENT_RESIZABLE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+async function downscaleCoverImage(file: File): Promise<File> {
+  if (typeof document === "undefined" || typeof createImageBitmap !== "function") return file;
+  if (!CLIENT_RESIZABLE_IMAGE_TYPES.has(file.type)) return file;
+
+  try {
+    // imageOrientation: "from-image" применяет EXIF-поворот — иначе после
+    // перекодировки в canvas фото с телефона легло бы набок.
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const longest = Math.max(bitmap.width, bitmap.height);
+    const scale = longest > COVER_CLIENT_MAX_DIMENSION ? COVER_CLIENT_MAX_DIMENSION / longest : 1;
+
+    // Картинка уже небольшая и файл лёгкий — не перекодируем зря.
+    if (scale === 1 && file.size <= 1_500_000) {
+      bitmap.close();
+      return file;
+    }
+
+    const width = Math.round(bitmap.width * scale);
+    const height = Math.round(bitmap.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return file;
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((result) => resolve(result), "image/jpeg", COVER_CLIENT_JPEG_QUALITY),
+    );
+    if (!blob || blob.size === 0 || blob.size >= file.size) return file;
+
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "cover";
+    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
+  } catch {
+    // Не удалось обработать (необычный формат и т.п.) — грузим оригинал,
+    // сервер сам ужмёт и повернёт.
+    return file;
+  }
+}
+
 export async function apiUploadFile(
   file: File,
   options: { token?: string | null; accessLevel?: FileAsset["accessLevel"]; imagePreset?: "cover" } = {},
 ): Promise<FileAsset> {
+  const prepared = options.imagePreset === "cover" ? await downscaleCoverImage(file) : file;
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("file", prepared);
   formData.append("accessLevel", options.accessLevel ?? "public");
   if (options.imagePreset) {
     formData.append("imagePreset", options.imagePreset);
