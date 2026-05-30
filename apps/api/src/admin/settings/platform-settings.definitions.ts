@@ -53,6 +53,50 @@ export const platformSettingDefinitions = {
     schema: z.number().min(0).max(50),
     default: 1,
   },
+  "security.login_lockout_threshold": {
+    label: "Порог блокировки входа (попыток)",
+    description:
+      "Сколько неудачных попыток входа подряд (в пределах окна ниже) приводит к временной блокировке учётной записи. Минимум 3, чтобы случайно не отключить защиту от перебора пароля.",
+    schema: z.number().int().min(3).max(50),
+    default: 10,
+  },
+  "security.login_lockout_window_minutes": {
+    label: "Окно подсчёта попыток входа (минут)",
+    description: "За какой период считаются неудачные попытки. По истечении окна без новых ошибок счётчик сбрасывается.",
+    schema: z.number().int().min(1).max(1440),
+    default: 15,
+  },
+  "security.login_lockout_duration_minutes": {
+    label: "Длительность блокировки входа (минут)",
+    description: "На сколько минут блокируется вход после превышения порога неудачных попыток.",
+    schema: z.number().int().min(1).max(1440),
+    default: 15,
+  },
+  "security.pwned_check_enabled": {
+    label: "Проверять пароли по базе утечек",
+    description:
+      "Когда включено — новые пароли проверяются по базе Have I Been Pwned (k-anonymity, без отправки пароля). Если внешний сервис недоступен, регистрация не блокируется.",
+    schema: z.boolean(),
+    default: true,
+  },
+  "files.max_upload_mb": {
+    label: "Максимальный размер файла (МБ)",
+    description: "Предельный размер одного загружаемого файла.",
+    schema: z.number().int().min(1).max(1024),
+    default: 100,
+  },
+  "files.max_cover_mb": {
+    label: "Максимальный размер обложки (МБ)",
+    description: "Предельный размер изображения-обложки (для новостей, курсов и статей).",
+    schema: z.number().int().min(1).max(100),
+    default: 10,
+  },
+  "files.daily_quota_mb": {
+    label: "Дневная квота загрузок на компанию (МБ)",
+    description: "Сколько мегабайт компания может загрузить за сутки суммарно. Защита от исчерпания хранилища.",
+    schema: z.number().int().min(1).max(102400),
+    default: 500,
+  },
 } as const;
 
 export type PlatformSettingKey = keyof typeof platformSettingDefinitions;

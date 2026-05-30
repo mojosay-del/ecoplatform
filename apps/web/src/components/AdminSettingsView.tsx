@@ -68,6 +68,18 @@ const GROUPS: GroupDef[] = [
     unit: () => "",
   },
   {
+    id: "security",
+    title: "Безопасность",
+    description: "Защита от перебора пароля и проверка паролей по утечкам.",
+    unit: (key) => (key.includes("minutes") ? "мин" : key.includes("threshold") ? "попыток" : ""),
+  },
+  {
+    id: "files",
+    title: "Файлы",
+    description: "Лимиты на размер загрузок и дневную квоту.",
+    unit: () => "МБ",
+  },
+  {
     id: "other",
     title: "Прочее",
     description: "Настройки, не относящиеся к стандартным группам.",

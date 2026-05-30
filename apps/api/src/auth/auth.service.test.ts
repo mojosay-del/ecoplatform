@@ -7,11 +7,17 @@ vi.mock("bcryptjs", () => ({
   hash: vi.fn(),
 }));
 
+const LOCKOUT_SETTING_DEFAULTS: Record<string, number> = {
+  "security.login_lockout_threshold": 10,
+  "security.login_lockout_window_minutes": 15,
+  "security.login_lockout_duration_minutes": 15,
+};
+
 function createService(prisma: Record<string, unknown>) {
   return new AuthService(
     prisma as any,
     {} as any,
-    {} as any,
+    { getValue: vi.fn(async (key: string) => LOCKOUT_SETTING_DEFAULTS[key]) } as any,
     { createInApp: vi.fn() } as any,
     { invalidateUser: vi.fn(), invalidateSession: vi.fn() } as any,
     { assertAcceptablePassword: vi.fn() } as any,

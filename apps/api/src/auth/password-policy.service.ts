@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, Optional } from "@nestjs/common";
 import { createHash } from "crypto";
 import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
+import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 
 const PWNED_PASSWORDS_RANGE_URL = "https://api.pwnedpasswords.com/range";
 const PWNED_PASSWORDS_TIMEOUT_MS = 1500;
@@ -16,6 +17,10 @@ export class PasswordPolicyService {
   private readonly logger = new Logger(PasswordPolicyService.name);
   private readonly rangeCache = new Map<string, CachedRange>();
 
+  // settings опционален: в рантайме внедряется глобальный модуль настроек,
+  // а юнит-тесты создают сервис как `new PasswordPolicyService()`.
+  constructor(@Optional() private readonly settings?: PlatformSettingsService) {}
+
   async assertAcceptablePassword(password: string): Promise<void> {
     if (password.length < MIN_PASSWORD_LENGTH) {
       throw new BadRequestException(`Пароль должен быть не короче ${MIN_PASSWORD_LENGTH} символов.`);
@@ -27,7 +32,14 @@ export class PasswordPolicyService {
   }
 
   private async isPwnedPassword(password: string): Promise<boolean> {
+    // Жёсткий kill-switch для офлайна/интеграционных тестов.
     if (process.env.PWNED_PASSWORDS_CHECK_ENABLED === "0") {
+      return false;
+    }
+    // Тумблер из админки (Настройки → Безопасность). `?? true` — поведение по
+    // умолчанию (проверка включена), в т.ч. когда settings не внедрён в тестах.
+    const checkEnabled = (await this.settings?.getValue("security.pwned_check_enabled")) ?? true;
+    if (!checkEnabled) {
       return false;
     }
 

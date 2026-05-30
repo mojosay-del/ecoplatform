@@ -28,9 +28,6 @@ type SessionTokens = {
 // Реальный bcrypt-compare должен выполняться и для неизвестного email,
 // иначе login выдаёт существование пользователя через заметно более быстрый ответ.
 const LOGIN_DUMMY_PASSWORD_HASH = "$2a$12$abcdefghijklmnopqrstuv.WkOaBPyDV7c9o6XhOuLNS8tIeS5wXa";
-const LOGIN_LOCKOUT_THRESHOLD = 10;
-const LOGIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 const ACCOUNT_DELETION_GRACE_DAYS = 30;
 
 type LoginLockoutState = {
@@ -208,14 +205,20 @@ export class AuthService {
 
   private async recordFailedLogin(user: LoginLockoutState): Promise<Date | null> {
     const now = new Date();
+    // Параметры блокировки управляются из админки (Настройки → Безопасность).
+    const [threshold, windowMinutes, durationMinutes] = await Promise.all([
+      this.settings.getValue("security.login_lockout_threshold"),
+      this.settings.getValue("security.login_lockout_window_minutes"),
+      this.settings.getValue("security.login_lockout_duration_minutes"),
+    ]);
     const windowStartedAt = user.failedLoginWindowStartedAt;
     const withinWindow = Boolean(
-      windowStartedAt && now.getTime() - windowStartedAt.getTime() <= LOGIN_LOCKOUT_WINDOW_MS,
+      windowStartedAt && now.getTime() - windowStartedAt.getTime() <= windowMinutes * 60 * 1000,
     );
     const failedLoginAttempts = withinWindow ? user.failedLoginAttempts + 1 : 1;
     const failedLoginWindowStartedAt = withinWindow ? windowStartedAt : now;
     const lockedUntil =
-      failedLoginAttempts >= LOGIN_LOCKOUT_THRESHOLD ? new Date(now.getTime() + LOGIN_LOCKOUT_DURATION_MS) : null;
+      failedLoginAttempts >= threshold ? new Date(now.getTime() + durationMinutes * 60 * 1000) : null;
 
     await this.prisma.user.update({
       where: { id: user.id },

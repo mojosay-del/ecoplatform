@@ -5,9 +5,11 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { DeleteObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
+import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 // file-type ≥17 поставляется только как ESM. apps/api собирается в CommonJS:
 // tsc эмитит require("file-type"), который Node ≥20 грузит синхронно через
 // условие экспорта "module-sync" (стабильно на нашем Node 24). В vitest swc
@@ -50,9 +52,13 @@ type ValidatedUpload = {
   variants?: ProcessedImageVariant[];
 };
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const MAX_COVER_UPLOAD_BYTES = 10 * 1024 * 1024;
-const DAILY_UPLOAD_QUOTA_BYTES = 500 * 1024 * 1024;
+// Дефолты лимитов файлов. Реальные значения берутся из настроек платформы
+// (Настройки → Файлы) с этими значениями по умолчанию; константы остаются
+// fallback'ом для юнит-тестов, где settings не внедрён.
+const DEFAULT_MAX_UPLOAD_MB = 100;
+const DEFAULT_MAX_COVER_MB = 10;
+const DEFAULT_DAILY_QUOTA_MB = 500;
+const MB_IN_BYTES = 1024 * 1024;
 const SAFE_NAME_PATTERN = /[^a-zA-Z0-9._-]+/g;
 const GENERIC_DECLARED_MIME_TYPES = new Set(["application/octet-stream", "binary/octet-stream"]);
 const BLOCKED_UPLOAD_MIME_TYPES = new Set([
@@ -110,7 +116,22 @@ function isPlaceholderS3Value(value: string) {
 
 @Injectable()
 export class FilesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly settings?: PlatformSettingsService,
+  ) {}
+
+  private async maxUploadMb(): Promise<number> {
+    return (await this.settings?.getValue("files.max_upload_mb")) ?? DEFAULT_MAX_UPLOAD_MB;
+  }
+
+  private async maxCoverMb(): Promise<number> {
+    return (await this.settings?.getValue("files.max_cover_mb")) ?? DEFAULT_MAX_COVER_MB;
+  }
+
+  private async dailyQuotaMb(): Promise<number> {
+    return (await this.settings?.getValue("files.daily_quota_mb")) ?? DEFAULT_DAILY_QUOTA_MB;
+  }
 
   private getS3Config() {
     const endpoint = process.env.S3_ENDPOINT;
@@ -493,10 +514,6 @@ export class FilesService {
       throw new BadRequestException("Формат файла не поддерживается.");
     }
 
-    if (input.sizeBytes > MAX_UPLOAD_BYTES) {
-      throw new BadRequestException("Файл больше 100 МБ.");
-    }
-
     return {
       ...input,
       mimeType,
@@ -560,7 +577,8 @@ export class FilesService {
       _sum: { sizeBytes: true },
     });
     const usedBytes = aggregate._sum.sizeBytes ?? 0;
-    if (usedBytes + nextFileBytes <= DAILY_UPLOAD_QUOTA_BYTES) {
+    const dailyQuotaBytes = (await this.dailyQuotaMb()) * MB_IN_BYTES;
+    if (usedBytes + nextFileBytes <= dailyQuotaBytes) {
       return;
     }
 
@@ -595,6 +613,10 @@ export class FilesService {
     userId: string,
   ) {
     const metadata = this.validateMetadataInput(input);
+    const maxUploadMb = await this.maxUploadMb();
+    if (metadata.sizeBytes > maxUploadMb * MB_IN_BYTES) {
+      throw new BadRequestException(`Файл больше ${maxUploadMb} МБ.`);
+    }
     await this.assertDailyUploadQuota(userId, metadata.sizeBytes);
 
     const asset = await this.prisma.fileAsset.create({
@@ -622,11 +644,15 @@ export class FilesService {
     if (!file.buffer || file.size <= 0) {
       throw new BadRequestException("Файл пустой.");
     }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      throw new BadRequestException("Файл больше 100 МБ.");
+    const maxUploadMb = await this.maxUploadMb();
+    if (file.size > maxUploadMb * MB_IN_BYTES) {
+      throw new BadRequestException(`Файл больше ${maxUploadMb} МБ.`);
     }
-    if (input.imagePreset === "cover" && file.size > MAX_COVER_UPLOAD_BYTES) {
-      throw new BadRequestException("Обложка больше 10 МБ.");
+    if (input.imagePreset === "cover") {
+      const maxCoverMb = await this.maxCoverMb();
+      if (file.size > maxCoverMb * MB_IN_BYTES) {
+        throw new BadRequestException(`Обложка больше ${maxCoverMb} МБ.`);
+      }
     }
 
     await this.assertDailyUploadQuota(userId, file.size);
