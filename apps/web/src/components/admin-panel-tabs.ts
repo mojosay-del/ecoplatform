@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   TrendingUp,
   UserCog,
+  UserPlus,
   Users,
   Wrench,
 } from "lucide-react";
@@ -184,6 +185,15 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         roles: ["admin"],
         description: "Пороговые значения и рыночные настройки.",
         icon: SlidersHorizontal,
+      },
+      {
+        href: "/admin/settings#auth",
+        label: "Регистрация",
+        pathname: "/admin/settings",
+        hash: "auth",
+        roles: ["admin"],
+        description: "Включить или выключить регистрацию новых пользователей.",
+        icon: UserPlus,
       },
       {
         href: "/admin/settings#other",

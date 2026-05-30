@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
-import { Throttle } from "@nestjs/throttler";
+import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import type { CookieOptions, Request, Response } from "express";
 import { changePasswordDtoSchema, loginDtoSchema, registerDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
@@ -36,6 +36,14 @@ export class AuthController {
   @Get("csrf")
   csrf(@Req() request: RequestWithCsrf) {
     return { csrfToken: request.csrfToken };
+  }
+
+  // Публично, без auth: страница регистрации спрашивает, открыта ли само-
+  // регистрация (тумблер в админке). Если выключено — форма не показывается.
+  @Get("registration")
+  @SkipThrottle({ short: true, long: true, auth: true })
+  async registrationStatus() {
+    return this.auth.getRegistrationStatus();
   }
 
   @Throttle(AUTH_THROTTLE)

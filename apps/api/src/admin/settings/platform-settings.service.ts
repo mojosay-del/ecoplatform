@@ -47,6 +47,7 @@ export class PlatformSettingsService implements OnModuleInit {
       const record = storedMap.get(key);
       return {
         key,
+        type: typeof definition.default === "boolean" ? "boolean" : "number",
         label: definition.label,
         description: definition.description,
         defaultValue: definition.default,

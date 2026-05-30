@@ -10,10 +10,11 @@ type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
 type SettingItem = {
   key: string;
+  type: "number" | "boolean";
   label: string;
   description: string;
-  defaultValue: number;
-  value: number;
+  defaultValue: number | boolean;
+  value: number | boolean;
   updatedAt: string | null;
   updatedById: string | null;
 };
@@ -47,6 +48,12 @@ const GROUPS: GroupDef[] = [
     title: "Индексы цен",
     description: "Алгоритмы расчёта индексов и пороги.",
     unit: (key) => (key.includes("percent") ? "%" : ""),
+  },
+  {
+    id: "auth",
+    title: "Регистрация",
+    description: "Доступ новых пользователей к регистрации на платформе.",
+    unit: () => "",
   },
   {
     id: "other",
@@ -103,24 +110,27 @@ export function AdminSettingsView() {
     }
   }
 
-  async function save(key: string) {
+  async function saveValue(key: string, value: number | boolean) {
     if (!token) return;
-    const raw = drafts[key];
-    const num = Number(raw);
-    if (Number.isNaN(num)) {
-      setErrorMessage("Значение должно быть числом.");
-      return;
-    }
     setSavingKey(key);
     setErrorMessage(null);
     try {
-      await apiFetch(`/admin/settings/${key}`, { method: "PATCH", token, body: { value: num } });
+      await apiFetch(`/admin/settings/${key}`, { method: "PATCH", token, body: { value } });
       await loadList();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить настройку");
     } finally {
       setSavingKey(null);
     }
+  }
+
+  async function save(key: string) {
+    const num = Number(drafts[key]);
+    if (Number.isNaN(num)) {
+      setErrorMessage("Значение должно быть числом.");
+      return;
+    }
+    await saveValue(key, num);
   }
 
   useEffect(() => {
@@ -194,36 +204,55 @@ export function AdminSettingsView() {
             {groupItems.length === 0 ? <p className="page-subtitle">В этой группе пока нет настроек.</p> : null}
             {groupItems.map((item) => {
               const unit = groupDef.unit(item.key);
-              const isDirty = drafts[item.key] !== String(item.value);
+              const isBoolean = item.type === "boolean";
+              const isDirty = !isBoolean && drafts[item.key] !== String(item.value);
+              const defaultLabel = isBoolean
+                ? item.defaultValue
+                  ? "Включено"
+                  : "Выключено"
+                : `${item.defaultValue}${unit ? ` ${unit}` : ""}`;
               return (
                 <article className="setting-row" key={item.key}>
                   <div className="setting-row-info">
                     <strong className="setting-row-label">{item.label}</strong>
                     <p className="setting-row-description">{item.description}</p>
                     <small className="setting-row-meta">
-                      По умолчанию: {item.defaultValue}
-                      {unit ? ` ${unit}` : ""}
+                      По умолчанию: {defaultLabel}
                       {item.updatedAt ? ` · Изменено ${new Date(item.updatedAt).toLocaleString("ru-RU")}` : ""}
                     </small>
                   </div>
                   <div className="setting-row-control">
-                    <div className="setting-row-input">
-                      <input
-                        className="input"
-                        onChange={(event) => setDrafts((prev) => ({ ...prev, [item.key]: event.target.value }))}
-                        type="number"
-                        value={drafts[item.key] ?? ""}
-                      />
-                      {unit ? <span className="setting-row-unit">{unit}</span> : null}
-                    </div>
-                    <button
-                      className="button"
-                      disabled={savingKey === item.key || !isDirty}
-                      onClick={() => save(item.key)}
-                      type="button"
-                    >
-                      {savingKey === item.key ? "Сохраняю…" : "Сохранить"}
-                    </button>
+                    {isBoolean ? (
+                      <label className="setting-toggle">
+                        <input
+                          checked={Boolean(item.value)}
+                          disabled={savingKey === item.key}
+                          onChange={(event) => saveValue(item.key, event.target.checked)}
+                          type="checkbox"
+                        />
+                        <span>{item.value ? "Включено" : "Выключено"}</span>
+                      </label>
+                    ) : (
+                      <>
+                        <div className="setting-row-input">
+                          <input
+                            className="input"
+                            onChange={(event) => setDrafts((prev) => ({ ...prev, [item.key]: event.target.value }))}
+                            type="number"
+                            value={drafts[item.key] ?? ""}
+                          />
+                          {unit ? <span className="setting-row-unit">{unit}</span> : null}
+                        </div>
+                        <button
+                          className="button"
+                          disabled={savingKey === item.key || !isDirty}
+                          onClick={() => save(item.key)}
+                          type="button"
+                        >
+                          {savingKey === item.key ? "Сохраняю…" : "Сохранить"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </article>
               );

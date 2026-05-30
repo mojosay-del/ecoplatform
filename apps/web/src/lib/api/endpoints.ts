@@ -122,6 +122,8 @@ export const api = {
 
   // ── Аутентификация / сессии ────────────────────────────────────────────
   auth: {
+    // Публично: открыта ли само-регистрация (тумблер в админке).
+    registrationStatus: () => apiFetch<{ enabled: boolean }>("/auth/registration"),
     listSessions: () =>
       apiFetch<
         Array<{

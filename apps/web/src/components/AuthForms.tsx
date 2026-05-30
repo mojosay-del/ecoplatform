@@ -669,6 +669,8 @@ export function RegisterForm() {
   const [values, setValues] = useState<RegisterFormValues>(INITIAL_REGISTER_VALUES);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Тумблер из админки: открыта ли само-регистрация. null — пока грузим статус.
+  const [registrationOpen, setRegistrationOpen] = useState<boolean | null>(null);
 
   // Активные документы — приходят с API, чекбоксы рендерятся динамически по
   // списку. Это даёт гибкость: контент-менеджер опубликовал новую обязательную
@@ -688,6 +690,22 @@ export function RegisterForm() {
       .catch(() => {
         if (cancelled) return;
         setLegalLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.auth
+      .registrationStatus()
+      .then((status) => {
+        if (!cancelled) setRegistrationOpen(status.enabled);
+      })
+      .catch(() => {
+        // Статус не получили — форму не блокируем, бэк всё равно проверит тумблер.
+        if (!cancelled) setRegistrationOpen(true);
       });
     return () => {
       cancelled = true;
@@ -772,6 +790,24 @@ export function RegisterForm() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (registrationOpen === false) {
+    return (
+      <AuthShell mode="register">
+        <div className="auth-card form auth-card-wide">
+          <header className="auth-card-head">
+            <h1 className="auth-card-title">Регистрация закрыта</h1>
+            <p className="auth-card-sub">
+              Регистрация новых пользователей временно отключена. Загляните позже.
+            </p>
+          </header>
+          <p className="auth-card-sub">
+            Уже есть аккаунт? <Link href="/login">Войти</Link>
+          </p>
+        </div>
+      </AuthShell>
+    );
   }
 
   return (

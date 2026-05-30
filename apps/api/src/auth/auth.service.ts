@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
@@ -57,7 +58,19 @@ export class AuthService {
     private readonly passwordPolicy: PasswordPolicyService,
   ) {}
 
+  async getRegistrationStatus(): Promise<{ enabled: boolean }> {
+    return { enabled: await this.settings.getValue("auth.registration_enabled") };
+  }
+
   async register(input: RegisterDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {
+    // Тумблер из админки (Настройки → Регистрация). Когда выключен — само-
+    // регистрация закрыта (например, на время доработки MVP). Существующих
+    // пользователей и вход это не затрагивает.
+    const registrationEnabled = await this.settings.getValue("auth.registration_enabled");
+    if (!registrationEnabled) {
+      throw new ForbiddenException("Регистрация новых пользователей временно отключена.");
+    }
+
     const existing = await this.prisma.user.findFirst({
       where: {
         OR: [{ email: input.email.toLowerCase() }, { phone: input.phone }],

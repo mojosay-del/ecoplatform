@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 export const platformSettingDefinitions = {
+  "auth.registration_enabled": {
+    label: "Регистрация новых пользователей",
+    description:
+      "Когда выключено — публичная форма регистрации недоступна, и попытки создать аккаунт отклоняются. Уже зарегистрированные пользователи продолжают входить как обычно. Удобно на время разработки MVP.",
+    schema: z.boolean(),
+    default: true,
+  },
   "moderation.lock_duration_minutes": {
     label: "Время удержания кейса модератором",
     description: "Сколько минут кейс модерации закреплён за модератором, прежде чем lock автоматически снимется.",

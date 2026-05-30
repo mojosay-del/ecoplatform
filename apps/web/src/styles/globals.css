@@ -8572,6 +8572,21 @@ li.tree-add-row + li.tree-add-row,
   white-space: nowrap;
 }
 
+.setting-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.setting-toggle input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
 /* Drawer поддержки — правая выезжающая панель, доступная по «?» в шапке.
    Раньше форма обращения была встроена в /account и терялась на странице. */
 .support-drawer-root {
