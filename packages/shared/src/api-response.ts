@@ -424,8 +424,22 @@ export type AdminDashboardSummary = {
     activeUsersToday: number;
     registrationsToday: number;
     activeSubscriptions: number;
+    subscriptionsExpiringSoon: number;
     openModerationCases: number;
     activeSupportTickets: number;
+  };
+  business: {
+    conversion: {
+      convertedCompanies: number;
+      totalCompanies: number;
+      percent: number;
+    };
+    subscriptionsByPlan: {
+      basic: number;
+      extended: number;
+    };
+    newSubscriptionsThisMonth: number;
+    companiesByStatus: Array<{ status: string; count: number }>;
   };
   registrationSeries: Array<{
     date: IsoDateString;

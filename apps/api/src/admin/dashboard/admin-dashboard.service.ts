@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { ModerationCaseStatus, SubscriptionStatus, SupportTicketStatus } from "@prisma/client";
+import { ModerationCaseStatus, SubscriptionPlan, SubscriptionStatus, SupportTicketStatus } from "@prisma/client";
 import type { AdminDashboardSummary } from "@ecoplatform/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -47,15 +47,18 @@ export class AdminDashboardService {
     const todayStart = startOfDay(now);
     const tomorrowStart = addDays(todayStart, 1);
     const chartStart = addDays(todayStart, -29);
+    const expiringCutoff = addDays(now, 7);
 
     const [
       activeSessionsToday,
       registrationsToday,
       activeSubscriptions,
+      subscriptionsExpiringSoon,
       openModerationCases,
       activeSupportTickets,
       registrationRows,
       recentAuditEvents,
+      business,
     ] = await Promise.all([
       this.prisma.session.findMany({
         where: {
@@ -75,6 +78,15 @@ export class AdminDashboardService {
           endsAt: { gt: now },
         },
       }),
+      // Активные подписки, истекающие в ближайшие 7 дней — список «кому
+      // продлевать»; именно этот KPI закрывает ручной биллинг.
+      this.prisma.subscription.count({
+        where: {
+          status: SubscriptionStatus.active,
+          startsAt: { lte: now },
+          endsAt: { gt: now, lte: expiringCutoff },
+        },
+      }),
       this.prisma.moderationCase.count({
         where: { status: { in: ACTIVE_MODERATION_STATUSES } },
       }),
@@ -83,6 +95,7 @@ export class AdminDashboardService {
       }),
       this.registrationSeries(chartStart, todayStart),
       this.recentAuditEvents(),
+      this.businessSummary(now),
     ]);
 
     return {
@@ -91,11 +104,50 @@ export class AdminDashboardService {
         activeUsersToday: activeSessionsToday.length,
         registrationsToday,
         activeSubscriptions,
+        subscriptionsExpiringSoon,
         openModerationCases,
         activeSupportTickets,
       },
+      business,
       registrationSeries: registrationRows,
       recentAuditEvents,
+    };
+  }
+
+  private async businessSummary(now: Date): Promise<AdminDashboardSummary["business"]> {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [totalCompanies, convertedCompanies, newSubscriptionsThisMonth, planGroups, statusGroups] =
+      await Promise.all([
+        this.prisma.company.count(),
+        // «Сконвертировались» = у компании есть хотя бы одна подписка (демо
+        // подписку не создаёт, ручная активация — создаёт).
+        this.prisma.company.count({ where: { subscriptions: { some: {} } } }),
+        this.prisma.subscription.count({ where: { createdAt: { gte: monthStart } } }),
+        this.prisma.subscription.groupBy({
+          by: ["plan"],
+          where: { status: SubscriptionStatus.active, startsAt: { lte: now }, endsAt: { gt: now } },
+          _count: true,
+        }),
+        this.prisma.company.groupBy({ by: ["status"], _count: true }),
+      ]);
+
+    const planCount = (plan: SubscriptionPlan) => planGroups.find((group) => group.plan === plan)?._count ?? 0;
+
+    return {
+      conversion: {
+        convertedCompanies,
+        totalCompanies,
+        percent: totalCompanies > 0 ? Math.round((convertedCompanies / totalCompanies) * 100) : 0,
+      },
+      subscriptionsByPlan: {
+        basic: planCount(SubscriptionPlan.basic),
+        extended: planCount(SubscriptionPlan.extended),
+      },
+      newSubscriptionsThisMonth,
+      companiesByStatus: statusGroups
+        .map((group) => ({ status: group.status as string, count: group._count }))
+        .sort((a, b) => b.count - a.count),
     };
   }
 

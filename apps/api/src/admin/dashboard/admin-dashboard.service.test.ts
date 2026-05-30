@@ -19,8 +19,19 @@ describe("AdminDashboardService", () => {
       activeUsersToday: 2,
       registrationsToday: 4,
       activeSubscriptions: 2,
+      subscriptionsExpiringSoon: 2,
       openModerationCases: 3,
       activeSupportTickets: 5,
+    });
+    expect(result.business).toEqual({
+      conversion: { convertedCompanies: 3, totalCompanies: 10, percent: 30 },
+      subscriptionsByPlan: { basic: 1, extended: 1 },
+      newSubscriptionsThisMonth: 2,
+      companiesByStatus: [
+        { status: "demo", count: 6 },
+        { status: "active", count: 3 },
+        { status: "blocked", count: 1 },
+      ],
     });
     expect(result.registrationSeries).toEqual([
       { date: "2026-05-26", count: 1 },
@@ -75,7 +86,21 @@ function createPrismaMock() {
         .fn()
         .mockResolvedValue([{ id: "admin-1", firstName: "Админ", lastName: "Платформы", email: "admin@example.com" }]),
     },
-    subscription: { count: vi.fn().mockResolvedValue(2) },
+    subscription: {
+      count: vi.fn().mockResolvedValue(2),
+      groupBy: vi.fn().mockResolvedValue([
+        { plan: "basic", _count: 1 },
+        { plan: "extended", _count: 1 },
+      ]),
+    },
+    company: {
+      count: vi.fn().mockResolvedValueOnce(10).mockResolvedValueOnce(3),
+      groupBy: vi.fn().mockResolvedValue([
+        { status: "active", _count: 3 },
+        { status: "demo", _count: 6 },
+        { status: "blocked", _count: 1 },
+      ]),
+    },
     moderationCase: { count: vi.fn().mockResolvedValue(3) },
     supportTicket: { count: vi.fn().mockResolvedValue(5) },
     adminActionLog: {
