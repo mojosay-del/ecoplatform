@@ -111,9 +111,7 @@ export function EducationView() {
                   <div className="education-card-panel">
                     <p>{module.summary}</p>
                   </div>
-                  <span className="education-card-open-overlay" aria-hidden="true">
-                    {isInDevelopment ? "В разработке" : "Открыть"}
-                  </span>
+                  <span className="education-card-open-overlay" aria-hidden="true" />
                 </Link>
               </article>
             );
