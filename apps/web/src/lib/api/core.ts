@@ -307,16 +307,22 @@ function filenameFromContentDisposition(value: string | null): string | null {
   return ascii?.[1] ?? null;
 }
 
-// Обложка на сервере всё равно ужимается до 1200px, поэтому грузить тяжёлый
-// оригинал (фото с телефона на 5–10 МБ) бессмысленно: на обычном канале это
-// 30+ секунд, соединение обрывается и пользователь видит «Load failed».
-// Ужимаем картинку прямо в браузере перед отправкой — тело запроса становится
-// в десятки раз легче, и загрузка проходит мгновенно.
-const COVER_CLIENT_MAX_DIMENSION = 1600;
-const COVER_CLIENT_JPEG_QUALITY = 0.85;
+// Изображения ужимаем прямо в браузере перед загрузкой. Иначе тяжёлый оригинал
+// (фото с телефона на 5–10 МБ) на обычном канале передаётся 30+ секунд,
+// соединение обрывается и пользователь видит «Load failed».
+// Обложки сервер и так пересжимает до 1200px → гоним их в JPEG. Контентные
+// картинки хранятся как есть, поэтому для них только уменьшаем слишком большие
+// и СОХРАНЯЕМ формат (PNG-скриншоты/схемы не портим перекодировкой в JPEG).
 const CLIENT_RESIZABLE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const COVER_MAX_DIMENSION = 1600;
+const CONTENT_IMAGE_MAX_DIMENSION = 2048;
+const IMAGE_JPEG_QUALITY = 0.85;
+const SKIP_RESIZE_BELOW_BYTES = 1_500_000;
 
-async function downscaleCoverImage(file: File): Promise<File> {
+async function downscaleImageForUpload(
+  file: File,
+  options: { maxDimension: number; forceJpeg?: boolean },
+): Promise<File> {
   if (typeof document === "undefined" || typeof createImageBitmap !== "function") return file;
   if (!CLIENT_RESIZABLE_IMAGE_TYPES.has(file.type)) return file;
 
@@ -325,14 +331,15 @@ async function downscaleCoverImage(file: File): Promise<File> {
     // перекодировки в canvas фото с телефона легло бы набок.
     const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
     const longest = Math.max(bitmap.width, bitmap.height);
-    const scale = longest > COVER_CLIENT_MAX_DIMENSION ? COVER_CLIENT_MAX_DIMENSION / longest : 1;
+    const needsResize = longest > options.maxDimension;
 
-    // Картинка уже небольшая и файл лёгкий — не перекодируем зря.
-    if (scale === 1 && file.size <= 1_500_000) {
+    // Уже небольшую и лёгкую картинку не трогаем — без лишней перекодировки.
+    if (!needsResize && file.size <= SKIP_RESIZE_BELOW_BYTES) {
       bitmap.close();
       return file;
     }
 
+    const scale = needsResize ? options.maxDimension / longest : 1;
     const width = Math.round(bitmap.width * scale);
     const height = Math.round(bitmap.height * scale);
     const canvas = document.createElement("canvas");
@@ -346,25 +353,37 @@ async function downscaleCoverImage(file: File): Promise<File> {
     ctx.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
 
+    const outputType = options.forceJpeg ? "image/jpeg" : file.type;
+    const quality = outputType === "image/png" ? undefined : IMAGE_JPEG_QUALITY;
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((result) => resolve(result), "image/jpeg", COVER_CLIENT_JPEG_QUALITY),
+      canvas.toBlob((result) => resolve(result), outputType, quality),
     );
     if (!blob || blob.size === 0 || blob.size >= file.size) return file;
 
-    const baseName = file.name.replace(/\.[^.]+$/, "") || "cover";
-    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
+    const extension = outputType === "image/png" ? ".png" : outputType === "image/webp" ? ".webp" : ".jpg";
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "image";
+    return new File([blob], `${baseName}${extension}`, { type: outputType });
   } catch {
-    // Не удалось обработать (необычный формат и т.п.) — грузим оригинал,
-    // сервер сам ужмёт и повернёт.
+    // Не удалось обработать (необычный формат и т.п.) — грузим оригинал.
     return file;
   }
+}
+
+async function prepareUploadFile(file: File, imagePreset?: "cover"): Promise<File> {
+  if (imagePreset === "cover") {
+    return downscaleImageForUpload(file, { maxDimension: COVER_MAX_DIMENSION, forceJpeg: true });
+  }
+  if (file.type.startsWith("image/")) {
+    return downscaleImageForUpload(file, { maxDimension: CONTENT_IMAGE_MAX_DIMENSION });
+  }
+  return file;
 }
 
 export async function apiUploadFile(
   file: File,
   options: { token?: string | null; accessLevel?: FileAsset["accessLevel"]; imagePreset?: "cover" } = {},
 ): Promise<FileAsset> {
-  const prepared = options.imagePreset === "cover" ? await downscaleCoverImage(file) : file;
+  const prepared = await prepareUploadFile(file, options.imagePreset);
   const formData = new FormData();
   formData.append("file", prepared);
   formData.append("accessLevel", options.accessLevel ?? "public");
