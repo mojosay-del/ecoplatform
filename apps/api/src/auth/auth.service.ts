@@ -111,13 +111,20 @@ export class AuthService {
     await this.passwordPolicy.assertAcceptablePassword(input.password);
 
     const passwordHash = await hash(input.password, 12);
+    // Демо-доступ управляется из админки. Когда выдача демо выключена, компания
+    // регистрируется с уже истёкшим демо (demoEndsAt = «сейчас»): кабинет
+    // доступен, но платные разделы закрыты до ручной активации подписки.
+    // Существующий access.ts уже трактует demo с прошедшим demoEndsAt как
+    // «демо закончилось», поэтому новый статус заводить не нужно.
+    const demoEnabled = await this.settings.getValue("demo.enabled");
     const demoHours = await this.settings.getValue("demo.duration_hours");
+    const demoEndsAt = demoEnabled ? new Date(Date.now() + demoHours * 60 * 60 * 1000) : new Date();
     const company = await this.prisma.company.create({
       data: {
         organizationName: input.organizationName,
         type: input.companyType,
         status: CompanyStatus.demo,
-        demoEndsAt: new Date(Date.now() + demoHours * 60 * 60 * 1000),
+        demoEndsAt,
       },
     });
 

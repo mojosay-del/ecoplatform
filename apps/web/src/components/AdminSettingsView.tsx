@@ -56,6 +56,18 @@ const GROUPS: GroupDef[] = [
     unit: () => "",
   },
   {
+    id: "support",
+    title: "Поддержка",
+    description: "Приём новых обращений пользователей.",
+    unit: () => "",
+  },
+  {
+    id: "discussions",
+    title: "Сообщество",
+    description: "Комментарии и обсуждения на платформе.",
+    unit: () => "",
+  },
+  {
     id: "other",
     title: "Прочее",
     description: "Настройки, не относящиеся к стандартным группам.",

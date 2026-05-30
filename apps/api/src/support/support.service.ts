@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { NotificationCategory, Prisma, SupportTicketStatus } from "@prisma/client";
 import type { SupportTicketDto } from "@ecoplatform/shared";
+import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { paginatedResponse, resolvePagination } from "../common/pagination";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -27,10 +28,19 @@ function supportMessages(includeInternal: boolean) {
 export class SupportService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly settings?: PlatformSettingsService,
     private readonly notifications?: NotificationsService,
   ) {}
 
   async createTicket(input: SupportTicketDto, userId: string, companyId: string) {
+    // Рубильник из админки (Настройки → Поддержка). Глобальный модуль настроек
+    // всегда внедряется в рантайме; `?? true` страхует только юнит-тесты,
+    // которые конструируют сервис вручную без settings.
+    const newTicketsEnabled = (await this.settings?.getValue("support.new_tickets_enabled")) ?? true;
+    if (!newTicketsEnabled) {
+      throw new ForbiddenException("Приём новых обращений временно приостановлен.");
+    }
+
     const ticket = await this.prisma.supportTicket.create({
       data: {
         authorId: userId,

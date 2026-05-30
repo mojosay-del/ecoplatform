@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { CommentStatus, ContentStatus, DiscussionTargetType, Prisma } from "@prisma/client";
 import { newsBlockSchema, slugify, validateContentBlocks } from "@ecoplatform/shared";
+import { PlatformSettingsService } from "../../admin/settings/platform-settings.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { ModuleAccessService } from "../../common/module-access.service";
@@ -87,6 +88,7 @@ export class NewsService {
     private readonly auditLog: AdminActionLogService,
     private readonly moduleAccess: ModuleAccessService,
     private readonly common: ContentCommonService,
+    private readonly settings: PlatformSettingsService,
   ) {}
 
   async listNews(user: RequestUser, paginationInput: PaginationInput & { tags?: string[] } = {}) {
@@ -678,6 +680,13 @@ export class NewsService {
   }
 
   async addNewsComment(newsPostId: string, user: RequestUser, input: { text: string; parentCommentId?: string }) {
+    // Глобальный стоп-кран комментариев из админки (Настройки → Сообщество).
+    // Проверяем до доступа пользователя, чтобы при отключении любой запрос
+    // получал понятный отказ.
+    const commentsEnabled = await this.settings.getValue("discussions.enabled");
+    if (!commentsEnabled) {
+      throw new ForbiddenException("Комментирование временно отключено.");
+    }
     this.common.assertFunctionalAccess(user);
     await this.moduleAccess.assertModuleAccess(user.id, "comments");
 
