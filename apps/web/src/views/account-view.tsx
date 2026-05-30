@@ -4,7 +4,7 @@
 // биллинг и список тикетов поддержки. Самый крупный view в проекте — раньше
 // жил в DataViews.tsx, теперь изолирован.
 
-import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { Download, KeyRound, LifeBuoy, LogOut, Pencil, RotateCcw, Smartphone, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -18,7 +18,13 @@ import type {
 } from "@ecoplatform/shared";
 import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
-import { accountSectionHref, isAccountBusinessSection, type AccountSectionId } from "../components/app-shell-nav";
+import {
+  ACCOUNT_SECTION_CHANGE_EVENT,
+  ACCOUNT_SECTION_NAVIGATE_EVENT,
+  accountSectionHref,
+  isAccountBusinessSection,
+  type AccountSectionId,
+} from "../components/app-shell-nav";
 import {
   StatusPill,
   companyStatusPillVariant,
@@ -41,6 +47,34 @@ import { useApiQuery } from "./_shared";
 
 const PROFILE_PHOTO_HINT =
   "Фото профиля подбирается автоматически по типу компании. Загрузка своего фото появится в следующих обновлениях.";
+
+const ACCOUNT_SETTINGS_SECTIONS: AccountSectionId[] = [
+  "profile",
+  "security",
+  "notifications",
+  "data-privacy",
+  "sessions",
+];
+const ACCOUNT_BUSINESS_VIEW_SECTIONS: AccountSectionId[] = ["company", "billing", "support"];
+const ACCOUNT_SCROLL_OFFSET = 124;
+
+function accountSectionDomId(section: AccountSectionId) {
+  return `account-section-${section}`;
+}
+
+function dispatchActiveAccountSection(section: AccountSectionId) {
+  window.dispatchEvent(new CustomEvent(ACCOUNT_SECTION_CHANGE_EVENT, { detail: { section } }));
+}
+
+function scrollAccountSectionIntoView(section: AccountSectionId) {
+  const target = document.getElementById(accountSectionDomId(section));
+  if (!target) return;
+
+  dispatchActiveAccountSection(section);
+  const prefersReducedMotion =
+    typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+}
 
 function describeSubscription(
   billing: {
@@ -290,13 +324,109 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   const [deletionMessage, setDeletionMessage] = useState<string | null>(null);
   const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
   const [notificationBusyKey, setNotificationBusyKey] = useState<string | null>(null);
-  const activeSection = isPlatformStaff && isAccountBusinessSection(section) ? "profile" : section;
+  const targetSection = isPlatformStaff && isAccountBusinessSection(section) ? "profile" : section;
+  const visibleSections = useMemo(
+    () =>
+      isPlatformStaff ? ACCOUNT_SETTINGS_SECTIONS : [...ACCOUNT_SETTINGS_SECTIONS, ...ACCOUNT_BUSINESS_VIEW_SECTIONS],
+    [isPlatformStaff],
+  );
+  const visibleSectionsKey = visibleSections.join("|");
+  const targetLayoutKey = isAccountBusinessSection(targetSection) ? `${billingState}|${sessionsState}` : "stable";
 
   useEffect(() => {
     if (isPlatformStaff && isAccountBusinessSection(section)) {
       router.replace(accountSectionHref("profile"));
     }
   }, [isPlatformStaff, router, section]);
+
+  useEffect(() => {
+    const timeouts: number[] = [];
+    const frame = window.requestAnimationFrame(() => {
+      timeouts.push(window.setTimeout(() => scrollAccountSectionIntoView(targetSection), 80));
+      timeouts.push(window.setTimeout(() => scrollAccountSectionIntoView(targetSection), 280));
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      for (const timeout of timeouts) {
+        window.clearTimeout(timeout);
+      }
+    };
+  }, [targetLayoutKey, targetSection, visibleSectionsKey]);
+
+  useEffect(() => {
+    function onNavigate(event: Event) {
+      const sectionId = (event as CustomEvent<{ section?: AccountSectionId }>).detail?.section;
+      if (!sectionId || !visibleSections.includes(sectionId)) return;
+      scrollAccountSectionIntoView(sectionId);
+    }
+
+    window.addEventListener(ACCOUNT_SECTION_NAVIGATE_EVENT, onNavigate);
+    return () => window.removeEventListener(ACCOUNT_SECTION_NAVIGATE_EVENT, onNavigate);
+  }, [visibleSectionsKey, visibleSections]);
+
+  useEffect(() => {
+    const sections = visibleSections
+      .map((sectionId) => ({
+        sectionId,
+        element: document.getElementById(accountSectionDomId(sectionId)),
+      }))
+      .filter((item): item is { sectionId: AccountSectionId; element: HTMLElement } => Boolean(item.element));
+
+    if (sections.length === 0 || typeof IntersectionObserver === "undefined") return;
+
+    const entriesBySection = new Map<AccountSectionId, IntersectionObserverEntry>();
+    const sectionByElement = new Map<Element, AccountSectionId>(
+      sections.map(({ element, sectionId }) => [element, sectionId]),
+    );
+
+    function pickFallbackSection() {
+      const scrollBottom = window.scrollY + window.innerHeight;
+      const pageBottom = document.documentElement.scrollHeight;
+      if (pageBottom - scrollBottom <= 4) {
+        return sections[sections.length - 1]?.sectionId ?? "profile";
+      }
+
+      const pivot = ACCOUNT_SCROLL_OFFSET + 12;
+      let fallback = sections[0]?.sectionId ?? "profile";
+      for (const { element, sectionId } of sections) {
+        if (element.getBoundingClientRect().top <= pivot) fallback = sectionId;
+      }
+      return fallback;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const sectionId = sectionByElement.get(entry.target);
+          if (sectionId) entriesBySection.set(sectionId, entry);
+        }
+
+        const intersecting = visibleSections
+          .map((sectionId) => entriesBySection.get(sectionId))
+          .filter((entry): entry is IntersectionObserverEntry => Boolean(entry?.isIntersecting))
+          .sort(
+            (a, b) =>
+              Math.abs(a.boundingClientRect.top - ACCOUNT_SCROLL_OFFSET) -
+              Math.abs(b.boundingClientRect.top - ACCOUNT_SCROLL_OFFSET),
+          );
+
+        const nextSection =
+          (intersecting[0] ? sectionByElement.get(intersecting[0].target) : null) ?? pickFallbackSection();
+        dispatchActiveAccountSection(nextSection);
+      },
+      {
+        root: null,
+        rootMargin: `-${ACCOUNT_SCROLL_OFFSET}px 0px -10% 0px`,
+        threshold: [0, 0.2, 0.45, 0.75, 1],
+      },
+    );
+
+    for (const { element } of sections) {
+      observer.observe(element);
+    }
+
+    return () => observer.disconnect();
+  }, [visibleSectionsKey, visibleSections]);
 
   // Подписка и статус компании теперь рендерятся в отдельных карточках —
   // форма поддержки переехала в drawer (иконка «?» в шапке), чтобы личный
@@ -478,43 +608,43 @@ export function AccountView({ section }: { section: AccountSectionId }) {
 
   return (
     <AppShell>
-      <section className="page">
-        {/* Hero: крупный аватар и основная идентификация пользователя.
+      <section className="page account-scroll-page">
+        <AccountScrollSection accountSection="profile">
+          {/* Hero: крупный аватар и основная идентификация пользователя.
             Раньше аватар был 40px и терялся среди карточек. */}
-        <header className="account-hero">
-          <div className="account-hero-profile">
-            <div className="account-hero-avatar" aria-hidden={!user?.avatarUrl} title={PROFILE_PHOTO_HINT}>
-              {user?.avatarUrl ? (
-                <Image alt="" src={user.avatarUrl} width={128} height={128} />
-              ) : (
-                <span className="account-hero-initials">{initials || "?"}</span>
-              )}
+          <header className="account-hero">
+            <div className="account-hero-profile">
+              <div className="account-hero-avatar" aria-hidden={!user?.avatarUrl} title={PROFILE_PHOTO_HINT}>
+                {user?.avatarUrl ? (
+                  <Image alt="" src={user.avatarUrl} width={128} height={128} />
+                ) : (
+                  <span className="account-hero-initials">{initials || "?"}</span>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="account-hero-info">
-            <h1 className="account-hero-name">{fullName}</h1>
-            {user?.email ? <p className="account-hero-email">{user.email}</p> : null}
-            <div className="account-hero-meta">
-              {isPlatformStaff
-                ? user?.platformRoles?.map((role) => (
-                    <StatusPill key={role} variant="brand">
-                      {PLATFORM_ROLE_LABELS[role] ?? role}
-                    </StatusPill>
-                  ))
-                : null}
-              {companyStatusLabel && !isPlatformStaff ? (
-                <StatusPill variant={companyStatusPillVariant(billing?.status)}>{companyStatusLabel}</StatusPill>
-              ) : null}
-              {billing?.status === "demo" && !isPlatformStaff ? (
-                <Link className="account-hero-cta" href={accountSectionHref("billing")}>
-                  Активировать подписку
-                </Link>
-              ) : null}
+            <div className="account-hero-info">
+              <h1 className="account-hero-name">{fullName}</h1>
+              {user?.email ? <p className="account-hero-email">{user.email}</p> : null}
+              <div className="account-hero-meta">
+                {isPlatformStaff
+                  ? user?.platformRoles?.map((role) => (
+                      <StatusPill key={role} variant="brand">
+                        {PLATFORM_ROLE_LABELS[role] ?? role}
+                      </StatusPill>
+                    ))
+                  : null}
+                {companyStatusLabel && !isPlatformStaff ? (
+                  <StatusPill variant={companyStatusPillVariant(billing?.status)}>{companyStatusLabel}</StatusPill>
+                ) : null}
+                {billing?.status === "demo" && !isPlatformStaff ? (
+                  <Link className="account-hero-cta" href={accountSectionHref("billing")} scroll={false}>
+                    Активировать подписку
+                  </Link>
+                ) : null}
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        {activeSection === "profile" ? (
           <div className="account-section-grid">
             <article className="card account-card">
               <h2>Пользователь</h2>
@@ -541,122 +671,13 @@ export function AccountView({ section }: { section: AccountSectionId }) {
               </article>
             ) : null}
           </div>
-        ) : null}
+        </AccountScrollSection>
 
-        {activeSection === "company" && !isPlatformStaff ? (
-          billing ? (
-            <CompanyProfileForm billing={billing} onSaved={(updated) => setBilling(updated)} />
-          ) : (
-            <article className="card account-card">
-              <h2>Компания</h2>
-              <p className="page-subtitle">
-                {billingState === "loading" ? "Загружаем реквизиты компании..." : "Данные компании пока недоступны."}
-              </p>
-            </article>
-          )
-        ) : null}
-
-        {activeSection === "billing" && !isPlatformStaff ? (
-          <div className="account-panel-stack">
-            {showBillingStateBanner ? (
-              <div className={`account-state-banner status-${company.status}`}>
-                <strong>{subscription.tariff}</strong>
-                <span>{subscription.note}</span>
-              </div>
-            ) : null}
-            <div className="account-section-grid">
-              <article className="card account-card">
-                <h2>Текущий тариф</h2>
-                <AccountDetailList
-                  rows={[
-                    { label: "Тариф", value: subscription.tariff },
-                    { label: "Статус", value: companyStatusLabel },
-                    { label: "Начало периода", value: formatAccountDate(latestSubscription?.startsAt) },
-                    {
-                      label: "Окончание периода",
-                      value: formatAccountDate(
-                        company?.subscriptionEndsAt ?? latestSubscription?.endsAt ?? company?.demoEndsAt,
-                      ),
-                    },
-                    { label: "Автопродление", value: <span className="account-muted">Отключено</span> },
-                  ]}
-                />
-                <div className="account-action-list">
-                  <button className="button" type="button" disabled>
-                    Оплатить / продлить
-                  </button>
-                  <button className="button secondary" type="button" disabled>
-                    Сменить тариф
-                  </button>
-                  <button className="button secondary" type="button" onClick={openSupport}>
-                    Связаться по биллингу
-                  </button>
-                </div>
-              </article>
-              <article className="card account-card">
-                <h2>Покупки и документы</h2>
-                <div className="account-doc-grid">
-                  <div>
-                    <strong>Покупки компании</strong>
-                    <p className="page-subtitle">Появятся после покупки модулей, инструментов или готовых решений.</p>
-                  </div>
-                  <div>
-                    <strong>Финансовые документы</strong>
-                    <p className="page-subtitle">Счета, чеки и акты будут доступны после первой оплаты.</p>
-                  </div>
-                </div>
-              </article>
-            </div>
-            <article className="card account-card">
-              <h2>История подписок</h2>
-              {billing?.subscriptions?.length ? (
-                <div className="account-history-list">
-                  {billing.subscriptions.map((item: BillingSubscription) => (
-                    <div className="account-history-row" key={item.id}>
-                      <div>
-                        <strong>{SUBSCRIPTION_PLAN_TITLE_LABELS[item.plan] ?? item.plan}</strong>
-                        <span>
-                          {formatAccountDate(item.startsAt)} — {formatAccountDate(item.endsAt)}
-                        </span>
-                      </div>
-                      <StatusPill variant={subscriptionStatusPillVariant(item.status)}>
-                        {SUBSCRIPTION_STATUS_LABELS[item.status] ?? item.status}
-                      </StatusPill>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="page-subtitle">История появится после активации подписки.</p>
-              )}
-            </article>
-            <div className="account-section-grid">
-              <article className="card account-card">
-                <h2>Способы оплаты</h2>
-                <p className="page-subtitle">
-                  Здесь появятся сохранённые карты и реквизиты для безналичной оплаты. Подключим в ближайшем обновлении
-                  — пока подписки активируются вручную поддержкой.
-                </p>
-                <div className="account-action-list">
-                  <button className="button secondary" type="button" disabled>
-                    Добавить карту
-                  </button>
-                  <button className="button secondary" type="button" disabled>
-                    Добавить расчётный счёт
-                  </button>
-                </div>
-              </article>
-              <article className="card account-card">
-                <h2>История платежей</h2>
-                <p className="page-subtitle">
-                  Платежи появятся здесь после оплаты подписки или покупок в магазине. Чек и счёт-фактуру можно будет
-                  скачать рядом с каждой записью.
-                </p>
-              </article>
-            </div>
-          </div>
-        ) : null}
-
-        {activeSection === "security" ? (
+        <AccountScrollSection
+          accountSection="security"
+          description="Пароль, дополнительная защита и быстрый выход из текущей сессии."
+          title="Безопасность"
+        >
           <div className="account-panel-stack">
             <div className="account-section-grid">
               <article className="card account-card">
@@ -719,9 +740,61 @@ export function AccountView({ section }: { section: AccountSectionId }) {
               </article>
             </div>
           </div>
-        ) : null}
+        </AccountScrollSection>
 
-        {activeSection === "data-privacy" ? (
+        <AccountScrollSection
+          accountSection="notifications"
+          description="Что показывать в кабинете и что отправлять на email."
+          title="Уведомления"
+        >
+          <article className="card account-card">
+            <h2>Настройки уведомлений</h2>
+            <div className="account-notification-table">
+              <div className="account-notification-head">
+                <span>Категория</span>
+                <span>В кабинете</span>
+                <span>Email</span>
+              </div>
+              {NOTIFICATION_ROWS.filter((row) => !row.companyOnly || !isPlatformStaff).map((row) => (
+                <div className="account-notification-row" key={row.category}>
+                  <div>
+                    <strong>{row.label}</strong>
+                    <p>{row.description}</p>
+                  </div>
+                  {(["in_app", "email"] as const).map((channel) => {
+                    const busyKey = `${row.category}:${channel}`;
+                    return (
+                      <label className="account-toggle" key={channel}>
+                        <input
+                          checked={notificationEnabled(row.category, channel)}
+                          disabled={
+                            row.locked || notificationPreferencesState === "loading" || notificationBusyKey === busyKey
+                          }
+                          onChange={(event) =>
+                            void updateNotificationPreference(row.category, channel, event.currentTarget.checked)
+                          }
+                          type="checkbox"
+                        />
+                        <span>
+                          {row.locked ? "Всегда" : notificationEnabled(row.category, channel) ? "Вкл" : "Выкл"}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {notificationPreferencesState === "error" ? (
+              <p className="account-form-message">Не удалось загрузить настройки уведомлений.</p>
+            ) : null}
+          </article>
+        </AccountScrollSection>
+
+        <AccountScrollSection
+          accountSection="data-privacy"
+          description="Экспорт персональных данных и управление удалением аккаунта."
+          title="Данные и приватность"
+        >
           <div className="account-section-grid">
             <article className="card account-card">
               <h2>Мои данные</h2>
@@ -765,9 +838,13 @@ export function AccountView({ section }: { section: AccountSectionId }) {
               )}
             </article>
           </div>
-        ) : null}
+        </AccountScrollSection>
 
-        {activeSection === "sessions" ? (
+        <AccountScrollSection
+          accountSection="sessions"
+          description="Устройства, с которых сейчас открыт кабинет."
+          title="Сессии"
+        >
           <article className="card account-card">
             <div className="account-card-head">
               <div>
@@ -819,92 +896,212 @@ export function AccountView({ section }: { section: AccountSectionId }) {
               ) : null}
             </div>
           </article>
+        </AccountScrollSection>
+
+        {!isPlatformStaff ? (
+          <AccountScrollSection
+            accountSection="company"
+            description="Реквизиты, контакты, адреса и банковская информация компании."
+            title="Компания"
+          >
+            {billing ? (
+              <CompanyProfileForm billing={billing} onSaved={(updated) => setBilling(updated)} />
+            ) : (
+              <article className="card account-card">
+                <h2>Компания</h2>
+                <p className="page-subtitle">
+                  {billingState === "loading" ? "Загружаем реквизиты компании..." : "Данные компании пока недоступны."}
+                </p>
+              </article>
+            )}
+          </AccountScrollSection>
         ) : null}
 
-        {activeSection === "notifications" ? (
-          <article className="card account-card">
-            <h2>Настройки уведомлений</h2>
-            <div className="account-notification-table">
-              <div className="account-notification-head">
-                <span>Категория</span>
-                <span>В кабинете</span>
-                <span>Email</span>
-              </div>
-              {NOTIFICATION_ROWS.filter((row) => !row.companyOnly || !isPlatformStaff).map((row) => (
-                <div className="account-notification-row" key={row.category}>
-                  <div>
-                    <strong>{row.label}</strong>
-                    <p>{row.description}</p>
-                  </div>
-                  {(["in_app", "email"] as const).map((channel) => {
-                    const busyKey = `${row.category}:${channel}`;
-                    return (
-                      <label className="account-toggle" key={channel}>
-                        <input
-                          checked={notificationEnabled(row.category, channel)}
-                          disabled={
-                            row.locked || notificationPreferencesState === "loading" || notificationBusyKey === busyKey
-                          }
-                          onChange={(event) =>
-                            void updateNotificationPreference(row.category, channel, event.currentTarget.checked)
-                          }
-                          type="checkbox"
-                        />
-                        <span>
-                          {row.locked ? "Всегда" : notificationEnabled(row.category, channel) ? "Вкл" : "Выкл"}
-                        </span>
-                      </label>
-                    );
-                  })}
+        {!isPlatformStaff ? (
+          <AccountScrollSection
+            accountSection="billing"
+            description="Тариф, документы, способы оплаты и история подписок."
+            title="Подписка"
+          >
+            <div className="account-panel-stack">
+              {showBillingStateBanner ? (
+                <div className={`account-state-banner status-${company.status}`}>
+                  <strong>{subscription.tariff}</strong>
+                  <span>{subscription.note}</span>
                 </div>
-              ))}
-            </div>
-            {notificationPreferencesState === "error" ? (
-              <p className="account-form-message">Не удалось загрузить настройки уведомлений.</p>
-            ) : null}
-          </article>
-        ) : null}
-
-        {activeSection === "support" && !isPlatformStaff ? (
-          <div className="account-section-grid">
-            <article className="card account-card">
-              <h2>Поддержка</h2>
-              <p className="page-subtitle">Создайте обращение или продолжите переписку с администратором платформы.</p>
-              <div className="account-action-list">
-                <button className="button" type="button" onClick={openSupport}>
-                  <LifeBuoy size={16} />
-                  Открыть поддержку
-                </button>
-              </div>
-            </article>
-            <article className="card account-card">
-              <h2>Последние обращения</h2>
-              {supportState === "loading" ? <p className="page-subtitle">Загружаем обращения...</p> : null}
-              {supportPreview.length > 0 ? (
-                <div className="account-history-list">
-                  {supportPreview.map((ticket) => (
-                    <button className="account-ticket-row" key={ticket.id} type="button" onClick={openSupport}>
-                      <div>
-                        <strong>{ticket.subject}</strong>
-                        <span>
-                          {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
-                          {formatAccountDateTime(ticket.updatedAt)}
-                        </span>
-                      </div>
-                      <StatusPill variant={supportStatusPillVariant(ticket.status)}>
-                        {SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}
-                      </StatusPill>
-                    </button>
-                  ))}
-                </div>
-              ) : supportState !== "loading" ? (
-                <p className="page-subtitle">Обращений пока нет.</p>
               ) : null}
-            </article>
-          </div>
+              <div className="account-section-grid">
+                <article className="card account-card">
+                  <h2>Текущий тариф</h2>
+                  <AccountDetailList
+                    rows={[
+                      { label: "Тариф", value: subscription.tariff },
+                      { label: "Статус", value: companyStatusLabel },
+                      { label: "Начало периода", value: formatAccountDate(latestSubscription?.startsAt) },
+                      {
+                        label: "Окончание периода",
+                        value: formatAccountDate(
+                          company?.subscriptionEndsAt ?? latestSubscription?.endsAt ?? company?.demoEndsAt,
+                        ),
+                      },
+                      { label: "Автопродление", value: <span className="account-muted">Отключено</span> },
+                    ]}
+                  />
+                  <div className="account-action-list">
+                    <button className="button" type="button" disabled>
+                      Оплатить / продлить
+                    </button>
+                    <button className="button secondary" type="button" disabled>
+                      Сменить тариф
+                    </button>
+                    <button className="button secondary" type="button" onClick={openSupport}>
+                      Связаться по биллингу
+                    </button>
+                  </div>
+                </article>
+                <article className="card account-card">
+                  <h2>Покупки и документы</h2>
+                  <div className="account-doc-grid">
+                    <div>
+                      <strong>Покупки компании</strong>
+                      <p className="page-subtitle">Появятся после покупки модулей, инструментов или готовых решений.</p>
+                    </div>
+                    <div>
+                      <strong>Финансовые документы</strong>
+                      <p className="page-subtitle">Счета, чеки и акты будут доступны после первой оплаты.</p>
+                    </div>
+                  </div>
+                </article>
+              </div>
+              <article className="card account-card">
+                <h2>История подписок</h2>
+                {billing?.subscriptions?.length ? (
+                  <div className="account-history-list">
+                    {billing.subscriptions.map((item: BillingSubscription) => (
+                      <div className="account-history-row" key={item.id}>
+                        <div>
+                          <strong>{SUBSCRIPTION_PLAN_TITLE_LABELS[item.plan] ?? item.plan}</strong>
+                          <span>
+                            {formatAccountDate(item.startsAt)} — {formatAccountDate(item.endsAt)}
+                          </span>
+                        </div>
+                        <StatusPill variant={subscriptionStatusPillVariant(item.status)}>
+                          {SUBSCRIPTION_STATUS_LABELS[item.status] ?? item.status}
+                        </StatusPill>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="page-subtitle">История появится после активации подписки.</p>
+                )}
+              </article>
+              <div className="account-section-grid">
+                <article className="card account-card">
+                  <h2>Способы оплаты</h2>
+                  <p className="page-subtitle">
+                    Здесь появятся сохранённые карты и реквизиты для безналичной оплаты. Подключим в ближайшем
+                    обновлении — пока подписки активируются вручную поддержкой.
+                  </p>
+                  <div className="account-action-list">
+                    <button className="button secondary" type="button" disabled>
+                      Добавить карту
+                    </button>
+                    <button className="button secondary" type="button" disabled>
+                      Добавить расчётный счёт
+                    </button>
+                  </div>
+                </article>
+                <article className="card account-card">
+                  <h2>История платежей</h2>
+                  <p className="page-subtitle">
+                    Платежи появятся здесь после оплаты подписки или покупок в магазине. Чек и счёт-фактуру можно будет
+                    скачать рядом с каждой записью.
+                  </p>
+                </article>
+              </div>
+            </div>
+          </AccountScrollSection>
+        ) : null}
+
+        {!isPlatformStaff ? (
+          <AccountScrollSection
+            accountSection="support"
+            description="Создайте обращение или продолжите переписку с администратором платформы."
+            title="Поддержка"
+          >
+            <div className="account-section-grid">
+              <article className="card account-card">
+                <h2>Поддержка</h2>
+                <p className="page-subtitle">
+                  Создайте обращение или продолжите переписку с администратором платформы.
+                </p>
+                <div className="account-action-list">
+                  <button className="button" type="button" onClick={openSupport}>
+                    <LifeBuoy size={16} />
+                    Открыть поддержку
+                  </button>
+                </div>
+              </article>
+              <article className="card account-card">
+                <h2>Последние обращения</h2>
+                {supportState === "loading" ? <p className="page-subtitle">Загружаем обращения...</p> : null}
+                {supportPreview.length > 0 ? (
+                  <div className="account-history-list">
+                    {supportPreview.map((ticket) => (
+                      <button className="account-ticket-row" key={ticket.id} type="button" onClick={openSupport}>
+                        <div>
+                          <strong>{ticket.subject}</strong>
+                          <span>
+                            {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
+                            {formatAccountDateTime(ticket.updatedAt)}
+                          </span>
+                        </div>
+                        <StatusPill variant={supportStatusPillVariant(ticket.status)}>
+                          {SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}
+                        </StatusPill>
+                      </button>
+                    ))}
+                  </div>
+                ) : supportState !== "loading" ? (
+                  <p className="page-subtitle">Обращений пока нет.</p>
+                ) : null}
+              </article>
+            </div>
+          </AccountScrollSection>
         ) : null}
       </section>
     </AppShell>
+  );
+}
+
+function AccountScrollSection({
+  accountSection,
+  children,
+  description,
+  title,
+}: {
+  accountSection: AccountSectionId;
+  children: ReactNode;
+  description?: string;
+  title?: string;
+}) {
+  const titleId = title ? `${accountSectionDomId(accountSection)}-title` : undefined;
+
+  return (
+    <section
+      className="account-scroll-section"
+      data-account-section={accountSection}
+      id={accountSectionDomId(accountSection)}
+      aria-labelledby={titleId}
+    >
+      {title ? (
+        <header className="account-scroll-section-head">
+          <h2 id={titleId}>{title}</h2>
+          {description ? <p>{description}</p> : null}
+        </header>
+      ) : null}
+      {children}
+    </section>
   );
 }
 

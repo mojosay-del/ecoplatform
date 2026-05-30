@@ -7,6 +7,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ChevronsLeft, ChevronsRight, HelpCircle, LogOut, Menu, Settings, X } from "lucide-react";
 import { useAuth, type User } from "../lib/auth";
 import {
+  ACCOUNT_SECTION_CHANGE_EVENT,
+  ACCOUNT_SECTION_NAVIGATE_EVENT,
+  accountSectionFromHref,
   appNavSections,
   getAccountMenuSections,
   getAccountNavSections,
@@ -14,6 +17,7 @@ import {
   isAccountPath,
   isNavItemActive,
   type BreadcrumbItem,
+  type AccountSectionId,
   type NavItem,
   type NavSection,
 } from "./app-shell-nav";
@@ -28,6 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [activeAccountSection, setActiveAccountSection] = useState<AccountSectionId | null>(null);
   // У админов своя полноценная страница /admin/support — drawer им
   // показывать не нужно, иначе двойная сущность.
   const isAdminUser = (user?.platformRoles?.length ?? 0) > 0;
@@ -49,6 +54,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!inAccountSettings) {
+      setActiveAccountSection(null);
+      return;
+    }
+    setActiveAccountSection(accountSectionFromHref(pathname));
+  }, [inAccountSettings, pathname]);
+
+  useEffect(() => {
+    if (!inAccountSettings) return;
+
+    function onAccountSectionChange(event: Event) {
+      const section = (event as CustomEvent<{ section?: AccountSectionId }>).detail?.section;
+      if (section) setActiveAccountSection(section);
+    }
+
+    window.addEventListener(ACCOUNT_SECTION_CHANGE_EVENT, onAccountSectionChange);
+    return () => window.removeEventListener(ACCOUNT_SECTION_CHANGE_EVENT, onAccountSectionChange);
+  }, [inAccountSettings]);
 
   useEffect(() => {
     const handler = () => setSupportOpen(true);
@@ -127,7 +152,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="nav-section" key={section.title}>
             <p className="nav-title">{section.title}</p>
             {section.items.map((item) => (
-              <NavEntry item={item} key={item.href ?? item.label} pathname={pathname} />
+              <NavEntry
+                activeAccountSection={activeAccountSection}
+                item={item}
+                key={item.href ?? item.label}
+                pathname={pathname}
+              />
             ))}
           </nav>
         ))}
@@ -160,7 +190,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <HelpCircle size={20} />
             </button>
           )}
-          <AccountMenu includeBusiness={!isAdminUser} onLogout={logout} pathname={pathname} user={user} />
+          <AccountMenu
+            activeAccountSection={activeAccountSection}
+            includeBusiness={!isAdminUser}
+            onLogout={logout}
+            pathname={pathname}
+            user={user}
+          />
         </header>
         <div className="page-surface">
           {showAdminPanelBackLink ? (
@@ -180,11 +216,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function AccountMenu({
+  activeAccountSection,
   includeBusiness,
   onLogout,
   pathname,
   user,
 }: {
+  activeAccountSection: AccountSectionId | null;
   includeBusiness: boolean;
   onLogout: () => Promise<void>;
   pathname: string;
@@ -248,13 +286,24 @@ function AccountMenu({
               <p>{section.title}</p>
               {section.items.map((item) => {
                 const Icon = item.icon;
-                const active = isNavItemActive(item, pathname);
+                const accountSection = activeAccountSection ? accountSectionFromHref(item.href) : null;
+                const active = accountSection
+                  ? accountSection === activeAccountSection
+                  : isNavItemActive(item, pathname);
                 return item.href ? (
                   <Link
                     className={`account-menu-link ${active ? "active" : ""}`}
                     href={item.href}
                     key={item.href}
+                    onClick={() => {
+                      if (accountSection) {
+                        window.dispatchEvent(
+                          new CustomEvent(ACCOUNT_SECTION_NAVIGATE_EVENT, { detail: { section: accountSection } }),
+                        );
+                      }
+                    }}
                     role="menuitem"
+                    scroll={accountSection ? false : undefined}
                   >
                     <Icon size={16} />
                     <span>{item.label}</span>
@@ -273,17 +322,40 @@ function AccountMenu({
   );
 }
 
-function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: string; child?: boolean }) {
+function NavEntry({
+  activeAccountSection,
+  item,
+  pathname,
+  child = false,
+}: {
+  activeAccountSection: AccountSectionId | null;
+  item: NavItem;
+  pathname: string;
+  child?: boolean;
+}) {
   const Icon = item.icon;
   const tooltipId = useId();
-  const active = isNavItemActive(item, pathname);
+  const accountSection = activeAccountSection ? accountSectionFromHref(item.href) : null;
+  const active = accountSection ? accountSection === activeAccountSection : isNavItemActive(item, pathname);
   const className = `nav-link ${child ? "nav-link-child" : ""} ${active ? "active" : ""} ${item.disabled ? "disabled" : ""}`;
   const iconSize = child ? 16 : 19;
 
   return (
     <div className="nav-entry">
       {item.href && !item.disabled ? (
-        <Link className={className} href={item.href} title={item.label}>
+        <Link
+          className={className}
+          href={item.href}
+          onClick={() => {
+            if (accountSection) {
+              window.dispatchEvent(
+                new CustomEvent(ACCOUNT_SECTION_NAVIGATE_EVENT, { detail: { section: accountSection } }),
+              );
+            }
+          }}
+          scroll={accountSection ? false : undefined}
+          title={item.label}
+        >
           <Icon size={iconSize} />
           <span className="nav-label">{item.label}</span>
         </Link>
@@ -310,7 +382,13 @@ function NavEntry({ item, pathname, child = false }: { item: NavItem; pathname: 
       {item.children?.length ? (
         <div className="nav-children">
           {item.children.map((childItem) => (
-            <NavEntry child item={childItem} key={childItem.href ?? childItem.label} pathname={pathname} />
+            <NavEntry
+              activeAccountSection={activeAccountSection}
+              child
+              item={childItem}
+              key={childItem.href ?? childItem.label}
+              pathname={pathname}
+            />
           ))}
         </div>
       ) : null}

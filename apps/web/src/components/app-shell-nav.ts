@@ -54,6 +54,9 @@ export type AccountSectionId =
   | "billing"
   | "support";
 
+export const ACCOUNT_SECTION_CHANGE_EVENT = "account:section-change";
+export const ACCOUNT_SECTION_NAVIGATE_EVENT = "account:section-navigate";
+
 const futureItem = (label: string, icon: LucideIcon, disabledHint: string): NavItem => ({
   label,
   icon,
@@ -164,6 +167,15 @@ export function normalizeAccountSection(value: string): AccountSectionId | null 
 
 export function accountSectionHref(section: AccountSectionId): string {
   return `/account/${section}`;
+}
+
+export function accountSectionFromHref(href: string | undefined): AccountSectionId | null {
+  if (!href) return null;
+  if (href === "/account") return "profile";
+  if (!href.startsWith("/account/")) return null;
+
+  const [section] = href.slice("/account/".length).split(/[?#/]/);
+  return section ? normalizeAccountSection(section) : null;
 }
 
 export function getLegacyAccountTabHref(tab: string | null | undefined): string | null {

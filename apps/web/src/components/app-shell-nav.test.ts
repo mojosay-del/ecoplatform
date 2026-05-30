@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  accountSectionFromHref,
   appNavSections,
   futureNavItems,
   getAccountNavSections,
@@ -109,5 +110,13 @@ describe("AppShell future navigation teasers", () => {
     expect(getLegacyAccountTabHref("billing")).toBe("/account/billing");
     expect(getLegacyAccountTabHref("support")).toBe("/account/support");
     expect(getLegacyAccountTabHref("unknown")).toBeNull();
+  });
+
+  it("parses account section links for scroll navigation", () => {
+    expect(accountSectionFromHref("/account")).toBe("profile");
+    expect(accountSectionFromHref("/account/billing")).toBe("billing");
+    expect(accountSectionFromHref("/account/sessions?from=menu")).toBe("sessions");
+    expect(accountSectionFromHref("/account/support/thread")).toBe("support");
+    expect(accountSectionFromHref("/news")).toBeNull();
   });
 });
