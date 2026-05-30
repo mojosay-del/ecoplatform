@@ -3,8 +3,8 @@
 Репозиторий содержит рабочую кодовую базу MVP на Turborepo + pnpm.
 
 Текущее состояние MVP и следующий этап — в [PROJECT_STATUS.md](PROJECT_STATUS.md).
-На 2026-05-28 полный технический codebase-аудит завершён; дальше идёт ручная
-приёмка MVP владельцем продукта.
+**MVP задеплоен в прод (2026-05-30): https://ecoplatform.pro.** Как развёрнуто и
+как выкатывать обновления — в [deploy/PRODUCTION.md](deploy/PRODUCTION.md).
 
 ## Карта проекта
 
@@ -122,9 +122,23 @@ Integration-тесты создают отдельную БД `ecoplatform_test`
 
 После seed также создаются 5 placeholder-юр-документов v1.0.0 (privacy/terms/personal-data — обязательные, cookies/offer — опциональные) и админский `ConsentRecord` на обязательные — иначе `auth/me.requiresReConsent` блокирует кабинет.
 
-## Целевая БД для деплоя
+## Прод (деплой)
 
-Для размещения на Timeweb выбрана **PostgreSQL 18**. Подробности по целевой БД, env, SSL и бэкапам зафиксированы в [PROJECT_STATUS.md](PROJECT_STATUS.md).
+MVP развёрнут на **Timeweb VPS** (Ubuntu + Docker) со стандартным `docker compose`
+(`docker-compose.prod.yml`: caddy + web + api + redis). БД — Timeweb Managed
+**PostgreSQL** (приватная сеть), файлы — Timeweb **S3**, HTTPS — Caddy/Let's
+Encrypt. Полный runbook (как устроено, как обновлять, как НЕ сломать БД) — в
+**[deploy/PRODUCTION.md](deploy/PRODUCTION.md)**.
+
+Обновление прода — одной командой на сервере (после `git push`):
+
+```bash
+cd /root/ecoplatform && git pull && \
+  docker compose -f docker-compose.prod.yml --env-file deploy/.env.prod up -d --build
+```
+
+Новые миграции БД применяются автоматически при перезапуске `api`
+(`prisma migrate deploy`). **Перед изменениями схемы — бэкап БД.**
 
 ## Что есть в проде-готовности
 
