@@ -138,18 +138,24 @@ export function AdminSettingsView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // Синхронизация активной группы с hash при ручной смене URL пользователем.
+  // Синхронизация активной группы с hash.
   useEffect(() => {
-    function onHashChange() {
+    function syncFromHash() {
       const fromHash = window.location.hash.replace("#", "");
-      if (isSettingsSection(fromHash)) {
-        setActiveGroup(fromHash);
-      } else {
-        setActiveGroup("moderation");
-      }
+      setActiveGroup(isSettingsSection(fromHash) ? fromHash : "moderation");
     }
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+    // Важно прочитать hash ПОСЛЕ монтирования: при переходе по ссылке вида
+    // /admin/settings#demo Next-навигация меняет hash через pushState, который
+    // НЕ вызывает событие hashchange, а ленивый useState-инициализатор успевает
+    // прочитать ещё пустой window.location.hash и падает в дефолт «moderation».
+    // Этот вызов гарантированно подхватывает актуальный hash из URL.
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    window.addEventListener("popstate", syncFromHash);
+    return () => {
+      window.removeEventListener("hashchange", syncFromHash);
+      window.removeEventListener("popstate", syncFromHash);
+    };
   }, []);
 
   if (state === "unauthenticated") {
