@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { HealthIndicatorService } from "@nestjs/terminus";
+import { EmailService } from "../email/email.service";
 import { FilesService } from "../files/files.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
@@ -15,6 +16,7 @@ export class HealthDependencyIndicator {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly files: FilesService,
+    private readonly email: EmailService,
   ) {}
 
   process(key: string, options: CheckOptions = {}) {
@@ -98,6 +100,27 @@ export class HealthDependencyIndicator {
         ...this.failureData(startedAt, error, options),
       });
     }
+  }
+
+  emailDelivery(key: string, options: CheckOptions = {}) {
+    const config = this.email.getHealthConfig();
+    const required = this.isProduction();
+    const payload = {
+      configured: config.configured,
+      required,
+      disabled: config.deliveryDisabled,
+      ...(options.detailed
+        ? { host: config.host, missing: config.missing, invalid: config.invalid }
+        : config.missing.length || config.invalid.length
+          ? { missing: config.missing, invalid: config.invalid }
+          : {}),
+    };
+
+    if (required && !config.configured) {
+      return this.indicator.check(key).down(payload);
+    }
+
+    return this.indicator.check(key).up(payload);
   }
 
   private successData(startedAt: number, options: CheckOptions): Record<string, unknown> {

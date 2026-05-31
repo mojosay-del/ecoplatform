@@ -17,6 +17,14 @@ type SmtpConfig = {
   from: string;
 };
 
+type EmailHealthConfig = {
+  configured: boolean;
+  deliveryDisabled: boolean;
+  missing: string[];
+  invalid: string[];
+  host: string | null;
+};
+
 @Injectable()
 export class EmailService {
   private transporter: Transporter | null = null;
@@ -64,6 +72,27 @@ export class EmailService {
       },
     });
     return this.transporter;
+  }
+
+  getHealthConfig(): EmailHealthConfig {
+    const rawPort = process.env.SMTP_PORT ?? "465";
+    const port = Number(rawPort);
+    const requiredEnv: Array<[string, string | undefined]> = [
+      ["SMTP_HOST", process.env.SMTP_HOST],
+      ["SMTP_USER", process.env.SMTP_USER],
+      ["SMTP_PASS", process.env.SMTP_PASS],
+    ];
+    const missing = requiredEnv.filter(([, value]) => !value).map(([name]) => name);
+    const invalid = Number.isInteger(port) && port > 0 ? [] : ["SMTP_PORT"];
+    const deliveryDisabled = process.env.EMAIL_DELIVERY_DISABLED === "1";
+
+    return {
+      configured: !deliveryDisabled && missing.length === 0 && invalid.length === 0,
+      deliveryDisabled,
+      missing,
+      invalid,
+      host: process.env.SMTP_HOST ?? null,
+    };
   }
 
   private smtpConfig(): SmtpConfig {

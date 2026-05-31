@@ -47,6 +47,7 @@ export class HealthController {
       () => this.dependencies.database("database", options),
       () => this.dependencies.redisCache("redis", options),
       () => this.dependencies.objectStorage("s3", options),
+      () => this.dependencies.emailDelivery("email", options),
     ]);
   }
 }
@@ -66,6 +67,7 @@ export class ReadyController {
       () => this.dependencies.database("database"),
       () => this.dependencies.redisCache("redis"),
       () => this.dependencies.objectStorage("s3"),
+      () => this.dependencies.emailDelivery("email"),
     ]);
   }
 }

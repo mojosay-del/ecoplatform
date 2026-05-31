@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { HealthIndicatorService } from "@nestjs/terminus";
+import { EmailService } from "../email/email.service";
 import { FilesService } from "../files/files.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
@@ -10,6 +11,7 @@ function createIndicator(
     prisma?: Partial<PrismaService>;
     redis?: Partial<RedisService>;
     files?: Partial<FilesService>;
+    email?: Partial<EmailService>;
   } = {},
 ) {
   const prisma = {
@@ -27,8 +29,18 @@ function createIndicator(
     pingS3: vi.fn(),
     ...options.files,
   } as unknown as FilesService;
+  const email = {
+    getHealthConfig: vi.fn().mockReturnValue({
+      configured: false,
+      deliveryDisabled: false,
+      missing: ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"],
+      invalid: [],
+      host: null,
+    }),
+    ...options.email,
+  } as unknown as EmailService;
 
-  return new HealthDependencyIndicator(new HealthIndicatorService(), prisma, redis, files);
+  return new HealthDependencyIndicator(new HealthIndicatorService(), prisma, redis, files, email);
 }
 
 describe("HealthDependencyIndicator", () => {
@@ -96,6 +108,57 @@ describe("HealthDependencyIndicator", () => {
         process.env.NODE_ENV = previousNodeEnv;
       }
     }
+  });
+
+  it("требует SMTP-настройки в production", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    const indicator = createIndicator();
+
+    try {
+      expect(indicator.emailDelivery("email")).toEqual({
+        email: {
+          status: "down",
+          configured: false,
+          required: true,
+          disabled: false,
+          missing: ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"],
+          invalid: [],
+        },
+      });
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("подтверждает настроенный SMTP без отправки письма", async () => {
+    const indicator = createIndicator({
+      email: {
+        getHealthConfig: vi.fn().mockReturnValue({
+          configured: true,
+          deliveryDisabled: false,
+          missing: [],
+          invalid: [],
+          host: "smtp.example.test",
+        }),
+      },
+    });
+
+    expect(indicator.emailDelivery("email", { detailed: true })).toEqual({
+      email: {
+        status: "up",
+        configured: true,
+        required: false,
+        disabled: false,
+        host: "smtp.example.test",
+        missing: [],
+        invalid: [],
+      },
+    });
   });
 
   it("пингует настроенный S3 bucket", async () => {

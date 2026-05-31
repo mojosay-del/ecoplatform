@@ -20,7 +20,8 @@
 
 - Репозиторий на сервере: **`/root/ecoplatform`** (склонирован с GitHub).
 - Секреты: **`/root/ecoplatform/deploy/.env.prod`** — НЕ в git (gitignored),
-  перенесён на сервер через `scp`. Там `DATABASE_URL`, `JWT_*`, `S3_*` и т.д.
+  перенесён на сервер через `scp`. Там `DATABASE_URL`, `JWT_*`, `S3_*`, `SMTP_*`
+  и другие runtime-секреты.
 - Маршрутизация (Caddy, `deploy/Caddyfile`): `ecoplatform.pro/api/*` → `api:4000`,
   всё остальное → `web:3000` (один origin, без CORS).
 
@@ -48,6 +49,10 @@ Docker Hub и CDN Alpine режутся/блокируются из РФ, поэ
 
 **1. Локально (ноутбук):** правишь → коммит → `git push origin main`.
 
+Если в коммите изменился `deploy/.env.prod.example`, сначала синхронизируй
+реальный `/root/ecoplatform/deploy/.env.prod` на сервере. Этот файл не в git,
+поэтому новые обязательные секреты сами туда не попадут.
+
 **2. На сервере:**
 ```bash
 ssh root@81.200.158.7
@@ -63,6 +68,7 @@ docker compose -f docker-compose.prod.yml --env-file deploy/.env.prod up -d --bu
 ```bash
 docker compose -f docker-compose.prod.yml ps                 # все Up?
 docker compose -f docker-compose.prod.yml logs --tail=40 api # миграции + Nest started
+curl -s localhost:4000/api/ready                             # зависимости ok?
 ```
 
 > Полезно: сборка идёт несколько минут — можно запускать в фоне, чтобы не
