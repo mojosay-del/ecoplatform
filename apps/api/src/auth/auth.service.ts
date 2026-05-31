@@ -75,7 +75,10 @@ export class AuthService {
     return { enabled: await this.settings.getValue("auth.registration_enabled") };
   }
 
-  async register(input: RegisterDto, meta: { userAgent?: string; ipAddress?: string }): Promise<RegistrationVerificationStart> {
+  async register(
+    input: RegisterDto,
+    meta: { userAgent?: string; ipAddress?: string },
+  ): Promise<RegistrationVerificationStart> {
     const prepared = await this.prepareRegistration(input);
     const verificationId = randomUUID();
     const code = this.generateEmailVerificationCode();
@@ -108,22 +111,26 @@ export class AuthService {
       },
     });
 
-    try {
-      await this.email.sendRegistrationCode({ to: prepared.email, code, expiresAt });
-    } catch (error) {
-      await this.prisma.emailVerificationChallenge
-        .updateMany({
-          where: { id: verificationId, verifiedAt: null },
-          data: { expiresAt: new Date() },
-        })
-        .catch(swallowAndLog("auth.registration.email.expire", { verificationId }));
-      throw error;
-    }
+    this.sendRegistrationCodeInBackground({ verificationId, email: prepared.email, code, expiresAt });
 
     return { verificationId, email: prepared.email, expiresAt: expiresAt.toISOString() };
   }
 
-  async verifyRegistration(input: RegistrationVerifyDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {
+  private sendRegistrationCodeInBackground(input: {
+    verificationId: string;
+    email: string;
+    code: string;
+    expiresAt: Date;
+  }): void {
+    void this.email
+      .sendRegistrationCode({ to: input.email, code: input.code, expiresAt: input.expiresAt })
+      .catch(swallowAndLog("auth.registration.email.background", { verificationId: input.verificationId }));
+  }
+
+  async verifyRegistration(
+    input: RegistrationVerifyDto,
+    meta: { userAgent?: string; ipAddress?: string },
+  ): Promise<SessionTokens> {
     const now = new Date();
     const challenge = await this.prisma.emailVerificationChallenge.findUnique({
       where: { id: input.verificationId },
@@ -148,9 +155,7 @@ export class AuthService {
         },
       });
       throw new BadRequestException(
-        tooManyAttempts
-          ? "Слишком много попыток. Отправьте новый код подтверждения."
-          : "Неверный код подтверждения.",
+        tooManyAttempts ? "Слишком много попыток. Отправьте новый код подтверждения." : "Неверный код подтверждения.",
       );
     }
 
@@ -393,8 +398,7 @@ export class AuthService {
     );
     const failedLoginAttempts = withinWindow ? user.failedLoginAttempts + 1 : 1;
     const failedLoginWindowStartedAt = withinWindow ? windowStartedAt : now;
-    const lockedUntil =
-      failedLoginAttempts >= threshold ? new Date(now.getTime() + durationMinutes * 60 * 1000) : null;
+    const lockedUntil = failedLoginAttempts >= threshold ? new Date(now.getTime() + durationMinutes * 60 * 1000) : null;
 
     await this.prisma.user.update({
       where: { id: user.id },

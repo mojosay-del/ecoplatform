@@ -1,4 +1,4 @@
-import { compare } from "bcryptjs";
+import { compare, hash } from "bcryptjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthService } from "./auth.service";
 
@@ -7,26 +7,33 @@ vi.mock("bcryptjs", () => ({
   hash: vi.fn(),
 }));
 
-const LOCKOUT_SETTING_DEFAULTS: Record<string, number> = {
+const SETTING_DEFAULTS: Record<string, number | boolean> = {
+  "auth.registration_enabled": true,
   "security.login_lockout_threshold": 10,
   "security.login_lockout_window_minutes": 15,
   "security.login_lockout_duration_minutes": 15,
 };
+const ORIGINAL_JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 
-function createService(prisma: Record<string, unknown>) {
+function createService(
+  prisma: Record<string, unknown>,
+  email: Record<string, unknown> = { sendRegistrationCode: vi.fn() },
+) {
   return new AuthService(
     prisma as any,
     {} as any,
-    { getValue: vi.fn(async (key: string) => LOCKOUT_SETTING_DEFAULTS[key]) } as any,
+    { getValue: vi.fn(async (key: string) => SETTING_DEFAULTS[key]) } as any,
     { createInApp: vi.fn() } as any,
     { invalidateUser: vi.fn(), invalidateSession: vi.fn() } as any,
     { assertAcceptablePassword: vi.fn() } as any,
+    email as any,
   );
 }
 
 describe("AuthService login", () => {
   beforeEach(() => {
     vi.mocked(compare).mockReset();
+    vi.mocked(hash).mockReset();
   });
 
   afterEach(() => {
@@ -155,5 +162,68 @@ describe("AuthService login", () => {
 
     expect(prisma.user.update).not.toHaveBeenCalled();
     expect(prisma.session.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("AuthService registration email", () => {
+  beforeEach(() => {
+    process.env.JWT_ACCESS_SECRET = "test-access-secret-that-is-long-enough";
+    vi.mocked(compare).mockReset();
+    vi.mocked(hash).mockReset();
+    vi.mocked(hash).mockResolvedValue("hashed-password");
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_JWT_ACCESS_SECRET === undefined) {
+      delete process.env.JWT_ACCESS_SECRET;
+    } else {
+      process.env.JWT_ACCESS_SECRET = ORIGINAL_JWT_ACCESS_SECRET;
+    }
+  });
+
+  it("возвращает шаг ввода кода, не ожидая завершения SMTP-отправки", async () => {
+    const prisma = {
+      user: {
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+      legalDocument: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      emailVerificationChallenge: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({}),
+      },
+    };
+    const email = {
+      sendRegistrationCode: vi.fn(() => new Promise<void>(() => undefined)),
+    };
+    const service = createService(prisma, email);
+
+    const result = await service.register(
+      {
+        organizationName: "ООО Быстрая регистрация",
+        companyType: "collector",
+        firstName: "Иван",
+        lastName: "Петров",
+        gender: "male",
+        phone: "+79990000000",
+        email: "Fast@Example.Test",
+        password: "Password12345",
+        acceptedDocumentIds: [],
+      },
+      { userAgent: "test" },
+    );
+
+    expect(result).toEqual({
+      verificationId: expect.any(String),
+      email: "fast@example.test",
+      expiresAt: expect.any(String),
+    });
+    expect(email.sendRegistrationCode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "fast@example.test",
+        code: expect.stringMatching(/^\d{4}$/),
+      }),
+    );
   });
 });
