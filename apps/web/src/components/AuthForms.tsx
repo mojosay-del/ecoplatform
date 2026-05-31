@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ChangeEvent, FormEvent, ReactNode } from "react";
+import type { ChangeEvent, FormEvent, KeyboardEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, Factory, Forklift, Package, RussianRuble, Truck } from "lucide-react";
+import { Check, Eye, EyeOff, Factory, Forklift, Package, RussianRuble, Truck, X } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -199,6 +199,10 @@ const ORGANIZATION_ERASE_DELAY = 90;
 const ORGANIZATION_HOLD_DELAY = 1800;
 const ORGANIZATION_EMPTY_DELAY = 600;
 const REGISTER_STEP_TOTAL = 3;
+const VERIFICATION_CODE_LENGTH = 4;
+const VERIFICATION_AUTO_SUBMIT_DELAY_MS = 140;
+const VERIFICATION_ERROR_RESET_DELAY_MS = 850;
+const VERIFICATION_SUCCESS_REDIRECT_DELAY_MS = 1000;
 const INITIAL_REGISTER_VALUES: RegisterFormValues = {
   organizationName: "",
   companyType: "collector",
@@ -210,6 +214,7 @@ const INITIAL_REGISTER_VALUES: RegisterFormValues = {
   email: "",
   password: "",
 };
+type VerificationPhase = "typing" | "checking" | "success" | "error";
 
 function getPhoneCountry(id: PhoneCountryId) {
   return PHONE_COUNTRIES.find((country) => country.id === id) ?? DEFAULT_PHONE_COUNTRY;
@@ -595,6 +600,14 @@ function PasswordStrengthMeter({ password }: { password: string }) {
   );
 }
 
+function AuthVerificationMark() {
+  return (
+    <svg className="auth-verification-mark" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M32 6v52M6 32h52M13.6 13.6l36.8 36.8M50.4 13.6 13.6 50.4" />
+    </svg>
+  );
+}
+
 export function LoginForm() {
   const router = useRouter();
   const { login } = useAuth();
@@ -666,12 +679,19 @@ export function RegisterForm() {
   const router = useRouter();
   const { register, verifyRegistration } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
+  const verificationInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const verificationAttemptRef = useRef(0);
+  const verificationResetTimerRef = useRef<number | null>(null);
+  const verificationRedirectTimerRef = useRef<number | null>(null);
   const [step, setStep] = useState<RegisterStep>("company");
   const [values, setValues] = useState<RegisterFormValues>(INITIAL_REGISTER_VALUES);
   const [verification, setVerification] = useState<{ verificationId: string; email: string; expiresAt: string } | null>(
     null,
   );
-  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationDigits, setVerificationDigits] = useState<string[]>(() =>
+    Array.from({ length: VERIFICATION_CODE_LENGTH }, () => ""),
+  );
+  const [verificationPhase, setVerificationPhase] = useState<VerificationPhase>("typing");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   // Тумблер из админки: открыта ли само-регистрация. null — пока грузим статус.
@@ -731,6 +751,56 @@ export function RegisterForm() {
   const verificationExpiresAt = verification
     ? new Date(verification.expiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
     : "";
+  const verificationCode = verificationDigits.join("");
+  const verificationIsComplete = verificationCode.length === VERIFICATION_CODE_LENGTH;
+  const verificationIsAnimating = verificationPhase !== "typing";
+  const verificationInputLocked = verificationIsAnimating || (step === "verification" && submitting);
+  const verificationStatusText =
+    verificationPhase === "checking"
+      ? "Проверяем код"
+      : verificationPhase === "success"
+        ? "Почта подтверждена"
+        : verificationPhase === "error"
+          ? "Код не подошёл"
+          : "";
+
+  function emptyVerificationDigits() {
+    return Array.from({ length: VERIFICATION_CODE_LENGTH }, () => "");
+  }
+
+  function clearVerificationTimers() {
+    if (verificationResetTimerRef.current) {
+      window.clearTimeout(verificationResetTimerRef.current);
+      verificationResetTimerRef.current = null;
+    }
+    if (verificationRedirectTimerRef.current) {
+      window.clearTimeout(verificationRedirectTimerRef.current);
+      verificationRedirectTimerRef.current = null;
+    }
+  }
+
+  function focusVerificationInput(index: number) {
+    window.setTimeout(() => verificationInputRefs.current[index]?.focus(), 0);
+  }
+
+  useEffect(() => {
+    return () => clearVerificationTimers();
+  }, []);
+
+  useEffect(() => {
+    if (step !== "verification" || verificationPhase !== "typing") return;
+    const firstEmptyIndex = verificationDigits.findIndex((digit) => digit === "");
+    focusVerificationInput(firstEmptyIndex === -1 ? VERIFICATION_CODE_LENGTH - 1 : firstEmptyIndex);
+  }, [step, verification?.verificationId]);
+
+  useEffect(() => {
+    if (step !== "verification" || verificationPhase !== "typing" || !verification || !verificationIsComplete) return;
+    const timerId = window.setTimeout(() => {
+      void confirmVerificationCode(verificationCode);
+    }, VERIFICATION_AUTO_SUBMIT_DELAY_MS);
+
+    return () => window.clearTimeout(timerId);
+  }, [step, verification?.verificationId, verificationPhase, verificationCode, verificationIsComplete]);
 
   function setField<K extends keyof RegisterFormValues>(field: K, value: RegisterFormValues[K]) {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -786,8 +856,10 @@ export function RegisterForm() {
     setError("");
     try {
       const result = await register(registrationPayload());
+      clearVerificationTimers();
       setVerification(result);
-      setVerificationCode("");
+      setVerificationDigits(emptyVerificationDigits());
+      setVerificationPhase("typing");
       setStep("verification");
     } catch (err) {
       setError(
@@ -818,20 +890,99 @@ export function RegisterForm() {
       return;
     }
 
-    if (!/^\d{4}$/.test(verificationCode)) {
+    if (verificationPhase !== "typing") {
+      return;
+    }
+
+    if (!verificationIsComplete) {
       setError("Введите 4 цифры из письма.");
       return;
     }
 
+    await confirmVerificationCode(verificationCode);
+  }
+
+  async function confirmVerificationCode(code: string) {
+    if (!verification || verificationPhase !== "typing" || !/^\d{4}$/.test(code)) return;
+
+    const attempt = verificationAttemptRef.current + 1;
+    verificationAttemptRef.current = attempt;
+    clearVerificationTimers();
     setSubmitting(true);
     setError("");
+    setVerificationPhase("checking");
+
     try {
-      await verifyRegistration({ verificationId: verification.verificationId, code: verificationCode });
-      router.push("/news");
+      await verifyRegistration({ verificationId: verification.verificationId, code });
+      if (verificationAttemptRef.current !== attempt) return;
+      setVerificationPhase("success");
+      verificationRedirectTimerRef.current = window.setTimeout(() => {
+        router.push("/news");
+      }, VERIFICATION_SUCCESS_REDIRECT_DELAY_MS);
     } catch (err) {
+      if (verificationAttemptRef.current !== attempt) return;
+      setVerificationPhase("error");
       setError(err instanceof ApiError && err.message ? err.message : "Не удалось подтвердить почту.");
-    } finally {
-      setSubmitting(false);
+      verificationResetTimerRef.current = window.setTimeout(() => {
+        if (verificationAttemptRef.current !== attempt) return;
+        setVerificationDigits(emptyVerificationDigits());
+        setVerificationPhase("typing");
+        setSubmitting(false);
+        focusVerificationInput(0);
+      }, VERIFICATION_ERROR_RESET_DELAY_MS);
+    }
+  }
+
+  function setVerificationDigit(index: number, rawValue: string) {
+    if (verificationInputLocked) return;
+
+    const digits = rawValue.replace(/\D/g, "").slice(0, VERIFICATION_CODE_LENGTH - index).split("");
+    setError("");
+    setVerificationDigits((current) => {
+      const next = [...current];
+      if (digits.length === 0) {
+        next[index] = "";
+        return next;
+      }
+
+      digits.forEach((digit, offset) => {
+        next[index + offset] = digit;
+      });
+
+      const nextEmptyIndex = next.findIndex((digit, digitIndex) => digitIndex > index && digit === "");
+      if (nextEmptyIndex !== -1) {
+        focusVerificationInput(nextEmptyIndex);
+      } else {
+        focusVerificationInput(Math.min(index + digits.length, VERIFICATION_CODE_LENGTH - 1));
+      }
+
+      return next;
+    });
+  }
+
+  function onVerificationKeyDown(index: number, event: KeyboardEvent<HTMLInputElement>) {
+    if (verificationInputLocked) return;
+
+    if (event.key === "Backspace" && verificationDigits[index] === "" && index > 0) {
+      event.preventDefault();
+      setVerificationDigits((current) => {
+        const next = [...current];
+        next[index - 1] = "";
+        return next;
+      });
+      focusVerificationInput(index - 1);
+      return;
+    }
+
+    if (event.key === "ArrowLeft" && index > 0) {
+      event.preventDefault();
+      focusVerificationInput(index - 1);
+      return;
+    }
+
+    if (event.key === "ArrowRight" && index < VERIFICATION_CODE_LENGTH - 1) {
+      event.preventDefault();
+      focusVerificationInput(index + 1);
     }
   }
 
@@ -855,25 +1006,33 @@ export function RegisterForm() {
 
   return (
     <AuthShell mode="register">
-      <form ref={formRef} className="auth-card form auth-card-wide" onSubmit={onSubmit}>
-        <header className="auth-card-head">
-          <h1 className="auth-card-title">Создать аккаунт</h1>
-          <p className="auth-card-sub">
-            Доступ на 24 часа · <Link href="/login">Уже есть аккаунт</Link>
-          </p>
-        </header>
+      <form
+        ref={formRef}
+        className={`auth-card form auth-card-wide${step === "verification" ? " auth-card-verification" : ""}`}
+        onSubmit={onSubmit}
+      >
+        {step !== "verification" ? (
+          <header className="auth-card-head">
+            <h1 className="auth-card-title">Создать аккаунт</h1>
+            <p className="auth-card-sub">
+              Доступ на 24 часа · <Link href="/login">Уже есть аккаунт</Link>
+            </p>
+          </header>
+        ) : null}
 
-        <div className="auth-progress" aria-label={`Шаг ${currentStepNumber} из ${REGISTER_STEP_TOTAL}`}>
-          <div className="auth-progress-row">
-            <span>
-              Шаг {currentStepNumber} из {REGISTER_STEP_TOTAL}
-            </span>
-            <span>{currentStepLabel}</span>
+        {step !== "verification" ? (
+          <div className="auth-progress" aria-label={`Шаг ${currentStepNumber} из ${REGISTER_STEP_TOTAL}`}>
+            <div className="auth-progress-row">
+              <span>
+                Шаг {currentStepNumber} из {REGISTER_STEP_TOTAL}
+              </span>
+              <span>{currentStepLabel}</span>
+            </div>
+            <div className="auth-progress-track" aria-hidden="true">
+              <span style={{ width: progressWidth }} />
+            </div>
           </div>
-          <div className="auth-progress-track" aria-hidden="true">
-            <span style={{ width: progressWidth }} />
-          </div>
-        </div>
+        ) : null}
 
         {step === "company" ? (
           <fieldset className="auth-section">
@@ -998,25 +1157,52 @@ export function RegisterForm() {
             </fieldset>
           </>
         ) : (
-          <fieldset className="auth-section">
-            <legend className="auth-section-title">Подтверждение почты</legend>
-            <p className="auth-card-sub">
+          <fieldset className="auth-section auth-verification-section">
+            <legend className="auth-section-title auth-verification-title">
+              <AuthVerificationMark />
+              <span>Подтвердите почту</span>
+            </legend>
+            <p className="auth-card-sub auth-verification-copy">
               Код отправлен на {verification?.email ?? normalizeEmailValue(values.email)}
               {verificationExpiresAt ? `, действует до ${verificationExpiresAt}.` : "."}
             </p>
-            <AuthField label="Код из письма">
-              <input
-                className="input auth-code-input"
-                name="emailCode"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{4}"
-                maxLength={4}
-                value={verificationCode}
-                onChange={(event) => setVerificationCode(event.currentTarget.value.replace(/\D/g, "").slice(0, 4))}
-                required
-              />
-            </AuthField>
+            <div
+              className={`auth-code-stage is-${verificationPhase}`}
+              aria-busy={verificationPhase === "checking"}
+              data-phase={verificationPhase}
+            >
+              <div className="auth-code-digits" aria-hidden={verificationIsAnimating}>
+                {verificationDigits.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(element) => {
+                      verificationInputRefs.current[index] = element;
+                    }}
+                    className={`auth-code-box${digit ? " is-filled" : ""}`}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete={index === 0 ? "one-time-code" : "off"}
+                    aria-label={`Цифра ${index + 1} из ${VERIFICATION_CODE_LENGTH}`}
+                    pattern="[0-9]"
+                    maxLength={VERIFICATION_CODE_LENGTH}
+                    value={digit}
+                    onChange={(event) => setVerificationDigit(index, event.currentTarget.value)}
+                    onKeyDown={(event) => onVerificationKeyDown(index, event)}
+                    disabled={verificationInputLocked}
+                    required
+                  />
+                ))}
+              </div>
+              <div className="auth-code-orb" aria-hidden={!verificationIsAnimating}>
+                {verificationPhase === "checking" ? <span className="auth-code-spinner" /> : null}
+                {verificationPhase === "success" ? <Check size={34} strokeWidth={3} aria-hidden="true" /> : null}
+                {verificationPhase === "error" ? <X size={34} strokeWidth={3} aria-hidden="true" /> : null}
+              </div>
+            </div>
+            <input type="hidden" name="emailCode" value={verificationCode} />
+            <span className="auth-sr-only" aria-live="polite">
+              {verificationStatusText}
+            </span>
           </fieldset>
         )}
 
@@ -1037,25 +1223,37 @@ export function RegisterForm() {
           </div>
         ) : (
           <div className="auth-verification-actions">
-            <div className="auth-step-actions">
+            <button
+              className="button auth-submit auth-verification-submit"
+              type="submit"
+              disabled={verificationInputLocked || !verificationIsComplete}
+            >
+              {verificationPhase === "checking"
+                ? "Проверяем код..."
+                : verificationPhase === "success"
+                  ? "Готово"
+                  : verificationPhase === "error"
+                    ? "Код не подошёл"
+                    : "Создать аккаунт"}
+            </button>
+            <div className="auth-verification-secondary">
               <button
-                className="button secondary"
+                className="auth-text-button"
                 type="button"
                 onClick={() => {
+                  clearVerificationTimers();
                   setError("");
+                  setVerificationPhase("typing");
                   setStep("person");
                 }}
                 disabled={submitting}
               >
                 Назад
               </button>
-              <button className="button auth-submit" type="submit" disabled={submitting || verificationCode.length !== 4}>
-                {submitting ? "Проверяем…" : "Подтвердить почту"}
+              <button className="auth-text-button" type="button" onClick={requestVerificationCode} disabled={submitting}>
+                Отправить код ещё раз
               </button>
             </div>
-            <button className="button secondary auth-resend" type="button" onClick={requestVerificationCode} disabled={submitting}>
-              Отправить код ещё раз
-            </button>
           </div>
         )}
       </form>

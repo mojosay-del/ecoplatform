@@ -5,12 +5,28 @@
 // жил в DataViews.tsx, теперь изолирован.
 
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
-import { Download, KeyRound, LifeBuoy, LogOut, Pencil, RotateCcw, Smartphone, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  Check,
+  ChevronDown,
+  CreditCard,
+  Download,
+  FileText,
+  KeyRound,
+  LifeBuoy,
+  LogOut,
+  Monitor,
+  Pencil,
+  RotateCcw,
+  Smartphone,
+  Trash2,
+  UserRound,
+  X,
+} from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type {
-  AddressDto,
   BillingStatus,
   BillingSubscription,
   CompanyProfileUpdateDto,
@@ -74,6 +90,17 @@ function scrollAccountSectionIntoView(section: AccountSectionId) {
   const prefersReducedMotion =
     typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+}
+
+// Приветствие по времени суток. Значение по умолчанию ("Добрый день")
+// одинаково на сервере и при первом клиентском рендере — гидратация не рвётся,
+// а точное приветствие подставляется уже в useEffect после монтирования.
+function accountGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 6) return "Доброй ночи";
+  if (hour < 12) return "Доброе утро";
+  if (hour < 18) return "Добрый день";
+  return "Добрый вечер";
 }
 
 function describeSubscription(
@@ -249,44 +276,56 @@ function AccountEditableValue({ value, label }: { value?: string | null; label: 
   );
 }
 
-function getAccountModuleCards(companyType?: string | null, status?: string | null, plan?: string | null) {
-  const locked = status === "suspended" || status === "blocked" || status === "archived";
-  const baseAccess = locked ? "Закрыто" : "Доступно";
-  const buyerRole = companyType === "collector" ? "Мои объявления" : "Мои предложения";
+// Тарифные планы для секции «Подписка». Цены Базовой/Расширенной пока не
+// определены (MVP) — показываем «Цена скоро» и кнопку-заявку в поддержку.
+type PlanTier = {
+  key: "demo" | "basic" | "extended";
+  name: string;
+  description: string;
+  price: string | null;
+  pricePeriod?: string;
+  features: Array<{ label: string; included: boolean }>;
+};
 
-  return [
-    {
-      title: "Торговая площадка",
-      state: locked ? "Закрыто" : companyType === "collector" ? "Продавец" : "Покупатель",
-      description: companyType ? buyerRole : "Сценарий зависит от типа компании.",
-    },
-    {
-      title: "Новости и индексы",
-      state: baseAccess,
-      description: "Открыты в демо, базовой и расширенной подписке.",
-    },
-    {
-      title: "База знаний",
-      state: baseAccess,
-      description: "Сырьё, справочники и документация по рынку.",
-    },
-    {
-      title: "Обучение",
-      state: plan === "extended" ? "Расширенное" : locked ? "Закрыто" : "Базовое",
-      description: "Расширенные модули требуют расширенной подписки или разовой покупки.",
-    },
-    {
-      title: "Калькуляторы и инструменты",
-      state: locked ? "Закрыто" : "По доступу",
-      description: "Часть инструментов открывается подпиской, часть — разовой покупкой.",
-    },
-    {
-      title: "Магазин и форум",
-      state: locked ? "Закрыто" : "В кабинете",
-      description: "Покупки доступны активным компаниям; форум входит в общий контур.",
-    },
-  ];
-}
+const PLAN_TIERS: PlanTier[] = [
+  {
+    key: "demo",
+    name: "Демо",
+    description: "Полный доступ для знакомства с платформой.",
+    price: "0 ₽",
+    pricePeriod: "/ 30 дней",
+    features: [
+      { label: "Доступ ко всем разделам", included: true },
+      { label: "Индексы цен и новости", included: true },
+      { label: "Базы знаний и обучение", included: true },
+      { label: "Ограничено по времени", included: false },
+    ],
+  },
+  {
+    key: "basic",
+    name: "Базовая",
+    description: "Для постоянной работы на рынке вторсырья.",
+    price: null,
+    features: [
+      { label: "Всё из Демо, без ограничений", included: true },
+      { label: "Торговая площадка", included: true },
+      { label: "Приоритетная поддержка", included: true },
+      { label: "Без расширенной аналитики", included: false },
+    ],
+  },
+  {
+    key: "extended",
+    name: "Расширенная",
+    description: "Максимум возможностей для крупных игроков.",
+    price: null,
+    features: [
+      { label: "Всё из Базовой", included: true },
+      { label: "Расширенная аналитика", included: true },
+      { label: "Калькуляторы и карты", included: true },
+      { label: "Персональный менеджер", included: true },
+    ],
+  },
+];
 
 export function AccountView({ section }: { section: AccountSectionId }) {
   const router = useRouter();
@@ -324,6 +363,9 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   const [deletionMessage, setDeletionMessage] = useState<string | null>(null);
   const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
   const [notificationBusyKey, setNotificationBusyKey] = useState<string | null>(null);
+  const [greeting, setGreeting] = useState("Добрый день");
+  useEffect(() => setGreeting(accountGreeting()), []);
+  const [sessionsShown, setSessionsShown] = useState(3);
   const targetSection = isPlatformStaff && isAccountBusinessSection(section) ? "profile" : section;
   const visibleSections = useMemo(
     () =>
@@ -364,68 +406,73 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     return () => window.removeEventListener(ACCOUNT_SECTION_NAVIGATE_EVENT, onNavigate);
   }, [visibleSectionsKey, visibleSections]);
 
+  // Scroll-spy: подсветка активной секции в меню при скролле. Раньше на
+  // IntersectionObserver — но он «срывался» на первой загрузке (секции ещё не в
+  // DOM в момент запуска эффекта) и не перевешивался. Теперь — обычный слушатель
+  // скролла: слушатель навешан всегда, а элементы ищем «вживую» при каждом
+  // расчёте, поэтому работает сразу после открытия страницы.
   useEffect(() => {
-    const sections = visibleSections
-      .map((sectionId) => ({
-        sectionId,
-        element: document.getElementById(accountSectionDomId(sectionId)),
-      }))
-      .filter((item): item is { sectionId: AccountSectionId; element: HTMLElement } => Boolean(item.element));
+    if (visibleSections.length === 0) return;
 
-    if (sections.length === 0 || typeof IntersectionObserver === "undefined") return;
+    let frame = 0;
+    let lastDispatched: AccountSectionId | null = null;
 
-    const entriesBySection = new Map<AccountSectionId, IntersectionObserverEntry>();
-    const sectionByElement = new Map<Element, AccountSectionId>(
-      sections.map(({ element, sectionId }) => [element, sectionId]),
-    );
+    function computeActive() {
+      const offset = ACCOUNT_SCROLL_OFFSET + 12;
+      const items = visibleSections
+        .map((sectionId) => {
+          const element = document.getElementById(accountSectionDomId(sectionId));
+          return element ? { sectionId, top: element.getBoundingClientRect().top } : null;
+        })
+        .filter((item): item is { sectionId: AccountSectionId; top: number } => item !== null);
 
-    function pickFallbackSection() {
+      const first = items[0];
+      if (!first) return;
+
       const scrollBottom = window.scrollY + window.innerHeight;
       const pageBottom = document.documentElement.scrollHeight;
-      if (pageBottom - scrollBottom <= 4) {
-        return sections[sections.length - 1]?.sectionId ?? "profile";
-      }
+      let active: AccountSectionId = first.sectionId;
 
-      const pivot = ACCOUNT_SCROLL_OFFSET + 12;
-      let fallback = sections[0]?.sectionId ?? "profile";
-      for (const { element, sectionId } of sections) {
-        if (element.getBoundingClientRect().top <= pivot) fallback = sectionId;
-      }
-      return fallback;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const sectionId = sectionByElement.get(entry.target);
-          if (sectionId) entriesBySection.set(sectionId, entry);
+      if (pageBottom - scrollBottom <= 8) {
+        // У самого низа страницы — последняя секция (она может не дотянуть до
+        // линии активации из-за футера под .page-surface).
+        active = (items[items.length - 1] ?? first).sectionId;
+      } else {
+        for (const item of items) {
+          if (item.top <= offset) active = item.sectionId;
         }
+      }
 
-        const intersecting = visibleSections
-          .map((sectionId) => entriesBySection.get(sectionId))
-          .filter((entry): entry is IntersectionObserverEntry => Boolean(entry?.isIntersecting))
-          .sort(
-            (a, b) =>
-              Math.abs(a.boundingClientRect.top - ACCOUNT_SCROLL_OFFSET) -
-              Math.abs(b.boundingClientRect.top - ACCOUNT_SCROLL_OFFSET),
-          );
-
-        const nextSection =
-          (intersecting[0] ? sectionByElement.get(intersecting[0].target) : null) ?? pickFallbackSection();
-        dispatchActiveAccountSection(nextSection);
-      },
-      {
-        root: null,
-        rootMargin: `-${ACCOUNT_SCROLL_OFFSET}px 0px -10% 0px`,
-        threshold: [0, 0.2, 0.45, 0.75, 1],
-      },
-    );
-
-    for (const { element } of sections) {
-      observer.observe(element);
+      if (active !== lastDispatched) {
+        lastDispatched = active;
+        dispatchActiveAccountSection(active);
+      }
     }
 
-    return () => observer.disconnect();
+    function onScrollOrResize() {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        computeActive();
+      });
+    }
+
+    window.addEventListener("scroll", onScrollOrResize, { passive: true });
+    window.addEventListener("resize", onScrollOrResize);
+
+    // Первичный расчёт + повторы: высоты могут «доехать» после монтирования и
+    // догрузки данных (billing/sessions), поэтому пересчитываем несколько раз.
+    computeActive();
+    const t1 = window.setTimeout(computeActive, 200);
+    const t2 = window.setTimeout(computeActive, 700);
+
+    return () => {
+      window.removeEventListener("scroll", onScrollOrResize);
+      window.removeEventListener("resize", onScrollOrResize);
+      if (frame) window.cancelAnimationFrame(frame);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
   }, [visibleSectionsKey, visibleSections]);
 
   // Подписка и статус компании теперь рендерятся в отдельных карточках —
@@ -439,13 +486,38 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   // лежит only-name shape — нет реквизитов и подписок. Тип BillingStatus
   // полнее и приходит сразу после refresh, так что фолбэк был вестигиальным.
   const company = billing;
-  const latestSubscription = billing?.subscriptions?.[0] ?? null;
   const supportPreview = supportTickets.items.slice(0, 4);
+  // Демо больше не показываем баннером — его роль выполняет плашка «Текущий
+  // план» в секции «Подписка». Баннер оставляем только для проблемных статусов.
   const showBillingStateBanner =
-    company?.status === "demo" ||
     company?.status === "past_due" ||
     company?.status === "suspended" ||
     company?.status === "pending_deletion";
+
+  // Заполненность профиля — 4 критерия, каждый по 25%. «Способ оплаты» пока
+  // всегда false (биллинг-методы не реализованы), при 100% кольцо показывает
+  // галочку. Считаем только для клиентских компаний (у сотрудников нет биллинга).
+  const profileChecks: Array<{ label: string; done: boolean }> = [
+    { label: "Подтверждённая почта", done: Boolean(user?.email) },
+    { label: "Указанный телефон", done: Boolean(user?.phone) },
+    { label: "Добавлен способ оплаты", done: false },
+    {
+      label: "Активная подписка",
+      done:
+        billing?.status === "active" &&
+        (billing?.subscriptionPlan === "basic" || billing?.subscriptionPlan === "extended"),
+    },
+  ];
+  const profileCompletion = Math.round(
+    (profileChecks.filter((check) => check.done).length / profileChecks.length) * 100,
+  );
+  const profileComplete = profileCompletion >= 100;
+  const currentPlanKey: PlanTier["key"] =
+    billing?.status === "active" && billing?.subscriptionPlan === "extended"
+      ? "extended"
+      : billing?.status === "active" && billing?.subscriptionPlan === "basic"
+        ? "basic"
+        : "demo";
 
   function openSupport() {
     window.dispatchEvent(new Event("support:open"));
@@ -610,44 +682,134 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     <AppShell>
       <section className="page account-scroll-page">
         <AccountScrollSection accountSection="profile">
-          {/* Hero: крупный аватар и основная идентификация пользователя.
-            Раньше аватар был 40px и терялся среди карточек. */}
-          <header className="account-hero">
-            <div className="account-hero-profile">
-              <div className="account-hero-avatar" aria-hidden={!user?.avatarUrl} title={PROFILE_PHOTO_HINT}>
-                {user?.avatarUrl ? (
-                  <Image alt="" src={user.avatarUrl} width={128} height={128} />
+          {/* Обзор: приветствие, идентификация, кольцо заполнения профиля и
+              мини-статистика. Раньше тут был статичный hero с аватаром 128px. */}
+          <header className="account-welcome">
+            <div className="account-welcome-avatar" title={PROFILE_PHOTO_HINT}>
+              {user?.avatarUrl ? (
+                <Image alt="" src={user.avatarUrl} width={84} height={84} />
+              ) : (
+                <span>{initials || "?"}</span>
+              )}
+            </div>
+            <div className="account-welcome-info">
+              <span className="account-welcome-hi">{greeting},</span>
+              <h1 className="account-welcome-name">{fullName}</h1>
+              <div className="account-welcome-tags">
+                {isPlatformStaff ? (
+                  user?.platformRoles?.map((role) => (
+                    <span className="account-welcome-tag" key={role}>
+                      {PLATFORM_ROLE_LABELS[role] ?? role}
+                    </span>
+                  ))
                 ) : (
-                  <span className="account-hero-initials">{initials || "?"}</span>
+                  <>
+                    {company?.organizationName ? (
+                      <span className="account-welcome-tag">
+                        <span className="account-welcome-dot" aria-hidden="true" />
+                        {company.organizationName}
+                      </span>
+                    ) : null}
+                    {company?.type ? (
+                      <span className="account-welcome-tag">{COMPANY_TYPE_LABELS[company.type] ?? company.type}</span>
+                    ) : null}
+                    {companyStatusLabel ? <span className="account-welcome-tag">{companyStatusLabel}</span> : null}
+                  </>
                 )}
               </div>
             </div>
-            <div className="account-hero-info">
-              <h1 className="account-hero-name">{fullName}</h1>
-              {user?.email ? <p className="account-hero-email">{user.email}</p> : null}
-              <div className="account-hero-meta">
-                {isPlatformStaff
-                  ? user?.platformRoles?.map((role) => (
-                      <StatusPill key={role} variant="brand">
-                        {PLATFORM_ROLE_LABELS[role] ?? role}
-                      </StatusPill>
-                    ))
-                  : null}
-                {companyStatusLabel && !isPlatformStaff ? (
-                  <StatusPill variant={companyStatusPillVariant(billing?.status)}>{companyStatusLabel}</StatusPill>
-                ) : null}
-                {billing?.status === "demo" && !isPlatformStaff ? (
-                  <Link className="account-hero-cta" href={accountSectionHref("billing")} scroll={false}>
-                    Активировать подписку
-                  </Link>
-                ) : null}
+            {!isPlatformStaff ? (
+              <div className="account-welcome-ring" aria-label={`Профиль заполнен на ${profileCompletion}%`}>
+                <svg width="96" height="96" viewBox="0 0 96 96" role="img" aria-hidden="true">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="9" />
+                  <circle
+                    className="account-ring-progress"
+                    cx="48"
+                    cy="48"
+                    r="40"
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="9"
+                    strokeLinecap="round"
+                    strokeDasharray={251}
+                    strokeDashoffset={Math.round(251 * (1 - profileCompletion / 100))}
+                    transform="rotate(-90 48 48)"
+                  />
+                  {profileComplete ? (
+                    <g>
+                      <circle cx="48" cy="48" r="20" fill="#ffffff" />
+                      <path
+                        d="M40 48l6 6 11-12"
+                        fill="none"
+                        stroke="var(--brand)"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </g>
+                  ) : (
+                    <text
+                      x="48"
+                      y="48"
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize="20"
+                      fontWeight="800"
+                      fill="#ffffff"
+                    >
+                      {profileCompletion}%
+                    </text>
+                  )}
+                </svg>
+                <span className="account-welcome-ring-label">Профиль заполнен</span>
               </div>
-            </div>
+            ) : null}
           </header>
+
+          {!isPlatformStaff ? (
+            <div className="account-stats">
+              <button className="account-stat" type="button" onClick={() => scrollAccountSectionIntoView("billing")}>
+                <span className="account-stat-icon account-stat-warn">
+                  <CreditCard size={20} />
+                </span>
+                <span className="account-stat-value">{subscription.tariff}</span>
+                <span className="account-stat-label">Подписка</span>
+                <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
+              </button>
+              <button className="account-stat" type="button" onClick={() => scrollAccountSectionIntoView("profile")}>
+                <span className="account-stat-icon account-stat-brand">
+                  <UserRound size={20} />
+                </span>
+                <span className="account-stat-value">{profileCompletion}%</span>
+                <span className="account-stat-label">Профиль заполнен</span>
+                <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
+              </button>
+              <button className="account-stat" type="button" onClick={() => scrollAccountSectionIntoView("sessions")}>
+                <span className="account-stat-icon account-stat-info">
+                  <Smartphone size={20} />
+                </span>
+                <span className="account-stat-value">{sessions.length}</span>
+                <span className="account-stat-label">Активные сессии</span>
+                <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
+              </button>
+              <button
+                className="account-stat"
+                type="button"
+                onClick={() => scrollAccountSectionIntoView("notifications")}
+              >
+                <span className="account-stat-icon account-stat-green">
+                  <Bell size={20} />
+                </span>
+                <span className="account-stat-value">Вкл</span>
+                <span className="account-stat-label">Уведомления</span>
+                <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
 
           <div className="account-section-grid">
             <article className="card account-card">
-              <h2>Пользователь</h2>
+              <h2>Личные данные</h2>
               <AccountDetailList
                 rows={[
                   { label: "Имя", value: fullName },
@@ -724,16 +886,22 @@ export function AccountView({ section }: { section: AccountSectionId }) {
               </article>
               <article className="card account-card">
                 <h2>Дополнительная защита</h2>
-                <div className="account-security-actions">
+                <p className="page-subtitle">Второй фактор и быстрый выход из текущей сессии.</p>
+                <div className="account-empty">
+                  <span className="account-empty-icon">
+                    <Smartphone size={22} />
+                  </span>
                   <div>
-                    <Smartphone size={20} />
-                    <span>Двухфакторная аутентификация по SMS</span>
+                    <strong>
+                      Двухфакторная аутентификация <span className="account-soon">Скоро</span>
+                    </strong>
+                    <p>SMS-код при входе с нового устройства.</p>
                   </div>
                   <button className="button secondary" type="button" disabled>
                     Включить
                   </button>
                 </div>
-                <button className="button secondary" type="button" onClick={logout}>
+                <button className="button secondary account-block-button" type="button" onClick={logout}>
                   <LogOut size={16} />
                   Завершить эту сессию
                 </button>
@@ -748,7 +916,6 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           title="Уведомления"
         >
           <article className="card account-card">
-            <h2>Настройки уведомлений</h2>
             <div className="account-notification-table">
               <div className="account-notification-head">
                 <span>Категория</span>
@@ -763,21 +930,24 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                   </div>
                   {(["in_app", "email"] as const).map((channel) => {
                     const busyKey = `${row.category}:${channel}`;
+                    if (row.locked) {
+                      return (
+                        <span className="account-toggle-locked" key={channel}>
+                          Всегда
+                        </span>
+                      );
+                    }
                     return (
-                      <label className="account-toggle" key={channel}>
+                      <label className="account-switch" key={channel}>
                         <input
                           checked={notificationEnabled(row.category, channel)}
-                          disabled={
-                            row.locked || notificationPreferencesState === "loading" || notificationBusyKey === busyKey
-                          }
+                          disabled={notificationPreferencesState === "loading" || notificationBusyKey === busyKey}
                           onChange={(event) =>
                             void updateNotificationPreference(row.category, channel, event.currentTarget.checked)
                           }
                           type="checkbox"
                         />
-                        <span>
-                          {row.locked ? "Всегда" : notificationEnabled(row.category, channel) ? "Вкл" : "Выкл"}
-                        </span>
+                        <span className="account-switch-track" aria-hidden="true" />
                       </label>
                     );
                   })}
@@ -849,7 +1019,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
             <div className="account-card-head">
               <div>
                 <h2>Активные сессии</h2>
-                <p className="page-subtitle">Устройства, с которых сейчас открыт кабинет.</p>
+                <p className="page-subtitle">Всего устройств: {sessions.length}</p>
               </div>
               <button
                 className="button secondary danger"
@@ -862,46 +1032,65 @@ export function AccountView({ section }: { section: AccountSectionId }) {
             </div>
             {sessionsState === "loading" ? <p className="page-subtitle">Загружаем сессии...</p> : null}
             <div className="account-session-list">
-              {sessions.map((session) => (
-                <div className="account-session-row" key={session.id}>
-                  <div>
-                    <strong>
-                      {describeSessionDevice(session.userAgent)}
-                      {session.current ? (
-                        <>
-                          {" "}
-                          <StatusPill variant="brand">Текущая</StatusPill>
-                        </>
-                      ) : null}
-                    </strong>
-                    <span>
-                      IP {session.ipAddress ?? "—"} · последний раз {formatAccountDateTime(session.updatedAt)} · до{" "}
-                      {formatAccountDateTime(session.expiresAt)}
-                    </span>
+              {sessions.slice(0, sessionsShown).map((session) => {
+                const mobile = /iPhone|iPad|Android/i.test(session.userAgent ?? "");
+                const DeviceIcon = mobile ? Smartphone : Monitor;
+                return (
+                  <div className="account-session-card" key={session.id}>
+                    <div className="account-session-left">
+                      <span className="account-session-ic">
+                        <DeviceIcon size={20} />
+                      </span>
+                      <div className="account-session-meta">
+                        <strong>
+                          {describeSessionDevice(session.userAgent)}
+                          {session.current ? (
+                            <>
+                              {" "}
+                              <StatusPill variant="brand">Текущая</StatusPill>
+                            </>
+                          ) : null}
+                        </strong>
+                        <span>
+                          IP {session.ipAddress ?? "—"} · {formatAccountDateTime(session.updatedAt)} · до{" "}
+                          {formatAccountDateTime(session.expiresAt)}
+                        </span>
+                      </div>
+                    </div>
+                    {!session.current ? (
+                      <button
+                        className="button secondary"
+                        onClick={() => void revokeSession(session.id)}
+                        type="button"
+                        disabled={sessionBusyId === session.id}
+                      >
+                        Отозвать
+                      </button>
+                    ) : null}
                   </div>
-                  {!session.current ? (
-                    <button
-                      className="button secondary"
-                      onClick={() => void revokeSession(session.id)}
-                      type="button"
-                      disabled={sessionBusyId === session.id}
-                    >
-                      Отозвать
-                    </button>
-                  ) : null}
-                </div>
-              ))}
+                );
+              })}
               {sessionsState !== "loading" && sessions.length === 0 ? (
                 <p className="page-subtitle">Активных сессий не найдено.</p>
               ) : null}
             </div>
+            {sessions.length > sessionsShown ? (
+              <button
+                className="button secondary account-block-button"
+                type="button"
+                onClick={() => setSessionsShown((shown) => shown + 5)}
+              >
+                <ChevronDown size={16} />
+                Показать ещё ({sessions.length - sessionsShown})
+              </button>
+            ) : null}
           </article>
         </AccountScrollSection>
 
         {!isPlatformStaff ? (
           <AccountScrollSection
             accountSection="company"
-            description="Реквизиты, контакты, адреса и банковская информация компании."
+            description="Основные данные вашей компании."
             title="Компания"
           >
             {billing ? (
@@ -930,49 +1119,105 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                   <span>{subscription.note}</span>
                 </div>
               ) : null}
+              <div className="account-plan-current">
+                <div className="account-plan-current-main">
+                  <span className="account-plan-current-icon">
+                    <CreditCard size={26} />
+                  </span>
+                  <div>
+                    <span className="account-plan-current-label">Текущий план</span>
+                    <strong className="account-plan-current-name">{subscription.tariff}</strong>
+                  </div>
+                </div>
+                <div className="account-plan-current-side">
+                  {companyStatusLabel ? (
+                    <StatusPill variant={companyStatusPillVariant(billing?.status)}>{companyStatusLabel}</StatusPill>
+                  ) : null}
+                  <span className="account-plan-current-note">{subscription.note}</span>
+                </div>
+              </div>
+
+              <div className="account-plans">
+                {PLAN_TIERS.map((tier) => {
+                  const isCurrent = tier.key === currentPlanKey;
+                  const popular = tier.key === "basic";
+                  return (
+                    <article
+                      className={`account-plan${isCurrent ? " is-current" : ""}${popular ? " is-popular" : ""}`}
+                      key={tier.key}
+                    >
+                      {popular ? <span className="account-plan-badge">Рекомендуем</span> : null}
+                      <h3 className="account-plan-name">{tier.name}</h3>
+                      <p className="account-plan-desc">{tier.description}</p>
+                      <div className="account-plan-price">
+                        {tier.price ? (
+                          <>
+                            <span className="account-plan-amount">{tier.price}</span>
+                            {tier.pricePeriod ? <span className="account-plan-period">{tier.pricePeriod}</span> : null}
+                          </>
+                        ) : (
+                          <span className="account-plan-tbd">Цена скоро</span>
+                        )}
+                      </div>
+                      <ul className="account-plan-features">
+                        {tier.features.map((feature) => (
+                          <li className={feature.included ? undefined : "is-off"} key={feature.label}>
+                            <span className={`account-plan-check${feature.included ? "" : " is-off"}`}>
+                              {feature.included ? <Check size={12} /> : <X size={12} />}
+                            </span>
+                            {feature.label}
+                          </li>
+                        ))}
+                      </ul>
+                      {isCurrent ? (
+                        <button className="button secondary" type="button" disabled>
+                          Текущий план
+                        </button>
+                      ) : (
+                        <button
+                          className={popular ? "button" : "button secondary"}
+                          type="button"
+                          onClick={openSupport}
+                        >
+                          Оставить заявку
+                        </button>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+
               <div className="account-section-grid">
                 <article className="card account-card">
-                  <h2>Текущий тариф</h2>
-                  <AccountDetailList
-                    rows={[
-                      { label: "Тариф", value: subscription.tariff },
-                      { label: "Статус", value: companyStatusLabel },
-                      { label: "Начало периода", value: formatAccountDate(latestSubscription?.startsAt) },
-                      {
-                        label: "Окончание периода",
-                        value: formatAccountDate(
-                          company?.subscriptionEndsAt ?? latestSubscription?.endsAt ?? company?.demoEndsAt,
-                        ),
-                      },
-                      { label: "Автопродление", value: <span className="account-muted">Отключено</span> },
-                    ]}
-                  />
-                  <div className="account-action-list">
-                    <button className="button" type="button" disabled>
-                      Оплатить / продлить
-                    </button>
-                    <button className="button secondary" type="button" disabled>
-                      Сменить тариф
-                    </button>
-                    <button className="button secondary" type="button" onClick={openSupport}>
-                      Связаться по биллингу
-                    </button>
+                  <h2>Способы оплаты</h2>
+                  <p className="page-subtitle">Сохранённые карты и расчётные счета для безналичной оплаты.</p>
+                  <div className="account-empty">
+                    <span className="account-empty-icon">
+                      <CreditCard size={22} />
+                    </span>
+                    <div>
+                      <strong>
+                        Пока нет способов оплаты <span className="account-soon">Скоро</span>
+                      </strong>
+                      <p>Подписки активируются вручную поддержкой.</p>
+                    </div>
                   </div>
                 </article>
                 <article className="card account-card">
-                  <h2>Покупки и документы</h2>
-                  <div className="account-doc-grid">
+                  <h2>Документы и платежи</h2>
+                  <p className="page-subtitle">Счета, чеки и акты появятся рядом с каждым платежом.</p>
+                  <div className="account-empty">
+                    <span className="account-empty-icon">
+                      <FileText size={22} />
+                    </span>
                     <div>
-                      <strong>Покупки компании</strong>
-                      <p className="page-subtitle">Появятся после покупки модулей, инструментов или готовых решений.</p>
-                    </div>
-                    <div>
-                      <strong>Финансовые документы</strong>
-                      <p className="page-subtitle">Счета, чеки и акты будут доступны после первой оплаты.</p>
+                      <strong>Документов пока нет</strong>
+                      <p>Появятся после первой оплаты подписки.</p>
                     </div>
                   </div>
                 </article>
               </div>
+
               <article className="card account-card">
                 <h2>История подписок</h2>
                 {billing?.subscriptions?.length ? (
@@ -995,30 +1240,6 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                   <p className="page-subtitle">История появится после активации подписки.</p>
                 )}
               </article>
-              <div className="account-section-grid">
-                <article className="card account-card">
-                  <h2>Способы оплаты</h2>
-                  <p className="page-subtitle">
-                    Здесь появятся сохранённые карты и реквизиты для безналичной оплаты. Подключим в ближайшем
-                    обновлении — пока подписки активируются вручную поддержкой.
-                  </p>
-                  <div className="account-action-list">
-                    <button className="button secondary" type="button" disabled>
-                      Добавить карту
-                    </button>
-                    <button className="button secondary" type="button" disabled>
-                      Добавить расчётный счёт
-                    </button>
-                  </div>
-                </article>
-                <article className="card account-card">
-                  <h2>История платежей</h2>
-                  <p className="page-subtitle">
-                    Платежи появятся здесь после оплаты подписки или покупок в магазине. Чек и счёт-фактуру можно будет
-                    скачать рядом с каждой записью.
-                  </p>
-                </article>
-              </div>
             </div>
           </AccountScrollSection>
         ) : null}
@@ -1105,56 +1326,16 @@ function AccountScrollSection({
   );
 }
 
-// ── /account → Компания (Волна 7.4) ─────────────────────────────────────────
-// Редактируемый профиль компании: 4 секции (Основное / Контакты / Адреса /
-// Реквизиты). Один Save-кнопка внизу — собирает все изменённые поля и
-// отправляет одним PATCH. Поля type/status/createdAt — read-only (управляются
-// бэком), остальное — текстовые input'ы с inline-валидацией от бэка.
-type AddressFormState = {
-  country: string;
-  region: string;
-  city: string;
-  street: string;
-  building: string;
-  apartment: string;
-  postcode: string;
-};
-
+// ── /account → Компания ─────────────────────────────────────────────────────
+// Упрощённый профиль компании (MVP): только базовые поля «Основное» — название,
+// сайт, корпоративные телефон и email. Один PATCH собирает изменённые поля.
+// Тип/статус компании здесь не показываем — ими управляет бэкенд.
 type CompanyFormState = {
   organizationName: string;
   websiteUrl: string;
   corporatePhone: string;
   corporateEmail: string;
-  about: string;
-  contactPersonName: string;
-  contactPersonPhone: string;
-  contactPersonEmail: string;
-  billingInn: string;
-  billingKpp: string;
-  bankName: string;
-  bankBik: string;
-  bankAccount: string;
-  correspondentAccount: string;
-  factualAddress: AddressFormState;
-  structuredLegalAddress: AddressFormState;
 };
-
-function emptyAddress(): AddressFormState {
-  return { country: "Россия", region: "", city: "", street: "", building: "", apartment: "", postcode: "" };
-}
-
-function addressFromBilling(address: BillingStatus["factualAddress"]): AddressFormState {
-  if (!address) return emptyAddress();
-  return {
-    country: address.country ?? "Россия",
-    region: address.region ?? "",
-    city: address.city ?? "",
-    street: address.street ?? "",
-    building: address.building ?? "",
-    apartment: address.apartment ?? "",
-    postcode: address.postcode ?? "",
-  };
-}
 
 function billingToFormState(billing: BillingStatus): CompanyFormState {
   return {
@@ -1162,34 +1343,6 @@ function billingToFormState(billing: BillingStatus): CompanyFormState {
     websiteUrl: billing.websiteUrl ?? "",
     corporatePhone: billing.corporatePhone ?? "",
     corporateEmail: billing.corporateEmail ?? "",
-    about: billing.about ?? "",
-    contactPersonName: billing.contactPersonName ?? "",
-    contactPersonPhone: billing.contactPersonPhone ?? "",
-    contactPersonEmail: billing.contactPersonEmail ?? "",
-    billingInn: billing.billingInn ?? "",
-    billingKpp: billing.billingKpp ?? "",
-    bankName: billing.bankName ?? "",
-    bankBik: billing.bankBik ?? "",
-    bankAccount: billing.bankAccount ?? "",
-    correspondentAccount: billing.correspondentAccount ?? "",
-    factualAddress: addressFromBilling(billing.factualAddress),
-    structuredLegalAddress: addressFromBilling(billing.structuredLegalAddress),
-  };
-}
-
-// Адрес считаем заполненным, если указан город. Не передаём бэку пустой адрес
-// (Zod-схема требует city.min(1)) — отправляем null = «отвязать».
-function addressToDto(address: AddressFormState): AddressDto | null {
-  if (!address.city.trim()) return null;
-  return {
-    country: address.country.trim() || "Россия",
-    region: address.region.trim() || null,
-    city: address.city.trim(),
-    street: address.street.trim() || null,
-    building: address.building.trim() || null,
-    apartment: address.apartment.trim() || null,
-    postcode: address.postcode.trim() || null,
-    formatted: null,
   };
 }
 
@@ -1214,17 +1367,6 @@ function CompanyProfileForm({
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function setAddressField(
-    section: "factualAddress" | "structuredLegalAddress",
-    key: keyof AddressFormState,
-    value: string,
-  ) {
-    setForm((current) => ({
-      ...current,
-      [section]: { ...current[section], [key]: value },
-    }));
-  }
-
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
@@ -1234,18 +1376,6 @@ function CompanyProfileForm({
       websiteUrl: form.websiteUrl.trim() || null,
       corporatePhone: form.corporatePhone.trim() || null,
       corporateEmail: form.corporateEmail.trim() || null,
-      about: form.about.trim() || null,
-      contactPersonName: form.contactPersonName.trim() || null,
-      contactPersonPhone: form.contactPersonPhone.trim() || null,
-      contactPersonEmail: form.contactPersonEmail.trim() || null,
-      billingInn: form.billingInn.trim() || null,
-      billingKpp: form.billingKpp.trim() || null,
-      bankName: form.bankName.trim() || null,
-      bankBik: form.bankBik.trim() || null,
-      bankAccount: form.bankAccount.trim() || null,
-      correspondentAccount: form.correspondentAccount.trim() || null,
-      factualAddress: addressToDto(form.factualAddress),
-      structuredLegalAddress: addressToDto(form.structuredLegalAddress),
     };
     try {
       const updated = await api.billing.updateCompanyProfile(dto);
@@ -1262,294 +1392,63 @@ function CompanyProfileForm({
   }
 
   return (
-    <form className="account-panel-stack" onSubmit={onSubmit}>
-      <div className="account-section-grid">
-        <article className="card account-card">
-          <h2>Основное</h2>
-          <label className="account-form-field">
-            <span>Название компании</span>
-            <input
-              className="input"
-              type="text"
-              value={form.organizationName}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setField("organizationName", event.target.value)}
-              required
-            />
-          </label>
-          <AccountDetailList
-            rows={[
-              {
-                label: "Тип",
-                value: billing.type ? (COMPANY_TYPE_LABELS[billing.type] ?? billing.type) : null,
-              },
-              {
-                label: "Статус",
-                value: billing.status ? (
-                  <StatusPill variant={companyStatusPillVariant(billing.status)}>
-                    {COMPANY_STATUS_LABELS[billing.status] ?? billing.status}
-                  </StatusPill>
-                ) : null,
-              },
-            ]}
-          />
-          <label className="account-form-field">
-            <span>О компании</span>
-            <textarea
-              className="input"
-              rows={4}
-              maxLength={2000}
-              value={form.about}
-              onChange={(event) => setField("about", event.target.value)}
-              placeholder="Несколько предложений о вашей компании — для коллег, партнёров и админов"
-            />
-          </label>
-        </article>
-
-        <article className="card account-card">
-          <h2>Контакты</h2>
-          <label className="account-form-field">
-            <span>Сайт</span>
-            <input
-              className="input"
-              type="url"
-              value={form.websiteUrl}
-              onChange={(event) => setField("websiteUrl", event.target.value)}
-              placeholder="https://example.ru"
-            />
-          </label>
-          <label className="account-form-field">
-            <span>Корпоративный телефон</span>
-            <input
-              className="input"
-              type="tel"
-              value={form.corporatePhone}
-              onChange={(event) => setField("corporatePhone", event.target.value)}
-              placeholder="+74951234567"
-            />
-          </label>
-          <label className="account-form-field">
-            <span>Корпоративный email</span>
-            <input
-              className="input"
-              type="email"
-              value={form.corporateEmail}
-              onChange={(event) => setField("corporateEmail", event.target.value)}
-              placeholder="info@example.ru"
-            />
-          </label>
-          <h3 className="account-form-subhead">Контактное лицо</h3>
-          <label className="account-form-field">
-            <span>ФИО</span>
-            <input
-              className="input"
-              type="text"
-              value={form.contactPersonName}
-              onChange={(event) => setField("contactPersonName", event.target.value)}
-              placeholder="Иван Петров"
-            />
-          </label>
-          <label className="account-form-field">
-            <span>Телефон</span>
-            <input
-              className="input"
-              type="tel"
-              value={form.contactPersonPhone}
-              onChange={(event) => setField("contactPersonPhone", event.target.value)}
-              placeholder="+79161112233"
-            />
-          </label>
-          <label className="account-form-field">
-            <span>Email</span>
-            <input
-              className="input"
-              type="email"
-              value={form.contactPersonEmail}
-              onChange={(event) => setField("contactPersonEmail", event.target.value)}
-              placeholder="ivan@example.ru"
-            />
-          </label>
-        </article>
-      </div>
-
-      <div className="account-section-grid">
-        <article className="card account-card">
-          <h2>Фактический адрес</h2>
-          <AddressFields
-            address={form.factualAddress}
-            onChange={(key, value) => setAddressField("factualAddress", key, value)}
-          />
-        </article>
-
-        <article className="card account-card">
-          <h2>Юридический адрес</h2>
-          <AddressFields
-            address={form.structuredLegalAddress}
-            onChange={(key, value) => setAddressField("structuredLegalAddress", key, value)}
-          />
-          <p className="page-subtitle">
-            Этот адрес уходит в счета, акты и договоры. Если совпадает с фактическим — продублируйте.
+    <form className="card account-card" onSubmit={onSubmit}>
+      <div className="account-card-head">
+        <div>
+          <h2>{billing.organizationName}</h2>
+          <p className="page-subtitle" style={{ margin: 0 }}>
+            Основные данные компании
           </p>
-        </article>
-      </div>
-
-      <article className="card account-card">
-        <h2>Банковские реквизиты</h2>
-        <div className="account-form-grid-2">
-          <label className="account-form-field">
-            <span>ИНН</span>
-            <input
-              className="input"
-              type="text"
-              inputMode="numeric"
-              value={form.billingInn}
-              onChange={(event) => setField("billingInn", event.target.value)}
-              placeholder="7707083893"
-              maxLength={12}
-            />
-          </label>
-          <label className="account-form-field">
-            <span>КПП</span>
-            <input
-              className="input"
-              type="text"
-              inputMode="numeric"
-              value={form.billingKpp}
-              onChange={(event) => setField("billingKpp", event.target.value)}
-              placeholder="770701001"
-              maxLength={9}
-            />
-          </label>
-          <label className="account-form-field account-form-field-wide">
-            <span>Банк</span>
-            <input
-              className="input"
-              type="text"
-              value={form.bankName}
-              onChange={(event) => setField("bankName", event.target.value)}
-              placeholder="ПАО Сбербанк"
-            />
-          </label>
-          <label className="account-form-field">
-            <span>БИК</span>
-            <input
-              className="input"
-              type="text"
-              inputMode="numeric"
-              value={form.bankBik}
-              onChange={(event) => setField("bankBik", event.target.value)}
-              placeholder="044525225"
-              maxLength={9}
-            />
-          </label>
-          <label className="account-form-field account-form-field-wide">
-            <span>Расчётный счёт</span>
-            <input
-              className="input"
-              type="text"
-              inputMode="numeric"
-              value={form.bankAccount}
-              onChange={(event) => setField("bankAccount", event.target.value)}
-              placeholder="40702810500000000123"
-              maxLength={20}
-            />
-          </label>
-          <label className="account-form-field account-form-field-wide">
-            <span>Корреспондентский счёт</span>
-            <input
-              className="input"
-              type="text"
-              inputMode="numeric"
-              value={form.correspondentAccount}
-              onChange={(event) => setField("correspondentAccount", event.target.value)}
-              placeholder="30101810400000000225"
-              maxLength={20}
-            />
-          </label>
         </div>
-      </article>
-
-      {message ? <p className={`account-form-message account-form-message-${message.type}`}>{message.text}</p> : null}
-
-      <div className="account-action-list">
         <button className="button" type="submit" disabled={saving}>
-          {saving ? "Сохраняем..." : "Сохранить изменения"}
+          {saving ? "Сохраняем..." : "Сохранить"}
         </button>
       </div>
+      <div className="account-form-grid-2">
+        <label className="account-form-field">
+          <span>Название организации</span>
+          <input
+            className="input"
+            type="text"
+            value={form.organizationName}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => setField("organizationName", event.target.value)}
+            required
+          />
+        </label>
+        <label className="account-form-field">
+          <span>Сайт</span>
+          <input
+            className="input"
+            type="url"
+            value={form.websiteUrl}
+            onChange={(event) => setField("websiteUrl", event.target.value)}
+            placeholder="https://example.ru"
+          />
+        </label>
+        <label className="account-form-field">
+          <span>Корпоративный телефон</span>
+          <input
+            className="input"
+            type="tel"
+            value={form.corporatePhone}
+            onChange={(event) => setField("corporatePhone", event.target.value)}
+            placeholder="+74951234567"
+          />
+        </label>
+        <label className="account-form-field">
+          <span>Корпоративный email</span>
+          <input
+            className="input"
+            type="email"
+            value={form.corporateEmail}
+            onChange={(event) => setField("corporateEmail", event.target.value)}
+            placeholder="info@example.ru"
+          />
+        </label>
+      </div>
+      {message ? (
+        <p className={`account-form-message account-form-message-${message.type}`}>{message.text}</p>
+      ) : null}
     </form>
-  );
-}
-
-function AddressFields({
-  address,
-  onChange,
-}: {
-  address: AddressFormState;
-  onChange: (key: keyof AddressFormState, value: string) => void;
-}) {
-  return (
-    <div className="account-form-grid-2">
-      <label className="account-form-field account-form-field-wide">
-        <span>Город *</span>
-        <input
-          className="input"
-          type="text"
-          value={address.city}
-          onChange={(event) => onChange("city", event.target.value)}
-          placeholder="Москва"
-        />
-      </label>
-      <label className="account-form-field">
-        <span>Индекс</span>
-        <input
-          className="input"
-          type="text"
-          inputMode="numeric"
-          value={address.postcode}
-          onChange={(event) => onChange("postcode", event.target.value)}
-          placeholder="101000"
-          maxLength={6}
-        />
-      </label>
-      <label className="account-form-field">
-        <span>Регион</span>
-        <input
-          className="input"
-          type="text"
-          value={address.region}
-          onChange={(event) => onChange("region", event.target.value)}
-          placeholder="Московская область"
-        />
-      </label>
-      <label className="account-form-field account-form-field-wide">
-        <span>Улица</span>
-        <input
-          className="input"
-          type="text"
-          value={address.street}
-          onChange={(event) => onChange("street", event.target.value)}
-          placeholder="Ленина"
-        />
-      </label>
-      <label className="account-form-field">
-        <span>Дом</span>
-        <input
-          className="input"
-          type="text"
-          value={address.building}
-          onChange={(event) => onChange("building", event.target.value)}
-          placeholder="12"
-        />
-      </label>
-      <label className="account-form-field">
-        <span>Кв./офис</span>
-        <input
-          className="input"
-          type="text"
-          value={address.apartment}
-          onChange={(event) => onChange("apartment", event.target.value)}
-          placeholder="5"
-        />
-      </label>
-    </div>
   );
 }
