@@ -9363,11 +9363,13 @@ li.tree-add-row + li.tree-add-row,
 .account-scroll-page {
   display: grid;
   gap: 26px;
+  min-width: 0;
 }
 
 .account-scroll-section {
   display: grid;
   gap: 14px;
+  min-width: 0;
   scroll-margin-top: 124px;
 }
 
@@ -9508,6 +9510,7 @@ li.tree-add-row + li.tree-add-row,
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .account-card h2 {
@@ -9520,6 +9523,7 @@ li.tree-add-row + li.tree-add-row,
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 16px;
+  min-width: 0;
 }
 
 .account-panel-stack {
@@ -9873,6 +9877,7 @@ li.tree-add-row + li.tree-add-row,
   grid-template-columns: auto 1fr auto;
   gap: 24px;
   align-items: center;
+  min-width: 0;
   padding: 26px 28px;
   border-radius: var(--radius-lg);
   color: var(--white);
@@ -9992,6 +9997,7 @@ li.tree-add-row + li.tree-add-row,
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+  min-width: 0;
 }
 
 .account-stat {
@@ -10001,6 +10007,7 @@ li.tree-add-row + li.tree-add-row,
   flex-direction: column;
   align-items: flex-start;
   padding: 18px;
+  min-width: 0;
   text-align: left;
   font-family: inherit;
   color: var(--text);
@@ -10335,6 +10342,7 @@ li.tree-add-row + li.tree-add-row,
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  min-width: 0;
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 13px;
@@ -10375,6 +10383,8 @@ li.tree-add-row + li.tree-add-row,
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
   font-size: 14px;
   font-weight: 600;
 }
@@ -10384,6 +10394,7 @@ li.tree-add-row + li.tree-add-row,
   margin-top: 2px;
   color: var(--muted);
   font-size: 12.5px;
+  overflow-wrap: anywhere;
 }
 
 /* Switch-переключатели уведомлений */
@@ -10471,6 +10482,40 @@ li.tree-add-row + li.tree-add-row,
 
   .account-welcome-ring {
     order: -1;
+  }
+}
+
+@media (max-width: 540px) {
+  .account-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .account-welcome {
+    padding: 22px 18px;
+  }
+
+  .account-welcome-tags {
+    justify-content: center;
+  }
+
+  .account-welcome-tag {
+    max-width: 100%;
+    height: auto;
+    min-height: 26px;
+    overflow-wrap: anywhere;
+  }
+
+  .account-session-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-session-left {
+    align-items: flex-start;
+  }
+
+  .account-session-card > .button {
+    width: 100%;
   }
 }
 
