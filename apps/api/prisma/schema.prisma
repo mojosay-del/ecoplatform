@@ -254,6 +254,29 @@ model User {
   @@index([deletionRequestedAt])
 }
 
+model EmailVerificationChallenge {
+  id                  String      @id @default(cuid())
+  email               String
+  phone               String
+  organizationName    String
+  companyType         CompanyType
+  firstName           String
+  lastName            String
+  gender              UserGender
+  passwordHash        String
+  acceptedDocumentIds String[]    @default([])
+  codeHash            String
+  attempts            Int         @default(0)
+  expiresAt           DateTime
+  verifiedAt          DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([email, createdAt(sort: Desc)])
+  @@index([phone, createdAt(sort: Desc)])
+  @@index([expiresAt])
+}
+
 model Company {
   id                       String            @id @default(cuid())
   organizationName         String

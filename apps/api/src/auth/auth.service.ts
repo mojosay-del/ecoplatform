@@ -10,10 +10,17 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import { CompanyStatus, NotificationCategory, UserStatus } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
-import { randomBytes } from "crypto";
-import { MIN_PASSWORD_LENGTH, type AuthMeUser, type LoginDto, type RegisterDto } from "@ecoplatform/shared";
+import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "crypto";
+import {
+  MIN_PASSWORD_LENGTH,
+  type AuthMeUser,
+  type LoginDto,
+  type RegisterDto,
+  type RegistrationVerifyDto,
+} from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { swallowAndLog } from "../common/silent-catch";
+import { EmailService } from "../email/email.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { recordUserRegistered } from "../observability/metrics.registry";
 import { PrismaService } from "../prisma/prisma.service";
@@ -29,6 +36,8 @@ type SessionTokens = {
 // иначе login выдаёт существование пользователя через заметно более быстрый ответ.
 const LOGIN_DUMMY_PASSWORD_HASH = "$2a$12$abcdefghijklmnopqrstuv.WkOaBPyDV7c9o6XhOuLNS8tIeS5wXa";
 const ACCOUNT_DELETION_GRACE_DAYS = 30;
+const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
+const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
 
 type LoginLockoutState = {
   id: string;
@@ -43,6 +52,12 @@ type AccountDeletionResponse = {
   deletionScheduledFor: string | null;
 };
 
+type RegistrationVerificationStart = {
+  verificationId: string;
+  email: string;
+  expiresAt: string;
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -53,13 +68,172 @@ export class AuthService {
     private readonly notifications: NotificationsService,
     private readonly sessionCache: SessionCacheService,
     private readonly passwordPolicy: PasswordPolicyService,
+    private readonly email: EmailService,
   ) {}
 
   async getRegistrationStatus(): Promise<{ enabled: boolean }> {
     return { enabled: await this.settings.getValue("auth.registration_enabled") };
   }
 
-  async register(input: RegisterDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {
+  async register(input: RegisterDto, meta: { userAgent?: string; ipAddress?: string }): Promise<RegistrationVerificationStart> {
+    const prepared = await this.prepareRegistration(input);
+    const verificationId = randomUUID();
+    const code = this.generateEmailVerificationCode();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS);
+
+    await this.prisma.emailVerificationChallenge.updateMany({
+      where: {
+        OR: [{ email: prepared.email }, { phone: input.phone }],
+        verifiedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: { expiresAt: now },
+    });
+
+    await this.prisma.emailVerificationChallenge.create({
+      data: {
+        id: verificationId,
+        email: prepared.email,
+        phone: input.phone,
+        organizationName: input.organizationName,
+        companyType: input.companyType,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        gender: input.gender,
+        passwordHash: prepared.passwordHash,
+        acceptedDocumentIds: prepared.consentDocumentIds,
+        codeHash: this.hashEmailVerificationCode(verificationId, prepared.email, code),
+        expiresAt,
+      },
+    });
+
+    try {
+      await this.email.sendRegistrationCode({ to: prepared.email, code, expiresAt });
+    } catch (error) {
+      await this.prisma.emailVerificationChallenge
+        .updateMany({
+          where: { id: verificationId, verifiedAt: null },
+          data: { expiresAt: new Date() },
+        })
+        .catch(swallowAndLog("auth.registration.email.expire", { verificationId }));
+      throw error;
+    }
+
+    return { verificationId, email: prepared.email, expiresAt: expiresAt.toISOString() };
+  }
+
+  async verifyRegistration(input: RegistrationVerifyDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {
+    const now = new Date();
+    const challenge = await this.prisma.emailVerificationChallenge.findUnique({
+      where: { id: input.verificationId },
+    });
+
+    if (!challenge || challenge.verifiedAt || challenge.expiresAt <= now) {
+      throw new BadRequestException("Код устарел. Отправьте новый код подтверждения.");
+    }
+
+    if (challenge.attempts >= EMAIL_VERIFICATION_MAX_ATTEMPTS) {
+      throw new BadRequestException("Слишком много попыток. Отправьте новый код подтверждения.");
+    }
+
+    if (!this.emailVerificationCodeMatches(challenge.id, challenge.email, input.code, challenge.codeHash)) {
+      const nextAttempts = challenge.attempts + 1;
+      const tooManyAttempts = nextAttempts >= EMAIL_VERIFICATION_MAX_ATTEMPTS;
+      await this.prisma.emailVerificationChallenge.update({
+        where: { id: challenge.id },
+        data: {
+          attempts: nextAttempts,
+          ...(tooManyAttempts ? { expiresAt: now } : {}),
+        },
+      });
+      throw new BadRequestException(
+        tooManyAttempts
+          ? "Слишком много попыток. Отправьте новый код подтверждения."
+          : "Неверный код подтверждения.",
+      );
+    }
+
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: challenge.email }, { phone: challenge.phone }],
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException("Пользователь с такой почтой или телефоном уже зарегистрирован.");
+    }
+
+    const consentDocumentIds = await this.resolveRegistrationConsentDocumentIds(challenge.acceptedDocumentIds);
+    // Демо-доступ управляется из админки. Когда выдача демо выключена, компания
+    // регистрируется с уже истёкшим демо (demoEndsAt = «сейчас»): кабинет
+    // доступен, но платные разделы закрыты до ручной активации подписки.
+    // Существующий access.ts уже трактует demo с прошедшим demoEndsAt как
+    // «демо закончилось», поэтому новый статус заводить не нужно.
+    const demoEnabled = await this.settings.getValue("demo.enabled");
+    const demoHours = await this.settings.getValue("demo.duration_hours");
+    const demoEndsAt = demoEnabled ? new Date(Date.now() + demoHours * 60 * 60 * 1000) : new Date();
+    const userId = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.emailVerificationChallenge.updateMany({
+        where: {
+          id: challenge.id,
+          verifiedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: { verifiedAt: new Date() },
+      });
+
+      if (claimed.count !== 1) {
+        throw new BadRequestException("Код устарел. Отправьте новый код подтверждения.");
+      }
+
+      const company = await tx.company.create({
+        data: {
+          organizationName: challenge.organizationName,
+          type: challenge.companyType,
+          status: CompanyStatus.demo,
+          demoEndsAt,
+        },
+      });
+
+      const user = await tx.user.create({
+        data: {
+          email: challenge.email,
+          phone: challenge.phone,
+          firstName: challenge.firstName,
+          lastName: challenge.lastName,
+          gender: challenge.gender,
+          passwordHash: challenge.passwordHash,
+          companyId: company.id,
+        },
+      });
+
+      if (consentDocumentIds.length) {
+        await tx.consentRecord.createMany({
+          data: consentDocumentIds.map((documentId) => ({
+            userId: user.id,
+            documentId,
+            source: "registration" as const,
+            ipAddress: meta.ipAddress ?? null,
+            userAgent: meta.userAgent ?? null,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      return user.id;
+    });
+
+    const tokens = await this.createSession(userId, meta, false);
+    recordUserRegistered();
+    return tokens;
+  }
+
+  private async prepareRegistration(input: RegisterDto): Promise<{
+    email: string;
+    passwordHash: string;
+    consentDocumentIds: string[];
+  }> {
     // Тумблер из админки (Настройки → Регистрация). Когда выключен — само-
     // регистрация закрыта (например, на время доработки MVP). Существующих
     // пользователей и вход это не затрагивает.
@@ -78,6 +252,17 @@ export class AuthService {
       throw new ConflictException("Пользователь с такой почтой или телефоном уже зарегистрирован.");
     }
 
+    await this.passwordPolicy.assertAcceptablePassword(input.password);
+    const passwordHash = await hash(input.password, 12);
+
+    return {
+      email: input.email.toLowerCase(),
+      passwordHash,
+      consentDocumentIds: await this.resolveRegistrationConsentDocumentIds(input.acceptedDocumentIds),
+    };
+  }
+
+  private async resolveRegistrationConsentDocumentIds(acceptedDocumentIds: string[]): Promise<string[]> {
     // Проверка обязательных юр-документов до создания компании/юзера, чтобы
     // не оставлять «мусорный» аккаунт без consent'а, если массив неполный.
     // Если в системе вообще нет активных обязательных документов (свежий
@@ -87,7 +272,7 @@ export class AuthService {
       where: { isActive: true, isRequired: true },
       select: { id: true, title: true },
     });
-    const proposed = new Set(input.acceptedDocumentIds);
+    const proposed = new Set(acceptedDocumentIds);
     const missingRequired = requiredActive.filter((d) => !proposed.has(d.id));
     if (missingRequired.length) {
       throw new BadRequestException(
@@ -97,62 +282,53 @@ export class AuthService {
     // Опциональные документы (cookies, marketing): берём только активные из
     // присланных, остальные молча игнорируем — устаревшие версии или
     // несуществующие ID не должны валить регистрацию.
-    const optionalAcceptedActive = input.acceptedDocumentIds.length
+    const optionalAcceptedActive = acceptedDocumentIds.length
       ? await this.prisma.legalDocument.findMany({
-          where: { isActive: true, id: { in: input.acceptedDocumentIds } },
+          where: { isActive: true, id: { in: acceptedDocumentIds } },
           select: { id: true },
         })
       : [];
-    const consentDocumentIds = Array.from(new Set(optionalAcceptedActive.map((d) => d.id)));
+    return Array.from(new Set(optionalAcceptedActive.map((d) => d.id)));
+  }
 
-    await this.passwordPolicy.assertAcceptablePassword(input.password);
-
-    const passwordHash = await hash(input.password, 12);
-    // Демо-доступ управляется из админки. Когда выдача демо выключена, компания
-    // регистрируется с уже истёкшим демо (demoEndsAt = «сейчас»): кабинет
-    // доступен, но платные разделы закрыты до ручной активации подписки.
-    // Существующий access.ts уже трактует demo с прошедшим demoEndsAt как
-    // «демо закончилось», поэтому новый статус заводить не нужно.
-    const demoEnabled = await this.settings.getValue("demo.enabled");
-    const demoHours = await this.settings.getValue("demo.duration_hours");
-    const demoEndsAt = demoEnabled ? new Date(Date.now() + demoHours * 60 * 60 * 1000) : new Date();
-    const company = await this.prisma.company.create({
-      data: {
-        organizationName: input.organizationName,
-        type: input.companyType,
-        status: CompanyStatus.demo,
-        demoEndsAt,
-      },
-    });
-
-    const user = await this.prisma.user.create({
-      data: {
-        email: input.email.toLowerCase(),
-        phone: input.phone,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        gender: input.gender,
-        passwordHash,
-        companyId: company.id,
-      },
-    });
-
-    if (consentDocumentIds.length) {
-      await this.prisma.consentRecord.createMany({
-        data: consentDocumentIds.map((documentId) => ({
-          userId: user.id,
-          documentId,
-          source: "registration" as const,
-          ipAddress: meta.ipAddress ?? null,
-          userAgent: meta.userAgent ?? null,
-        })),
-        skipDuplicates: true,
-      });
+  private generateEmailVerificationCode(): string {
+    const fixedCode = process.env.EMAIL_VERIFICATION_TEST_CODE;
+    if (fixedCode && process.env.NODE_ENV !== "production") {
+      if (!/^\d{4}$/.test(fixedCode)) {
+        throw new Error("EMAIL_VERIFICATION_TEST_CODE должен состоять из 4 цифр.");
+      }
+      return fixedCode;
     }
+    if (fixedCode && process.env.NODE_ENV === "production") {
+      throw new Error("EMAIL_VERIFICATION_TEST_CODE нельзя использовать в production.");
+    }
+    return randomInt(0, 10_000).toString().padStart(4, "0");
+  }
 
-    const tokens = await this.createSession(user.id, meta, false);
-    recordUserRegistered();
-    return tokens;
+  private hashEmailVerificationCode(verificationId: string, email: string, code: string): string {
+    return createHmac("sha256", this.emailVerificationSecret())
+      .update(`${verificationId}:${email}:${code}`)
+      .digest("hex");
+  }
+
+  private emailVerificationCodeMatches(
+    verificationId: string,
+    email: string,
+    code: string,
+    storedHash: string,
+  ): boolean {
+    const expectedHash = this.hashEmailVerificationCode(verificationId, email, code);
+    const expected = Buffer.from(expectedHash, "hex");
+    const actual = Buffer.from(storedHash, "hex");
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
+
+  private emailVerificationSecret(): string {
+    const secret = process.env.EMAIL_VERIFICATION_SECRET ?? process.env.JWT_ACCESS_SECRET;
+    if (!secret || secret.length < 32) {
+      throw new Error("EMAIL_VERIFICATION_SECRET или JWT_ACCESS_SECRET должен быть не короче 32 символов.");
+    }
+    return secret;
   }
 
   async login(input: LoginDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {

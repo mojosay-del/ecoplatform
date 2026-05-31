@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import type { CookieOptions, Request, Response } from "express";
-import { changePasswordDtoSchema, loginDtoSchema, registerDtoSchema } from "@ecoplatform/shared";
+import { changePasswordDtoSchema, loginDtoSchema, registerDtoSchema, registrationVerifyDtoSchema } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import type { RequestWithCsrf } from "../common/csrf.guard";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
@@ -48,9 +48,20 @@ export class AuthController {
 
   @Throttle(AUTH_THROTTLE)
   @Post("register")
-  async register(@Body() body: unknown, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+  async register(@Body() body: unknown, @Req() request: Request) {
     const input = parseBody(registerDtoSchema, body);
-    const tokens = await this.auth.register(input, this.meta(request));
+    return this.auth.register(input, this.meta(request));
+  }
+
+  @Throttle(AUTH_THROTTLE)
+  @Post("register/verify")
+  async verifyRegistration(
+    @Body() body: unknown,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const input = parseBody(registrationVerifyDtoSchema, body);
+    const tokens = await this.auth.verifyRegistration(input, this.meta(request));
     this.setRefreshCookie(response, tokens.refreshToken);
     return { accessToken: tokens.accessToken };
   }

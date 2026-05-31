@@ -24,7 +24,12 @@ import { SchedulerModule } from "./scheduler/scheduler.module";
 import { SupportModule } from "./support/support.module";
 import { createLoggerModuleOptions } from "./common/logging";
 
-const AUTH_THROTTLE_PATHS = new Set(["/api/auth/register", "/api/auth/login", "/api/auth/refresh"]);
+const AUTH_THROTTLE_PATHS = new Set([
+  "/api/auth/register",
+  "/api/auth/register/verify",
+  "/api/auth/login",
+  "/api/auth/refresh",
+]);
 
 function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
   if (process.env.THROTTLER_DISABLED === "1") return true;

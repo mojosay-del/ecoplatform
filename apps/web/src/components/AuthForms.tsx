@@ -73,7 +73,7 @@ const AUTH_ICONS: AuthIcon[] = [
 ];
 
 type AuthMode = "login" | "register";
-type RegisterStep = "company" | "person";
+type RegisterStep = "company" | "person" | "verification";
 
 type RegisterFormValues = {
   organizationName: string;
@@ -198,6 +198,7 @@ const ORGANIZATION_TYPE_DELAY = 150;
 const ORGANIZATION_ERASE_DELAY = 90;
 const ORGANIZATION_HOLD_DELAY = 1800;
 const ORGANIZATION_EMPTY_DELAY = 600;
+const REGISTER_STEP_TOTAL = 3;
 const INITIAL_REGISTER_VALUES: RegisterFormValues = {
   organizationName: "",
   companyType: "collector",
@@ -663,10 +664,14 @@ export function LoginForm() {
 
 export function RegisterForm() {
   const router = useRouter();
-  const { register } = useAuth();
+  const { register, verifyRegistration } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState<RegisterStep>("company");
   const [values, setValues] = useState<RegisterFormValues>(INITIAL_REGISTER_VALUES);
+  const [verification, setVerification] = useState<{ verificationId: string; email: string; expiresAt: string } | null>(
+    null,
+  );
+  const [verificationCode, setVerificationCode] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   // Тумблер из админки: открыта ли само-регистрация. null — пока грузим статус.
@@ -720,8 +725,12 @@ export function RegisterForm() {
   // все обязательные, а пароль не дошёл до зелёной шкалы. Бэк сохраняет
   // двойную защиту на те же документы и пароль.
   const canSubmit = legalDocs.length > 0 && requiredAccepted && passwordReady;
-  const currentStepNumber = step === "company" ? 1 : 2;
-  const progressWidth = `${currentStepNumber * 50}%`;
+  const currentStepNumber = step === "company" ? 1 : step === "person" ? 2 : 3;
+  const currentStepLabel = step === "company" ? "О компании" : step === "person" ? "О вас" : "Почта";
+  const progressWidth = `${(currentStepNumber / REGISTER_STEP_TOTAL) * 100}%`;
+  const verificationExpiresAt = verification
+    ? new Date(verification.expiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+    : "";
 
   function setField<K extends keyof RegisterFormValues>(field: K, value: RegisterFormValues[K]) {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -748,14 +757,21 @@ export function RegisterForm() {
     setStep("company");
   }
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function registrationPayload() {
+    return {
+      organizationName: values.organizationName.trim(),
+      companyType: values.companyType,
+      lastName: values.lastName.trim(),
+      firstName: values.firstName.trim(),
+      gender: values.gender,
+      phone: formatPhoneFull(selectedPhoneCountry, values.phoneDigits),
+      email: normalizeEmailValue(values.email),
+      password: values.password,
+      acceptedDocumentIds: Array.from(acceptedIds),
+    };
+  }
 
-    if (step === "company") {
-      goToPersonStep();
-      return;
-    }
-
+  async function requestVerificationCode() {
     if (!passwordReady) {
       setError("Пароль должен стать зелёным: минимум 12 символов, буква и цифра.");
       return;
@@ -769,24 +785,51 @@ export function RegisterForm() {
     setSubmitting(true);
     setError("");
     try {
-      await register({
-        organizationName: values.organizationName.trim(),
-        companyType: values.companyType,
-        lastName: values.lastName.trim(),
-        firstName: values.firstName.trim(),
-        gender: values.gender,
-        phone: formatPhoneFull(selectedPhoneCountry, values.phoneDigits),
-        email: normalizeEmailValue(values.email),
-        password: values.password,
-        acceptedDocumentIds: Array.from(acceptedIds),
-      });
-      router.push("/news");
+      const result = await register(registrationPayload());
+      setVerification(result);
+      setVerificationCode("");
+      setStep("verification");
     } catch (err) {
       setError(
         err instanceof ApiError && err.message
           ? err.message
-          : "Не удалось зарегистрироваться. Возможно, email или телефон уже используются.",
+          : "Не удалось отправить код. Возможно, email или телефон уже используются.",
       );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (step === "company") {
+      goToPersonStep();
+      return;
+    }
+
+    if (step === "person") {
+      await requestVerificationCode();
+      return;
+    }
+
+    if (!verification) {
+      setStep("person");
+      return;
+    }
+
+    if (!/^\d{4}$/.test(verificationCode)) {
+      setError("Введите 4 цифры из письма.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    try {
+      await verifyRegistration({ verificationId: verification.verificationId, code: verificationCode });
+      router.push("/news");
+    } catch (err) {
+      setError(err instanceof ApiError && err.message ? err.message : "Не удалось подтвердить почту.");
     } finally {
       setSubmitting(false);
     }
@@ -820,10 +863,12 @@ export function RegisterForm() {
           </p>
         </header>
 
-        <div className="auth-progress" aria-label={`Шаг ${currentStepNumber} из 2`}>
+        <div className="auth-progress" aria-label={`Шаг ${currentStepNumber} из ${REGISTER_STEP_TOTAL}`}>
           <div className="auth-progress-row">
-            <span>Шаг {currentStepNumber} из 2</span>
-            <span>{step === "company" ? "О компании" : "О вас"}</span>
+            <span>
+              Шаг {currentStepNumber} из {REGISTER_STEP_TOTAL}
+            </span>
+            <span>{currentStepLabel}</span>
           </div>
           <div className="auth-progress-track" aria-hidden="true">
             <span style={{ width: progressWidth }} />
@@ -855,7 +900,7 @@ export function RegisterForm() {
               </select>
             </AuthField>
           </fieldset>
-        ) : (
+        ) : step === "person" ? (
           <>
             <fieldset className="auth-section">
               <legend className="auth-section-title">О вас</legend>
@@ -952,6 +997,27 @@ export function RegisterForm() {
               )}
             </fieldset>
           </>
+        ) : (
+          <fieldset className="auth-section">
+            <legend className="auth-section-title">Подтверждение почты</legend>
+            <p className="auth-card-sub">
+              Код отправлен на {verification?.email ?? normalizeEmailValue(values.email)}
+              {verificationExpiresAt ? `, действует до ${verificationExpiresAt}.` : "."}
+            </p>
+            <AuthField label="Код из письма">
+              <input
+                className="input auth-code-input"
+                name="emailCode"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{4}"
+                maxLength={4}
+                value={verificationCode}
+                onChange={(event) => setVerificationCode(event.currentTarget.value.replace(/\D/g, "").slice(0, 4))}
+                required
+              />
+            </AuthField>
+          </fieldset>
         )}
 
         {error ? <p className="auth-error">{error}</p> : null}
@@ -960,13 +1026,35 @@ export function RegisterForm() {
           <button className="button auth-submit" type="button" onClick={goToPersonStep}>
             Далее
           </button>
-        ) : (
+        ) : step === "person" ? (
           <div className="auth-step-actions">
             <button className="button secondary" type="button" onClick={goBackToCompanyStep} disabled={submitting}>
               Назад
             </button>
             <button className="button auth-submit" type="submit" disabled={submitting || !canSubmit}>
-              {submitting ? "Создаём аккаунт…" : "Создать аккаунт"}
+              {submitting ? "Отправляем код…" : "Создать аккаунт"}
+            </button>
+          </div>
+        ) : (
+          <div className="auth-verification-actions">
+            <div className="auth-step-actions">
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setStep("person");
+                }}
+                disabled={submitting}
+              >
+                Назад
+              </button>
+              <button className="button auth-submit" type="submit" disabled={submitting || verificationCode.length !== 4}>
+                {submitting ? "Проверяем…" : "Подтвердить почту"}
+              </button>
+            </div>
+            <button className="button secondary auth-resend" type="button" onClick={requestVerificationCode} disabled={submitting}>
+              Отправить код ещё раз
             </button>
           </div>
         )}

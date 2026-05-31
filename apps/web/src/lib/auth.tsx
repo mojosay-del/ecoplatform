@@ -18,9 +18,16 @@ type AuthContextValue = {
   user: User | null;
   ready: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  register: (input: Record<string, string | string[]>) => Promise<void>;
+  register: (input: Record<string, string | string[]>) => Promise<RegistrationStartResult>;
+  verifyRegistration: (input: { verificationId: string; code: string }) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
+};
+
+export type RegistrationStartResult = {
+  verificationId: string;
+  email: string;
+  expiresAt: string;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -89,8 +96,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadMe(result.accessToken);
   }
 
-  async function register(input: Record<string, string | string[]>) {
-    const result = await apiFetch<{ accessToken: string }>("/auth/register", {
+  async function register(input: Record<string, string | string[]>): Promise<RegistrationStartResult> {
+    return apiFetch<RegistrationStartResult>("/auth/register", {
+      method: "POST",
+      body: input,
+    });
+  }
+
+  async function verifyRegistration(input: { verificationId: string; code: string }) {
+    const result = await apiFetch<{ accessToken: string }>("/auth/register/verify", {
       method: "POST",
       body: input,
     });
@@ -116,7 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const value = useMemo(() => ({ token, user, ready, login, register, logout, refreshMe }), [token, user, ready]);
+  const value = useMemo(
+    () => ({ token, user, ready, login, register, verifyRegistration, logout, refreshMe }),
+    [token, user, ready],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

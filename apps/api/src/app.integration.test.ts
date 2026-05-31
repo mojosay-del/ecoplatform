@@ -96,6 +96,7 @@ beforeEach(async () => {
 });
 
 const REQUIRED_DOC_IDS_FOR_TESTS = ["test-doc-privacy", "test-doc-terms", "test-doc-pd"];
+const TEST_EMAIL_VERIFICATION_CODE = "1234";
 
 async function loginAdmin(): Promise<string> {
   const res = await ctx.http.post("/api/auth/login").send({ email: "admin@test.local", password: "Admin12345" });
@@ -103,8 +104,33 @@ async function loginAdmin(): Promise<string> {
   return res.body.accessToken as string;
 }
 
-async function registerCompany(suffix: string): Promise<{ token: string; companyId: string; userId: string }> {
+async function submitRegistration(body: Record<string, unknown>) {
   const res = await ctx.http.post("/api/auth/register").send({
+    ...body,
+    acceptedDocumentIds: body.acceptedDocumentIds ?? REQUIRED_DOC_IDS_FOR_TESTS,
+  });
+  expect(res.status).toBe(201);
+  expect(res.body.verificationId).toEqual(expect.any(String));
+  expect(res.body.expiresAt).toEqual(expect.any(String));
+  return res.body as { verificationId: string; email: string; expiresAt: string };
+}
+
+async function verifyRegistration(verificationId: string): Promise<string> {
+  const res = await ctx.http
+    .post("/api/auth/register/verify")
+    .send({ verificationId, code: TEST_EMAIL_VERIFICATION_CODE });
+  expect(res.status).toBe(201);
+  expect(res.body.accessToken).toMatch(/\./);
+  return res.body.accessToken as string;
+}
+
+async function registerWithBody(body: Record<string, unknown>): Promise<string> {
+  const start = await submitRegistration(body);
+  return verifyRegistration(start.verificationId);
+}
+
+async function registerCompany(suffix: string): Promise<{ token: string; companyId: string; userId: string }> {
+  const token = await registerWithBody({
     organizationName: `ООО Тест ${suffix}`,
     companyType: "collector",
     firstName: "Иван",
@@ -113,10 +139,7 @@ async function registerCompany(suffix: string): Promise<{ token: string; company
     phone: `+7900${suffix}`,
     email: `user${suffix}@test.local`,
     password: "User12345678",
-    acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
   });
-  expect(res.status).toBe(201);
-  const token = res.body.accessToken as string;
 
   const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
   expect(me.status).toBe(200);
@@ -519,7 +542,7 @@ describe("Auth", () => {
     expect(clearedRefreshCookie).toContain("Expires=Thu, 01 Jan 1970");
   });
 
-  it("регистрация создаёт компанию в demo-статусе и возвращает access-токен", async () => {
+  it("регистрация после подтверждения почты создаёт компанию в demo-статусе и возвращает access-токен", async () => {
     const { token, companyId } = await registerCompany("0000001");
     expect(token).toMatch(/\./);
 
@@ -528,6 +551,32 @@ describe("Auth", () => {
     expect(company?.type).toBe("collector");
     expect(company?.demoEndsAt).toBeInstanceOf(Date);
     expect(company!.demoEndsAt!.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("регистрация не создаёт пользователя до ввода кода из письма", async () => {
+    const start = await submitRegistration({
+      organizationName: "ООО Код Потом",
+      companyType: "collector",
+      firstName: "Иван",
+      lastName: "Тестов",
+      gender: "male",
+      phone: "+79000001000",
+      email: "pending-code@test.local",
+      password: "User12345678",
+    });
+
+    const pendingUser = await ctx.prisma.user.findUnique({ where: { email: "pending-code@test.local" } });
+    expect(pendingUser).toBeNull();
+
+    const wrongCode = await ctx.http
+      .post("/api/auth/register/verify")
+      .send({ verificationId: start.verificationId, code: "0000" });
+    expect(wrongCode.status).toBe(400);
+
+    const token = await verifyRegistration(start.verificationId);
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(me.status).toBe(200);
+    expect(me.body.email).toBe("pending-code@test.local");
   });
 
   it("системному администратору назначается аватар по роли и полу", async () => {
@@ -543,7 +592,7 @@ describe("Auth", () => {
   });
 
   it("регистрация сохраняет тип компании и пол для аватара профиля", async () => {
-    const res = await ctx.http.post("/api/auth/register").send({
+    const token = await registerWithBody({
       organizationName: "ООО Трейд Жен",
       companyType: "trader",
       firstName: "Анна",
@@ -552,11 +601,9 @@ describe("Auth", () => {
       phone: "+375291234567",
       email: "trader-female@test.local",
       password: "User12345678",
-      acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
     });
-    expect(res.status).toBe(201);
 
-    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${res.body.accessToken}`);
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
     expect(me.status).toBe(200);
     expect(me.body.gender).toBe("female");
     expect(me.body.company.type).toBe("trader");

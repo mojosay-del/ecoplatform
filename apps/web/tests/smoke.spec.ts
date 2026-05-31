@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const EMAIL_DOMAIN = process.env.SMOKE_TEST_EMAIL_DOMAIN ?? "example.com";
+const EMAIL_CODE = process.env.SMOKE_TEST_EMAIL_CODE;
 
 type SmokeUser = {
   organizationName: string;
@@ -15,7 +16,10 @@ test.describe("production smoke", () => {
   test("registers, logs in, checks news and indices, then logs out", async ({ page }) => {
     const user = createSmokeUser();
 
-    await registerSmokeUser(page, user);
+    const completedRegistration = await registerSmokeUser(page, user);
+    if (!completedRegistration) {
+      return;
+    }
     await logout(page);
     await login(page, user);
     await expectNewsFeed(page, { navigate: false });
@@ -24,7 +28,7 @@ test.describe("production smoke", () => {
   });
 });
 
-async function registerSmokeUser(page: Page, user: SmokeUser) {
+async function registerSmokeUser(page: Page, user: SmokeUser): Promise<boolean> {
   await page.goto("/register");
   await acceptNecessaryCookies(page);
 
@@ -33,12 +37,12 @@ async function registerSmokeUser(page: Page, user: SmokeUser) {
   await form.locator("input[name='organizationName']").fill(user.organizationName);
   await form.locator("select[name='companyType']").selectOption("collector");
   await page.getByRole("button", { name: "Далее" }).click();
-  await expect(page.getByText("Шаг 2 из 2")).toBeVisible();
+  await expect(page.getByText("Шаг 2 из 3")).toBeVisible();
   await page.getByRole("button", { name: "Назад" }).click();
-  await expect(page.getByText("Шаг 1 из 2")).toBeVisible();
+  await expect(page.getByText("Шаг 1 из 3")).toBeVisible();
   await expect(form.locator("input[name='organizationName']")).toHaveValue(user.organizationName);
   await page.getByRole("button", { name: "Далее" }).click();
-  await expect(page.getByText("Шаг 2 из 2")).toBeVisible();
+  await expect(page.getByText("Шаг 2 из 3")).toBeVisible();
   await form.locator("input[name='lastName']").fill(user.lastName);
   await form.locator("input[name='firstName']").fill(user.firstName);
   await form.locator("select[name='gender']").selectOption("male");
@@ -62,8 +66,16 @@ async function registerSmokeUser(page: Page, user: SmokeUser) {
   await expect(page.getByRole("button", { name: "Создать аккаунт" })).toBeEnabled();
 
   await page.getByRole("button", { name: "Создать аккаунт" }).click();
+  await expect(page.getByText("Шаг 3 из 3")).toBeVisible();
+  if (!EMAIL_CODE) {
+    await expect(page.getByRole("group", { name: "Подтверждение почты" })).toBeVisible();
+    return false;
+  }
+  await form.locator("input[name='emailCode']").fill(EMAIL_CODE);
+  await page.getByRole("button", { name: "Подтвердить почту" }).click();
   await expect(page).toHaveURL(/\/news(?:\?|$)/);
   await expectNewsFeed(page, { navigate: false });
+  return true;
 }
 
 async function login(page: Page, user: SmokeUser) {

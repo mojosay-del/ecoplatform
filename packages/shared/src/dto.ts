@@ -31,6 +31,16 @@ export const registerDtoSchema = z.object({
 
 export type RegisterDto = z.infer<typeof registerDtoSchema>;
 
+export const registrationVerifyDtoSchema = z.object({
+  verificationId: z.string().trim().min(1),
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/, "Код подтверждения должен состоять из 4 цифр."),
+});
+
+export type RegistrationVerifyDto = z.infer<typeof registrationVerifyDtoSchema>;
+
 export const consentSubmitDtoSchema = z.object({
   documentIds: z.array(z.string().min(1)).min(1, "Не указан ни один документ"),
   source: z.enum(consentSources).default("settings"),
