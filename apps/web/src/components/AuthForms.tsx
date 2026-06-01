@@ -303,6 +303,13 @@ function AuthShell({ children, mode }: { children: ReactNode; mode: AuthMode }) 
       <div className="auth-layout">
         <AuthVisual mode={mode} />
         <div className="auth-form-panel">
+          {/* Компактная шапка бренда вместо оранжевого блока — видна только на
+              мобильном (на десктопе оранжевый «билборд» остаётся). */}
+          <div className="auth-mobile-brand" aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="auth-mobile-brand-logo" src="/icons/icon-192.png" alt="" width={36} height={36} />
+            <span>ЭкоПлатформа</span>
+          </div>
           {children}
           <footer className="auth-footer">
             <Link href="/legal/privacy">Конфиденциальность</Link>

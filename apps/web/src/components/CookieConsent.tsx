@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 
 // Версия флага в localStorage. При смене политики/набора категорий — повышаем,
@@ -66,6 +66,7 @@ export function CookieConsent() {
   const [showCustom, setShowCustom] = useState(false);
   const [analytics, setAnalytics] = useState(true);
   const [marketing, setMarketing] = useState(false);
+  const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const choice = readChoice();
@@ -75,6 +76,29 @@ export function CookieConsent() {
     }
     setOpen(true);
   }, []);
+
+  // Пока баннер открыт — публикуем его высоту в CSS-переменную, чтобы страницы
+  // могли зарезервировать место снизу и баннер не перекрывал контент
+  // (на мобильном раньше прятал кнопку «Войти»). Высота пересчитывается при
+  // переносе кнопок/ресайзе.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!open || !bannerRef.current) {
+      root.style.setProperty("--cookie-banner-height", "0px");
+      return;
+    }
+    const el = bannerRef.current;
+    const update = () => root.style.setProperty("--cookie-banner-height", `${el.offsetHeight}px`);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+      root.style.setProperty("--cookie-banner-height", "0px");
+    };
+  }, [open, showCustom]);
 
   function persist(choice: CookieChoice) {
     if (typeof window !== "undefined") {
@@ -129,7 +153,7 @@ export function CookieConsent() {
   if (!open) return null;
 
   return (
-    <div className="cookie-banner" role="dialog" aria-labelledby="cookie-banner-title">
+    <div className="cookie-banner" role="dialog" aria-labelledby="cookie-banner-title" ref={bannerRef}>
       <div className="cookie-banner-inner">
         <div className="cookie-banner-text">
           <strong id="cookie-banner-title">Мы используем cookies</strong>

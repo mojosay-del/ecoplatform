@@ -7,6 +7,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family:
+    var(--font-inter),
     Inter,
     ui-sans-serif,
     system-ui,
@@ -99,6 +100,34 @@ input[type="checkbox"]:focus-visible {
 
 .app-shell[data-collapsed="true"] {
   grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.app-shell.app-shell-no-sidebar,
+.app-shell.app-shell-no-sidebar[data-collapsed="true"] {
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--surface);
+}
+
+.app-shell-no-sidebar .main {
+  grid-column: 1;
+}
+
+.app-shell-no-sidebar .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: 12px clamp(20px, 4vw, 48px) 8px;
+  border-bottom: 1px solid rgb(var(--shadow-rgb) / 0.07);
+  background: rgb(var(--white-rgb) / 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.app-shell-no-sidebar .page-surface {
+  margin-left: 0;
+  padding: 0;
+  border-radius: 0;
+  background: var(--surface);
 }
 
 .sidebar {
@@ -333,6 +362,29 @@ input[type="checkbox"]:focus-visible {
   gap: 12px;
   padding: 12px 24px 8px;
   background: transparent;
+}
+
+.topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.topbar-brand img {
+  flex: 0 0 auto;
+  display: block;
+  object-fit: contain;
+}
+
+.topbar-brand span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .demo-banner {
@@ -6506,6 +6558,15 @@ body.news-modal-open .app-shell {
     gap: 10px;
   }
 
+  .app-shell-no-sidebar .main {
+    padding: 0;
+  }
+
+  .app-shell-no-sidebar .topbar {
+    margin: 0;
+    padding: 0 18px;
+  }
+
   .demo-banner {
     height: 34px;
     padding: 3px 3px 3px 10px;
@@ -11296,6 +11357,509 @@ li.tree-add-row + li.tree-add-row,
   font-weight: 600;
 }
 
+/* Subscription choice */
+.subscription-page {
+  position: relative;
+  min-height: calc(100vh - 64px);
+  overflow: hidden;
+  background:
+    linear-gradient(120deg, rgb(var(--white-rgb) / 0.88), rgb(var(--white-rgb) / 0.42)),
+    linear-gradient(135deg, #fff8f3 0%, #f7fbf4 46%, var(--surface) 100%);
+  color: var(--text);
+}
+
+.subscription-grid-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(var(--brand-rgb) / 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--success-rgb) / 0.08) 1px, transparent 1px),
+    linear-gradient(116deg, transparent 0%, transparent 42%, rgb(var(--brand-rgb) / 0.1) 42%, transparent 58%);
+  background-size:
+    56px 56px,
+    56px 56px,
+    100% 100%;
+  mask-image: linear-gradient(180deg, rgb(var(--black-rgb) / 0.8), transparent 92%);
+  -webkit-mask-image: linear-gradient(180deg, rgb(var(--black-rgb) / 0.8), transparent 92%);
+}
+
+.subscription-inner {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 44px 0 56px;
+}
+
+.subscription-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.52fr);
+  gap: 32px;
+  align-items: end;
+}
+
+.subscription-copy {
+  min-width: 0;
+}
+
+.subscription-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid rgb(var(--success-rgb) / 0.24);
+  border-radius: 8px;
+  background: rgb(var(--white-rgb) / 0.78);
+  color: var(--success-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.subscription-copy h1 {
+  max-width: 760px;
+  margin: 18px 0 0;
+  font-size: 44px;
+  line-height: 1.04;
+  letter-spacing: 0;
+}
+
+.subscription-copy p {
+  max-width: 680px;
+  margin: 18px 0 0;
+  color: var(--text-secondary);
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.subscription-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.subscription-visual {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.subscription-visual-card {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  width: min(100%, 330px);
+  padding: 22px;
+  border: 1px solid rgb(var(--brand-rgb) / 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgb(var(--white-rgb) / 0.92), rgb(var(--white-rgb) / 0.68)),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgb(var(--success-rgb) / 0.08) 18px 19px);
+  box-shadow: 0 22px 60px -42px rgb(var(--brand-shadow-rgb) / 0.45);
+  overflow: hidden;
+}
+
+.subscription-visual-card::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgb(var(--success-rgb) / 0.18);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.subscription-logo-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgb(var(--success-rgb) / 0.22);
+  border-radius: 8px;
+  background: var(--white);
+}
+
+.subscription-logo-mark img {
+  display: block;
+  object-fit: contain;
+}
+
+.subscription-visual-lines {
+  display: grid;
+  gap: 8px;
+}
+
+.subscription-visual-lines span {
+  display: block;
+  height: 8px;
+  border-radius: 8px;
+  background: rgb(var(--brand-rgb) / 0.18);
+}
+
+.subscription-visual-lines span:nth-child(2) {
+  width: 74%;
+  background: rgb(var(--success-rgb) / 0.18);
+}
+
+.subscription-visual-lines span:nth-child(3) {
+  width: 48%;
+}
+
+.subscription-visual-card strong {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.subscription-visual-card small {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.subscription-status-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 32px 0 22px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--shadow-rgb) / 0.08);
+  border-radius: 8px;
+  background: rgb(var(--shadow-rgb) / 0.08);
+  box-shadow: 0 18px 46px -38px rgb(var(--shadow-rgb) / 0.55);
+}
+
+.subscription-status-panel > div {
+  min-width: 0;
+  padding: 17px 18px;
+  background: rgb(var(--white-rgb) / 0.82);
+}
+
+.subscription-status-panel span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.subscription-status-panel strong {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+}
+
+.subscription-flash {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 13px 15px;
+  border: 1px solid var(--success-soft);
+  border-radius: 8px;
+  background: rgb(var(--white-rgb) / 0.82);
+  color: var(--success-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.subscription-flash.danger {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger-text-strong);
+}
+
+.subscription-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.subscription-plan-card {
+  --subscription-accent-rgb: var(--brand-rgb);
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 520px;
+  flex-direction: column;
+  padding: 28px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--subscription-accent-rgb) / 0.22);
+  border-radius: 8px;
+  background: rgb(var(--white-rgb) / 0.88);
+  box-shadow: 0 20px 58px -42px rgb(var(--shadow-rgb) / 0.65);
+  animation: subscription-card-in 420ms ease both;
+  animation-delay: var(--subscription-card-delay, 0ms);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.subscription-plan-card.accent-green {
+  --subscription-accent-rgb: var(--success-rgb);
+}
+
+.subscription-plan-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  height: 6px;
+  background: linear-gradient(90deg, rgb(var(--subscription-accent-rgb) / 0.88), rgb(var(--brand-rgb) / 0.72));
+}
+
+.subscription-plan-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    112deg,
+    transparent 0%,
+    transparent 38%,
+    rgb(var(--white-rgb) / 0.58) 50%,
+    transparent 62%
+  );
+  transform: translateX(-140%);
+  transition: transform 760ms ease;
+}
+
+.subscription-plan-card:hover {
+  border-color: rgb(var(--subscription-accent-rgb) / 0.5);
+  box-shadow: 0 26px 70px -42px rgb(var(--subscription-accent-rgb) / 0.8);
+  transform: translateY(-4px);
+}
+
+.subscription-plan-card:hover::after {
+  transform: translateX(140%);
+}
+
+.subscription-plan-card.is-featured {
+  border-width: 2px;
+}
+
+.subscription-plan-card.is-selected {
+  border-color: var(--success);
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.94), rgb(var(--success-rgb) / 0.08));
+}
+
+.subscription-plan-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--brand);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.subscription-plan-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 15px;
+  min-width: 0;
+  padding-right: 104px;
+}
+
+.subscription-plan-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgb(var(--subscription-accent-rgb) / 0.22);
+  border-radius: 8px;
+  background: rgb(var(--subscription-accent-rgb) / 0.1);
+  color: rgb(var(--subscription-accent-rgb));
+}
+
+.subscription-plan-head h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.subscription-plan-head p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.subscription-plan-price {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 5px;
+  margin: 28px 0 22px;
+  padding: 16px;
+  border: 1px solid rgb(var(--subscription-accent-rgb) / 0.16);
+  border-radius: 8px;
+  background: rgb(var(--subscription-accent-rgb) / 0.07);
+}
+
+.subscription-plan-price strong {
+  color: var(--brand-active);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.subscription-plan-price span {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.subscription-feature-list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  margin: 0 0 24px;
+  padding: 0;
+  list-style: none;
+}
+
+.subscription-feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.subscription-feature-list li.is-muted {
+  color: var(--text-subtle);
+}
+
+.subscription-feature-list li span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 21px;
+  height: 21px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.subscription-feature-list li.is-muted span {
+  background: var(--surface-muted-strong);
+  color: var(--text-subtle);
+}
+
+.subscription-plan-button {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-top: auto;
+}
+
+.subscription-plan-button span {
+  min-width: 0;
+}
+
+.subscription-proof-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.subscription-proof-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--shadow-rgb) / 0.08);
+  border-radius: 8px;
+  background: rgb(var(--white-rgb) / 0.74);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@keyframes subscription-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subscription-plan-card {
+    animation: none;
+    transition: none;
+  }
+
+  .subscription-plan-card::after {
+    display: none;
+  }
+}
+
+@media (max-width: 920px) {
+  .subscription-hero,
+  .subscription-status-panel,
+  .subscription-plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .subscription-visual {
+    justify-content: flex-start;
+  }
+
+  .subscription-plan-card {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .subscription-inner {
+    width: min(100% - 28px, 1180px);
+    padding: 28px 0 40px;
+  }
+
+  .subscription-copy h1 {
+    font-size: 34px;
+  }
+
+  .subscription-copy p {
+    font-size: 15px;
+  }
+
+  .subscription-plan-card {
+    padding: 24px 18px 20px;
+  }
+
+  .subscription-plan-head {
+    padding-right: 0;
+  }
+
+  .subscription-plan-badge {
+    position: static;
+    width: max-content;
+    margin-bottom: 14px;
+  }
+}
+
 /* Footer внутри AppShell: компактная строка ссылок на юр-документы. */
 .app-shell-footer {
   grid-column: 1 / -1;
@@ -11435,4 +11999,93 @@ li.tree-add-row + li.tree-add-row,
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-muted);
+}
+
+/* =========================================================================
+   Мобильная адаптация и PWA / safe-area.
+   Блок размещён в конце файла намеренно — чтобы переопределять более ранние
+   правила при одинаковой специфичности. env(safe-area-inset-*) корректно
+   сворачивается в 0 там, где выреза/домашней полосы нет.
+   ========================================================================= */
+
+/* --- Cookie-баннер: не залезать под домашнюю полосу iPhone --- */
+.cookie-banner {
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+
+/* --- Auth: на десктопе оранжевый «билборд» остаётся; на мобильном его
+       заменяет компактная шапка бренда, а экран отдаётся форме. --- */
+.auth-mobile-brand {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .auth-visual {
+    display: none;
+  }
+
+  .auth-layout {
+    grid-template-columns: 1fr;
+    min-height: 100dvh;
+  }
+
+  .auth-mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 900;
+    color: var(--text);
+    margin-bottom: 22px;
+  }
+
+  .auth-mobile-brand-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: block;
+  }
+
+  .auth-form-panel {
+    /* safe-area сверху + резерв под cookie-баннер снизу, чтобы кнопка «Войти»
+       и футер не прятались за ним. */
+    padding-top: calc(28px + env(safe-area-inset-top));
+    padding-bottom: calc(40px + env(safe-area-inset-bottom) + var(--cookie-banner-height, 0px));
+  }
+}
+
+/* --- Базовая раскладка «листа» страницы на телефоне: во всю ширину колонки,
+       симметричные углы, компактные паддинги, резерв под cookie-баннер. --- */
+@media (max-width: 640px) {
+  .page-surface {
+    margin-left: 0;
+    border-radius: 18px;
+    padding: 16px 14px calc(24px + env(safe-area-inset-bottom) + var(--cookie-banner-height, 0px));
+  }
+
+  /* iOS зумит страницу при фокусе на поле с font-size < 16px. Поднимаем
+     текстовые поля до 16px только на мобильном (крупные код-боксы не трогаем). */
+  .input,
+  .textarea,
+  .select,
+  .auth-field input,
+  .auth-field select,
+  .auth-field textarea {
+    font-size: 16px;
+  }
+}
+
+/* --- safe-area для фиксированных элементов на мобильном --- */
+@media (max-width: 880px) {
+  /* Мобильное меню-драуэр: верх под вырезом, низ над домашней полосой. */
+  .sidebar {
+    padding-top: calc(22px + env(safe-area-inset-top));
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Прилипающий топбар (страницы без сайдбара: auth-shell c топбаром, legal) —
+   уводим его содержимое из-под выреза. */
+.app-shell-no-sidebar .topbar {
+  padding-top: calc(12px + env(safe-area-inset-top));
 }
