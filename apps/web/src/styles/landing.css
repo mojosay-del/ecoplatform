@@ -1,0 +1,840 @@
+/*
+ * Стили заглавной (презентационной) страницы.
+ * Полностью изолированы под классом `.lp`, чтобы не пересекаться с globals.css.
+ * Опираются на дизайн-токены из tokens.css. Анимации — только transform/opacity.
+ * Всё «тяжёлое» отключается при prefers-reduced-motion.
+ */
+
+.lp {
+  --lp-ink: #1a1208;
+  --lp-paper: #fdf9f4;
+  --lp-paper-deep: #f6efe5;
+  --lp-ember: var(--brand); /* #f5773e */
+  --lp-ember-deep: #d35922;
+  --lp-ember-glow: rgb(245 119 62 / 0.22);
+  --lp-line: rgb(26 18 8 / 0.1);
+  --lp-line-soft: rgb(26 18 8 / 0.06);
+  --lp-muted: #6b5f50;
+  --lp-display: var(--font-display, "Unbounded"), var(--font-inter), system-ui, sans-serif;
+  --lp-shell: min(1180px, 92vw);
+
+  position: relative;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--lp-paper);
+  color: var(--lp-ink);
+  overflow-x: clip;
+  font-feature-settings: "ss01", "cv01";
+}
+
+.lp * {
+  box-sizing: border-box;
+}
+
+/* ───────────────────────── Живой фон ───────────────────────── */
+
+.lp-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.lp-bg__mesh {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(38% 42% at 18% 22%, rgb(245 119 62 / 0.16), transparent 70%),
+    radial-gradient(34% 40% at 82% 18%, rgb(255 200 120 / 0.18), transparent 72%),
+    radial-gradient(46% 50% at 70% 88%, rgb(245 119 62 / 0.1), transparent 70%);
+  filter: blur(4px);
+  animation: lp-mesh 26s ease-in-out infinite alternate;
+}
+
+.lp-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.lp-orb--1 {
+  top: 8%;
+  left: 6%;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgb(245 119 62 / 0.5), transparent 65%);
+  animation: lp-float-a 22s ease-in-out infinite;
+}
+
+.lp-orb--2 {
+  top: 46%;
+  right: 4%;
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, rgb(255 188 120 / 0.45), transparent 65%);
+  animation: lp-float-b 28s ease-in-out infinite;
+}
+
+.lp-orb--3 {
+  bottom: 4%;
+  left: 38%;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgb(245 119 62 / 0.32), transparent 65%);
+  animation: lp-float-a 32s ease-in-out infinite reverse;
+}
+
+/* Тонкое зерно поверх — придаёт «бумажную» фактуру. */
+.lp-bg__grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.4;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+}
+
+@keyframes lp-mesh {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(2%, -2%, 0) scale(1.08); }
+}
+@keyframes lp-float-a {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(40px, -36px, 0); }
+}
+@keyframes lp-float-b {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-50px, 30px, 0); }
+}
+
+/* ───────────────────────── Прогресс-бар ───────────────────────── */
+
+.lp-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  z-index: 60;
+  background: var(--lp-line-soft);
+}
+.lp-progress__bar {
+  height: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, var(--lp-ember), var(--lp-ember-deep));
+  will-change: transform;
+}
+
+/* ───────────────────────── Навбар ───────────────────────── */
+
+.lp-nav {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  width: var(--lp-shell);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px 10px 20px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--lp-line-soft);
+  background: rgb(253 249 244 / 0.72);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: 0 10px 30px rgb(26 18 8 / 0.06);
+}
+.lp-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--lp-display);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  color: var(--lp-ink);
+}
+.lp-nav__spark {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--lp-ember), var(--lp-ember-deep));
+  box-shadow: 0 4px 12px var(--lp-ember-glow);
+}
+.lp-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lp-nav__link {
+  padding: 9px 14px;
+  border-radius: var(--radius-chip);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lp-muted);
+  transition: color 180ms ease, background 180ms ease;
+}
+.lp-nav__link:hover {
+  color: var(--lp-ink);
+  background: rgb(26 18 8 / 0.04);
+}
+
+/* ───────────────────────── Кнопки ───────────────────────── */
+
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: var(--radius-chip);
+  border: 1px solid transparent;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms ease,
+    background 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+.lp-btn:active { transform: translateY(1px); }
+.lp-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.lp-btn--primary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--lp-ember), var(--lp-ember-deep));
+  box-shadow: 0 12px 26px var(--lp-ember-glow);
+}
+.lp-btn--primary:hover {
+  box-shadow: 0 16px 34px rgb(245 119 62 / 0.34);
+  transform: translateY(-2px);
+}
+.lp-btn--ghost {
+  color: var(--lp-ink);
+  background: rgb(253 249 244 / 0.6);
+  border-color: var(--lp-line);
+}
+.lp-btn--ghost:hover {
+  background: #fff;
+  border-color: rgb(26 18 8 / 0.18);
+}
+.lp-btn--sm { min-height: 40px; padding: 0 18px; font-size: 14px; }
+.lp-btn--lg { min-height: 54px; padding: 0 30px; font-size: 16px; }
+
+/* ───────────────────────── Общая раскладка ───────────────────────── */
+
+.lp-main {
+  position: relative;
+  z-index: 1;
+}
+.lp-shell {
+  width: var(--lp-shell);
+  margin-inline: auto;
+}
+.lp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--lp-line);
+  background: rgb(255 255 255 / 0.5);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--lp-ember-deep);
+}
+.lp-eyebrow__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lp-ember);
+  box-shadow: 0 0 0 4px var(--lp-ember-glow);
+}
+.lp-chapter-label {
+  font-family: var(--lp-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--lp-ember-deep);
+  text-transform: uppercase;
+}
+
+/* ───────────────────────── Hero ───────────────────────── */
+
+.lp-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 168px 0 96px;
+}
+.lp-hero__title {
+  margin: 22px 0 0;
+  max-width: 16ch;
+  font-family: var(--lp-display);
+  font-weight: 700;
+  font-size: clamp(40px, 7vw, 84px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+}
+.lp-hero__title em {
+  font-style: normal;
+  background: linear-gradient(120deg, var(--lp-ember), var(--lp-ember-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lp-hero__sub {
+  margin: 26px 0 0;
+  max-width: 56ch;
+  font-size: clamp(16px, 2.1vw, 20px);
+  line-height: 1.6;
+  color: var(--lp-muted);
+}
+.lp-hero__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 38px;
+}
+.lp-hero__scroll {
+  margin-top: 64px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-muted);
+}
+.lp-hero__scroll svg { animation: lp-bob 2.2s ease-in-out infinite; }
+@keyframes lp-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+/* «Окно» приложения под героем — даёт ощущение продукта. */
+.lp-hero__preview {
+  position: relative;
+  width: var(--lp-shell);
+  margin: 64px auto 0;
+  border-radius: 20px;
+  border: 1px solid var(--lp-line);
+  background: linear-gradient(180deg, #fff, var(--lp-paper-deep));
+  box-shadow: 0 40px 80px rgb(26 18 8 / 0.12);
+  overflow: hidden;
+  will-change: transform;
+}
+.lp-hero__chrome {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--lp-line-soft);
+}
+.lp-hero__chrome span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--lp-line);
+}
+.lp-hero__chrome span:first-child { background: rgb(245 119 62 / 0.6); }
+.lp-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 22px;
+}
+.lp-preview-tile {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--lp-line-soft);
+  background: #fff;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.lp-preview-tile__k { font-size: 12px; font-weight: 600; color: var(--lp-muted); }
+.lp-preview-tile__v {
+  font-family: var(--lp-display);
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+.lp-preview-tile__trend { font-size: 12px; font-weight: 700; color: var(--success-text); }
+.lp-preview-tile__trend.is-down { color: var(--danger-text); }
+.lp-spark {
+  height: 34px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.lp-spark i {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--lp-ember), rgb(245 119 62 / 0.3));
+}
+
+/* ───────────────────────── Бегущая строка ───────────────────────── */
+
+.lp-marquee {
+  margin: 88px 0;
+  padding: 22px 0;
+  border-block: 1px solid var(--lp-line-soft);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.lp-marquee__track {
+  display: flex;
+  gap: 56px;
+  width: max-content;
+  animation: lp-marquee 34s linear infinite;
+}
+.lp-marquee__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 56px;
+  font-family: var(--lp-display);
+  font-size: clamp(20px, 3vw, 34px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgb(26 18 8 / 0.32);
+}
+.lp-marquee__item::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--lp-ember);
+}
+@keyframes lp-marquee {
+  to { transform: translateX(-50%); }
+}
+
+/* ───────────────────────── Секции / общий ритм ───────────────────────── */
+
+.lp-section {
+  padding: 96px 0;
+}
+.lp-section__head {
+  max-width: 40ch;
+  margin-bottom: 56px;
+}
+.lp-section__title {
+  margin: 16px 0 0;
+  font-family: var(--lp-display);
+  font-weight: 700;
+  font-size: clamp(30px, 4.6vw, 52px);
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+}
+.lp-section__lead {
+  margin: 20px 0 0;
+  max-width: 52ch;
+  font-size: clamp(16px, 2vw, 19px);
+  line-height: 1.6;
+  color: var(--lp-muted);
+}
+
+/* ───────────────────────── Глава 1 — Проблема (sticky) ───────────────────────── */
+
+.lp-problem {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: start;
+}
+.lp-problem__sticky {
+  position: sticky;
+  top: 120px;
+}
+.lp-problem__list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.lp-problem-card {
+  padding: 28px;
+  border-radius: 18px;
+  border: 1px solid var(--lp-line);
+  background: rgb(255 255 255 / 0.7);
+  backdrop-filter: blur(6px);
+}
+.lp-problem-card__n {
+  font-family: var(--lp-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--lp-ember-deep);
+}
+.lp-problem-card__t {
+  margin: 10px 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.lp-problem-card__d {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--lp-muted);
+}
+
+/* ───────────────────────── Глава 2 — Горизонтальная лента ───────────────────────── */
+
+.lp-horizontal {
+  position: relative;
+}
+/* Высоту секции задаёт JS (= ширине ленты), чтобы вертикальный скролл двигал ленту вбок. */
+.lp-horizontal__viewport {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+.lp-horizontal__head {
+  width: var(--lp-shell);
+  margin: 0 auto 36px;
+}
+.lp-horizontal__track {
+  display: flex;
+  gap: 28px;
+  padding-inline: max(calc((100vw - var(--lp-shell)) / 2), 24px);
+  will-change: transform;
+}
+.lp-feature {
+  position: relative;
+  flex: 0 0 clamp(280px, 34vw, 420px);
+  padding: 34px;
+  border-radius: 24px;
+  border: 1px solid var(--lp-line);
+  background: linear-gradient(180deg, #fff, var(--lp-paper-deep));
+  box-shadow: 0 20px 44px rgb(26 18 8 / 0.07);
+  display: flex;
+  flex-direction: column;
+  min-height: 380px;
+}
+.lp-feature__icon {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--lp-ember), var(--lp-ember-deep));
+  box-shadow: 0 10px 22px var(--lp-ember-glow);
+}
+.lp-feature__num {
+  position: absolute;
+  top: 28px;
+  right: 30px;
+  font-family: var(--lp-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgb(26 18 8 / 0.22);
+}
+.lp-feature__t {
+  margin: 26px 0 10px;
+  font-family: var(--lp-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.lp-feature__d {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.62;
+  color: var(--lp-muted);
+}
+.lp-feature__more {
+  margin-top: auto;
+  padding-top: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--lp-ember-deep);
+}
+
+/* На устройствах без JS-«пиннинга» лента превращается в горизонтальный скролл-снап. */
+.lp-horizontal:not(.is-pinned) .lp-horizontal__viewport {
+  position: static;
+  height: auto;
+  padding-bottom: 24px;
+}
+.lp-horizontal:not(.is-pinned) .lp-horizontal__track {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 16px;
+  transform: none !important;
+}
+.lp-horizontal:not(.is-pinned) .lp-feature { scroll-snap-align: center; }
+
+/* ───────────────────────── Bento «Почему это работает» ───────────────────────── */
+
+.lp-bento {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-rows: minmax(150px, auto);
+  gap: 20px;
+}
+.lp-bento-card {
+  position: relative;
+  overflow: hidden;
+  padding: 28px;
+  border-radius: 22px;
+  border: 1px solid var(--lp-line);
+  background: rgb(255 255 255 / 0.72);
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 260ms ease,
+    border-color 260ms ease;
+  will-change: transform;
+}
+.lp-bento-card:hover {
+  transform: translateY(-4px);
+  border-color: rgb(245 119 62 / 0.4);
+  box-shadow: 0 24px 50px rgb(26 18 8 / 0.1);
+}
+.lp-bento-card--wide { grid-column: span 4; }
+.lp-bento-card--tall { grid-column: span 2; grid-row: span 2; }
+.lp-bento-card--std { grid-column: span 2; }
+.lp-bento-card--feature {
+  grid-column: span 4;
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--lp-ember), var(--lp-ember-deep));
+  box-shadow: 0 26px 56px var(--lp-ember-glow);
+}
+.lp-bento-card__t {
+  font-family: var(--lp-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.lp-bento-card--feature .lp-bento-card__t { font-size: clamp(24px, 3vw, 34px); }
+.lp-bento-card__d {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--lp-muted);
+}
+.lp-bento-card--feature .lp-bento-card__d { color: rgb(255 255 255 / 0.86); }
+.lp-bento-card__icon { margin-bottom: 16px; color: var(--lp-ember-deep); }
+
+/* ───────────────────────── Метрики (count-up) ───────────────────────── */
+
+.lp-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
+  padding: 56px 0;
+  border-block: 1px solid var(--lp-line-soft);
+}
+.lp-metric__v {
+  font-family: var(--lp-display);
+  font-weight: 700;
+  font-size: clamp(36px, 5vw, 60px);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(120deg, var(--lp-ink), var(--lp-ember-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lp-metric__l {
+  margin-top: 12px;
+  font-size: 15px;
+  color: var(--lp-muted);
+}
+
+/* ───────────────────────── Отзывы ───────────────────────── */
+
+.lp-quotes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+.lp-quote {
+  padding: 34px;
+  border-radius: 22px;
+  border: 1px solid var(--lp-line);
+  background: rgb(255 255 255 / 0.72);
+}
+.lp-quote__text {
+  margin: 0;
+  font-size: clamp(18px, 2.2vw, 22px);
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+.lp-quote__by {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lp-quote__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--avatar-gradient-start), var(--avatar-gradient-end));
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
+}
+.lp-quote__name { font-weight: 700; font-size: 15px; }
+.lp-quote__role { font-size: 13px; color: var(--lp-muted); }
+
+/* ───────────────────────── Climax CTA ───────────────────────── */
+
+.lp-cta {
+  position: relative;
+  overflow: hidden;
+  margin: 40px auto 0;
+  width: var(--lp-shell);
+  padding: clamp(56px, 8vw, 96px) 40px;
+  border-radius: 32px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--lp-ember), var(--lp-ember-deep));
+  box-shadow: 0 40px 90px var(--lp-ember-glow);
+}
+.lp-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(40% 60% at 20% 10%, rgb(255 255 255 / 0.28), transparent 60%),
+    radial-gradient(40% 60% at 85% 90%, rgb(255 255 255 / 0.18), transparent 60%);
+  pointer-events: none;
+}
+.lp-cta__inner { position: relative; }
+.lp-cta__title {
+  margin: 0;
+  font-family: var(--lp-display);
+  font-weight: 700;
+  font-size: clamp(32px, 5.4vw, 60px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+.lp-cta__sub {
+  margin: 22px auto 0;
+  max-width: 50ch;
+  font-size: clamp(16px, 2vw, 19px);
+  line-height: 1.6;
+  color: rgb(255 255 255 / 0.9);
+}
+.lp-cta__btn {
+  margin-top: 36px;
+  background: #fff;
+  color: var(--lp-ember-deep);
+  box-shadow: 0 16px 36px rgb(26 18 8 / 0.22);
+}
+.lp-cta__btn:hover { transform: translateY(-2px); background: #fff; }
+
+/* ───────────────────────── Подвал ───────────────────────── */
+
+.lp-footer {
+  padding: 64px 0 56px;
+  text-align: center;
+}
+.lp-footer__brand {
+  font-family: var(--lp-display);
+  font-weight: 700;
+  font-size: 18px;
+}
+.lp-footer__links {
+  margin: 22px 0 18px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 24px;
+}
+.lp-footer__links a {
+  font-size: 14px;
+  color: var(--lp-muted);
+  transition: color 160ms ease;
+}
+.lp-footer__links a:hover { color: var(--lp-ink); }
+.lp-footer__copy { font-size: 13px; color: rgb(26 18 8 / 0.4); }
+
+/* ───────────────────────── Reveal on scroll ───────────────────────── */
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+[data-reveal].in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ───────────────────────── Адаптив ───────────────────────── */
+
+@media (max-width: 980px) {
+  .lp-problem { grid-template-columns: 1fr; gap: 36px; }
+  .lp-problem__sticky { position: static; }
+  .lp-bento { grid-template-columns: repeat(2, 1fr); }
+  .lp-bento-card--wide,
+  .lp-bento-card--tall,
+  .lp-bento-card--std,
+  .lp-bento-card--feature { grid-column: span 2; grid-row: auto; }
+  .lp-metrics { grid-template-columns: repeat(2, 1fr); gap: 32px 24px; }
+  .lp-quotes { grid-template-columns: 1fr; }
+  .lp-preview-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 620px) {
+  .lp { --lp-shell: 92vw; }
+  .lp-nav__links .lp-nav__link { display: none; }
+  .lp-nav__links .lp-btn { display: inline-flex; }
+  .lp-hero { padding: 140px 0 56px; }
+  .lp-hero__title {
+    font-size: clamp(33px, 11vw, 48px);
+    padding-inline: 20px;
+  }
+  .lp-hero__sub,
+  .lp-hero__cta { padding-inline: 22px; }
+  .lp-section { padding: 64px 0; }
+  .lp-bento { grid-template-columns: 1fr; }
+  .lp-bento-card--wide,
+  .lp-bento-card--tall,
+  .lp-bento-card--std,
+  .lp-bento-card--feature { grid-column: span 1; }
+  .lp-metrics { grid-template-columns: 1fr 1fr; }
+  .lp-preview-grid { grid-template-columns: 1fr; }
+}
+
+/* ───────────────────────── Reduced motion ───────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-bg__mesh,
+  .lp-orb,
+  .lp-marquee__track,
+  .lp-hero__scroll svg {
+    animation: none !important;
+  }
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .lp-horizontal__viewport { position: static !important; height: auto !important; }
+  .lp-horizontal__track { transform: none !important; }
+  .lp-btn:hover,
+  .lp-bento-card:hover { transform: none !important; }
+}

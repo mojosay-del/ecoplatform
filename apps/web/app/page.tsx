@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation";
+import { LandingView } from "../src/views/landing-view";
 
+// Заглавная (презентационная) страница — первое, что видит гость.
+// Залогиненного пользователя LandingView сам уводит в кабинет (/news).
 export default function HomePage() {
-  redirect("/news");
+  return <LandingView />;
 }
