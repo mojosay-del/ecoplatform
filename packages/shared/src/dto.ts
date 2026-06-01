@@ -97,6 +97,12 @@ export const manualSubscriptionDtoSchema = z.object({
 
 export type ManualSubscriptionDto = z.infer<typeof manualSubscriptionDtoSchema>;
 
+export const selfSubscriptionDtoSchema = z.object({
+  plan: z.enum(["basic", "extended"]),
+});
+
+export type SelfSubscriptionDto = z.infer<typeof selfSubscriptionDtoSchema>;
+
 export const SUPPORT_TICKET_SUBJECT_MAX_LENGTH = 160;
 export const SUPPORT_TICKET_MESSAGE_MAX_LENGTH = 4000;
 

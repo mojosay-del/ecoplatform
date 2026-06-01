@@ -26,7 +26,15 @@ import { DemoBanner } from "./DemoBanner";
 import { NotificationBell } from "./NotificationBell";
 import { UserSupportDrawer } from "./UserSupportDrawer";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+type AppShellChrome = {
+  sidebar?: boolean;
+  breadcrumbs?: boolean;
+  notifications?: boolean;
+  demoBanner?: boolean;
+  adminBackLink?: boolean;
+};
+
+export function AppShell({ children, chrome = {} }: { children: React.ReactNode; chrome?: AppShellChrome }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, token, ready, logout } = useAuth();
@@ -41,7 +49,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // показывать не нужно, иначе двойная сущность.
   const isAdminUser = (user?.platformRoles?.length ?? 0) > 0;
   const inAccountSettings = isAccountPath(pathname);
-  const showAdminPanelBackLink = pathname.startsWith("/admin/");
+  const showSidebar = chrome.sidebar !== false;
+  const showBreadcrumbs = chrome.breadcrumbs !== false;
+  const showNotifications = chrome.notifications !== false;
+  const showDemoBanner = chrome.demoBanner !== false;
+  const showAdminPanelBackLink = chrome.adminBackLink !== false && pathname.startsWith("/admin/");
 
   // Любой защищённый раздел оборачивается в AppShell. Если AuthProvider уже
   // попробовал восстановить refresh-cookie и токена нет — отправляем на /login.
@@ -150,68 +162,81 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const visibleNav = inAccountSettings ? getAccountNavSections(!isAdminUser) : visibleAppNav;
 
   return (
-    <div className="app-shell" data-collapsed={collapsed ? "true" : "false"}>
-      <aside
-        className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}
-        role="navigation"
-        aria-label={inAccountSettings ? "Навигация личного кабинета" : "Основная навигация"}
-      >
-        <div className="sidebar-head">
-          <Link className="brand" href="/news">
-            <span className="brand-mark">
-              <Image alt="" height={32} src="/brand/logo.webp" width={32} priority />
-            </span>
-            <span className="brand-text">ЭкоПлатформа</span>
-          </Link>
-          <button
-            className="sidebar-close"
-            type="button"
-            onClick={() => setMobileNavOpen(false)}
-            aria-label="Закрыть меню"
-          >
-            <X size={20} />
-          </button>
-          <button
-            className="sidebar-collapse"
-            type="button"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
-            title={collapsed ? "Развернуть меню" : "Свернуть меню"}
-          >
-            {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
-          </button>
-        </div>
-        {visibleNav.map((section) => (
-          <nav className="nav-section" key={section.title}>
-            <p className="nav-title">{section.title}</p>
-            {section.items.map((item) => (
-              <NavEntry
-                activeAccountSection={activeAccountSection}
-                item={item}
-                key={item.href ?? item.label}
-                pathname={pathname}
-              />
-            ))}
-          </nav>
-        ))}
-      </aside>
-      {mobileNavOpen ? (
+    <div
+      className={`app-shell${showSidebar ? "" : " app-shell-no-sidebar"}`}
+      data-collapsed={collapsed ? "true" : "false"}
+    >
+      {showSidebar ? (
+        <aside
+          className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}
+          role="navigation"
+          aria-label={inAccountSettings ? "Навигация личного кабинета" : "Основная навигация"}
+        >
+          <div className="sidebar-head">
+            <Link className="brand" href="/news">
+              <span className="brand-mark">
+                <Image alt="" height={32} src="/brand/logo.webp" width={32} priority />
+              </span>
+              <span className="brand-text">ЭкоПлатформа</span>
+            </Link>
+            <button
+              className="sidebar-close"
+              type="button"
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="Закрыть меню"
+            >
+              <X size={20} />
+            </button>
+            <button
+              className="sidebar-collapse"
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
+              title={collapsed ? "Развернуть меню" : "Свернуть меню"}
+            >
+              {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+            </button>
+          </div>
+          {visibleNav.map((section) => (
+            <nav className="nav-section" key={section.title}>
+              <p className="nav-title">{section.title}</p>
+              {section.items.map((item) => (
+                <NavEntry
+                  activeAccountSection={activeAccountSection}
+                  item={item}
+                  key={item.href ?? item.label}
+                  pathname={pathname}
+                />
+              ))}
+            </nav>
+          ))}
+        </aside>
+      ) : null}
+      {showSidebar && mobileNavOpen ? (
         <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
       ) : null}
       <main className="main" id="main-content" tabIndex={-1}>
         <header className="topbar">
-          <button
-            className="icon-button mobile-menu-button"
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            aria-label="Открыть меню"
-          >
-            <Menu size={20} />
-          </button>
-          <Breadcrumb nav={visibleNav} pathname={pathname} />
+          {showSidebar ? (
+            <button
+              className="icon-button mobile-menu-button"
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Открыть меню"
+            >
+              <Menu size={20} />
+            </button>
+          ) : null}
+          {!showSidebar ? (
+            <Link className="topbar-brand" href="/news" title="ЭкоПлатформа">
+              <Image alt="" height={30} src="/brand/logo.webp" width={30} priority />
+              <span>ЭкоПлатформа</span>
+            </Link>
+          ) : null}
+          {showBreadcrumbs ? <Breadcrumb nav={visibleNav} pathname={pathname} /> : null}
           <div className="topbar-spacer" />
-          <DemoBanner user={user} pathname={pathname} />
-          <NotificationBell />
+          {showDemoBanner ? <DemoBanner user={user} pathname={pathname} /> : null}
+          {showNotifications ? <NotificationBell /> : null}
           {isAdminUser ? null : (
             <button
               className="icon-button"

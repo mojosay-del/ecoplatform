@@ -10,6 +10,7 @@
 import type {
   AdminNavResponse,
   BillingStatus,
+  BillingSubscriptionActivationResponse,
   CompanyProfileUpdateDto,
   ConsentRecordItem,
   ConsentSource,
@@ -27,6 +28,7 @@ import type {
   NewsTagSummary,
   NomenclatureCategoryListItem,
   PaginatedResponse,
+  SelfSubscriptionDto,
 } from "@ecoplatform/shared";
 import { apiDownload, apiFetch, type FileAsset } from "./core";
 
@@ -120,6 +122,12 @@ export const api = {
     status: () => apiFetch<BillingStatus>("/billing/status"),
     updateCompanyProfile: (input: CompanyProfileUpdateDto) =>
       apiFetch<BillingStatus>("/billing/company", { method: "PATCH", body: input }),
+    activateSubscription: (input: SelfSubscriptionDto, options: { idempotencyKey: string }) =>
+      apiFetch<BillingSubscriptionActivationResponse>("/billing/subscriptions", {
+        method: "POST",
+        body: input,
+        headers: { "Idempotency-Key": options.idempotencyKey },
+      }),
   },
 
   // ── Аутентификация / сессии ────────────────────────────────────────────

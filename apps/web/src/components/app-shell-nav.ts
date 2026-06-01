@@ -75,7 +75,12 @@ export const appNavSections: NavSection[] = [
       { key: "news", href: "/news", label: "Новости", icon: Newspaper },
       { key: "indices", href: "/indices", label: "Индексы цен", icon: LineChart },
       { key: "education", href: "/education", label: "Обучение", icon: GraduationCap },
-      futureItem("marketplace", "Торговая площадка", ShoppingBag, "Торговая площадка — закрытый аукцион на объявлениях."),
+      futureItem(
+        "marketplace",
+        "Торговая площадка",
+        ShoppingBag,
+        "Торговая площадка — закрытый аукцион на объявлениях.",
+      ),
     ],
   },
   {

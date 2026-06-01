@@ -1,5 +1,9 @@
 import { Body, Controller, ForbiddenException, Get, Headers, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { companyProfileUpdateDtoSchema, manualSubscriptionDtoSchema } from "@ecoplatform/shared";
+import {
+  companyProfileUpdateDtoSchema,
+  manualSubscriptionDtoSchema,
+  selfSubscriptionDtoSchema,
+} from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
@@ -31,6 +35,19 @@ export class BillingController {
     }
     const input = parseBody(companyProfileUpdateDtoSchema, body);
     return this.billing.updateOwnProfile(user.companyId, input);
+  }
+
+  @Post("billing/subscriptions")
+  async activateOwnSubscription(
+    @Body() body: unknown,
+    @CurrentUser() user: RequestUser,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+  ) {
+    if (!user.companyId) {
+      throw new ForbiddenException("Подписка доступна только пользователям компаний.");
+    }
+    const input = parseBody(selfSubscriptionDtoSchema, body);
+    return this.billing.activateSelf(input, user.id, user.companyId, idempotencyKey);
   }
 
   @UseGuards(RolesGuard)

@@ -257,6 +257,31 @@ export type BillingSubscription = {
   endsAt: IsoDateString;
   reason: string | null;
   createdAt: IsoDateString;
+  updatedAt: IsoDateString;
+};
+
+export type BillingCompanySummary = {
+  id: string;
+  organizationName: string;
+  type: string;
+  status: string;
+  demoEndsAt: IsoDateString | null;
+  subscriptionPlan: string | null;
+  subscriptionEndsAt: IsoDateString | null;
+  billingInn: string | null;
+  billingKpp: string | null;
+  legalAddress: string | null;
+  bankName: string | null;
+  bankBik: string | null;
+  bankAccount: string | null;
+  correspondentAccount: string | null;
+  createdAt: IsoDateString;
+  updatedAt: IsoDateString;
+};
+
+export type BillingSubscriptionActivationResponse = {
+  company: BillingCompanySummary;
+  subscription: BillingSubscription;
 };
 
 // `/billing/status` отдаёт полный Company (с реквизитами) + список подписок.

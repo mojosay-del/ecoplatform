@@ -943,7 +943,10 @@ export function RegisterForm() {
   function setVerificationDigit(index: number, rawValue: string) {
     if (verificationInputLocked) return;
 
-    const digits = rawValue.replace(/\D/g, "").slice(0, VERIFICATION_CODE_LENGTH - index).split("");
+    const digits = rawValue
+      .replace(/\D/g, "")
+      .slice(0, VERIFICATION_CODE_LENGTH - index)
+      .split("");
     setError("");
     setVerificationDigits((current) => {
       const next = [...current];
@@ -999,9 +1002,7 @@ export function RegisterForm() {
         <div className="auth-card form auth-card-wide">
           <header className="auth-card-head">
             <h1 className="auth-card-title">Регистрация закрыта</h1>
-            <p className="auth-card-sub">
-              Регистрация новых пользователей временно отключена. Загляните позже.
-            </p>
+            <p className="auth-card-sub">Регистрация новых пользователей временно отключена. Загляните позже.</p>
           </header>
           <p className="auth-card-sub">
             Уже есть аккаунт? <Link href="/login">Войти</Link>
@@ -1257,7 +1258,12 @@ export function RegisterForm() {
               >
                 Назад
               </button>
-              <button className="auth-text-button" type="button" onClick={requestVerificationCode} disabled={submitting}>
+              <button
+                className="auth-text-button"
+                type="button"
+                onClick={requestVerificationCode}
+                disabled={submitting}
+              >
                 Отправить код ещё раз
               </button>
             </div>

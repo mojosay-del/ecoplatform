@@ -59,6 +59,7 @@ import {
   SUPPORT_STATUS_LABELS,
   USER_GENDER_LABELS,
 } from "../lib/display-labels";
+import { SUBSCRIPTION_PLAN_TIERS, type SubscriptionPlanTier } from "../lib/subscription-plans";
 import { useApiQuery } from "./_shared";
 
 const PROFILE_PHOTO_HINT =
@@ -273,57 +274,6 @@ function AccountEditableValue({ value, label }: { value?: string | null; label: 
   );
 }
 
-// Тарифные планы для секции «Подписка». Цены Базовой/Расширенной пока не
-// определены (MVP) — показываем «Цена скоро» и кнопку-заявку в поддержку.
-type PlanTier = {
-  key: "demo" | "basic" | "extended";
-  name: string;
-  description: string;
-  price: string | null;
-  pricePeriod?: string;
-  features: Array<{ label: string; included: boolean }>;
-};
-
-const PLAN_TIERS: PlanTier[] = [
-  {
-    key: "demo",
-    name: "Демо",
-    description: "Полный доступ для знакомства с платформой.",
-    price: "0 ₽",
-    pricePeriod: "/ 30 дней",
-    features: [
-      { label: "Доступ ко всем разделам", included: true },
-      { label: "Индексы цен и новости", included: true },
-      { label: "Базы знаний и обучение", included: true },
-      { label: "Ограничено по времени", included: false },
-    ],
-  },
-  {
-    key: "basic",
-    name: "Базовая",
-    description: "Для постоянной работы на рынке вторсырья.",
-    price: null,
-    features: [
-      { label: "Всё из Демо, без ограничений", included: true },
-      { label: "Торговая площадка", included: true },
-      { label: "Приоритетная поддержка", included: true },
-      { label: "Без расширенной аналитики", included: false },
-    ],
-  },
-  {
-    key: "extended",
-    name: "Расширенная",
-    description: "Максимум возможностей для крупных игроков.",
-    price: null,
-    features: [
-      { label: "Всё из Базовой", included: true },
-      { label: "Расширенная аналитика", included: true },
-      { label: "Калькуляторы и карты", included: true },
-      { label: "Персональный менеджер", included: true },
-    ],
-  },
-];
-
 export function AccountView({ section }: { section: AccountSectionId }) {
   const router = useRouter();
   const { user, token, logout, refreshMe } = useAuth();
@@ -487,9 +437,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   // Демо больше не показываем баннером — его роль выполняет плашка «Текущий
   // план» в секции «Подписка». Баннер оставляем только для проблемных статусов.
   const showBillingStateBanner =
-    company?.status === "past_due" ||
-    company?.status === "suspended" ||
-    company?.status === "pending_deletion";
+    company?.status === "past_due" || company?.status === "suspended" || company?.status === "pending_deletion";
 
   // Заполненность профиля — 4 критерия, каждый по 25%. «Способ оплаты» пока
   // всегда false (биллинг-методы не реализованы), при 100% кольцо показывает
@@ -509,7 +457,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     (profileChecks.filter((check) => check.done).length / profileChecks.length) * 100,
   );
   const profileComplete = profileCompletion >= 100;
-  const currentPlanKey: PlanTier["key"] =
+  const currentPlanKey: SubscriptionPlanTier["key"] =
     billing?.status === "active" && billing?.subscriptionPlan === "extended"
       ? "extended"
       : billing?.status === "active" && billing?.subscriptionPlan === "basic"
@@ -1074,11 +1022,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
         </AccountScrollSection>
 
         {!isPlatformStaff ? (
-          <AccountScrollSection
-            accountSection="company"
-            description="Основные данные вашей компании."
-            title="Компания"
-          >
+          <AccountScrollSection accountSection="company" description="Основные данные вашей компании." title="Компания">
             {billing ? (
               <CompanyProfileForm billing={billing} onSaved={(updated) => setBilling(updated)} />
             ) : (
@@ -1124,7 +1068,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
               </div>
 
               <div className="account-plans">
-                {PLAN_TIERS.map((tier) => {
+                {SUBSCRIPTION_PLAN_TIERS.map((tier) => {
                   const isCurrent = tier.key === currentPlanKey;
                   const popular = tier.key === "basic";
                   return (
@@ -1160,11 +1104,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                           Текущий план
                         </button>
                       ) : (
-                        <button
-                          className={popular ? "button" : "button secondary"}
-                          type="button"
-                          onClick={openSupport}
-                        >
+                        <button className={popular ? "button" : "button secondary"} type="button" onClick={openSupport}>
                           Оставить заявку
                         </button>
                       )}
@@ -1432,9 +1372,7 @@ function CompanyProfileForm({
           />
         </label>
       </div>
-      {message ? (
-        <p className={`account-form-message account-form-message-${message.type}`}>{message.text}</p>
-      ) : null}
+      {message ? <p className={`account-form-message account-form-message-${message.type}`}>{message.text}</p> : null}
     </form>
   );
 }

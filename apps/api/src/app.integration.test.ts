@@ -982,6 +982,154 @@ describe("Demo gating", () => {
     expect(auditPayload.subscriptionId).toBe(subscriptions[0].id);
   });
 
+  it("самостоятельная активация Базовой подписки возвращает доступ на месяц", async () => {
+    const { token, companyId, userId } = await registerCompany("0000016");
+    await ctx.prisma.company.update({
+      where: { id: companyId },
+      data: { demoEndsAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    });
+
+    const closed = await ctx.http.get("/api/news").set("Authorization", `Bearer ${token}`);
+    expect(closed.status).toBe(403);
+
+    const res = await ctx.http
+      .post("/api/billing/subscriptions")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", `self-basic-${companyId}`)
+      .send({ plan: "basic" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.company.status).toBe("active");
+    expect(res.body.company.subscriptionPlan).toBe("basic");
+    expect(new Date(res.body.subscription.endsAt).getTime()).toBeGreaterThan(Date.now() + 29 * 24 * 60 * 60 * 1000);
+
+    const open = await ctx.http.get("/api/news").set("Authorization", `Bearer ${token}`);
+    expect(open.status).toBe(200);
+
+    const [logs, notifications] = await Promise.all([
+      ctx.prisma.adminActionLog.findMany({
+        where: { action: "self_subscription_activation", entityId: companyId },
+      }),
+      ctx.prisma.inAppNotification.findMany({
+        where: { userId, eventType: "billing.subscription.activated" },
+      }),
+    ]);
+    expect(logs).toHaveLength(1);
+    expect(notifications).toHaveLength(1);
+    const payload = logs[0].payload as {
+      before: { status: string };
+      after: { status: string; subscriptionPlan: string };
+      durationDays: number;
+      source: string;
+    };
+    expect(payload.before.status).toBe("demo");
+    expect(payload.after.status).toBe("active");
+    expect(payload.after.subscriptionPlan).toBe("basic");
+    expect(payload.durationDays).toBe(30);
+    expect(payload.source).toBe("subscription_page");
+  });
+
+  it("самостоятельная активация Расширенной подписки работает после истечения платной подписки", async () => {
+    const adminToken = await loginAdmin();
+    const { token, companyId } = await registerCompany("0000017");
+    await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", `manual-before-self-${companyId}`)
+      .send({
+        companyId,
+        plan: "basic",
+        endsAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+        reason: "initial-paid-test",
+      });
+    const pastEndsAt = new Date(Date.now() - 60 * 60 * 1000);
+    await ctx.prisma.company.update({
+      where: { id: companyId },
+      data: { status: CompanyStatus.past_due, subscriptionEndsAt: pastEndsAt },
+    });
+    await ctx.prisma.subscription.updateMany({
+      where: { companyId },
+      data: { status: SubscriptionStatus.expired, endsAt: pastEndsAt },
+    });
+
+    const res = await ctx.http
+      .post("/api/billing/subscriptions")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", `self-extended-${companyId}`)
+      .send({ plan: "extended" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.company.status).toBe("active");
+    expect(res.body.company.subscriptionPlan).toBe("extended");
+  });
+
+  it("самостоятельная активация идемпотентна и не создаёт дубль подписки", async () => {
+    const { token, companyId } = await registerCompany("0000018");
+    await ctx.prisma.company.update({
+      where: { id: companyId },
+      data: { demoEndsAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    });
+    const key = `self-idempotency-${companyId}`;
+
+    const first = await ctx.http
+      .post("/api/billing/subscriptions")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", key)
+      .send({ plan: "basic" });
+    expect(first.status).toBe(201);
+
+    const second = await ctx.http
+      .post("/api/billing/subscriptions")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", key)
+      .send({ plan: "basic" });
+    expect(second.status).toBe(201);
+    expect(second.body).toEqual(first.body);
+
+    const conflict = await ctx.http
+      .post("/api/billing/subscriptions")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", key)
+      .send({ plan: "extended" });
+    expect(conflict.status).toBe(409);
+    await expect(ctx.prisma.subscription.count({ where: { companyId } })).resolves.toBe(1);
+  });
+
+  it("самостоятельная активация не продлевает уже активную подписку бесплатно", async () => {
+    const adminToken = await loginAdmin();
+    const { token, companyId } = await registerCompany("0000019");
+    await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", `manual-active-before-self-${companyId}`)
+      .send({
+        companyId,
+        plan: "basic",
+        endsAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+        reason: "active-subscription-test",
+      });
+
+    const res = await ctx.http
+      .post("/api/billing/subscriptions")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", `self-active-reject-${companyId}`)
+      .send({ plan: "extended" });
+
+    expect(res.status).toBe(409);
+    await expect(ctx.prisma.subscription.count({ where: { companyId } })).resolves.toBe(1);
+  });
+
+  it("платформенный сотрудник не может активировать клиентскую подписку для себя", async () => {
+    const adminToken = await loginAdmin();
+    const res = await ctx.http
+      .post("/api/billing/subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", "self-platform-staff")
+      .send({ plan: "basic" });
+
+    expect(res.status).toBe(403);
+  });
+
   it("админский список billing-компаний валидирует pagination query", async () => {
     const adminToken = await loginAdmin();
     await registerCompany("0000015");
@@ -4055,9 +4203,7 @@ describe("Navigation visibility (скрытие разделов меню)", () 
     expect(hide.status).toBe(200);
 
     // Видимость для всех: news скрыт, неизвестный ключ отброшен.
-    const visibility = await ctx.http
-      .get("/api/navigation/visibility")
-      .set("Authorization", `Bearer ${company.token}`);
+    const visibility = await ctx.http.get("/api/navigation/visibility").set("Authorization", `Bearer ${company.token}`);
     expect(visibility.status).toBe(200);
     expect(visibility.body.hiddenKeys).toEqual(["news"]);
     expect(visibility.body.hiddenHrefs).toContain("/news");

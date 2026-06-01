@@ -172,6 +172,7 @@ const ACTION_LABELS: Record<string, string> = {
   "learning.module.unpublish": "Курс снят с публикации",
   "learning.module.update": "Курс обновлён",
   manual_subscription_activation: "Подписка активирована вручную",
+  self_subscription_activation: "Подписка выбрана пользователем",
   "moderation.admin_sanction.module_restriction": "Ограничение модуля применено",
   "moderation.case.lock": "Кейс модерации взят в работу",
   "moderation.case.release": "Кейс модерации освобождён",

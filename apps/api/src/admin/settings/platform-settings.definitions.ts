@@ -62,7 +62,8 @@ export const platformSettingDefinitions = {
   },
   "security.login_lockout_window_minutes": {
     label: "Окно подсчёта попыток входа (минут)",
-    description: "За какой период считаются неудачные попытки. По истечении окна без новых ошибок счётчик сбрасывается.",
+    description:
+      "За какой период считаются неудачные попытки. По истечении окна без новых ошибок счётчик сбрасывается.",
     schema: z.number().int().min(1).max(1440),
     default: 15,
   },

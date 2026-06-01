@@ -15,10 +15,7 @@ export class SectionVisibilityGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const guardKey = this.reflector.getAllAndOverride<string>(SECTION_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const guardKey = this.reflector.getAllAndOverride<string>(SECTION_KEY, [context.getHandler(), context.getClass()]);
 
     if (!guardKey) {
       return true;

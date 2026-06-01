@@ -1,16 +1,31 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { createHash } from "crypto";
 import { CompanyStatus, NotificationCategory, Prisma, SubscriptionStatus } from "@prisma/client";
 import type { Company, Subscription } from "@prisma/client";
-import type { AddressDto, CompanyProfileUpdateDto, ManualSubscriptionDto } from "@ecoplatform/shared";
+import type {
+  AddressDto,
+  CompanyProfileUpdateDto,
+  ManualSubscriptionDto,
+  SelfSubscriptionDto,
+} from "@ecoplatform/shared";
 import { computeDiff } from "../common/admin-action-log.service";
 import { paginatedResponse, resolvePagination, type PaginationInput } from "../common/pagination";
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { SessionCacheService } from "../redis/session-cache.service";
 
 const MANUAL_SUBSCRIPTION_ENDPOINT = "POST /api/admin/billing/manual-subscriptions";
 const MANUAL_SUBSCRIPTION_ACTION = "manual_subscription_activation";
+const SELF_SUBSCRIPTION_ENDPOINT = "POST /api/billing/subscriptions";
+const SELF_SUBSCRIPTION_ACTION = "self_subscription_activation";
+const SELF_SUBSCRIPTION_DAYS = 30;
 
 type ManualSubscriptionResponse = {
   company: ReturnType<typeof serializeCompany>;
@@ -22,6 +37,7 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly sessionCache: SessionCacheService,
   ) {}
 
   async getOwnStatus(companyId: string) {
@@ -163,10 +179,34 @@ export class BillingService {
     }
 
     const result = await this.createManualSubscriptionWithIdempotency(input, actorId, key, requestHash);
+    await this.sessionCache.invalidateCompany(input.companyId);
 
     // Уведомляем всех пользователей компании — симметрично уведомлениям о
     // скором/состоявшемся истечении подписки, чтобы биллинг-канал был полным.
     await this.notifyManualActivation(input, result);
+
+    return result;
+  }
+
+  async activateSelf(
+    input: SelfSubscriptionDto,
+    actorId: string,
+    companyId: string,
+    idempotencyKey: string | undefined,
+  ): Promise<ManualSubscriptionResponse> {
+    const key = normalizeIdempotencyKey(idempotencyKey);
+    const requestHash = hashSelfSubscriptionRequest(input, companyId);
+
+    const existing = await this.prisma.idempotencyKey.findUnique({
+      where: { key_endpoint_actorId: { key, endpoint: SELF_SUBSCRIPTION_ENDPOINT, actorId } },
+    });
+    if (existing) {
+      return replayManualSubscription(existing, requestHash);
+    }
+
+    const result = await this.createSelfSubscriptionWithIdempotency(input, actorId, companyId, key, requestHash);
+    await this.sessionCache.invalidateCompany(companyId);
+    await this.notifySelfActivation(input, result);
 
     return result;
   }
@@ -303,13 +343,161 @@ export class BillingService {
       ),
     );
   }
+
+  private async createSelfSubscriptionWithIdempotency(
+    input: SelfSubscriptionDto,
+    actorId: string,
+    companyId: string,
+    key: string,
+    requestHash: string,
+  ): Promise<ManualSubscriptionResponse> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.idempotencyKey.create({
+          data: {
+            key,
+            endpoint: SELF_SUBSCRIPTION_ENDPOINT,
+            action: SELF_SUBSCRIPTION_ACTION,
+            actorId,
+            requestHash,
+          },
+        });
+
+        const company = await tx.company.findUnique({ where: { id: companyId } });
+        if (!company) {
+          throw new NotFoundException("Компания не найдена.");
+        }
+
+        if (isCompanySubscriptionCurrentlyActive(company)) {
+          throw new ConflictException("Подписка уже активна. Продление через оплату появится следующим шагом.");
+        }
+
+        if (company.status === CompanyStatus.suspended || company.status === CompanyStatus.pending_deletion) {
+          throw new ForbiddenException("Для этой компании самостоятельная активация подписки временно недоступна.");
+        }
+
+        await tx.subscription.updateMany({
+          where: { companyId, status: SubscriptionStatus.active, endsAt: { lt: new Date() } },
+          data: { status: SubscriptionStatus.expired },
+        });
+
+        const startsAt = new Date();
+        const endsAt = addDays(startsAt, SELF_SUBSCRIPTION_DAYS);
+        const subscription = await tx.subscription.create({
+          data: {
+            companyId,
+            plan: input.plan,
+            status: SubscriptionStatus.active,
+            startsAt,
+            endsAt,
+            reason: "Активация пользователем на странице выбора тарифа",
+          },
+        });
+
+        const updatedCompany = await tx.company.update({
+          where: { id: companyId },
+          data: {
+            status: CompanyStatus.active,
+            statusBeforeDeletion: null,
+            subscriptionPlan: input.plan,
+            subscriptionEndsAt: endsAt,
+          },
+        });
+
+        const before = {
+          status: company.status,
+          subscriptionPlan: company.subscriptionPlan,
+          subscriptionEndsAt: company.subscriptionEndsAt?.toISOString() ?? null,
+        };
+        const after = {
+          status: updatedCompany.status,
+          subscriptionPlan: updatedCompany.subscriptionPlan,
+          subscriptionEndsAt: updatedCompany.subscriptionEndsAt?.toISOString() ?? null,
+        };
+        const auditPayload: Record<string, unknown> = {
+          before,
+          after,
+          diff: computeDiff(before, after),
+          subscriptionId: subscription.id,
+          source: "subscription_page",
+          durationDays: SELF_SUBSCRIPTION_DAYS,
+        };
+        await tx.adminActionLog.create({
+          data: {
+            actorId,
+            action: SELF_SUBSCRIPTION_ACTION,
+            entityType: "Company",
+            entityId: companyId,
+            comment: "Пользователь выбрал подписку на странице выбора тарифа.",
+            payload: auditPayload as Prisma.InputJsonValue,
+          },
+        });
+
+        const response = {
+          company: serializeCompany(updatedCompany),
+          subscription: serializeSubscription(subscription),
+        };
+
+        await tx.idempotencyKey.update({
+          where: { key_endpoint_actorId: { key, endpoint: SELF_SUBSCRIPTION_ENDPOINT, actorId } },
+          data: {
+            response: response as unknown as Prisma.InputJsonValue,
+            referenceType: "Subscription",
+            referenceId: subscription.id,
+          },
+        });
+
+        return response;
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const existing = await this.prisma.idempotencyKey.findUnique({
+          where: { key_endpoint_actorId: { key, endpoint: SELF_SUBSCRIPTION_ENDPOINT, actorId } },
+        });
+        if (existing) {
+          return replayManualSubscription(existing, requestHash);
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  private async notifySelfActivation(input: SelfSubscriptionDto, result: ManualSubscriptionResponse): Promise<void> {
+    const users = await this.prisma.user.findMany({
+      where: { companyId: result.company.id },
+      select: { id: true },
+    });
+    const planLabel = input.plan === "basic" ? "Базовая" : "Расширенная";
+    await Promise.all(
+      users.map((user) =>
+        this.notifications
+          .createInApp({
+            userId: user.id,
+            eventType: "billing.subscription.activated",
+            sourceId: result.subscription.id,
+            category: NotificationCategory.billing,
+            title: "Подписка активирована",
+            body: `${planLabel} подписка активирована до ${new Date(result.subscription.endsAt).toLocaleString("ru-RU")}.`,
+            link: "/account/billing",
+            payload: { plan: input.plan, endsAt: result.subscription.endsAt, source: "subscription_page" },
+          })
+          .catch(
+            swallowAndLog("billing.self_activation.notify", {
+              userId: user.id,
+              subscriptionId: result.subscription.id,
+            }),
+          ),
+      ),
+    );
+  }
 }
 
 function normalizeIdempotencyKey(key: string | undefined): string {
   const normalized = key?.trim();
 
   if (!normalized) {
-    throw new BadRequestException("Idempotency-Key обязателен для ручной активации подписки.");
+    throw new BadRequestException("Idempotency-Key обязателен для активации подписки.");
   }
 
   if (normalized.length < 8 || normalized.length > 128) {
@@ -331,6 +519,17 @@ function hashManualSubscriptionRequest(input: ManualSubscriptionDto): string {
         endsAt: new Date(input.endsAt).toISOString(),
         plan: input.plan,
         reason: input.reason,
+      }),
+    )
+    .digest("hex");
+}
+
+function hashSelfSubscriptionRequest(input: SelfSubscriptionDto, companyId: string): string {
+  return createHash("sha256")
+    .update(
+      stableStringify({
+        companyId,
+        plan: input.plan,
       }),
     )
     .digest("hex");
@@ -388,6 +587,19 @@ function serializeSubscription(subscription: Subscription) {
     createdAt: subscription.createdAt.toISOString(),
     updatedAt: subscription.updatedAt.toISOString(),
   };
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function isCompanySubscriptionCurrentlyActive(company: Company, now = new Date()): boolean {
+  return (
+    company.status === CompanyStatus.active &&
+    Boolean(company.subscriptionPlan) &&
+    Boolean(company.subscriptionEndsAt) &&
+    company.subscriptionEndsAt!.getTime() > now.getTime()
+  );
 }
 
 function stableStringify(value: Record<string, unknown>): string {

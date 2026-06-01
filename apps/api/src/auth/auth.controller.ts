@@ -1,7 +1,12 @@
 import { Body, Controller, Get, Param, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import type { CookieOptions, Request, Response } from "express";
-import { changePasswordDtoSchema, loginDtoSchema, registerDtoSchema, registrationVerifyDtoSchema } from "@ecoplatform/shared";
+import {
+  changePasswordDtoSchema,
+  loginDtoSchema,
+  registerDtoSchema,
+  registrationVerifyDtoSchema,
+} from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import type { RequestWithCsrf } from "../common/csrf.guard";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";

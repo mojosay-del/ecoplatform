@@ -6,12 +6,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { type LucideIcon } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { StatusPill } from "../components/StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { isSubscriptionSelectionRequired, subscriptionSelectionHref } from "../lib/subscription-access";
 
 export type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
@@ -296,23 +298,47 @@ export function AuthRequired({ title }: { title: string }) {
 }
 
 export function AccessClosed({ title }: { title: string }) {
+  const { user } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [currentPath, setCurrentPath] = useState(pathname);
+  const shouldRedirect = isSubscriptionSelectionRequired(user?.company);
+
+  useEffect(() => {
+    setCurrentPath(currentBrowserPath(pathname));
+  }, [pathname]);
+
+  useEffect(() => {
+    const path = currentBrowserPath(pathname);
+    if (shouldRedirect) {
+      router.replace(subscriptionSelectionHref(path));
+    }
+  }, [pathname, router, shouldRedirect]);
+
   return (
     <AppShell>
       <section className="page">
         <header className="page-header">
           <h1 className="page-title">{title}</h1>
           <p className="page-subtitle">
-            Demo истёк или подписка не активна. Личный кабинет, биллинг и поддержка остаются доступны.
+            {shouldRedirect
+              ? "Срок доступа истёк. Перенаправляем на выбор подписки."
+              : "Для этого раздела нужен другой уровень доступа. Личный кабинет, биллинг и поддержка остаются доступны."}
           </p>
         </header>
         <div className="auth-actions">
-          <Link className="button" href="/account">
-            Открыть кабинет
+          <Link className="button" href={shouldRedirect ? subscriptionSelectionHref(currentPath) : "/account/billing"}>
+            {shouldRedirect ? "Выбрать подписку" : "Открыть подписку"}
           </Link>
         </div>
       </section>
     </AppShell>
   );
+}
+
+function currentBrowserPath(pathname: string): string {
+  if (typeof window === "undefined") return pathname;
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {

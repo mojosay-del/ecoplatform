@@ -155,7 +155,11 @@ export function AdminNavigationView() {
                     </div>
                     <div className="setting-row-control">
                       <label className="setting-toggle">
-                        <input checked={visible} onChange={(event) => toggle(item.key, event.target.checked)} type="checkbox" />
+                        <input
+                          checked={visible}
+                          onChange={(event) => toggle(item.key, event.target.checked)}
+                          type="checkbox"
+                        />
                         <span>{visible ? "Показан" : "Скрыт"}</span>
                       </label>
                     </div>
