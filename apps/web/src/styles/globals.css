@@ -12094,6 +12094,12 @@ li.tree-add-row + li.tree-add-row,
     font-size: 12px;
     text-align: center;
   }
+
+  /* Крошки на телефоне скрываем целиком: контекст даёт заголовок/герой
+     экрана, а у выреза/Dynamic Island топбар и так тесный — текст там лишний. */
+  .topbar-breadcrumb {
+    display: none;
+  }
 }
 
 /* --- safe-area для фиксированных элементов на мобильном --- */
@@ -12113,6 +12119,14 @@ li.tree-add-row + li.tree-add-row,
   .sidebar {
     padding-top: calc(22px + env(safe-area-inset-top));
     padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  }
+
+  /* Авторизованный топбар на мобильном уводим из-под чёлки/Dynamic Island
+     (в установленном PWA с прозрачным статус-баром контент мог уезжать вверх). */
+  .topbar {
+    height: auto;
+    min-height: 64px;
+    padding-top: calc(8px + env(safe-area-inset-top));
   }
 }
 
