@@ -9738,7 +9738,7 @@ li.tree-add-row + li.tree-add-row,
 .account-notification-head,
 .account-notification-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 92px 92px;
+  grid-template-columns: minmax(180px, 1fr) 92px;
   gap: 12px;
   align-items: center;
   padding: 14px 0;

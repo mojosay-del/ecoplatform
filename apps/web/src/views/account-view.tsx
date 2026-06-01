@@ -170,20 +170,17 @@ const NOTIFICATION_ROWS: Array<{
   category: string;
   label: string;
   description: string;
-  locked?: boolean;
   companyOnly?: boolean;
 }> = [
   {
     category: "security",
     label: "Безопасность",
     description: "Входы, смена пароля и отзыв сессий.",
-    locked: true,
   },
   {
     category: "billing",
     label: "Биллинг",
     description: "Счета, платежи, документы и статусы подписки.",
-    locked: true,
     companyOnly: true,
   },
   {
@@ -644,7 +641,6 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   }
 
   function notificationEnabled(category: string, channel: "in_app" | "email") {
-    if (category === "security" || category === "billing") return true;
     const muted =
       channel === "in_app"
         ? (notificationPreferences?.inAppMutedCategories ?? [])
@@ -653,7 +649,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   }
 
   async function updateNotificationPreference(category: string, channel: "in_app" | "email", enabled: boolean) {
-    if (!token || category === "security" || category === "billing") return;
+    if (!token) return;
     const field = channel === "in_app" ? "inAppMutedCategories" : "emailMutedCategories";
     const currentPreferences = notificationPreferences ?? {
       inAppMutedCategories: [],
@@ -912,7 +908,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
 
         <AccountScrollSection
           accountSection="notifications"
-          description="Что показывать в кабинете и что отправлять на email."
+          description="Какие уведомления показывать в личном кабинете."
           title="Уведомления"
         >
           <article className="card account-card">
@@ -920,39 +916,29 @@ export function AccountView({ section }: { section: AccountSectionId }) {
               <div className="account-notification-head">
                 <span>Категория</span>
                 <span>В кабинете</span>
-                <span>Email</span>
               </div>
-              {NOTIFICATION_ROWS.filter((row) => !row.companyOnly || !isPlatformStaff).map((row) => (
-                <div className="account-notification-row" key={row.category}>
-                  <div>
-                    <strong>{row.label}</strong>
-                    <p>{row.description}</p>
+              {NOTIFICATION_ROWS.filter((row) => !row.companyOnly || !isPlatformStaff).map((row) => {
+                const busyKey = `${row.category}:in_app`;
+                return (
+                  <div className="account-notification-row" key={row.category}>
+                    <div>
+                      <strong>{row.label}</strong>
+                      <p>{row.description}</p>
+                    </div>
+                    <label className="account-switch">
+                      <input
+                        checked={notificationEnabled(row.category, "in_app")}
+                        disabled={notificationPreferencesState === "loading" || notificationBusyKey === busyKey}
+                        onChange={(event) =>
+                          void updateNotificationPreference(row.category, "in_app", event.currentTarget.checked)
+                        }
+                        type="checkbox"
+                      />
+                      <span className="account-switch-track" aria-hidden="true" />
+                    </label>
                   </div>
-                  {(["in_app", "email"] as const).map((channel) => {
-                    const busyKey = `${row.category}:${channel}`;
-                    if (row.locked) {
-                      return (
-                        <span className="account-toggle-locked" key={channel}>
-                          Всегда
-                        </span>
-                      );
-                    }
-                    return (
-                      <label className="account-switch" key={channel}>
-                        <input
-                          checked={notificationEnabled(row.category, channel)}
-                          disabled={notificationPreferencesState === "loading" || notificationBusyKey === busyKey}
-                          onChange={(event) =>
-                            void updateNotificationPreference(row.category, channel, event.currentTarget.checked)
-                          }
-                          type="checkbox"
-                        />
-                        <span className="account-switch-track" aria-hidden="true" />
-                      </label>
-                    );
-                  })}
-                </div>
-              ))}
+                );
+              })}
             </div>
             {notificationPreferencesState === "error" ? (
               <p className="account-form-message">Не удалось загрузить настройки уведомлений.</p>

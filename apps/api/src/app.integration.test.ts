@@ -2010,7 +2010,7 @@ describe("Email channel queue (задел)", () => {
     expect(archive.body).not.toHaveProperty("payload");
   });
 
-  it("preferences API возвращает только публичные списки категорий", async () => {
+  it("preferences API сохраняет security/billing и отбрасывает неизвестные категории", async () => {
     const company = await registerCompany("0699902");
 
     const saved = await ctx.http
@@ -2018,7 +2018,10 @@ describe("Email channel queue (задел)", () => {
       .set("Authorization", `Bearer ${company.token}`)
       .send({ inAppMutedCategories: ["moderation", "security"], emailMutedCategories: ["support", "billing"] });
     expect(saved.status).toBe(200);
-    expect(saved.body).toEqual({ inAppMutedCategories: ["moderation"], emailMutedCategories: ["support"] });
+    expect(saved.body).toEqual({
+      inAppMutedCategories: ["moderation", "security"],
+      emailMutedCategories: ["support", "billing"],
+    });
     expect(saved.body).not.toHaveProperty("id");
     expect(saved.body).not.toHaveProperty("userId");
 

@@ -71,7 +71,7 @@ describe("NotificationsService", () => {
     expect(notificationUpsert).toHaveBeenCalledTimes(2);
   });
 
-  it("security не отключается через mute — уведомление создаётся даже если категория в inAppMutedCategories", async () => {
+  it("security можно отключить через mute — in-app уведомление подавляется", async () => {
     const { prisma, notificationUpsert } = buildPrismaMock({
       preferences: {
         inAppMutedCategories: [NotificationCategory.security, NotificationCategory.billing],
@@ -89,8 +89,8 @@ describe("NotificationsService", () => {
       body: "—",
     });
 
-    expect(result).not.toBeNull();
-    expect(notificationUpsert).toHaveBeenCalledTimes(1);
+    expect(result).toBeNull();
+    expect(notificationUpsert).not.toHaveBeenCalled();
   });
 
   it("in-app mute не гасит отдельную email-доставку", async () => {
@@ -176,7 +176,7 @@ describe("NotificationsService", () => {
     expect(recipientIds).toEqual(["admin-1", "admin-2"]);
   });
 
-  it("updatePreferences молча отбрасывает security/billing из inAppMutedCategories", async () => {
+  it("updatePreferences сохраняет security/billing в inAppMutedCategories", async () => {
     const { prisma } = buildPrismaMock({});
     const service = new NotificationsService(prisma);
 
@@ -192,14 +192,21 @@ describe("NotificationsService", () => {
       },
     );
 
+    const expectedInApp = [
+      NotificationCategory.security,
+      NotificationCategory.billing,
+      NotificationCategory.moderation,
+    ];
+    const expectedEmail = [NotificationCategory.billing, NotificationCategory.support];
+
     const args = prisma.userNotificationPreferences.upsert.mock.calls[0]?.[0];
-    expect(args.create.inAppMutedCategories).toEqual([NotificationCategory.moderation]);
-    expect(args.create.emailMutedCategories).toEqual([NotificationCategory.support]);
-    expect(args.update.inAppMutedCategories).toEqual([NotificationCategory.moderation]);
-    expect(args.update.emailMutedCategories).toEqual([NotificationCategory.support]);
+    expect(args.create.inAppMutedCategories).toEqual(expectedInApp);
+    expect(args.create.emailMutedCategories).toEqual(expectedEmail);
+    expect(args.update.inAppMutedCategories).toEqual(expectedInApp);
+    expect(args.update.emailMutedCategories).toEqual(expectedEmail);
     expect(result).toEqual({
-      inAppMutedCategories: [NotificationCategory.moderation],
-      emailMutedCategories: [NotificationCategory.support],
+      inAppMutedCategories: expectedInApp,
+      emailMutedCategories: expectedEmail,
     });
     expect(result).not.toHaveProperty("userId");
   });

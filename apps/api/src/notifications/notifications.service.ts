@@ -30,6 +30,8 @@ export type NotificationPreferencesInput = {
 type NotificationPreferencesOutput = NotificationPreferencesInput;
 
 const MUTABLE_CATEGORIES = new Set<NotificationCategory>([
+  NotificationCategory.security,
+  NotificationCategory.billing,
   NotificationCategory.marketplace,
   NotificationCategory.moderation,
   NotificationCategory.support,
