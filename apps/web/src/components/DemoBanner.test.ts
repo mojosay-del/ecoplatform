@@ -51,6 +51,25 @@ describe("DemoBanner", () => {
     });
   });
 
+  it("formats long countdown in days instead of hundreds of hours", () => {
+    const now = new Date("2026-05-27T09:00:00.000Z");
+
+    // 24 дня 8 часов — раньше показывалось как «584 ч 46 мин».
+    expect(getDemoBannerState("2026-06-20T17:00:00.000Z", now)).toEqual({
+      mode: "normal",
+      text: "24 дня 8 ч",
+    });
+    // Ровно сутки без остатка — без «0 ч».
+    expect(getDemoBannerState("2026-05-28T09:00:00.000Z", now)).toEqual({
+      mode: "normal",
+      text: "1 день",
+    });
+    expect(getDemoBannerState("2026-06-01T09:00:00.000Z", now)).toEqual({
+      mode: "normal",
+      text: "5 дней",
+    });
+  });
+
   it("does not render expired or invalid demo dates", () => {
     const now = new Date("2026-05-27T09:00:00.000Z");
 
