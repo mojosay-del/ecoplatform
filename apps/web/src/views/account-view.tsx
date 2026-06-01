@@ -83,14 +83,14 @@ function dispatchActiveAccountSection(section: AccountSectionId) {
   window.dispatchEvent(new CustomEvent(ACCOUNT_SECTION_CHANGE_EVENT, { detail: { section } }));
 }
 
-function scrollAccountSectionIntoView(section: AccountSectionId) {
+function scrollAccountSectionIntoView(section: AccountSectionId, behavior: ScrollBehavior = "smooth") {
   const target = document.getElementById(accountSectionDomId(section));
   if (!target) return;
 
   dispatchActiveAccountSection(section);
   const prefersReducedMotion =
     typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+  target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : behavior, block: "start" });
 }
 
 // Приветствие по времени суток. Значение по умолчанию ("Добрый день")
@@ -320,7 +320,10 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     [isPlatformStaff],
   );
   const visibleSectionsKey = visibleSections.join("|");
-  const targetLayoutKey = isAccountBusinessSection(targetSection) ? `${billingState}|${sessionsState}` : "stable";
+  // Высота секций зависит от асинхронно подгружаемых данных; включаем все
+  // релевантные состояния, чтобы при их догрузке заново «доводить» прокрутку
+  // к нужной секции (иначе на прямом заходе по ссылке позиция уезжала).
+  const targetLayoutKey = `${billingState}|${sessionsState}|${notificationPreferencesState}|${supportState}`;
 
   useEffect(() => {
     if (isPlatformStaff && isAccountBusinessSection(section)) {
@@ -331,8 +334,10 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   useEffect(() => {
     const timeouts: number[] = [];
     const frame = window.requestAnimationFrame(() => {
-      timeouts.push(window.setTimeout(() => scrollAccountSectionIntoView(targetSection), 80));
-      timeouts.push(window.setTimeout(() => scrollAccountSectionIntoView(targetSection), 280));
+      // На прямом заходе/смене секции — мгновенно (auto): плавную анимацию
+      // прерывали ре-рендеры первых сотен мс, и страница оставалась наверху.
+      timeouts.push(window.setTimeout(() => scrollAccountSectionIntoView(targetSection, "auto"), 80));
+      timeouts.push(window.setTimeout(() => scrollAccountSectionIntoView(targetSection, "auto"), 280));
     });
     return () => {
       window.cancelAnimationFrame(frame);
