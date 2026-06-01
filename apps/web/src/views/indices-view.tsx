@@ -522,11 +522,16 @@ function IndexChart({
           </text>
         </g>
 
-        {labels.map((label, i) => (
-          <text key={i} x={label.x} y={height - 12} textAnchor="middle" fontSize="13" fill="var(--muted)">
-            {label.text}
-          </text>
-        ))}
+        {labels.map((label, i) => {
+          // Крайние подписи якорим к краям, иначе при textAnchor="middle"
+          // половина первой/последней даты уходит за границу SVG и обрезается.
+          const anchor = i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle";
+          return (
+            <text key={i} x={label.x} y={height - 12} textAnchor={anchor} fontSize="13" fill="var(--muted)">
+              {label.text}
+            </text>
+          );
+        })}
       </svg>
     </div>
   );

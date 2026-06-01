@@ -12073,10 +12073,36 @@ li.tree-add-row + li.tree-add-row,
   .auth-field textarea {
     font-size: 16px;
   }
+
+  /* Переключатель периода графика: 4 коротких опции делят ширину поровну
+     (segmented control) и влезают целиком — раньше «6 мес» уезжал в скрытый
+     горизонтальный скролл без видимой подсказки. */
+  .index-period-tabs {
+    overflow-x: visible;
+  }
+
+  .index-period-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 7px 4px;
+    font-size: 12px;
+    text-align: center;
+  }
 }
 
 /* --- safe-area для фиксированных элементов на мобильном --- */
 @media (max-width: 880px) {
+  /* На телефоне сайдбар — это выезжающий драуэр (position:fixed), поэтому
+     «свёрнутое» состояние (72px-рельса) тут неуместно. Без этого правила
+     .app-shell[data-collapsed="true"] (высокая специфичность атрибута)
+     перебивал мобильную одну колонку и зажимал контент в 72px. */
+  .app-shell,
+  .app-shell[data-collapsed="true"],
+  .app-shell.app-shell-no-sidebar,
+  .app-shell.app-shell-no-sidebar[data-collapsed="true"] {
+    grid-template-columns: 1fr;
+  }
+
   /* Мобильное меню-драуэр: верх под вырезом, низ над домашней полосой. */
   .sidebar {
     padding-top: calc(22px + env(safe-area-inset-top));
