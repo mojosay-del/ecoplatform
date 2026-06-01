@@ -8,11 +8,13 @@
 // здесь, а не 42 в views.
 
 import type {
+  AdminNavResponse,
   BillingStatus,
   CompanyProfileUpdateDto,
   ConsentRecordItem,
   ConsentSource,
   AdminDashboardSummary,
+  NavVisibilityResponse,
   KnowledgeArticleDetail,
   KnowledgeNode,
   LearningModuleDetail,
@@ -172,6 +174,17 @@ export const api = {
           body,
         }),
     },
+  },
+
+  // ── Навигация (видимость пунктов меню) ────────────────────────────────────
+  navigation: {
+    // Для всех: какие пункты меню скрыты админом.
+    visibility: (options: ApiRequestOptions = {}) =>
+      apiFetch<NavVisibilityResponse>("/navigation/visibility", { token: options.token }),
+    // Админ-редактор видимости.
+    adminGet: () => apiFetch<AdminNavResponse>("/admin/navigation"),
+    adminSave: (hiddenKeys: string[]) =>
+      apiFetch<AdminNavResponse>("/admin/navigation", { method: "PATCH", body: { hiddenKeys } }),
   },
 
   // ── Поддержка ───────────────────────────────────────────────────────────

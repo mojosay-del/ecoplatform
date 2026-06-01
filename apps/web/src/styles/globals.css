@@ -8997,6 +8997,18 @@ li.tree-add-row + li.tree-add-row,
   margin-bottom: 18px;
 }
 
+/* Панель действий и стек категорий на странице «Меню сайта». */
+.admin-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.settings-pane + .settings-pane {
+  margin-top: 18px;
+}
+
 .settings-pane-title {
   font-size: 20px;
   font-weight: 700;

@@ -23,6 +23,9 @@ import {
 } from "lucide-react";
 
 export type NavItem = {
+  // Стабильный ключ пункта (для сопоставления со списком скрытых из
+  // navMenuItems). Есть у пунктов app-меню; у account-меню не нужен.
+  key?: string;
   href?: string;
   label: string;
   icon: LucideIcon;
@@ -57,7 +60,8 @@ export type AccountSectionId =
 export const ACCOUNT_SECTION_CHANGE_EVENT = "account:section-change";
 export const ACCOUNT_SECTION_NAVIGATE_EVENT = "account:section-navigate";
 
-const futureItem = (label: string, icon: LucideIcon, disabledHint: string): NavItem => ({
+const futureItem = (key: string, label: string, icon: LucideIcon, disabledHint: string): NavItem => ({
+  key,
   label,
   icon,
   disabled: true,
@@ -68,32 +72,37 @@ export const appNavSections: NavSection[] = [
   {
     title: "Главная",
     items: [
-      { href: "/news", label: "Новости", icon: Newspaper },
-      { href: "/indices", label: "Индексы цен", icon: LineChart },
-      { href: "/education", label: "Обучение", icon: GraduationCap },
-      futureItem("Торговая площадка", ShoppingBag, "Торговая площадка — закрытый аукцион на объявлениях."),
+      { key: "news", href: "/news", label: "Новости", icon: Newspaper },
+      { key: "indices", href: "/indices", label: "Индексы цен", icon: LineChart },
+      { key: "education", href: "/education", label: "Обучение", icon: GraduationCap },
+      futureItem("marketplace", "Торговая площадка", ShoppingBag, "Торговая площадка — закрытый аукцион на объявлениях."),
     ],
   },
   {
     title: "Сообщество",
-    items: [futureItem("Форум", MessageCircle, "Форум — обсуждения участников рынка.")],
+    items: [futureItem("forum", "Форум", MessageCircle, "Форум — обсуждения участников рынка.")],
   },
   {
     title: "Автоматизация",
-    items: [futureItem("Магазин", Store, "Магазин — каталог решений и сервисов для участников рынка.")],
+    items: [futureItem("shop", "Магазин", Store, "Магазин — каталог решений и сервисов для участников рынка.")],
   },
   {
     title: "Базы знаний",
     items: [
-      { href: "/knowledge-base", label: "Сырьё", icon: BookOpen },
-      futureItem("Документация", FileText, "Документация — шаблоны, регламенты и отраслевые справки."),
+      { key: "knowledge-base", href: "/knowledge-base", label: "Сырьё", icon: BookOpen },
+      futureItem("docs", "Документация", FileText, "Документация — шаблоны, регламенты и отраслевые справки."),
     ],
   },
   {
     title: "Инструменты",
     items: [
-      futureItem("Карты", MapIcon, "Карты — география переработчиков, складов и логистики."),
-      futureItem("Калькуляторы", Calculator, "Калькуляторы — расчёт экономики сделок, логистики и переработки."),
+      futureItem("maps", "Карты", MapIcon, "Карты — география переработчиков, складов и логистики."),
+      futureItem(
+        "calculators",
+        "Калькуляторы",
+        Calculator,
+        "Калькуляторы — расчёт экономики сделок, логистики и переработки.",
+      ),
     ],
   },
   {
@@ -102,6 +111,7 @@ export const appNavSections: NavSection[] = [
       // Личный кабинет и уведомления уже доступны через иконки в топбаре —
       // здесь дублировать не нужно. Админские разделы собраны в одной панели.
       {
+        key: "admin",
         href: "/admin",
         label: "Панель управления",
         icon: LayoutDashboard,
@@ -252,6 +262,7 @@ const adminBreadcrumbs: { prefix: string; trail: BreadcrumbItem[] }[] = [
   { prefix: "/admin/billing", trail: [adminPanelRoot, { href: "/admin/billing", label: "Подписки" }] },
   { prefix: "/admin/moderation", trail: [adminPanelRoot, { href: "/admin/moderation", label: "Очередь модерации" }] },
   { prefix: "/admin/settings", trail: [adminPanelRoot, { href: "/admin/settings", label: "Настройки" }] },
+  { prefix: "/admin/navigation", trail: [adminPanelRoot, { href: "/admin/navigation", label: "Меню сайта" }] },
   { prefix: "/admin/journals", trail: [adminPanelRoot, { href: "/admin/journals", label: "Журнал" }] },
   { prefix: "/admin", trail: [adminPanelRoot] },
 ];

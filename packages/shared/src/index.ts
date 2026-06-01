@@ -3,5 +3,6 @@ export * from "./api-response";
 export * from "./content-blocks";
 export * from "./domain";
 export * from "./dto";
+export * from "./navigation";
 export * from "./price-index";
 export * from "./slug";

@@ -4034,3 +4034,55 @@ describe("Discussion (полиморфные обсуждения, Волна 7.
     ).resolves.toBe(0);
   });
 });
+
+describe("Navigation visibility (скрытие разделов меню)", () => {
+  it("скрытый раздел блокируется для всех (404), видимость отражается в /navigation/visibility", async () => {
+    const adminToken = await loginAdmin();
+    const company = await registerCompany("0911001");
+
+    // До скрытия: обычный пользователь с активным demo видит /api/news.
+    const before = await ctx.http.get("/api/news").set("Authorization", `Bearer ${company.token}`);
+    expect(before.status).toBe(200);
+
+    // Админ скрывает раздел «Новости».
+    const hide = await ctx.http
+      .patch("/api/admin/navigation")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ hiddenKeys: ["news", "bogus-unknown-key"] });
+    expect(hide.status).toBe(200);
+
+    // Видимость для всех: news скрыт, неизвестный ключ отброшен.
+    const visibility = await ctx.http
+      .get("/api/navigation/visibility")
+      .set("Authorization", `Bearer ${company.token}`);
+    expect(visibility.status).toBe(200);
+    expect(visibility.body.hiddenKeys).toEqual(["news"]);
+    expect(visibility.body.hiddenHrefs).toContain("/news");
+
+    // Раздел недоступен и обычному пользователю, и админу (блок «от всех»).
+    const userBlocked = await ctx.http.get("/api/news").set("Authorization", `Bearer ${company.token}`);
+    expect(userBlocked.status).toBe(404);
+    const adminBlocked = await ctx.http.get("/api/news").set("Authorization", `Bearer ${adminToken}`);
+    expect(adminBlocked.status).toBe(404);
+
+    // Возврат видимости — раздел снова доступен пользователю.
+    const show = await ctx.http
+      .patch("/api/admin/navigation")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ hiddenKeys: [] });
+    expect(show.status).toBe(200);
+    const after = await ctx.http.get("/api/news").set("Authorization", `Bearer ${company.token}`);
+    expect(after.status).toBe(200);
+  });
+
+  it("админ-эндпоинты редактора меню закрыты для обычного пользователя", async () => {
+    const company = await registerCompany("0911002");
+    const get = await ctx.http.get("/api/admin/navigation").set("Authorization", `Bearer ${company.token}`);
+    expect(get.status).toBe(403);
+    const patch = await ctx.http
+      .patch("/api/admin/navigation")
+      .set("Authorization", `Bearer ${company.token}`)
+      .send({ hiddenKeys: ["news"] });
+    expect(patch.status).toBe(403);
+  });
+});
