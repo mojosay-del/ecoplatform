@@ -1105,7 +1105,7 @@ input[type="checkbox"]:focus-visible {
   right: 0;
   display: grid;
   gap: 4px;
-  width: min(360px, 100%);
+  width: min(360px, calc(100vw - 48px));
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
@@ -1154,8 +1154,9 @@ input[type="checkbox"]:focus-visible {
   gap: 12px;
   align-items: center;
   width: 100%;
-  border-radius: var(--radius-sm);
-  padding: 9px 10px;
+  min-height: 34px;
+  border-radius: var(--radius-chip);
+  padding: 7px 12px;
   text-align: left;
 }
 
