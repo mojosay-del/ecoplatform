@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -93,10 +85,7 @@ export function AdminKnowledgeView() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const categories = useMemo(
-    () => items.filter(isKnowledgeCategory).sort(sortByPosition),
-    [items],
-  );
+  const categories = useMemo(() => items.filter(isKnowledgeCategory).sort(sortByPosition), [items]);
   const categoryIds = useMemo(() => new Set(categories.map((category) => category.id)), [categories]);
   const materialsByCategory = useMemo(() => {
     const grouped = new Map<string, Article[]>();
@@ -229,7 +218,8 @@ export function AdminKnowledgeView() {
       coverImageId: kind === "category" ? "" : (article.coverImageId ?? ""),
       iconType: kind === "category" ? KNOWLEDGE_CATEGORY_ICON_TYPE : (article.iconType ?? ""),
       position: article.position,
-      blocks: kind === "category" ? [] : article.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
+      blocks:
+        kind === "category" ? [] : article.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
     });
   }
 
@@ -336,7 +326,9 @@ export function AdminKnowledgeView() {
       const result = await persistKnowledgeDraft();
       setMessage(draft.id ? `${label} обновлён.` : `${label} создан как черновик.`);
       if (wasNew && draft.kind === "material" && parentId) {
-        const nextPosition = result.items.filter((item) => !isKnowledgeCategory(item) && item.parentId === parentId).length;
+        const nextPosition = result.items.filter(
+          (item) => !isKnowledgeCategory(item) && item.parentId === parentId,
+        ).length;
         startNewMaterial(parentId, nextPosition);
       }
     } catch (error) {
@@ -365,7 +357,11 @@ export function AdminKnowledgeView() {
   async function remove(article: Article) {
     if (!token) return;
     const label = isKnowledgeCategory(article) ? "категорию" : "материал";
-    if (!confirm(`Удалить ${label} «${article.title}»? Если есть дочерние материалы — сначала переместите или удалите их.`))
+    if (
+      !confirm(
+        `Удалить ${label} «${article.title}»? Если есть дочерние материалы — сначала переместите или удалите их.`,
+      )
+    )
       return;
     try {
       await apiFetch(`/admin/content/knowledge-base/${article.id}`, { method: "DELETE", token });
@@ -451,7 +447,9 @@ export function AdminKnowledgeView() {
       <section className="page">
         <header className="page-header">
           <h1 className="page-title">База знаний</h1>
-          <p className="page-subtitle">Категории и материалы базы знаний. Новые материалы добавляются внутри категории.</p>
+          <p className="page-subtitle">
+            Категории и материалы базы знаний. Новые материалы добавляются внутри категории.
+          </p>
         </header>
         {message ? <p className="cms-flash">{message}</p> : null}
 
@@ -508,7 +506,9 @@ export function AdminKnowledgeView() {
             {hasActiveDraft ? (
               <form className="form news-form" onSubmit={submit} onBlur={knowledgeAutosave.handleAutosaveBlur}>
                 <div className="news-form-head">
-                  <span className="news-form-mode">{isEditingNew ? `Новый ${draftLabel.toLowerCase()}` : draftLabel}</span>
+                  <span className="news-form-mode">
+                    {isEditingNew ? `Новый ${draftLabel.toLowerCase()}` : draftLabel}
+                  </span>
                 </div>
 
                 {draft.kind === "category" ? (
@@ -597,7 +597,9 @@ export function AdminKnowledgeView() {
                             </option>
                           ))}
                         </select>
-                        <small className="form-field-hint">Это категория базы знаний, не справочник индексов цен.</small>
+                        <small className="form-field-hint">
+                          Это категория базы знаний, не справочник индексов цен.
+                        </small>
                       </label>
 
                       <div className="form-grid-2">
@@ -608,7 +610,9 @@ export function AdminKnowledgeView() {
                             type="number"
                             min={0}
                             value={draft.position}
-                            onChange={(event) => setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))}
+                            onChange={(event) =>
+                              setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))
+                            }
                           />
                         </label>
                         <label className="form-field">
@@ -845,7 +849,12 @@ function SortableKnowledgeMaterial({
   };
 
   return (
-    <li ref={setNodeRef} style={style} role="treeitem" className={isDragging ? "knowledge-sortable-item is-dragging" : "knowledge-sortable-item"}>
+    <li
+      ref={setNodeRef}
+      style={style}
+      role="treeitem"
+      className={isDragging ? "knowledge-sortable-item is-dragging" : "knowledge-sortable-item"}
+    >
       <KnowledgeMaterialRow
         material={material}
         active={active}
@@ -853,7 +862,13 @@ function SortableKnowledgeMaterial({
         onPublishToggle={onPublishToggle}
         onRemove={onRemove}
         dragHandle={
-          <button type="button" className="tree-row-drag-handle" aria-label="Перетащить материал" {...attributes} {...listeners}>
+          <button
+            type="button"
+            className="tree-row-drag-handle"
+            aria-label="Перетащить материал"
+            {...attributes}
+            {...listeners}
+          >
             <GripVertical size={14} />
           </button>
         }

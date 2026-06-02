@@ -35,15 +35,7 @@ const LEGAL_LINKS = [
   { href: "/legal/offer", label: "Оферта" },
 ] as const;
 
-const MARQUEE = [
-  "Индексы цен",
-  "Обучение",
-  "База знаний",
-  "Новости отрасли",
-  "Аналитика",
-  "Инструменты",
-  "Сообщество",
-];
+const MARQUEE = ["Индексы цен", "Обучение", "База знаний", "Новости отрасли", "Аналитика", "Инструменты", "Сообщество"];
 
 const FEATURES = [
   {
@@ -192,17 +184,12 @@ function sparkline(values: number[], w = 128, h = 40) {
   const max = Math.max(...values);
   const range = max - min || 1;
   const step = w / (values.length - 1);
-  const pts = values.map(
-    (v, i) => [i * step, h - 4 - ((v - min) / range) * (h - 8)] as const,
-  );
-  const line = pts
-    .map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`)
-    .join(" ");
+  const pts = values.map((v, i) => [i * step, h - 4 - ((v - min) / range) * (h - 8)] as const);
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
   return { line, area: `${line} L${w} ${h} L0 ${h} Z` };
 }
 
-const reveal = (delay: number): CSSProperties =>
-  ({ "--reveal-delay": `${delay}ms` }) as CSSProperties;
+const reveal = (delay: number): CSSProperties => ({ "--reveal-delay": `${delay}ms` }) as CSSProperties;
 
 export function LandingView() {
   return (
@@ -222,14 +209,7 @@ export function LandingView() {
       {/* Навбар — логотип + разделы + Войти */}
       <nav className="lp-nav" aria-label="Главная навигация">
         <Link className="lp-nav__brand" href="/" aria-label="ЭкоПлатформа">
-          <Image
-            className="lp-nav__logo"
-            src="/brand/logo.webp"
-            alt="ЭкоПлатформа"
-            width={34}
-            height={34}
-            priority
-          />
+          <Image className="lp-nav__logo" src="/brand/logo.webp" alt="ЭкоПлатформа" width={34} height={34} priority />
         </Link>
         <span className="lp-nav__links">
           <Link className="lp-nav__link" href="#subscription">
@@ -280,9 +260,7 @@ export function LandingView() {
                 const Icon = f.icon;
                 return (
                   <article className="lp-feature" key={f.t}>
-                    <span className="lp-feature__num">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
+                    <span className="lp-feature__num">{String(i + 1).padStart(2, "0")}</span>
                     <span className="lp-feature__icon" aria-hidden="true">
                       <Icon size={26} />
                     </span>
@@ -315,10 +293,8 @@ export function LandingView() {
               <span className="lp-chapter-label">02 · Индексы цен</span>
               <h3 className="lp-show__t">Цены живут здесь</h3>
               <p className="lp-show__d">
-                Ежедневные котировки по ключевым видам вторсырья: динамика, тренды
-                и история. Вы видите справедливую{" "}
-                <span style={{ whiteSpace: "nowrap" }}>цену — и торгуетесь</span> на
-                данных, а не на слухах.
+                Ежедневные котировки по ключевым видам вторсырья: динамика, тренды и история. Вы видите справедливую{" "}
+                <span style={{ whiteSpace: "nowrap" }}>цену — и торгуетесь</span> на данных, а не на слухах.
               </p>
             </div>
             <div className="lp-show__mock" data-reveal style={reveal(120)}>
@@ -330,11 +306,7 @@ export function LandingView() {
                       <article className="lp-idx lp-idx--solo" key={row.code}>
                         <div className="lp-idx__top">
                           <span className="lp-idx__code">{row.code}</span>
-                          <span
-                            className={`lp-idx__chg${row.up ? "" : " is-down"}`}
-                          >
-                            {row.change}
-                          </span>
+                          <span className={`lp-idx__chg${row.up ? "" : " is-down"}`}>{row.change}</span>
                         </div>
                         <div className="lp-idx__name">{row.name}</div>
                         <svg
@@ -343,14 +315,8 @@ export function LandingView() {
                           preserveAspectRatio="none"
                           aria-hidden="true"
                         >
-                          <path
-                            className={`lp-idx__area${row.up ? "" : " is-down"}`}
-                            d={sp.area}
-                          />
-                          <path
-                            className={`lp-idx__line${row.up ? "" : " is-down"}`}
-                            d={sp.line}
-                          />
+                          <path className={`lp-idx__area${row.up ? "" : " is-down"}`} d={sp.area} />
+                          <path className={`lp-idx__line${row.up ? "" : " is-down"}`} d={sp.line} />
                         </svg>
                         <div className="lp-idx__price">
                           {row.price} <span>{row.unit}</span>
@@ -371,8 +337,8 @@ export function LandingView() {
               <span className="lp-chapter-label">03 · Новости</span>
               <h3 className="lp-show__t">Главное в отрасли — без шума</h3>
               <p className="lp-show__d">
-                Лента с обложками, тегами и удобным чтением: регулирование, цены,
-                технологии. Будьте в курсе перемен за минуты, а не за часы.
+                Лента с обложками, тегами и удобным чтением: регулирование, цены, технологии. Будьте в курсе перемен за
+                минуты, а не за часы.
               </p>
             </div>
             <div className="lp-show__mock" data-reveal style={reveal(120)}>
@@ -419,8 +385,8 @@ export function LandingView() {
               <span className="lp-chapter-label">04 · Обучение</span>
               <h3 className="lp-show__t">Учитесь сами и обучайте команду</h3>
               <p className="lp-show__d">
-                Курсы с уроками и понятным прогрессом. От основ рынка до экономики
-                переработки — новый человек входит в отрасль за недели.
+                Курсы с уроками и понятным прогрессом. От основ рынка до экономики переработки — новый человек входит в
+                отрасль за недели.
               </p>
             </div>
             <div className="lp-show__mock" data-reveal style={reveal(120)}>
@@ -440,9 +406,7 @@ export function LandingView() {
                         </div>
                         <div className="lp-edu-card__overlay">
                           <h4 className="lp-edu-card__title">{c.title}</h4>
-                          <span className="lp-edu-card__lessons">
-                            Уроков: {c.lessons}
-                          </span>
+                          <span className="lp-edu-card__lessons">Уроков: {c.lessons}</span>
                         </div>
                       </div>
                       <div className="lp-edu-card__foot">
@@ -469,9 +433,8 @@ export function LandingView() {
               <span className="lp-chapter-label">05 · База знаний</span>
               <h3 className="lp-show__t">Сначала сырьё, потом документы</h3>
               <p className="lp-show__d">
-                По каждому виду вторсырья: характеристики, требования, обработка.
-                А затем — нормативы, 152-ФЗ и вся документация. Навигация слева,
-                материалы — справа.
+                По каждому виду вторсырья: характеристики, требования, обработка. А затем — нормативы, 152-ФЗ и вся
+                документация. Навигация слева, материалы — справа.
               </p>
             </div>
             <div className="lp-show__mock" data-reveal style={reveal(120)}>
@@ -496,9 +459,7 @@ export function LandingView() {
                     ))}
                   </aside>
                   <div className="lp-kb__content" aria-hidden="true">
-                    <span className="lp-kb__crumbs">
-                      База знаний / Макулатура / Картон
-                    </span>
+                    <span className="lp-kb__crumbs">База знаний / Макулатура / Картон</span>
                     <h4 className="lp-kb__title">Картон</h4>
                     <div className="lp-kb__cover lp-cover">
                       <Image
@@ -509,10 +470,7 @@ export function LandingView() {
                         style={{ objectFit: "cover" }}
                       />
                     </div>
-                    <p className="lp-kb__lead">
-                      Виды, требования к приёму, влажность и подготовка к
-                      переработке.
-                    </p>
+                    <p className="lp-kb__lead">Виды, требования к приёму, влажность и подготовка к переработке.</p>
                     <div className="lp-kb__grid">
                       {KB_CHILDREN.map((c) => (
                         <span className="lp-kb__child" key={c}>
@@ -543,11 +501,7 @@ export function LandingView() {
               return (
                 <article
                   className={`lp-bento-card ${
-                    card.feature
-                      ? "lp-bento-card--feature"
-                      : i < 3
-                        ? "lp-bento-card--half"
-                        : "lp-bento-card--third"
+                    card.feature ? "lp-bento-card--feature" : i < 3 ? "lp-bento-card--half" : "lp-bento-card--third"
                   }`}
                   key={card.t}
                   data-reveal
@@ -575,9 +529,7 @@ export function LandingView() {
                   <span data-count={m.count} data-suffix={m.suffix}>
                     {`0${m.suffix}`}
                   </span>
-                  {m.unit ? (
-                    <sup className="lp-metric__unit">{m.unit}</sup>
-                  ) : null}
+                  {m.unit ? <sup className="lp-metric__unit">{m.unit}</sup> : null}
                 </div>
                 <div className="lp-metric__l">{m.l}</div>
               </div>
@@ -589,13 +541,9 @@ export function LandingView() {
         <section className="lp-section">
           <div className="lp-cta" data-reveal>
             <div className="lp-cta__inner">
-              <h2 className="lp-cta__title">
-                Рынок вторсырья, каким он должен быть: прозрачным, понятным и
-                удобным
-              </h2>
+              <h2 className="lp-cta__title">Рынок вторсырья, каким он должен быть: прозрачным, понятным и удобным</h2>
               <p className="lp-cta__sub">
-                Присоединяйтесь к ЭкоПлатформе — и увидите отрасль такой, какой
-                она может быть уже сегодня.
+                Присоединяйтесь к ЭкоПлатформе — и увидите отрасль такой, какой она может быть уже сегодня.
               </p>
               <Link className="lp-btn lp-btn--lg lp-cta__btn" href="/login">
                 Войти в платформу
@@ -618,9 +566,7 @@ export function LandingView() {
               </Link>
             ))}
           </nav>
-          <div className="lp-footer__copy">
-            © {new Date().getFullYear()} ЭкоПлатформа. Рынок вторсырья на данных.
-          </div>
+          <div className="lp-footer__copy">© {new Date().getFullYear()} ЭкоПлатформа. Рынок вторсырья на данных.</div>
         </footer>
       </main>
     </div>

@@ -25,14 +25,10 @@ export function LandingClient() {
   }, [ready, user, router]);
 
   useEffect(() => {
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // 2. Reveal по скроллу.
-    const revealEls = Array.from(
-      document.querySelectorAll<HTMLElement>("[data-reveal]"),
-    );
+    const revealEls = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
     const revealObserver = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -48,9 +44,7 @@ export function LandingClient() {
 
     // 3. Счётчики метрик.
     const fmt = new Intl.NumberFormat("ru-RU");
-    const countEls = Array.from(
-      document.querySelectorAll<HTMLElement>("[data-count]"),
-    );
+    const countEls = Array.from(document.querySelectorAll<HTMLElement>("[data-count]"));
     const runCount = (el: HTMLElement) => {
       const target = Number(el.dataset.count ?? "0");
       const suffix = el.dataset.suffix ?? "";
@@ -95,17 +89,12 @@ export function LandingClient() {
     // 4. Скролл-движок: прогресс-бар, параллакс превью, горизонтальная лента.
     const bar = document.querySelector<HTMLElement>(".lp-progress__bar");
     const preview = document.querySelector<HTMLElement>("[data-parallax]");
-    const horizontal =
-      document.querySelector<HTMLElement>(".lp-horizontal");
-    const track = horizontal?.querySelector<HTMLElement>(
-      ".lp-horizontal__track",
-    );
+    const horizontal = document.querySelector<HTMLElement>(".lp-horizontal");
+    const track = horizontal?.querySelector<HTMLElement>(".lp-horizontal__track");
 
     // 3D-наклон плашек: поворачиваем их по оси X в зависимости от положения
     // в окне — создаёт ощущение объёма и лёгкого вращения при скролле.
-    const tiltEls = Array.from(
-      document.querySelectorAll<HTMLElement>("[data-tilt]"),
-    );
+    const tiltEls = Array.from(document.querySelectorAll<HTMLElement>("[data-tilt]"));
 
     // Включаем «пиннинг» ленты только на широких экранах и без reduced-motion.
     // canPin пересчитываем при каждом layout — чтобы корректно реагировать на
@@ -134,8 +123,7 @@ export function LandingClient() {
       frame = requestAnimationFrame(() => {
         frame = 0;
         const scrollY = window.scrollY;
-        const docH =
-          document.documentElement.scrollHeight - window.innerHeight;
+        const docH = document.documentElement.scrollHeight - window.innerHeight;
 
         if (bar) {
           const p = docH > 0 ? Math.min(scrollY / docH, 1) : 0;
@@ -149,8 +137,7 @@ export function LandingClient() {
         if (canPin && horizontal && track && maxTranslate > 0) {
           const rect = horizontal.getBoundingClientRect();
           const span = horizontal.offsetHeight - window.innerHeight;
-          const progress =
-            span > 0 ? Math.min(Math.max(-rect.top / span, 0), 1) : 0;
+          const progress = span > 0 ? Math.min(Math.max(-rect.top / span, 0), 1) : 0;
           track.style.transform = `translateX(${-progress * maxTranslate}px)`;
         }
 

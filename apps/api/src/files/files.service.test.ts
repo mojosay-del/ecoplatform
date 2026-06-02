@@ -580,9 +580,11 @@ describe("FilesService приватный бакет + signed URL", () => {
         findUnique: vi.fn(),
         delete: vi.fn(),
         aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
-        create: vi.fn().mockImplementation(({ data }) =>
-          Promise.resolve({ id: "file-pdf", createdAt: new Date("2026-06-02T00:00:00.000Z"), ...data }),
-        ),
+        create: vi
+          .fn()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ id: "file-pdf", createdAt: new Date("2026-06-02T00:00:00.000Z"), ...data }),
+          ),
       },
     });
     const service = serviceWithPrisma(prisma);

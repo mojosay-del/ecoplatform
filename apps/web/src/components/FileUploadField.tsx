@@ -183,7 +183,7 @@ export function FileUploadField({
         ) : (
           <div className="file-upload-chip">
             <strong>{uploaded?.originalName ?? "Файл прикреплён"}</strong>
-            {uploaded?.publicUrl ?? uploaded?.downloadUrl ? (
+            {(uploaded?.publicUrl ?? uploaded?.downloadUrl) ? (
               <a
                 className="file-upload-chip-link"
                 href={(uploaded?.publicUrl ?? uploaded?.downloadUrl) as string}

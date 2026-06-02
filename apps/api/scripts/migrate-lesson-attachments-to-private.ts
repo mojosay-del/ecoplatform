@@ -28,12 +28,7 @@
  */
 import { config as loadEnv } from "dotenv";
 import { resolve } from "path";
-import {
-  CopyObjectCommand,
-  DeleteObjectCommand,
-  HeadObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
+import { CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { FileAccessLevel, PrismaClient } from "@prisma/client";
 
 // Локально подхватываем корневой .env монорепы (в проде переменные уже в env).
@@ -72,7 +67,9 @@ async function main() {
     return;
   }
   if (!endpoint || !publicBucket || !accessKeyId || !secretAccessKey) {
-    throw new Error("Не заданы обязательные S3-переменные (S3_ENDPOINT/S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY).");
+    throw new Error(
+      "Не заданы обязательные S3-переменные (S3_ENDPOINT/S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY).",
+    );
   }
 
   const prisma = new PrismaClient();

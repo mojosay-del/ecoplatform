@@ -853,14 +853,11 @@ export class FilesService {
     // отдаём только public-файлы. Контент-персонал (admin / content_manager)
     // видит и приватные — это файлы, которыми он управляет в редакторе.
     const canSeePrivate = Boolean(
-      requester &&
-        (requester.platformRoles.includes("admin") || requester.platformRoles.includes("content_manager")),
+      requester && (requester.platformRoles.includes("admin") || requester.platformRoles.includes("content_manager")),
     );
 
     const assets = await this.prisma.fileAsset.findMany({
-      where: canSeePrivate
-        ? { id: { in: uniqueIds } }
-        : { id: { in: uniqueIds }, accessLevel: FileAccessLevel.public },
+      where: canSeePrivate ? { id: { in: uniqueIds } } : { id: { in: uniqueIds }, accessLevel: FileAccessLevel.public },
       orderBy: { createdAt: "desc" },
     });
 

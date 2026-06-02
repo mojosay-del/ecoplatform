@@ -348,9 +348,7 @@ export function LessonView({
     if (!container) return;
 
     const revealItems = Array.from(
-      container.querySelectorAll<HTMLElement>(
-        ".lesson-title, .lesson-blocks > .content-blocks > *, .lesson-actions",
-      ),
+      container.querySelectorAll<HTMLElement>(".lesson-title, .lesson-blocks > .content-blocks > *, .lesson-actions"),
     );
 
     revealItems.forEach((item, index) => {

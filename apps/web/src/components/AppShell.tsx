@@ -424,7 +424,15 @@ function NavEntry({
 
 // Хлебные крошки в топбаре: для обычных разделов берём активный пункт меню,
 // а для админки показываем вложенный путь внутри единой панели управления.
-function Breadcrumb({ nav, pathname, trail: customTrail }: { nav: NavSection[]; pathname: string; trail?: BreadcrumbItem[] }) {
+function Breadcrumb({
+  nav,
+  pathname,
+  trail: customTrail,
+}: {
+  nav: NavSection[];
+  pathname: string;
+  trail?: BreadcrumbItem[];
+}) {
   const trail = customTrail ?? getBreadcrumbTrail(nav, pathname);
   if (!trail) return null;
 
