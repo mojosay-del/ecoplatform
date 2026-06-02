@@ -503,6 +503,7 @@ function NewsModal({
       }}
       role="dialog"
       aria-modal="true"
+      aria-label="Новость"
     >
       <div className="news-modal">
         <button className="news-modal-close" onClick={onClose} type="button" aria-label="Закрыть">
@@ -607,35 +608,37 @@ function NewsArticleContent({
         </div>
       ) : null}
       <div className="news-article-body">
-        <span className="news-tile-category">Новости</span>
-        <h1 className="news-article-title">{post.title}</h1>
-        <p className="news-article-lead">{post.lead}</p>
-        <div className="content-blocks">
-          <ContentBlocks blocks={post.blocks ?? []} />
-        </div>
-        <div className="news-article-meta">
-          {publishedDate ? <time dateTime={publishedDate.toISOString()}>{formatNewsDate(publishedDate)}</time> : null}
-          <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
-          <NewsLikeButton post={post} pending={likePending} onToggle={onTogglePostLike} />
-        </div>
+        <div className="news-article-content">
+          <span className="news-tile-category">Новости</span>
+          <h1 className="news-article-title">{post.title}</h1>
+          <p className="news-article-lead">{post.lead}</p>
+          <div className="content-blocks">
+            <ContentBlocks blocks={post.blocks ?? []} />
+          </div>
+          <div className="news-article-meta">
+            {publishedDate ? <time dateTime={publishedDate.toISOString()}>{formatNewsDate(publishedDate)}</time> : null}
+            <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
+            <NewsLikeButton post={post} pending={likePending} onToggle={onTogglePostLike} />
+          </div>
 
-        <CommentsSection
-          comments={post.comments ?? []}
-          commentsCount={post._count?.comments ?? 0}
-          commentText={commentText}
-          onCommentTextChange={onCommentTextChange}
-          onSubmitComment={onSubmitComment}
-          resultMessage={resultMessage}
-          reportingCommentId={reportingCommentId}
-          setReportingCommentId={setReportingCommentId}
-          reportReason={reportReason}
-          setReportReason={setReportReason}
-          reportComment={reportComment}
-          setReportComment={setReportComment}
-          onSubmitComplaint={onSubmitComplaint}
-          onToggleCommentLike={onToggleCommentLike}
-          commentLikePendingId={commentLikePendingId}
-        />
+          <CommentsSection
+            comments={post.comments ?? []}
+            commentsCount={post._count?.comments ?? 0}
+            commentText={commentText}
+            onCommentTextChange={onCommentTextChange}
+            onSubmitComment={onSubmitComment}
+            resultMessage={resultMessage}
+            reportingCommentId={reportingCommentId}
+            setReportingCommentId={setReportingCommentId}
+            reportReason={reportReason}
+            setReportReason={setReportReason}
+            reportComment={reportComment}
+            setReportComment={setReportComment}
+            onSubmitComplaint={onSubmitComplaint}
+            onToggleCommentLike={onToggleCommentLike}
+            commentLikePendingId={commentLikePendingId}
+          />
+        </div>
       </div>
     </div>
   );
@@ -728,6 +731,32 @@ function CommentsSection({
         </StatusPill>
       ) : null}
 
+      <form className="comment-composer" onSubmit={onSubmitComment}>
+        <CommentAvatar current user={user} />
+        <div className="comment-composer-body">
+          <label className="comment-textarea-label" htmlFor="news-comment-text">
+            Ваш комментарий
+          </label>
+          <textarea
+            aria-describedby="comment-composer-help"
+            className="comment-textarea"
+            id="news-comment-text"
+            name="comment"
+            onChange={(event) => onCommentTextChange(event.target.value)}
+            placeholder="Напишите, что думаете по теме"
+            rows={3}
+            value={commentText}
+          />
+          <div className="comment-composer-footer">
+            <span id="comment-composer-help">Публикуем сразу после отправки</span>
+            <button className="button comment-submit" disabled={!commentText.trim()} type="submit">
+              <Send aria-hidden="true" size={16} />
+              Опубликовать
+            </button>
+          </div>
+        </div>
+      </form>
+
       <div className="comment-list">
         {comments.length === 0 ? (
           <div className="comments-empty">
@@ -752,26 +781,6 @@ function CommentsSection({
           ))
         )}
       </div>
-
-      <form className="comment-composer" onSubmit={onSubmitComment}>
-        <CommentAvatar current user={user} />
-        <div className="comment-composer-body">
-          <textarea
-            className="comment-textarea"
-            onChange={(event) => onCommentTextChange(event.target.value)}
-            placeholder="Продолжить обсуждение"
-            rows={3}
-            value={commentText}
-          />
-          <div className="comment-composer-footer">
-            <span>Комментарий появится после отправки</span>
-            <button className="button comment-submit" disabled={!commentText.trim()} type="submit">
-              <Send aria-hidden="true" size={16} />
-              Опубликовать
-            </button>
-          </div>
-        </div>
-      </form>
     </section>
   );
 }
@@ -818,12 +827,12 @@ function CommentCard({
         <header className="comment-card-head">
           <div className="comment-author-meta">
             <strong>{author}</strong>
+            {commentDate ? <time dateTime={commentDate.toISOString()}>{formatCommentDate(commentDate)}</time> : null}
           </div>
         </header>
         <p className="comment-text">{comment.text}</p>
         <footer className="comment-card-footer">
           <div className="comment-card-actions" aria-label={`Действия с комментарием, лайков: ${likesCount}`}>
-            {commentDate ? <time dateTime={commentDate.toISOString()}>{formatCommentDate(commentDate)}</time> : null}
             <button
               className={`comment-like-button ${comment.likedByMe ? "active" : ""}`}
               disabled={commentLikePendingId === comment.id}
@@ -852,17 +861,29 @@ function CommentCard({
 
         {isReporting ? (
           <form className="comment-report-form" onSubmit={onSubmitComplaint}>
-            <select className="select" onChange={(event) => setReportReason(event.target.value)} value={reportReason}>
+            <label className="comment-report-label" htmlFor={`comment-report-reason-${comment.id}`}>
+              Причина жалобы
+            </label>
+            <select
+              className="select"
+              id={`comment-report-reason-${comment.id}`}
+              onChange={(event) => setReportReason(event.target.value)}
+              value={reportReason}
+            >
               {complaintReasons.map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
             </select>
+            <label className="comment-report-label" htmlFor={`comment-report-comment-${comment.id}`}>
+              Комментарий модератору
+            </label>
             <textarea
               className="textarea small"
+              id={`comment-report-comment-${comment.id}`}
               onChange={(event) => setReportComment(event.target.value)}
-              placeholder="Комментарий к жалобе"
+              placeholder="Можно кратко пояснить проблему"
               value={reportComment}
             />
             <div className="report-actions">

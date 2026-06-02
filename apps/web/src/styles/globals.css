@@ -2980,19 +2980,19 @@ input[type="checkbox"]:focus-visible {
 
 /* Модалка просмотра новости поверх размытого фона. */
 body.news-modal-open .app-shell {
-  filter: blur(10px);
+  filter: blur(4px);
 }
 
 .news-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(var(--shadow-rgb) / 0.18);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgb(var(--shadow-rgb) / 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   z-index: 1000;
   display: grid;
   place-items: start center;
-  padding: 40px 20px;
+  padding: 40px 24px;
   overflow-y: auto;
   animation: news-modal-fade-in 160ms ease-out;
 }
@@ -3010,8 +3010,8 @@ body.news-modal-open .app-shell {
   position: relative;
   width: min(880px, 100%);
   background: var(--panel);
-  border-radius: 20px;
-  box-shadow: 0 30px 80px rgb(var(--shadow-rgb) / 0.25);
+  border-radius: 18px;
+  box-shadow: 0 32px 90px rgb(var(--shadow-rgb) / 0.3);
   overflow: hidden;
   animation: news-modal-rise 180ms ease-out;
 }
@@ -3029,10 +3029,10 @@ body.news-modal-open .app-shell {
 
 .news-modal-close {
   position: absolute;
-  top: 18px;
-  right: 18px;
-  width: 36px;
-  height: 36px;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--line);
   background: rgb(var(--white-rgb) / 0.95);
@@ -3074,9 +3074,15 @@ body.news-modal-open .app-shell {
 }
 
 .news-article-body {
-  padding: 28px 36px 36px;
+  padding: 32px 44px 44px;
+}
+
+.news-article-content {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .news-article-title {
@@ -3101,7 +3107,7 @@ body.news-modal-open .app-shell {
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  padding: 12px 0;
+  padding: 14px 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   color: var(--muted);
@@ -3179,10 +3185,10 @@ body.news-modal-open .app-shell {
   .news-modal {
     width: 100%;
     border-radius: 0;
-    min-height: 100vh;
+    min-height: 100dvh;
   }
   .news-article-body {
-    padding: 24px 20px 32px;
+    padding: 24px 20px 36px;
   }
   .news-like-button {
     margin-left: 0;
@@ -5484,20 +5490,16 @@ body.news-modal-open .app-shell {
 }
 
 .comments-section {
-  max-width: 900px;
-  margin-top: 32px;
+  margin-top: 36px;
   display: grid;
-  gap: 16px;
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  background: linear-gradient(180deg, var(--white) 0%, var(--panel-soft) 100%);
-  box-shadow: var(--shadow-card);
+  gap: 18px;
+  padding: 26px 0 0;
+  border-top: 1px solid var(--line);
 }
 
 .comments-section-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
@@ -5521,7 +5523,7 @@ body.news-modal-open .app-shell {
 .comments-counter {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 32px;
   border: 1px solid var(--line);
   border-radius: var(--radius-chip);
   padding: 5px 10px;
@@ -5539,12 +5541,12 @@ body.news-modal-open .app-shell {
 .comment-composer {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
-  gap: 12px;
+  gap: 14px;
   align-items: start;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
+  border-radius: 14px;
+  background: var(--panel-soft);
 }
 
 .comment-avatar {
@@ -5587,12 +5589,20 @@ body.news-modal-open .app-shell {
   min-width: 0;
 }
 
+.comment-textarea-label,
+.comment-report-label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
 .comment-textarea {
   width: 100%;
-  min-height: 92px;
-  border: 0;
+  min-height: 104px;
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--panel-soft);
+  background: var(--panel);
   color: var(--text);
   padding: 12px 14px;
   resize: vertical;
@@ -5624,13 +5634,13 @@ body.news-modal-open .app-shell {
 }
 
 .comment-submit {
-  min-height: 38px;
+  min-height: 44px;
   padding: 9px 14px;
 }
 
 .comment-list {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .comments-empty {
@@ -5638,10 +5648,10 @@ body.news-modal-open .app-shell {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 86px;
+  min-height: 96px;
   border: 1px dashed var(--line-strong);
   border-radius: 12px;
-  background: var(--panel);
+  background: var(--panel-soft);
   color: var(--muted);
   font-size: 14px;
   text-align: center;
@@ -5655,7 +5665,7 @@ body.news-modal-open .app-shell {
 .comment-card {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
   align-items: start;
 }
 
@@ -5673,11 +5683,11 @@ body.news-modal-open .app-shell {
 
 .comment-bubble {
   display: grid;
-  gap: 7px;
+  gap: 10px;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 14px;
+  padding: 12px 14px;
   background: var(--panel);
 }
 
@@ -5689,8 +5699,10 @@ body.news-modal-open .app-shell {
 }
 
 .comment-author-meta {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   min-width: 0;
 }
 
@@ -5698,6 +5710,12 @@ body.news-modal-open .app-shell {
   color: var(--text);
   font-size: 14px;
   line-height: 1.25;
+}
+
+.comment-author-meta time {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .comment-text {
@@ -5711,7 +5729,7 @@ body.news-modal-open .app-shell {
 
 .comment-card-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   min-width: 0;
 }
 
@@ -5719,18 +5737,12 @@ body.news-modal-open .app-shell {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   justify-self: end;
-  gap: 6px;
+  gap: 8px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
-}
-
-.comment-card-actions time {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .comment-like-button,
@@ -5740,9 +5752,9 @@ body.news-modal-open .app-shell {
   justify-content: center;
   border: 0;
   border-radius: var(--radius-chip);
-  min-width: 28px;
-  min-height: 26px;
-  padding: 4px 7px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
   background: transparent;
   color: var(--muted);
   font-size: 12px;
@@ -5754,7 +5766,11 @@ body.news-modal-open .app-shell {
 }
 
 .comment-like-button {
-  gap: 4px;
+  gap: 6px;
+}
+
+.comment-report-button {
+  padding-inline: 0;
 }
 
 .comment-like-button:hover,
@@ -5776,12 +5792,12 @@ body.news-modal-open .app-shell {
 
 .comment-report-form {
   display: grid;
-  gap: 10px;
-  margin-top: 2px;
-  padding: 12px;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 14px;
   border: 1px solid var(--danger-border);
   border-radius: 12px;
-  background: var(--panel-soft);
+  background: var(--danger-soft);
 }
 
 .comment-report-form .textarea.small {
@@ -5796,16 +5812,16 @@ body.news-modal-open .app-shell {
 }
 
 .report-actions .button {
-  min-height: 36px;
+  min-height: 44px;
   padding: 8px 12px;
 }
 
 .comment-replies {
   display: grid;
   gap: 12px;
-  margin-top: 4px;
-  padding-left: 16px;
-  border-left: 2px solid var(--line);
+  margin-top: 2px;
+  padding-left: 18px;
+  border-left: 2px solid var(--surface-muted-strong);
 }
 
 .moderation-layout {
@@ -6337,7 +6353,8 @@ body.news-modal-open .app-shell {
 
 @media (max-width: 640px) {
   .comments-section {
-    padding: 16px;
+    margin-top: 28px;
+    padding: 22px 0 0;
   }
 
   .comments-section-head,
@@ -6350,6 +6367,10 @@ body.news-modal-open .app-shell {
   .comment-composer,
   .comment-card {
     grid-template-columns: 1fr;
+  }
+
+  .comment-composer {
+    padding: 14px;
   }
 
   .comment-card.is-reply {
