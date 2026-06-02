@@ -61,6 +61,7 @@ import {
 } from "../lib/display-labels";
 import { SUBSCRIPTION_PLAN_TIERS, type SubscriptionPlanTier } from "../lib/subscription-plans";
 import { useApiQuery } from "./_shared";
+import { accountNotificationRowsForRoles } from "./account-notification-rows";
 
 const PROFILE_PHOTO_HINT =
   "Фото профиля подбирается автоматически по типу компании. Загрузка своего фото появится в следующих обновлениях.";
@@ -166,46 +167,6 @@ type AccountSupportTicket = {
   status: string;
   updatedAt: string;
 };
-
-const NOTIFICATION_ROWS: Array<{
-  category: string;
-  label: string;
-  description: string;
-  companyOnly?: boolean;
-}> = [
-  {
-    category: "security",
-    label: "Безопасность",
-    description: "Входы, смена пароля и отзыв сессий.",
-  },
-  {
-    category: "billing",
-    label: "Биллинг",
-    description: "Счета, платежи, документы и статусы подписки.",
-    companyOnly: true,
-  },
-  {
-    category: "marketplace",
-    label: "Торговая площадка",
-    description: "Объявления, предложения и статусы сделок.",
-    companyOnly: true,
-  },
-  {
-    category: "moderation",
-    label: "Модерация",
-    description: "Решения по жалобам, ограничения и предупреждения.",
-  },
-  {
-    category: "support",
-    label: "Поддержка",
-    description: "Ответы администратора и статусы обращений.",
-  },
-  {
-    category: "system",
-    label: "Системные",
-    description: "Правила, обновления и технические работы.",
-  },
-];
 
 function accountDash(value: ReactNode) {
   return value || <span className="account-muted">Не заполнено</span>;
@@ -468,6 +429,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
       : billing?.status === "active" && billing?.subscriptionPlan === "basic"
         ? "basic"
         : "demo";
+  const notificationRows = accountNotificationRowsForRoles(user?.platformRoles ?? []);
 
   function openSupport() {
     window.dispatchEvent(new Event("support:open"));
@@ -870,7 +832,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                 <span>Категория</span>
                 <span>В кабинете</span>
               </div>
-              {NOTIFICATION_ROWS.filter((row) => !row.companyOnly || !isPlatformStaff).map((row) => {
+              {notificationRows.map((row) => {
                 const busyKey = `${row.category}:in_app`;
                 return (
                   <div className="account-notification-row" key={row.category}>
