@@ -12,15 +12,45 @@ const immutablePublicAssetHeaders = [
   },
 ];
 
-const contentSecurityPolicyReportOnly = [
-  "default-src 'self'",
-  "img-src 'self' data: https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "connect-src 'self' http://localhost:4000 https://s3.twcstorage.ru https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
-  "font-src 'self'",
-  "frame-src https://rutube.ru https://*.rutube.ru",
-].join("; ");
+// CSP включается в БОЕВОМ (блокирующем) режиме только в production-сборке.
+// В dev остаётся report-only: webpack-HMR использует eval-сорсмапы и websocket,
+// которые строгий script-src/connect-src заблокировал бы и сломал локальную
+// разработку. NODE_ENV вычисляется на этапе `next build`/`next dev`, поэтому
+// каждое окружение получает свой режим автоматически.
+const isProduction = process.env.NODE_ENV === "production";
+
+function buildContentSecurityPolicy(): string {
+  const connectSrc = [
+    "'self'",
+    "https://s3.twcstorage.ru",
+    "https://*.ingest.sentry.io",
+    "https://*.ingest.us.sentry.io",
+  ];
+  // Локальный dev ходит в API по http://localhost:4000. В проде API живёт на
+  // том же origin (ecoplatform.pro/api → покрывается 'self'), внешний localhost
+  // в боевую политику не пускаем.
+  if (!isProduction) {
+    connectSrc.push("http://localhost:4000");
+  }
+
+  return [
+    "default-src 'self'",
+    "img-src 'self' data: https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    `connect-src ${connectSrc.join(" ")}`,
+    "font-src 'self'",
+    "frame-src https://rutube.ru https://*.rutube.ru",
+    // Жёсткие запреты, которые не влияют на штатную работу приложения, но
+    // закрывают классические XSS/clickjacking-векторы:
+    "object-src 'none'", // нет <object>/<embed>/<applet> — режем плагины
+    "base-uri 'self'", // запрет подмены <base> (перехват относительных ссылок)
+    "form-action 'self'", // формы уходят только на свой origin
+    "frame-ancestors 'none'", // нельзя встроить сайт в чужой iframe (как X-Frame-Options DENY)
+  ].join("; ");
+}
+
+const contentSecurityPolicy = buildContentSecurityPolicy();
 
 const securityHeaders = [
   {
@@ -44,8 +74,9 @@ const securityHeaders = [
     value: "max-age=63072000; includeSubDomains",
   },
   {
-    key: "Content-Security-Policy-Report-Only",
-    value: contentSecurityPolicyReportOnly,
+    // Prod — боевой блокирующий режим; dev — report-only (см. buildContentSecurityPolicy).
+    key: isProduction ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only",
+    value: contentSecurityPolicy,
   },
 ];
 
