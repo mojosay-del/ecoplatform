@@ -16,15 +16,12 @@ import {
   Map as MapIcon,
   MessageCircle,
   Newspaper,
-  ShoppingBag,
   Smartphone,
-  Store,
   UserRound,
 } from "lucide-react";
 
 export type NavItem = {
-  // Стабильный ключ пункта (для сопоставления со списком скрытых из
-  // navMenuItems). Есть у пунктов app-меню; у account-меню не нужен.
+  // Стабильный ключ пункта app-меню; у account-меню не нужен.
   key?: string;
   href?: string;
   label: string;
@@ -75,21 +72,11 @@ export const appNavSections: NavSection[] = [
       { key: "news", href: "/news", label: "Новости", icon: Newspaper },
       { key: "indices", href: "/indices", label: "Индексы цен", icon: LineChart },
       { key: "education", href: "/education", label: "Обучение", icon: GraduationCap },
-      futureItem(
-        "marketplace",
-        "Торговая площадка",
-        ShoppingBag,
-        "Торговая площадка — закрытый аукцион на объявлениях.",
-      ),
     ],
   },
   {
     title: "Сообщество",
     items: [futureItem("forum", "Форум", MessageCircle, "Форум — обсуждения участников рынка.")],
-  },
-  {
-    title: "Автоматизация",
-    items: [futureItem("shop", "Магазин", Store, "Магазин — каталог решений и сервисов для участников рынка.")],
   },
   {
     title: "Базы знаний",
@@ -267,7 +254,6 @@ const adminBreadcrumbs: { prefix: string; trail: BreadcrumbItem[] }[] = [
   { prefix: "/admin/billing", trail: [adminPanelRoot, { href: "/admin/billing", label: "Подписки" }] },
   { prefix: "/admin/moderation", trail: [adminPanelRoot, { href: "/admin/moderation", label: "Очередь модерации" }] },
   { prefix: "/admin/settings", trail: [adminPanelRoot, { href: "/admin/settings", label: "Настройки" }] },
-  { prefix: "/admin/navigation", trail: [adminPanelRoot, { href: "/admin/navigation", label: "Меню сайта" }] },
   { prefix: "/admin/journals", trail: [adminPanelRoot, { href: "/admin/journals", label: "Журнал" }] },
   { prefix: "/admin", trail: [adminPanelRoot] },
 ];

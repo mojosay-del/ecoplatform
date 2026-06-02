@@ -5,8 +5,6 @@ import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
 import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
-import { Section } from "../navigation/section.decorator";
-import { SectionVisibilityGuard } from "../navigation/section-visibility.guard";
 import {
   categoryInputSchema,
   categoryUpdateInputSchema,
@@ -50,7 +48,7 @@ function isPreviewQuery(value?: string) {
 // потом /admin/*. Порядок маршрутов важен: специфичные пути (например,
 // `admin/content/news/tags`) идут ПЕРЕД `admin/content/news/:id`, иначе
 // NestJS попытается интерпретировать "tags" как `:id`.
-@UseGuards(JwtAuthGuard, SectionVisibilityGuard)
+@UseGuards(JwtAuthGuard)
 @Controller()
 export class ContentController {
   constructor(
@@ -62,7 +60,6 @@ export class ContentController {
 
   // ── Публичные: новости ──────────────────────────────────────────────────
 
-  @Section("news")
   @Get("news")
   async listNews(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
     const input = parseBody(newsListQuerySchema, query);
@@ -75,31 +72,26 @@ export class ContentController {
     });
   }
 
-  @Section("news")
   @Get("news/tags")
   async newsTags(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
     return this.news.listNewsTags(user, parseBody(newsTagsQuerySchema, query));
   }
 
-  @Section("news")
   @Get("news/:slug")
   async newsPost(@Param("slug") slug: string, @CurrentUser() user: RequestUser, @Query("preview") preview?: string) {
     return this.news.getNews(slug, user, { preview: isPreviewQuery(preview) });
   }
 
-  @Section("news")
   @Post("news/:id/like")
   async likeNews(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.news.toggleNewsLike(id, user);
   }
 
-  @Section("news")
   @Post("news/comments/:id/like")
   async likeNewsComment(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.news.toggleNewsCommentLike(id, user);
   }
 
-  @Section("news")
   @Post("news/:id/comments")
   async commentNews(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(commentInputSchema, body);
@@ -108,7 +100,6 @@ export class ContentController {
 
   // ── Публичные: индексы цен ─────────────────────────────────────────────
 
-  @Section("indices")
   @Get("indices")
   async indicesList(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
     return this.indices.listIndices(user, parseBody(publicContentListQuerySchema, query));
@@ -116,19 +107,16 @@ export class ContentController {
 
   // ── Публичные: обучение ────────────────────────────────────────────────
 
-  @Section("education")
   @Get("education/modules")
   async learningModules(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
     return this.learning.listLearningModules(user, parseBody(publicContentListQuerySchema, query));
   }
 
-  @Section("education")
   @Get("education/modules/:id")
   async learningModule(@Param("id") id: string, @CurrentUser() user: RequestUser, @Query("preview") preview?: string) {
     return this.learning.getLearningModule(id, user, { preview: isPreviewQuery(preview) });
   }
 
-  @Section("education")
   @Post("education/lessons/:id/complete")
   async completeLesson(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.learning.completeLesson(id, user);
@@ -136,19 +124,16 @@ export class ContentController {
 
   // ── Публичные: база знаний ─────────────────────────────────────────────
 
-  @Section("knowledge-base")
   @Get("knowledge-base")
   async knowledgeTree(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
     return this.knowledgeBase.knowledgeTree(user, parseBody(knowledgeTreeQuerySchema, query));
   }
 
-  @Section("knowledge-base")
   @Get("knowledge-base/search")
   async knowledgeSearch(@Query("q") query = "", @CurrentUser() user: RequestUser) {
     return this.knowledgeBase.searchKnowledge(query, user);
   }
 
-  @Section("knowledge-base")
   @Get("knowledge-base/:slug")
   async knowledgeArticle(@Param("slug") slug: string, @CurrentUser() user: RequestUser) {
     return this.knowledgeBase.getKnowledgeArticle(slug, user);

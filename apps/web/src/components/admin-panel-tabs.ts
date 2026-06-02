@@ -6,7 +6,6 @@ import {
   CreditCard,
   GraduationCap,
   Headphones,
-  Menu,
   Newspaper,
   ScrollText,
   Settings2,
@@ -169,14 +168,6 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
   {
     title: "Настройки",
     items: [
-      {
-        href: "/admin/navigation",
-        label: "Меню сайта",
-        pathname: "/admin/navigation",
-        roles: ["admin"],
-        description: "Скрыть или показать разделы левого меню.",
-        icon: Menu,
-      },
       {
         href: "/admin/settings#demo",
         label: "Демо-доступ",

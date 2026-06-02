@@ -13,14 +13,7 @@ describe("AppShell future navigation teasers", () => {
   it("keeps every disabled sidebar item documented as a roadmap teaser", () => {
     const items = futureNavItems();
 
-    expect(items.map((item) => item.label)).toEqual([
-      "Торговая площадка",
-      "Форум",
-      "Магазин",
-      "Документация",
-      "Карты",
-      "Калькуляторы",
-    ]);
+    expect(items.map((item) => item.label)).toEqual(["Форум", "Документация", "Карты", "Калькуляторы"]);
 
     for (const item of items) {
       expect(item.disabledHint).toContain("—");

@@ -5,7 +5,6 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronsLeft, ChevronsRight, HelpCircle, LogOut, Menu, Settings, X } from "lucide-react";
-import { api } from "../lib/api";
 import { useAuth, type User } from "../lib/auth";
 import {
   ACCOUNT_SECTION_CHANGE_EVENT,
@@ -43,9 +42,6 @@ export function AppShell({ children, chrome = {} }: { children: React.ReactNode;
   const [collapsed, setCollapsed] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [activeAccountSection, setActiveAccountSection] = useState<AccountSectionId | null>(null);
-  // Скрытые админом пункты меню. Грузим с /navigation/visibility; до ответа
-  // показываем всё (fail-open), чтобы меню не мигало.
-  const [hiddenNav, setHiddenNav] = useState<{ keys: string[]; hrefs: string[] }>({ keys: [], hrefs: [] });
   // У админов своя полноценная страница /admin/support — drawer им
   // показывать не нужно, иначе двойная сущность.
   const isAdminUser = (user?.platformRoles?.length ?? 0) > 0;
@@ -71,31 +67,6 @@ export function AppShell({ children, chrome = {} }: { children: React.ReactNode;
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname]);
-
-  // Подтягиваем список скрытых разделов меню. Ошибку глотаем (fail-open).
-  useEffect(() => {
-    if (!ready || !token) return;
-    let active = true;
-    api.navigation
-      .visibility({ token })
-      .then((res) => {
-        if (active) setHiddenNav({ keys: res.hiddenKeys, hrefs: res.hiddenHrefs });
-      })
-      .catch(() => {
-        // Не удалось загрузить — оставляем меню как есть.
-      });
-    return () => {
-      active = false;
-    };
-  }, [ready, token]);
-
-  // Если пользователь вручную попал на скрытый путь — уводим на /news,
-  // чтобы не показывать сломанную страницу (данные раздела уже отдают 404).
-  useEffect(() => {
-    if (hiddenNav.hrefs.some((href) => pathname === href || pathname.startsWith(`${href}/`))) {
-      router.replace("/news");
-    }
-  }, [pathname, hiddenNav, router]);
 
   useEffect(() => {
     if (!inAccountSettings) {
@@ -148,14 +119,10 @@ export function AppShell({ children, chrome = {} }: { children: React.ReactNode;
     return null;
   }
 
-  const hiddenKeySet = new Set(hiddenNav.keys);
   const visibleAppNav = appNavSections
     .map((section) => ({
       ...section,
-      // Сначала фильтр по ролям, затем убираем скрытые админом пункты.
-      items: filterVisibleItems(section.items, user?.platformRoles ?? []).filter(
-        (item) => !item.key || !hiddenKeySet.has(item.key),
-      ),
+      items: filterVisibleItems(section.items, user?.platformRoles ?? []),
     }))
     // Если в секции не осталось ни одного пункта (например, «Служебное»
     // для обычного пользователя без админских ролей) — секцию не показываем.
