@@ -55,15 +55,26 @@ export function LandingClient() {
       const target = Number(el.dataset.count ?? "0");
       const suffix = el.dataset.suffix ?? "";
       const duration = 1500;
+      // Мутируем значение существующего текстового узла, а не textContent —
+      // иначе мы заменяем узел, которым владеет React, и в dev (StrictMode)
+      // при размонтировании ловим NotFoundError: removeChild.
+      const setText = (value: string) => {
+        const node = el.firstChild;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+          node.nodeValue = value;
+        } else {
+          el.textContent = value;
+        }
+      };
       if (reduceMotion) {
-        el.textContent = fmt.format(target) + suffix;
+        setText(fmt.format(target) + suffix);
         return;
       }
       const start = performance.now();
       const tick = (now: number) => {
         const t = Math.min((now - start) / duration, 1);
         const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
-        el.textContent = fmt.format(Math.round(target * eased)) + suffix;
+        setText(fmt.format(Math.round(target * eased)) + suffix);
         if (t < 1) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
@@ -88,6 +99,12 @@ export function LandingClient() {
       document.querySelector<HTMLElement>(".lp-horizontal");
     const track = horizontal?.querySelector<HTMLElement>(
       ".lp-horizontal__track",
+    );
+
+    // 3D-наклон плашек: поворачиваем их по оси X в зависимости от положения
+    // в окне — создаёт ощущение объёма и лёгкого вращения при скролле.
+    const tiltEls = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-tilt]"),
     );
 
     // Включаем «пиннинг» ленты только на широких экранах и без reduced-motion.
@@ -135,6 +152,18 @@ export function LandingClient() {
           const progress =
             span > 0 ? Math.min(Math.max(-rect.top / span, 0), 1) : 0;
           track.style.transform = `translateX(${-progress * maxTranslate}px)`;
+        }
+
+        if (!reduceMotion && tiltEls.length && window.innerWidth >= 980) {
+          const vh = window.innerHeight;
+          for (const el of tiltEls) {
+            const r = el.getBoundingClientRect();
+            if (r.bottom < -100 || r.top > vh + 100) continue;
+            const center = r.top + r.height / 2;
+            const rel = (center - vh / 2) / vh; // ≈ -0.5..0.5
+            const rotX = Math.max(-6, Math.min(6, -rel * 11));
+            el.style.transform = `perspective(1600px) rotateX(${rotX.toFixed(2)}deg)`;
+          }
         }
       });
     };

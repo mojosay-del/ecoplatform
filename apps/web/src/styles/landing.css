@@ -7,8 +7,8 @@
 
 .lp {
   --lp-ink: #1a1208;
-  --lp-paper: #fdf9f4;
-  --lp-paper-deep: #f6efe5;
+  --lp-paper: #ffffff;
+  --lp-paper-deep: #f7f8fa;
   --lp-ember: var(--brand); /* #f5773e */
   --lp-ember-deep: #d35922;
   --lp-ember-glow: rgb(245 119 62 / 0.22);
@@ -41,72 +41,24 @@
   overflow: hidden;
 }
 
-.lp-bg__mesh {
+/* Один мягкий оранжевый акцент сверху — единственное пятно цвета на белом. */
+.lp-bg__bloom {
   position: absolute;
-  inset: -20%;
-  background:
-    radial-gradient(38% 42% at 18% 22%, rgb(245 119 62 / 0.16), transparent 70%),
-    radial-gradient(34% 40% at 82% 18%, rgb(255 200 120 / 0.18), transparent 72%),
-    radial-gradient(46% 50% at 70% 88%, rgb(245 119 62 / 0.1), transparent 70%);
-  filter: blur(4px);
-  animation: lp-mesh 26s ease-in-out infinite alternate;
-}
-
-.lp-orb {
-  position: absolute;
+  top: -22%;
+  left: 50%;
+  width: 760px;
+  height: 620px;
+  transform: translateX(-50%);
   border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.55;
+  filter: blur(80px);
+  background: radial-gradient(circle, rgb(245 119 62 / 0.16), transparent 64%);
+  animation: lp-drift-a 28s ease-in-out infinite;
   will-change: transform;
 }
 
-.lp-orb--1 {
-  top: 8%;
-  left: 6%;
-  width: 360px;
-  height: 360px;
-  background: radial-gradient(circle, rgb(245 119 62 / 0.5), transparent 65%);
-  animation: lp-float-a 22s ease-in-out infinite;
-}
-
-.lp-orb--2 {
-  top: 46%;
-  right: 4%;
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(circle, rgb(255 188 120 / 0.45), transparent 65%);
-  animation: lp-float-b 28s ease-in-out infinite;
-}
-
-.lp-orb--3 {
-  bottom: 4%;
-  left: 38%;
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle, rgb(245 119 62 / 0.32), transparent 65%);
-  animation: lp-float-a 32s ease-in-out infinite reverse;
-}
-
-/* Тонкое зерно поверх — придаёт «бумажную» фактуру. */
-.lp-bg__grain {
-  position: absolute;
-  inset: 0;
-  opacity: 0.4;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
-}
-
-@keyframes lp-mesh {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(2%, -2%, 0) scale(1.08); }
-}
-@keyframes lp-float-a {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(40px, -36px, 0); }
-}
-@keyframes lp-float-b {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(-50px, 30px, 0); }
+@keyframes lp-drift-a {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-46%) translateY(26px); }
 }
 
 /* ───────────────────────── Прогресс-бар ───────────────────────── */
@@ -157,12 +109,12 @@
   letter-spacing: -0.01em;
   color: var(--lp-ink);
 }
-.lp-nav__spark {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, var(--lp-ember), var(--lp-ember-deep));
-  box-shadow: 0 4px 12px var(--lp-ember-glow);
+.lp-nav__logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: block;
+  object-fit: contain;
 }
 .lp-nav__links {
   display: flex;
@@ -271,41 +223,44 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  min-height: 100vh;
   text-align: center;
-  padding: 168px 0 96px;
+  /* Верхний паддинг = высота навбара + воздух, чтобы вордмарк не уезжал под него. */
+  padding: 130px 0 80px;
 }
-.lp-hero__title {
-  margin: 22px 0 0;
-  max-width: 16ch;
+.lp-hero__brand {
+  margin: 0;
+  max-width: 100%;
+  white-space: nowrap;
   font-family: var(--lp-display);
   font-weight: 700;
-  font-size: clamp(40px, 7vw, 84px);
-  line-height: 1.02;
-  letter-spacing: -0.03em;
-}
-.lp-hero__title em {
-  font-style: normal;
-  background: linear-gradient(120deg, var(--lp-ember), var(--lp-ember-deep));
+  font-size: clamp(32px, 8.4vw, 104px);
+  /* line-height с запасом + padding, чтобы фон-градиент покрывал ВЕСЬ глиф —
+     иначе при background-clip:text макушки высоких букв обрезаются. */
+  line-height: 1.34;
+  padding-block: 0.08em;
+  letter-spacing: -0.035em;
+  background: linear-gradient(120deg, var(--lp-ink) 30%, var(--lp-ember-deep));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
-.lp-hero__sub {
-  margin: 26px 0 0;
-  max-width: 56ch;
-  font-size: clamp(16px, 2.1vw, 20px);
-  line-height: 1.6;
+.lp-hero__slogan {
+  margin: 28px 0 0;
+  max-width: 28ch;
+  font-size: clamp(18px, 2.6vw, 26px);
+  font-weight: 500;
+  line-height: 1.4;
   color: var(--lp-muted);
 }
-.lp-hero__cta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 14px;
-  margin-top: 38px;
+.lp-hero__slogan em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--lp-ember-deep);
 }
 .lp-hero__scroll {
-  margin-top: 64px;
+  margin-top: 72px;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -320,68 +275,148 @@
   50% { transform: translateY(6px); }
 }
 
-/* «Окно» приложения под героем — даёт ощущение продукта. */
+/* Превью продукта под героем. Внешний слой держит перспективу для 3D-наклона. */
 .lp-hero__preview {
   position: relative;
   width: var(--lp-shell);
   margin: 64px auto 0;
+  perspective: 1600px;
+  will-change: transform;
+}
+
+/* ───────────────────────── 3D-наклон (общий) ───────────────────────── */
+
+.lp-tilt {
+  transform-style: preserve-3d;
+  transform: perspective(1600px) rotateX(0deg) rotateY(0deg);
+  transition: transform 120ms ease-out;
+  will-change: transform;
+}
+
+/* ───────────────────────── Доска индексов (hero mock) ───────────────────────── */
+
+.lp-board {
   border-radius: 20px;
   border: 1px solid var(--lp-line);
   background: linear-gradient(180deg, #fff, var(--lp-paper-deep));
-  box-shadow: 0 40px 80px rgb(26 18 8 / 0.12);
+  /* Многослойная тень = ощущение толщины/объёма плашки. */
+  box-shadow:
+    0 2px 0 rgb(26 18 8 / 0.04),
+    0 8px 0 rgb(26 18 8 / 0.03),
+    0 40px 80px rgb(26 18 8 / 0.16);
   overflow: hidden;
-  will-change: transform;
 }
-.lp-hero__chrome {
+.lp-board__chrome {
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--lp-line-soft);
 }
-.lp-hero__chrome span {
+.lp-board__chrome > span:not(.lp-board__chrome-title) {
   width: 11px;
   height: 11px;
   border-radius: 50%;
   background: var(--lp-line);
 }
-.lp-hero__chrome span:first-child { background: rgb(245 119 62 / 0.6); }
-.lp-preview-grid {
+.lp-board__chrome > span:first-child { background: rgb(245 119 62 / 0.6); }
+.lp-board__chrome-title {
+  margin-left: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-muted);
+}
+.lp-board__grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   padding: 22px;
 }
-.lp-preview-tile {
-  padding: 18px;
+.lp-idx {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
   border-radius: 14px;
   border: 1px solid var(--lp-line-soft);
   background: #fff;
-  min-height: 132px;
+}
+.lp-idx__top {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: space-between;
 }
-.lp-preview-tile__k { font-size: 12px; font-weight: 600; color: var(--lp-muted); }
-.lp-preview-tile__v {
+.lp-idx__code {
+  padding: 3px 9px;
+  border-radius: var(--radius-chip);
+  background: var(--brand-soft);
+  color: var(--lp-ember-deep);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.lp-idx__chg { font-size: 13px; font-weight: 700; color: var(--success-text); }
+.lp-idx__chg.is-down { color: var(--danger-text); }
+.lp-idx__name {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--lp-muted);
+  min-height: 2.7em;
+}
+.lp-idx__chart { width: 100%; height: 38px; display: block; }
+.lp-idx__line {
+  fill: none;
+  stroke: var(--success-text);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.lp-idx__line.is-down { stroke: var(--danger-text); }
+.lp-idx__area { fill: rgb(45 164 78 / 0.1); stroke: none; }
+.lp-idx__area.is-down { fill: rgb(215 58 73 / 0.08); }
+.lp-idx__price {
   font-family: var(--lp-display);
   font-weight: 700;
-  font-size: 26px;
+  font-size: 19px;
   letter-spacing: -0.02em;
 }
-.lp-preview-tile__trend { font-size: 12px; font-weight: 700; color: var(--success-text); }
-.lp-preview-tile__trend.is-down { color: var(--danger-text); }
-.lp-spark {
-  height: 34px;
+.lp-idx__price span {
+  font-family: var(--font-inter);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lp-muted);
+}
+
+/* Две самостоятельные карточки индексов (блок «Цены живут здесь»). */
+.lp-idx-duo {
   display: flex;
-  align-items: flex-end;
-  gap: 4px;
+  flex-direction: column;
+  gap: 16px;
+  width: 80%;
 }
-.lp-spark i {
-  flex: 1;
-  border-radius: 3px 3px 0 0;
-  background: linear-gradient(180deg, var(--lp-ember), rgb(245 119 62 / 0.3));
+.lp-idx--solo {
+  padding: 22px;
+  border: 1px solid var(--lp-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow:
+    0 2px 0 rgb(26 18 8 / 0.03),
+    0 18px 40px rgb(26 18 8 / 0.08);
 }
+.lp-idx--solo .lp-idx__name { min-height: 0; font-size: 14px; }
+.lp-idx--solo .lp-idx__chart { height: 48px; }
+.lp-idx--solo .lp-idx__price { font-size: 26px; }
+.lp-idx--solo .lp-idx__price span { font-size: 13px; }
+
+/* Контейнер под фото (next/image fill). */
+.lp-cover {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+.lp-cover img { object-fit: cover; }
 
 /* ───────────────────────── Бегущая строка ───────────────────────── */
 
@@ -606,11 +641,14 @@
   border-color: rgb(245 119 62 / 0.4);
   box-shadow: 0 24px 50px rgb(26 18 8 / 0.1);
 }
-.lp-bento-card--wide { grid-column: span 4; }
-.lp-bento-card--tall { grid-column: span 2; grid-row: span 2; }
-.lp-bento-card--std { grid-column: span 2; }
+.lp-bento-card--half { grid-column: span 3; }
+.lp-bento-card--third { grid-column: span 2; }
 .lp-bento-card--feature {
-  grid-column: span 4;
+  grid-column: span 3;
+  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   color: #fff;
   border-color: transparent;
   background: linear-gradient(135deg, var(--lp-ember), var(--lp-ember-deep));
@@ -642,59 +680,39 @@
   border-block: 1px solid var(--lp-line-soft);
 }
 .lp-metric__v {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 3px;
   font-family: var(--lp-display);
   font-weight: 700;
   font-size: clamp(36px, 5vw, 60px);
   letter-spacing: -0.03em;
-  line-height: 1;
+  line-height: 1.12;
+}
+.lp-metric__v > span {
+  display: inline-block;
+  padding-block: 4px;
   background: linear-gradient(120deg, var(--lp-ink), var(--lp-ember-deep));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  white-space: nowrap;
+}
+/* Единица измерения — мелким шрифтом справа сверху, как знак ®. */
+.lp-metric__unit {
+  margin-top: 0.42em;
+  font-size: 0.3em;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--lp-ember-deep);
 }
 .lp-metric__l {
-  margin-top: 12px;
+  margin-top: 10px;
   font-size: 15px;
+  line-height: 1.45;
   color: var(--lp-muted);
 }
-
-/* ───────────────────────── Отзывы ───────────────────────── */
-
-.lp-quotes {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-.lp-quote {
-  padding: 34px;
-  border-radius: 22px;
-  border: 1px solid var(--lp-line);
-  background: rgb(255 255 255 / 0.72);
-}
-.lp-quote__text {
-  margin: 0;
-  font-size: clamp(18px, 2.2vw, 22px);
-  line-height: 1.5;
-  letter-spacing: -0.01em;
-}
-.lp-quote__by {
-  margin-top: 22px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.lp-quote__avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--avatar-gradient-start), var(--avatar-gradient-end));
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-weight: 700;
-}
-.lp-quote__name { font-weight: 700; font-size: 15px; }
-.lp-quote__role { font-size: 13px; color: var(--lp-muted); }
 
 /* ───────────────────────── Climax CTA ───────────────────────── */
 
@@ -724,9 +742,11 @@
   margin: 0;
   font-family: var(--lp-display);
   font-weight: 700;
-  font-size: clamp(32px, 5.4vw, 60px);
-  line-height: 1.04;
-  letter-spacing: -0.03em;
+  font-size: clamp(30px, 4.6vw, 52px);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  max-width: 22ch;
+  margin-inline: auto;
 }
 .lp-cta__sub {
   margin: 22px auto 0;
@@ -746,13 +766,18 @@
 /* ───────────────────────── Подвал ───────────────────────── */
 
 .lp-footer {
-  padding: 64px 0 56px;
+  /* Резервируем место под cookie-баннер платформы, чтобы он не перекрывал подвал. */
+  padding: 64px 0 calc(56px + var(--cookie-banner-height, 0px));
   text-align: center;
 }
 .lp-footer__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-family: var(--lp-display);
   font-weight: 700;
   font-size: 18px;
+  color: var(--lp-ember-deep);
 }
 .lp-footer__links {
   margin: 22px 0 18px;
@@ -768,6 +793,305 @@
 }
 .lp-footer__links a:hover { color: var(--lp-ink); }
 .lp-footer__copy { font-size: 13px; color: rgb(26 18 8 / 0.4); }
+
+/* ───────────────────────── Showcase «Внутри платформы» ───────────────────────── */
+
+.lp-show {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 56px;
+  align-items: center;
+  margin-top: 8px;
+}
+.lp-show--rev { grid-template-columns: 1.1fr 0.9fr; }
+.lp-show--rev .lp-show__text { order: 2; }
+.lp-show--rev .lp-show__mock { order: 1; }
+.lp-show__icon {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  margin-bottom: 18px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--lp-ember), var(--lp-ember-deep));
+  box-shadow: 0 10px 22px var(--lp-ember-glow);
+}
+.lp-show__text .lp-chapter-label {
+  display: inline-block;
+  margin-bottom: 16px;
+}
+.lp-show__t {
+  margin: 0 0 12px;
+  font-family: var(--lp-display);
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.lp-show__d {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.62;
+  color: var(--lp-muted);
+}
+.lp-show__mock { perspective: 1600px; }
+
+/* KB остаётся единой панелью-рабочим пространством с «толщиной». */
+.lp-kb {
+  border-radius: 20px;
+  border: 1px solid var(--lp-line);
+  background: linear-gradient(180deg, #fff, var(--lp-paper-deep));
+  box-shadow:
+    0 2px 0 rgb(26 18 8 / 0.04),
+    0 8px 0 rgb(26 18 8 / 0.03),
+    0 30px 64px rgb(26 18 8 / 0.15);
+  overflow: hidden;
+}
+
+/* «Толщина» отдельных парящих плашек (новости, обучение). */
+.lp-news-tile,
+.lp-edu-card {
+  box-shadow:
+    0 2px 0 rgb(26 18 8 / 0.04),
+    0 8px 0 rgb(26 18 8 / 0.03),
+    0 24px 46px rgb(26 18 8 / 0.16);
+}
+
+/* ── Новости: три самостоятельные парящие плашки на разной высоте ── */
+.lp-news {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+  padding: 36px 8px 30px;
+}
+.lp-news-tile {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid var(--lp-line-soft);
+  background: #fff;
+  overflow: hidden;
+}
+.lp-news-tile:nth-child(1) { margin-top: 26px; }
+.lp-news-tile:nth-child(2) { margin-top: 0; }
+.lp-news-tile:nth-child(3) { margin-top: 46px; }
+.lp-news-tile__cover { height: 124px; }
+.lp-news-tile__body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 14px 14px;
+}
+.lp-news-tile__cat {
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: var(--radius-chip);
+  background: var(--brand-soft);
+  color: var(--lp-ember-deep);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.lp-news-tile__title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+}
+.lp-news-tile__lead {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--lp-muted);
+}
+.lp-news-tile__meta {
+  margin-top: auto;
+  padding-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.lp-news-tile__date { font-size: 12px; color: var(--lp-muted); }
+.lp-news-tile__tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.lp-tag {
+  padding: 3px 8px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--lp-line);
+  background: var(--surface-muted);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lp-muted);
+}
+
+/* ── Обучение ── */
+.lp-edu {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+  padding: 36px 8px 30px;
+}
+.lp-edu-card {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid var(--lp-line-soft);
+  background: #fff;
+  overflow: hidden;
+}
+.lp-edu-card:nth-child(1) { margin-top: 40px; }
+.lp-edu-card:nth-child(2) { margin-top: 8px; }
+.lp-edu-card:nth-child(3) { margin-top: 52px; }
+.lp-edu-card__cover {
+  position: relative;
+  min-height: 138px;
+  overflow: hidden;
+}
+.lp-edu-card__photo {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.lp-edu-card__photo img { object-fit: cover; }
+.lp-edu-card__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 14px;
+  color: #fff;
+  background: linear-gradient(180deg, transparent 38%, rgb(20 14 6 / 0.78));
+}
+.lp-edu-card__status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  padding: 3px 9px;
+  border-radius: var(--radius-chip);
+  background: rgb(255 255 255 / 0.92);
+  color: var(--success-text);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.lp-edu-card__status.is-soon { color: var(--warning-text); }
+.lp-edu-card__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.lp-edu-card__lessons { font-size: 12px; color: rgb(255 255 255 / 0.85); }
+.lp-edu-card__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+.lp-edu-card__progress {
+  height: 6px;
+  border-radius: var(--radius-chip);
+  background: var(--surface-muted-strong);
+  overflow: hidden;
+}
+.lp-edu-card__progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--lp-ember), var(--lp-ember-deep));
+}
+.lp-edu-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--lp-ember-deep);
+}
+
+/* ── База знаний ── */
+.lp-kb {
+  display: grid;
+  grid-template-columns: 0.82fr 1.18fr;
+}
+.lp-kb__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 18px 14px;
+  border-right: 1px solid var(--lp-line-soft);
+  background: var(--surface-muted);
+}
+.lp-kb__kicker {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lp-ember-deep);
+}
+.lp-kb__navitem {
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-muted);
+}
+.lp-kb__navitem.is-head {
+  margin-top: 10px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(26 18 8 / 0.5);
+}
+.lp-kb__navitem.is-active {
+  background: var(--brand-soft);
+  color: var(--lp-ember-deep);
+  font-weight: 700;
+}
+.lp-kb__navitem.is-muted {
+  color: rgb(26 18 8 / 0.38);
+  font-size: 12px;
+  font-weight: 500;
+}
+.lp-kb__content { padding: 22px; }
+.lp-kb__crumbs { font-size: 12px; color: var(--lp-muted); }
+.lp-kb__title {
+  margin: 8px 0 14px;
+  font-family: var(--lp-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.lp-kb__cover {
+  height: 156px;
+  border-radius: 12px;
+}
+.lp-kb__lead {
+  margin: 14px 0 16px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--lp-muted);
+}
+.lp-kb__grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.lp-kb__child {
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--lp-line-soft);
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
 
 /* ───────────────────────── Reveal on scroll ───────────────────────── */
 
@@ -789,41 +1113,63 @@
   .lp-problem { grid-template-columns: 1fr; gap: 36px; }
   .lp-problem__sticky { position: static; }
   .lp-bento { grid-template-columns: repeat(2, 1fr); }
-  .lp-bento-card--wide,
-  .lp-bento-card--tall,
-  .lp-bento-card--std,
   .lp-bento-card--feature { grid-column: span 2; grid-row: auto; }
+  .lp-bento-card--half { grid-column: span 1; }
+  .lp-bento-card--third { grid-column: span 1; }
   .lp-metrics { grid-template-columns: repeat(2, 1fr); gap: 32px 24px; }
-  .lp-quotes { grid-template-columns: 1fr; }
-  .lp-preview-grid { grid-template-columns: repeat(2, 1fr); }
+  .lp-board__grid { grid-template-columns: repeat(2, 1fr); }
+  /* Showcase: текст всегда сверху, мокап снизу. */
+  .lp-show,
+  .lp-show--rev {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    margin-top: 56px;
+  }
+  .lp-show--rev .lp-show__text,
+  .lp-show--rev .lp-show__mock { order: 0; }
+  .lp-tilt { transform: none !important; }
 }
 
 @media (max-width: 620px) {
   .lp { --lp-shell: 92vw; }
   .lp-nav__links .lp-nav__link { display: none; }
   .lp-nav__links .lp-btn { display: inline-flex; }
-  .lp-hero { padding: 140px 0 56px; }
-  .lp-hero__title {
-    font-size: clamp(33px, 11vw, 48px);
-    padding-inline: 20px;
+  .lp-hero { padding: 128px 0 56px; }
+  .lp-hero__brand {
+    font-size: clamp(26px, 8.4vw, 52px);
+    padding-inline: 14px;
   }
-  .lp-hero__sub,
-  .lp-hero__cta { padding-inline: 22px; }
+  .lp-hero__slogan { padding-inline: 22px; }
   .lp-section { padding: 64px 0; }
   .lp-bento { grid-template-columns: 1fr; }
-  .lp-bento-card--wide,
-  .lp-bento-card--tall,
-  .lp-bento-card--std,
-  .lp-bento-card--feature { grid-column: span 1; }
+  .lp-bento-card--feature,
+  .lp-bento-card--half,
+  .lp-bento-card--third { grid-column: span 1; grid-row: auto; }
   .lp-metrics { grid-template-columns: 1fr 1fr; }
-  .lp-preview-grid { grid-template-columns: 1fr; }
+  .lp-board__grid { grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px; }
+  .lp-news,
+  .lp-edu {
+    flex-direction: column;
+    padding: 14px 0;
+  }
+  .lp-news-tile,
+  .lp-edu-card {
+    margin-top: 0 !important;
+  }
+  .lp-kb { grid-template-columns: 1fr; }
+  .lp-kb__nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--lp-line-soft);
+  }
+  .lp-kb__kicker { width: 100%; }
 }
 
 /* ───────────────────────── Reduced motion ───────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-bg__mesh,
-  .lp-orb,
+  .lp-bg__bloom,
   .lp-marquee__track,
   .lp-hero__scroll svg {
     animation: none !important;
@@ -835,6 +1181,7 @@
   }
   .lp-horizontal__viewport { position: static !important; height: auto !important; }
   .lp-horizontal__track { transform: none !important; }
+  .lp-tilt { transform: none !important; }
   .lp-btn:hover,
   .lp-bento-card:hover { transform: none !important; }
 }

@@ -14,7 +14,14 @@ blob-report
 .DS_Store
 *.tsbuildinfo
 .pnpm-store
+__pycache__
+*.py[cod]
 # Локальные дампы БД (pg_dump перед миграциями и т.п.) — никогда не в git.
 .db-backups
 apps/api/generated
 ops/monitoring/alertmanager.yml
+# Локальные артефакты Claude Code: настройки разрешений и скачанные skill-пакеты.
+.claude/settings.local.json
+.claude/skills/
+.claude/scheduled_tasks.lock
+docs/

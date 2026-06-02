@@ -88,6 +88,7 @@ input[type="checkbox"]:focus-visible {
 }
 
 .app-shell {
+  --app-shell-footer-min-height: 64px;
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
@@ -137,7 +138,7 @@ input[type="checkbox"]:focus-visible {
   top: 0;
   align-self: start;
   z-index: 20;
-  min-height: 100vh;
+  min-height: calc(100vh - var(--app-shell-footer-min-height));
   background: var(--panel);
   padding: 22px 16px 28px;
   overflow-x: visible;
@@ -2664,8 +2665,7 @@ input[type="checkbox"]:focus-visible {
 }
 
 /* Страница урока: двухколоночный layout с правым sidebar (прогресс,
-   задания, материалы). Хлебные крошки сверху, баннер «Полный/Расширенный
-   доступ» — между крошками и контентом. */
+   задания, материалы) и отдельной шапкой урока внутри основной карточки. */
 .lesson-page {
   max-width: 1320px;
 }
@@ -2732,17 +2732,45 @@ input[type="checkbox"]:focus-visible {
 }
 
 .lesson-title {
-  margin: 0 0 18px;
+  margin: -28px -32px 24px;
+  padding: 18px 28px;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--primary);
   font-size: var(--text-2xl);
   line-height: 1.2;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0;
-  text-align: left;
-  color: var(--text);
+  text-align: center;
+  color: var(--white);
 }
 
 .lesson-blocks {
   margin-top: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lesson-scroll-reveal .lesson-reveal-item {
+    opacity: 0;
+    transform: translateY(22px);
+    transition:
+      opacity 520ms ease,
+      transform 520ms cubic-bezier(0.2, 0.78, 0.2, 1);
+    transition-delay: calc(var(--lesson-reveal-index, 0) * 45ms);
+    will-change: opacity, transform;
+  }
+
+  .lesson-scroll-reveal .lesson-reveal-item.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-scroll-reveal .lesson-reveal-item {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 .lesson-sidebar {
@@ -6550,6 +6578,10 @@ body.news-modal-open .app-shell {
   .main {
     grid-column: 1;
     padding: 0 18px 32px;
+  }
+
+  .app-shell-footer {
+    grid-column: 1;
   }
 
   .topbar {
@@ -11167,15 +11199,19 @@ li.tree-add-row + li.tree-add-row,
 /* Cookie-banner — sticky bottom, появляется при первом визите. */
 .cookie-banner {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1080px, calc(100vw - 32px));
   z-index: 9999;
-  background: var(--text);
-  color: var(--white);
-  border-top: 3px solid var(--brand);
-  box-shadow: 0 -8px 24px rgb(var(--black-rgb) / 0.15);
-  padding: 20px 24px;
+  background: rgb(255 255 255 / 0.72);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  color: var(--text);
+  border: 1px solid rgb(var(--white-rgb) / 0.6);
+  border-radius: 18px;
+  box-shadow: 0 14px 40px rgb(var(--shadow-rgb) / 0.16);
+  padding: 18px 22px;
 }
 
 .cookie-banner-inner {
@@ -11202,12 +11238,12 @@ li.tree-add-row + li.tree-add-row,
 .cookie-banner-text p {
   margin: 0;
   font-size: 14px;
-  color: var(--text-inverse-muted);
+  color: var(--text-muted);
   line-height: 1.4;
 }
 
 .cookie-banner-text a {
-  color: var(--white);
+  color: var(--brand-active);
   text-decoration: underline;
 }
 
@@ -11225,15 +11261,15 @@ li.tree-add-row + li.tree-add-row,
 }
 
 .cookie-banner-actions .button {
-  background: rgb(var(--white-rgb) / 0.1);
-  color: var(--white);
-  border-color: rgb(var(--white-rgb) / 0.3);
+  background: rgb(var(--white-rgb) / 0.6);
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 .cookie-banner-actions .button-link {
   background: transparent;
   border: none;
-  color: var(--white);
+  color: var(--text-secondary);
   text-decoration: underline;
   cursor: pointer;
   font-size: 14px;
@@ -11865,13 +11901,15 @@ li.tree-add-row + li.tree-add-row,
 .app-shell-footer {
   grid-column: 1 / -1;
   grid-row: 2;
+  position: relative;
+  z-index: 25;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 14px;
   min-height: 52px;
   padding: 10px 24px;
-  border-top: 1px solid var(--line);
+  border-top: 0;
   background: var(--panel);
   color: var(--text-muted);
   font-size: 12px;
@@ -12009,9 +12047,9 @@ li.tree-add-row + li.tree-add-row,
    сворачивается в 0 там, где выреза/домашней полосы нет.
    ========================================================================= */
 
-/* --- Cookie-баннер: не залезать под домашнюю полосу iPhone --- */
+/* --- Cookie-баннер: парящая карточка не залезает под домашнюю полосу iPhone --- */
 .cookie-banner {
-  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  bottom: calc(16px + env(safe-area-inset-bottom));
 }
 
 /* --- Модалка новости: кнопка ✕ и контент не под вырезом/домашней полосой --- */

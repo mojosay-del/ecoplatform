@@ -29,6 +29,7 @@ import { UserSupportDrawer } from "./UserSupportDrawer";
 type AppShellChrome = {
   sidebar?: boolean;
   breadcrumbs?: boolean;
+  breadcrumbTrail?: BreadcrumbItem[];
   notifications?: boolean;
   demoBanner?: boolean;
   adminBackLink?: boolean;
@@ -233,7 +234,7 @@ export function AppShell({ children, chrome = {} }: { children: React.ReactNode;
               <span>ЭкоПлатформа</span>
             </Link>
           ) : null}
-          {showBreadcrumbs ? <Breadcrumb nav={visibleNav} pathname={pathname} /> : null}
+          {showBreadcrumbs ? <Breadcrumb nav={visibleNav} pathname={pathname} trail={chrome.breadcrumbTrail} /> : null}
           <div className="topbar-spacer" />
           {showDemoBanner ? <DemoBanner user={user} pathname={pathname} /> : null}
           {showNotifications ? <NotificationBell /> : null}
@@ -456,8 +457,8 @@ function NavEntry({
 
 // Хлебные крошки в топбаре: для обычных разделов берём активный пункт меню,
 // а для админки показываем вложенный путь внутри единой панели управления.
-function Breadcrumb({ nav, pathname }: { nav: NavSection[]; pathname: string }) {
-  const trail = getBreadcrumbTrail(nav, pathname);
+function Breadcrumb({ nav, pathname, trail: customTrail }: { nav: NavSection[]; pathname: string; trail?: BreadcrumbItem[] }) {
+  const trail = customTrail ?? getBreadcrumbTrail(nav, pathname);
   if (!trail) return null;
 
   return (

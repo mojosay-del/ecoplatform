@@ -7,7 +7,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Download,
   File as FileIcon,
@@ -17,6 +17,7 @@ import {
   FileSpreadsheet,
   FileText,
   FileVideoCamera,
+  GraduationCap,
   Presentation,
 } from "lucide-react";
 import type {
@@ -164,6 +165,11 @@ export function LearningModuleView({ moduleId, preview = false }: { moduleId: st
     }
     return null;
   })();
+  const moduleBreadcrumbTrail = [
+    { label: "Главная" },
+    { href: "/education", label: "Обучение", icon: GraduationCap },
+    { label: data.title },
+  ];
 
   const accessLabel =
     data.accessLevel === "basic"
@@ -173,7 +179,7 @@ export function LearningModuleView({ moduleId, preview = false }: { moduleId: st
         : "Разовая покупка";
 
   return (
-    <AppShell>
+    <AppShell chrome={{ breadcrumbTrail: moduleBreadcrumbTrail }}>
       <section className="page module-page">
         {preview ? (
           <StatusPill as="p" className="cms-preview-banner" variant="warning">
@@ -299,6 +305,7 @@ export function LessonView({
 }) {
   const router = useRouter();
   const { token, user } = useAuth();
+  const lessonMainRef = useRef<HTMLElement>(null);
   const { data, state, errorMessage } = useApiQuery<LearningModuleDetail | null>(
     `learning-module:${moduleId}:${preview ? "preview" : "public"}`,
     () => api.learning.getModule(moduleId, { preview }),
@@ -329,13 +336,56 @@ export function LessonView({
       ? `Следующая глава: урок ${nextLessonEntry.lessonIndex + 1}`
       : "Следующий урок"
     : null;
-
   useEffect(() => {
     setCompleted(Boolean(lesson?.completedAt));
     setCompleting(false);
     setAdvancing(false);
     setCompletionError(null);
   }, [lesson?.completedAt, lessonId]);
+
+  useEffect(() => {
+    const container = lessonMainRef.current;
+    if (!container) return;
+
+    const revealItems = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        ".lesson-title, .lesson-blocks > .content-blocks > *, .lesson-actions",
+      ),
+    );
+
+    revealItems.forEach((item, index) => {
+      item.classList.remove("is-visible");
+      item.classList.add("lesson-reveal-item");
+      item.style.setProperty("--lesson-reveal-index", String(Math.min(index, 6)));
+    });
+
+    if (!("IntersectionObserver" in window)) {
+      revealItems.forEach((item) => item.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          const target = entry.target as HTMLElement;
+          target.classList.add("is-visible");
+          observer.unobserve(target);
+        });
+      },
+      { rootMargin: "0px 0px -10% 0px", threshold: 0.12 },
+    );
+
+    revealItems.forEach((item) => observer.observe(item));
+
+    return () => {
+      observer.disconnect();
+      revealItems.forEach((item) => {
+        item.classList.remove("lesson-reveal-item", "is-visible");
+        item.style.removeProperty("--lesson-reveal-index");
+      });
+    };
+  }, [lesson?.blocks?.length, lessonId, nextLessonHref, preview]);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Урок" />;
@@ -421,25 +471,21 @@ export function LessonView({
   const upgradeCta = preview ? null : resolveUpgradeCta(user);
   const lessonTasks = extractLessonTasks(lesson.blocks ?? []);
   const lessonContentBlocks = (lesson.blocks ?? []).filter((block) => block.type !== "lesson_tasks");
+  const lessonBreadcrumbTrail = [
+    { label: "Главная" },
+    { href: "/education", label: "Обучение", icon: GraduationCap },
+    { href: moduleHref, label: data.title },
+    { label: lesson.title },
+  ];
 
   return (
-    <AppShell>
+    <AppShell chrome={{ breadcrumbTrail: lessonBreadcrumbTrail }}>
       <section className="page lesson-page">
         {preview ? (
           <StatusPill as="p" className="cms-preview-banner" variant="warning">
             Предпросмотр урока: прогресс и отметка прохождения отключены.
           </StatusPill>
         ) : null}
-        <nav className="lesson-breadcrumb">
-          <Link href="/education">Главная</Link>
-          <span>/</span>
-          <Link href="/education">Курсы</Link>
-          <span>/</span>
-          <Link href={moduleHref}>{data.title}</Link>
-          <span>/</span>
-          <span className="lesson-breadcrumb-current">{lesson.title}</span>
-        </nav>
-
         {upgradeCta ? (
           <div className="lesson-upgrade-banner">
             <div>
@@ -453,7 +499,7 @@ export function LessonView({
         ) : null}
 
         <div className="lesson-layout">
-          <article className="lesson-main">
+          <article className="lesson-main lesson-scroll-reveal" ref={lessonMainRef}>
             <h1 className="lesson-title">{lesson.title}</h1>
             <div className="content-blocks lesson-blocks">
               <ContentBlocks blocks={lessonContentBlocks} />
@@ -479,16 +525,6 @@ export function LessonView({
                     {lessonAlreadyCompleted ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
                   </button>
                 )}
-                {nextLessonHref ? (
-                  <button
-                    className="button secondary"
-                    type="button"
-                    onClick={markCompleted}
-                    disabled={lessonAlreadyCompleted || completing || advancing}
-                  >
-                    {lessonAlreadyCompleted ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
-                  </button>
-                ) : null}
                 <Link className="button secondary" href={moduleHref}>
                   ← К модулю
                 </Link>
