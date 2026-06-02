@@ -7759,6 +7759,10 @@ body.news-modal-open .app-shell {
   transition: background-color 120ms ease;
 }
 
+.tree-row.has-drag-handle {
+  grid-template-columns: 24px 22px 1fr auto;
+}
+
 .tree-row.depth-0 {
   padding-left: 4px;
 }
@@ -7821,6 +7825,49 @@ body.news-modal-open .app-shell {
   padding: 6px 8px;
   border-radius: 8px;
   min-width: 0;
+}
+
+.tree-row-drag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tree-row-drag-handle {
+  width: 24px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: grab;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.tree-row:hover .tree-row-drag-handle,
+.tree-row-drag-handle:focus-visible,
+.knowledge-sortable-item.is-dragging .tree-row-drag-handle {
+  opacity: 1;
+}
+
+.tree-row-drag-handle:hover {
+  background: var(--line);
+  color: var(--text);
+}
+
+.tree-row-drag-handle:active {
+  cursor: grabbing;
+}
+
+.knowledge-sortable-item.is-dragging {
+  z-index: 5;
 }
 
 .tree-row-icon {

@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { ContentStatus, Prisma } from "@prisma/client";
-import { lessonBlockSchema, validateContentBlocks } from "@ecoplatform/shared";
+import { validateContentBlocks } from "@ecoplatform/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { paginatedResponse, resolvePagination, type PaginationInput } from "../../common/pagination";
@@ -131,10 +131,14 @@ export class KnowledgeBaseService {
 
   async createKnowledgeArticle(input: KnowledgeArticleInput, user: RequestUser) {
     const isCategory = this.isKnowledgeCategory(input.iconType);
-    const check = isCategory ? { ok: true as const } : validateContentBlocks(input.blocks);
+    const blocks = isCategory ? [] : input.blocks;
+    const check = this.validateDraftableKnowledgeBlocks(blocks);
 
     if (!check.ok) {
       throw new ForbiddenException(check.message);
+    }
+    if (isCategory && (input.parentId ?? null) !== null) {
+      throw new ForbiddenException("Категория базы знаний должна быть верхним узлом.");
     }
     await this.common.assertCoverImageAllowed(input.coverImageId, user);
 
@@ -157,7 +161,7 @@ export class KnowledgeBaseService {
         iconType: input.iconType,
         createdById: user.id,
         blocks: {
-          create: input.blocks.map((block, position) => ({
+          create: blocks.map((block, position) => ({
             position,
             type: block.type,
             payload: this.common.payload(block),
@@ -168,7 +172,7 @@ export class KnowledgeBaseService {
 
     await this.common.recordEntityReferences("knowledge_base_article", article.id, [
       input.coverImageId,
-      ...input.blocks.flatMap((block) => Array.from(this.common.collectFileIdsFromPayload(block.payload))),
+      ...blocks.flatMap((block) => Array.from(this.common.collectFileIdsFromPayload(block.payload))),
     ]);
 
     await this.auditLog.record({
@@ -182,14 +186,6 @@ export class KnowledgeBaseService {
   }
 
   async updateKnowledgeArticle(id: string, input: KnowledgeArticleInput, user: RequestUser) {
-    const isCategory = this.isKnowledgeCategory(input.iconType);
-    const check = isCategory ? { ok: true as const } : validateContentBlocks(input.blocks);
-
-    if (!check.ok) {
-      throw new ForbiddenException(check.message);
-    }
-    await this.common.assertCoverImageAllowed(input.coverImageId, user);
-
     const existing = await this.prisma.knowledgeBaseArticle.findUnique({
       where: { id },
       include: { blocks: true },
@@ -197,6 +193,22 @@ export class KnowledgeBaseService {
     if (!existing) {
       throw new NotFoundException("Статья не найдена.");
     }
+
+    const isCategory = this.isKnowledgeCategory(input.iconType);
+    const blocks = isCategory ? [] : input.blocks;
+    const check = this.validateDraftableKnowledgeBlocks(blocks);
+
+    if (!check.ok) {
+      throw new ForbiddenException(check.message);
+    }
+    if (isCategory && (input.parentId ?? existing.parentId) !== null) {
+      throw new ForbiddenException("Категория базы знаний должна быть верхним узлом.");
+    }
+    if (!isCategory && existing.status === ContentStatus.published && blocks.length === 0) {
+      throw new ForbiddenException("Нельзя сохранить опубликованный материал без блоков.");
+    }
+    await this.common.assertCoverImageAllowed(input.coverImageId, user);
+
     const previousFileIds = this.common.compactFileIds([
       existing.coverImageId,
       ...this.common.collectFileIdsFromBlocks(existing.blocks),
@@ -212,7 +224,7 @@ export class KnowledgeBaseService {
           coverImageId: input.coverImageId,
           iconType: input.iconType,
           blocks: {
-            create: input.blocks.map((block, position) => ({
+            create: blocks.map((block, position) => ({
               position,
               type: block.type,
               payload: this.common.payload(block),
@@ -228,7 +240,7 @@ export class KnowledgeBaseService {
 
     await this.common.recordEntityReferences("knowledge_base_article", id, [
       input.coverImageId,
-      ...input.blocks.flatMap((block) => Array.from(this.common.collectFileIdsFromPayload(block.payload))),
+      ...blocks.flatMap((block) => Array.from(this.common.collectFileIdsFromPayload(block.payload))),
     ]);
 
     await this.auditLog.record({
@@ -303,6 +315,9 @@ export class KnowledgeBaseService {
 
     if (input.parentId === id) {
       throw new ForbiddenException("Статья не может быть собственным родителем.");
+    }
+    if (this.isKnowledgeCategory(existing.iconType) && input.parentId !== null) {
+      throw new ForbiddenException("Категория базы знаний должна оставаться верхним узлом.");
     }
 
     await this.assertKnowledgeDepth(input.parentId, id);
@@ -400,6 +415,13 @@ export class KnowledgeBaseService {
 
   private isKnowledgeCategory(iconType?: string | null) {
     return iconType === "category";
+  }
+
+  private validateDraftableKnowledgeBlocks(blocks: KnowledgeArticleInput["blocks"]) {
+    if (blocks.length === 0) {
+      return { ok: true as const };
+    }
+    return validateContentBlocks(blocks);
   }
 
   private async knowledgeDepth(nodeId: string): Promise<number> {
