@@ -30,7 +30,7 @@ import type {
 } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { StatusPill } from "../components/StatusPill";
-import { ApiError, api, preferredFileAssetImageUrl, type FileAsset } from "../lib/api";
+import { ApiError, api, preferredFileAssetImageUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import {
@@ -610,31 +610,28 @@ function extractLessonTasks(blocks: Array<{ type: string; payload: Record<string
   });
 }
 
-function LessonAttachments({ attachments }: { attachments: Array<{ fileId: string; displayName: string }> }) {
-  const { token } = useAuth();
-  const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
-  const ids = attachments
-    .map((a) => a.fileId)
-    .filter(Boolean)
-    .sort();
-  const idsKey = ids.join(",");
-
-  useEffect(() => {
-    if (!token || ids.length === 0) {
-      setAssets(new Map());
-      return;
-    }
-    api.files
-      .listByIds(ids)
-      .then((result) => setAssets(new Map(result.map((asset) => [asset.id, asset]))))
-      .catch(() => setAssets(new Map()));
-  }, [idsKey, ids.length, token]);
-
+// Вложения уроков отдаёт сам API в составе урока: для приватных файлов это
+// короткоживущая presigned-ссылка (downloadUrl), выданная только при наличии
+// доступа к уроку. Отдельный запрос в /files?ids больше не нужен — поэтому
+// бывший пользователь без подписки ссылку уже не получит.
+function LessonAttachments({
+  attachments,
+}: {
+  attachments: Array<{
+    fileId: string;
+    displayName: string;
+    downloadUrl?: string | null;
+    originalName?: string | null;
+    mimeType?: string | null;
+  }>;
+}) {
   return (
     <div className="lesson-material-list">
       {attachments.map((attachment, index) => {
-        const asset = assets.get(attachment.fileId);
-        const Icon = resolveLessonMaterialIcon(asset, attachment.displayName);
+        const Icon = resolveLessonMaterialIcon(
+          { mimeType: attachment.mimeType, originalName: attachment.originalName },
+          attachment.displayName,
+        );
         return (
           <div className="lesson-material-item" key={index}>
             <span className="lesson-material-icon" aria-hidden>
@@ -643,10 +640,10 @@ function LessonAttachments({ attachments }: { attachments: Array<{ fileId: strin
             <strong className="lesson-material-title" title={attachment.displayName}>
               {attachment.displayName}
             </strong>
-            {asset?.publicUrl ? (
+            {attachment.downloadUrl ? (
               <a
                 className="lesson-material-download"
-                href={asset.publicUrl}
+                href={attachment.downloadUrl}
                 download={attachment.displayName}
                 rel="noreferrer"
                 target="_blank"
@@ -666,8 +663,11 @@ function LessonAttachments({ attachments }: { attachments: Array<{ fileId: strin
   );
 }
 
-function resolveLessonMaterialIcon(asset: FileAsset | undefined, displayName: string) {
-  const mimeType = asset?.mimeType.toLowerCase() ?? "";
+function resolveLessonMaterialIcon(
+  asset: { mimeType?: string | null; originalName?: string | null } | undefined,
+  displayName: string,
+) {
+  const mimeType = asset?.mimeType?.toLowerCase() ?? "";
   const fileName = `${asset?.originalName ?? ""} ${displayName}`.toLowerCase();
 
   if (mimeType.startsWith("image/") || /\.(avif|gif|jpe?g|png|webp)$/.test(fileName)) return FileImage;

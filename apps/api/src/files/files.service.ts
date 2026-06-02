@@ -7,7 +7,14 @@ import {
   NotFoundException,
   Optional,
 } from "@nestjs/common";
-import { DeleteObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 // file-type ≥17 поставляется только как ESM. apps/api собирается в CommonJS:
@@ -41,6 +48,10 @@ type FileAssetImageVariant = StoredImageVariant & {
 type FileAssetImageVariants = Partial<Record<ImageVariantFormat, FileAssetImageVariant>>;
 export type FileAssetResponse = Omit<FileAsset, "variants"> & {
   publicUrl: string | null;
+  // Ссылка для скачивания. Для public-файлов совпадает с publicUrl; для
+  // приватных — короткоживущая presigned-ссылка (или null, если S3 не настроен
+  // / запросившему не положено). См. signDownloadUrls.
+  downloadUrl: string | null;
   variants: FileAssetImageVariants | null;
 };
 
@@ -109,6 +120,10 @@ const MIME_ALIASES: Record<string, string[]> = {
   "video/quicktime": ["video/mov"],
 };
 const S3_HEALTH_TIMEOUT_MS = 1_000;
+// Срок жизни presigned-ссылки на приватный файл. Час — достаточно, чтобы открыть
+// урок и скачать материалы за сессию; по истечении фронт перезапрашивает урок,
+// и доступ перепроверяется заново (истёкшая подписка ссылку уже не получит).
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 function isPlaceholderS3Value(value: string) {
   return value.startsWith("replace-with-");
@@ -209,6 +224,10 @@ export class FilesService {
     }
   }
 
+  private directObjectUrl(baseUrl: string, bucket: string, storageKey: string): string {
+    return `${baseUrl.replace(/\/$/, "")}/${bucket}/${storageKey}`;
+  }
+
   private publicUrl(storageKey: string, accessLevel: FileAccessLevel): string | null {
     if (accessLevel !== FileAccessLevel.public) {
       return null;
@@ -220,7 +239,92 @@ export class FilesService {
       return null;
     }
 
-    return `${baseUrl.replace(/\/$/, "")}/${bucket}/${storageKey}`;
+    return this.directObjectUrl(baseUrl, bucket, storageKey);
+  }
+
+  // Отдельный приватный бакет для непубличных файлов (вложения платных уроков).
+  // Если не настроен — возвращаем null, и всё работает по-старому (мягкая
+  // деградация: до настройки инфраструктуры файлы остаются в публичном бакете).
+  private privateBucket(): string | null {
+    const bucket = process.env.S3_PRIVATE_BUCKET;
+    if (!bucket || isPlaceholderS3Value(bucket)) {
+      return null;
+    }
+    return bucket;
+  }
+
+  // Бакет, в котором ФИЗИЧЕСКИ лежит объект данного уровня доступа: public — в
+  // обычном public-read бакете, остальное — в приватном (если он настроен).
+  // Единая точка истины для upload / delete / presign — они обязаны совпадать.
+  private bucketForAccessLevel(accessLevel: FileAccessLevel, publicBucket: string): string {
+    if (accessLevel === FileAccessLevel.public) {
+      return publicBucket;
+    }
+    return this.privateBucket() ?? publicBucket;
+  }
+
+  private downloadContentDisposition(originalName: string): string {
+    // filename* (RFC 5987) корректно отдаёт кириллические имена при скачивании.
+    return `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`;
+  }
+
+  /**
+   * Считает ссылку для скачивания пачки файлов с учётом уровня доступа:
+   *  - public → прямая публичная ссылка (как раньше, кешируется CDN);
+   *  - не public + настроен приватный бакет → presigned GET на SIGNED_URL_TTL_SECONDS;
+   *  - не public + приватный бакет НЕ настроен → fallback на прямую ссылку
+   *    (объект ещё в публичном бакете, не мигрирован) — без регрессии выдачи;
+   *  - S3 не настроен → null.
+   * Принимает пачку, чтобы на странице урока создавать S3-клиент один раз.
+   */
+  async signDownloadUrls(
+    assets: Array<Pick<FileAsset, "id" | "storageKey" | "accessLevel" | "originalName">>,
+    ttlSeconds = SIGNED_URL_TTL_SECONDS,
+  ): Promise<Map<string, string | null>> {
+    const urls = new Map<string, string | null>();
+    if (assets.length === 0) {
+      return urls;
+    }
+
+    const needsPrivate = assets.some((asset) => asset.accessLevel !== FileAccessLevel.public);
+    const config = needsPrivate ? this.getS3Config() : null;
+    const privateBucket = needsPrivate ? this.privateBucket() : null;
+
+    try {
+      for (const asset of assets) {
+        if (asset.accessLevel === FileAccessLevel.public) {
+          urls.set(asset.id, this.publicUrl(asset.storageKey, asset.accessLevel));
+          continue;
+        }
+        if (!config) {
+          urls.set(asset.id, null);
+          continue;
+        }
+        if (!privateBucket) {
+          urls.set(asset.id, this.directObjectUrl(config.publicBaseUrl, config.bucket, asset.storageKey));
+          continue;
+        }
+        const command = new GetObjectCommand({
+          Bucket: privateBucket,
+          Key: asset.storageKey,
+          ResponseContentDisposition: this.downloadContentDisposition(asset.originalName),
+        });
+        urls.set(asset.id, await getSignedUrl(config.client, command, { expiresIn: ttlSeconds }));
+      }
+    } finally {
+      // getS3Config() создаёт клиента заново на каждый вызов — закрываем его,
+      // чтобы не накапливать дескрипторы пула соединений.
+      config?.client.destroy();
+    }
+
+    return urls;
+  }
+
+  async createSignedDownloadUrl(
+    asset: Pick<FileAsset, "id" | "storageKey" | "accessLevel" | "originalName">,
+    ttlSeconds = SIGNED_URL_TTL_SECONDS,
+  ): Promise<string | null> {
+    return (await this.signDownloadUrls([asset], ttlSeconds)).get(asset.id) ?? null;
   }
 
   private parseImageVariants(raw: Prisma.JsonValue | null | undefined): Record<string, StoredImageVariant> {
@@ -263,9 +367,14 @@ export class FilesService {
   }
 
   private toResponse(asset: FileAsset): FileAssetResponse {
+    const publicUrl = this.publicUrl(asset.storageKey, asset.accessLevel);
     return {
       ...asset,
-      publicUrl: this.publicUrl(asset.storageKey, asset.accessLevel),
+      publicUrl,
+      // Базовое значение: для public — публичная ссылка, для приватных — null.
+      // Вызовы, которым нужна presigned-ссылка для приватного файла, перезаписывают
+      // это поле через signDownloadUrls (см. upload / findManyByIds).
+      downloadUrl: publicUrl,
       variants: this.variantResponse(asset),
     };
   }
@@ -660,6 +769,10 @@ export class FilesService {
     const upload = await this.validateUpload(file, input);
     const { client, bucket } = this.getClient();
     const accessLevel = input.accessLevel ?? FileAccessLevel.public;
+    // Приватные файлы кладём в приватный бакет (см. bucketForAccessLevel) —
+    // публичные остаются в public-read бакете. Удаление и presign используют ту
+    // же функцию выбора бакета, поэтому объект всегда ищется там, где лежит.
+    const targetBucket = this.bucketForAccessLevel(accessLevel, bucket);
     const storageKey = this.storageKey(file.originalname, upload.extension);
     const variantUploads = (upload.variants ?? []).map((variant) => ({
       ...variant,
@@ -669,7 +782,7 @@ export class FilesService {
     await Promise.all([
       client.send(
         new PutObjectCommand({
-          Bucket: bucket,
+          Bucket: targetBucket,
           Key: storageKey,
           Body: upload.buffer,
           ContentType: upload.mimeType,
@@ -680,7 +793,7 @@ export class FilesService {
       ...variantUploads.map((variant) =>
         client.send(
           new PutObjectCommand({
-            Bucket: bucket,
+            Bucket: targetBucket,
             Key: variant.storageKey,
             Body: variant.buffer,
             ContentType: variant.mimeType,
@@ -723,21 +836,36 @@ export class FilesService {
       },
     });
 
-    return this.toResponse(asset);
+    // Сразу отдаём загрузившему рабочую ссылку — для приватного файла presigned,
+    // чтобы редактор/превью показали загруженный файл без отдельного запроса.
+    const response = this.toResponse(asset);
+    response.downloadUrl = await this.createSignedDownloadUrl(asset);
+    return response;
   }
 
-  async findManyByIds(ids: string[]) {
+  async findManyByIds(ids: string[], requester?: RequestUser) {
     const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
     if (uniqueIds.length === 0) {
       return [];
     }
 
+    // Приватные metadata по-прежнему НЕ утекают обычным пользователям: им
+    // отдаём только public-файлы. Контент-персонал (admin / content_manager)
+    // видит и приватные — это файлы, которыми он управляет в редакторе.
+    const canSeePrivate = Boolean(
+      requester &&
+        (requester.platformRoles.includes("admin") || requester.platformRoles.includes("content_manager")),
+    );
+
     const assets = await this.prisma.fileAsset.findMany({
-      where: { id: { in: uniqueIds }, accessLevel: FileAccessLevel.public },
+      where: canSeePrivate
+        ? { id: { in: uniqueIds } }
+        : { id: { in: uniqueIds }, accessLevel: FileAccessLevel.public },
       orderBy: { createdAt: "desc" },
     });
 
-    return assets.map((asset) => this.toResponse(asset));
+    const signed = await this.signDownloadUrls(assets);
+    return assets.map((asset) => ({ ...this.toResponse(asset), downloadUrl: signed.get(asset.id) ?? null }));
   }
 
   private async hasStructuredReference(fileId: string) {
@@ -792,11 +920,13 @@ export class FilesService {
 
       const config = this.getS3Config();
       if (config) {
+        // Удаляем из того же бакета, куда объект был загружен по его уровню доступа.
+        const objectBucket = this.bucketForAccessLevel(asset.accessLevel, config.bucket);
         await Promise.all(
           this.fileStorageKeys(asset).map((key) =>
             config.client.send(
               new DeleteObjectCommand({
-                Bucket: config.bucket,
+                Bucket: objectBucket,
                 Key: key,
               }),
             ),

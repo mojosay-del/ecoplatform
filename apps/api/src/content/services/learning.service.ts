@@ -6,6 +6,7 @@ import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { ModuleAccessService } from "../../common/module-access.service";
 import { paginatedResponse, resolvePagination, type PaginationInput } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
+import { FilesService } from "../../files/files.service";
 import type { z } from "zod";
 import type {
   chapterInputSchema,
@@ -41,7 +42,61 @@ export class LearningService {
     private readonly auditLog: AdminActionLogService,
     private readonly moduleAccess: ModuleAccessService,
     private readonly common: ContentCommonService,
+    private readonly files: FilesService,
   ) {}
+
+  // Готовит метаданные вложений (presigned downloadUrl + имя/тип/размер) для
+  // уроков, к которым у пользователя есть доступ. Presign приватных вложений
+  // делается ОДНОЙ пачкой на весь модуль и только здесь — то есть уже за гейтом
+  // hasAccess. Истекла подписка → урок не отдаёт вложения, и ссылка не выдаётся.
+  private async resolveAttachmentMeta(
+    chapters: Array<{ lessons: Array<{ attachments: Array<{ fileId: string }> }> }>,
+  ): Promise<Map<string, { downloadUrl: string | null; originalName: string; mimeType: string; sizeBytes: number }>> {
+    const fileIds = Array.from(
+      new Set(
+        chapters
+          .flatMap((chapter) => chapter.lessons.flatMap((lesson) => lesson.attachments.map((a) => a.fileId)))
+          .filter(Boolean),
+      ),
+    );
+    if (fileIds.length === 0) {
+      return new Map();
+    }
+
+    const assets = await this.prisma.fileAsset.findMany({
+      where: { id: { in: fileIds } },
+      select: { id: true, storageKey: true, accessLevel: true, originalName: true, mimeType: true, sizeBytes: true },
+    });
+    const signed = await this.files.signDownloadUrls(assets);
+
+    return new Map(
+      assets.map((asset) => [
+        asset.id,
+        {
+          downloadUrl: signed.get(asset.id) ?? null,
+          originalName: asset.originalName,
+          mimeType: asset.mimeType,
+          sizeBytes: asset.sizeBytes,
+        },
+      ]),
+    );
+  }
+
+  private mapLessonAttachment(
+    attachment: { id: string; fileId: string; displayName: string; position: number },
+    meta?: { downloadUrl: string | null; originalName: string; mimeType: string; sizeBytes: number },
+  ) {
+    return {
+      id: attachment.id,
+      fileId: attachment.fileId,
+      displayName: attachment.displayName,
+      position: attachment.position,
+      downloadUrl: meta?.downloadUrl ?? null,
+      originalName: meta?.originalName ?? null,
+      mimeType: meta?.mimeType ?? null,
+      sizeBytes: meta?.sizeBytes ?? null,
+    };
+  }
 
   private hasLearningAccess(user: RequestUser, accessLevel: LearningAccessLevel) {
     if (user.platformRoles.length > 0) {
@@ -146,6 +201,8 @@ export class LearningService {
         : chapter.lessons.filter((lesson) => lesson.status === ContentStatus.published),
     }));
     const hasAccess = canPreview || this.canAccessPublishedLearningModule(user, module);
+    // Presigned-ссылки на вложения считаем только при наличии доступа — за гейтом.
+    const attachmentMeta = hasAccess ? await this.resolveAttachmentMeta(visibleChapters) : new Map();
     let completedLessons = 0;
     const totalLessons = visibleChapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0);
     const chapters = visibleChapters.map((chapter) => ({
@@ -158,7 +215,13 @@ export class LearningService {
           if (completedAt) {
             completedLessons += 1;
           }
-          return { ...lessonWithoutProgress, completedAt };
+          return {
+            ...lessonWithoutProgress,
+            attachments: lessonWithoutProgress.attachments.map((attachment) =>
+              this.mapLessonAttachment(attachment, attachmentMeta.get(attachment.fileId)),
+            ),
+            completedAt,
+          };
         }
 
         const { blocks: _blocks, attachments: _attachments, ...publicLesson } = lessonWithoutProgress;

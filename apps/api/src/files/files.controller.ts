@@ -43,12 +43,13 @@ export class FilesController {
   constructor(private readonly files: FilesService) {}
 
   @Get()
-  async listByIds(@Query("ids") ids = "") {
+  async listByIds(@Query("ids") ids = "", @CurrentUser() user: RequestUser) {
     return this.files.findManyByIds(
       ids
         .split(",")
         .map((id) => id.trim())
         .filter(Boolean),
+      user,
     );
   }
 

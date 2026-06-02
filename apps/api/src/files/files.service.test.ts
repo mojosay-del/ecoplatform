@@ -3,9 +3,40 @@ import { FileAccessLevel } from "@prisma/client";
 import sharp from "sharp";
 import { FilesService } from "./files.service";
 
+// Presigner мокаем: реальная подпись ходит к конфигу S3, нам же важна только
+// логика выбора бакета и того, что для приватных файлов вызывается presign.
+vi.mock("@aws-sdk/s3-request-presigner", () => ({
+  getSignedUrl: vi.fn(
+    async (_client: unknown, command: { input: { Bucket: string; Key: string } }) =>
+      `https://signed.example/${command.input.Bucket}/${command.input.Key}`,
+  ),
+}));
+
 function serviceWithPrisma(prisma: Record<string, unknown>) {
   return new FilesService(prisma as any);
 }
+
+async function withEnvAsync<T>(updates: Record<string, string | undefined>, action: () => Promise<T>): Promise<T> {
+  const previous = Object.fromEntries(Object.keys(updates).map((name) => [name, process.env[name]]));
+  for (const [name, value] of Object.entries(updates)) {
+    restoreEnv(name, value);
+  }
+  try {
+    return await action();
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      restoreEnv(name, value);
+    }
+  }
+}
+
+const CONFIGURED_S3_ENV = {
+  S3_ENDPOINT: "https://s3.twcstorage.ru",
+  S3_PUBLIC_BASE_URL: "https://s3.twcstorage.ru",
+  S3_BUCKET: "public-bucket",
+  S3_ACCESS_KEY_ID: "key",
+  S3_SECRET_ACCESS_KEY: "secret",
+};
 
 function restoreEnv(name: string, value: string | undefined) {
   if (value === undefined) {
@@ -537,5 +568,118 @@ describe("FilesService cover ownership", () => {
         platformRoles: ["admin"],
       } as any),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("FilesService приватный бакет + signed URL", () => {
+  it("кладёт приватный файл в приватный бакет при upload", async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
+        create: vi.fn().mockImplementation(({ data }) =>
+          Promise.resolve({ id: "file-pdf", createdAt: new Date("2026-06-02T00:00:00.000Z"), ...data }),
+        ),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+    (service as unknown as { getClient: () => unknown }).getClient = () => ({
+      client: { send },
+      bucket: "public-bucket",
+    });
+
+    await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: "private-bucket" }, async () => {
+      await service.upload(
+        { originalname: "secret.pdf", mimetype: "application/pdf", size: pdf.length, buffer: pdf },
+        { accessLevel: FileAccessLevel.authenticated },
+        "user-1",
+      );
+    });
+
+    const command = send.mock.calls[0]?.[0] as { input?: Record<string, unknown> } | undefined;
+    expect(command?.input?.Bucket).toBe("private-bucket");
+  });
+
+  it("findManyByIds: контент-менеджер видит приватные файлы и получает presigned downloadUrl", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "priv-1",
+            storageKey: "uploads/2026-06-02/a.pdf",
+            accessLevel: FileAccessLevel.authenticated,
+            originalName: "a.pdf",
+            mimeType: "application/pdf",
+            sizeBytes: 10,
+            variants: null,
+            createdAt: new Date("2026-06-02T00:00:00.000Z"),
+          },
+        ]),
+        findUnique: vi.fn(),
+        aggregate: vi.fn(),
+        delete: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    const result = await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: "private-bucket" }, () =>
+      service.findManyByIds(["priv-1"], { id: "cm-1", platformRoles: ["content_manager"] } as any),
+    );
+
+    // Контент-персоналу фильтр по accessLevel НЕ применяется.
+    expect(prisma.fileAsset.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ["priv-1"] } },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(result[0]?.downloadUrl).toBe("https://signed.example/private-bucket/uploads/2026-06-02/a.pdf");
+  });
+
+  it("signDownloadUrls: public → прямая публичная ссылка", async () => {
+    const service = serviceWithPrisma(referencePrisma());
+
+    const urls = await withEnvAsync(CONFIGURED_S3_ENV, () =>
+      service.signDownloadUrls([
+        { id: "pub", storageKey: "uploads/x/cover.webp", accessLevel: FileAccessLevel.public, originalName: "c.webp" },
+      ]),
+    );
+
+    expect(urls.get("pub")).toBe("https://s3.twcstorage.ru/public-bucket/uploads/x/cover.webp");
+  });
+
+  it("signDownloadUrls: приватный файл при настроенном приватном бакете → presigned GET", async () => {
+    const service = serviceWithPrisma(referencePrisma());
+
+    const urls = await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: "private-bucket" }, () =>
+      service.signDownloadUrls([
+        {
+          id: "priv",
+          storageKey: "uploads/x/doc.pdf",
+          accessLevel: FileAccessLevel.authenticated,
+          originalName: "doc.pdf",
+        },
+      ]),
+    );
+
+    expect(urls.get("priv")).toBe("https://signed.example/private-bucket/uploads/x/doc.pdf");
+  });
+
+  it("signDownloadUrls: приватный файл без приватного бакета → fallback на публичную ссылку (без регрессии)", async () => {
+    const service = serviceWithPrisma(referencePrisma());
+
+    const urls = await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: undefined }, () =>
+      service.signDownloadUrls([
+        {
+          id: "priv",
+          storageKey: "uploads/x/doc.pdf",
+          accessLevel: FileAccessLevel.authenticated,
+          originalName: "doc.pdf",
+        },
+      ]),
+    );
+
+    expect(urls.get("priv")).toBe("https://s3.twcstorage.ru/public-bucket/uploads/x/doc.pdf");
   });
 });

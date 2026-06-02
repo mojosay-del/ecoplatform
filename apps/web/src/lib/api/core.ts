@@ -26,6 +26,9 @@ export type FileAsset = {
   > | null;
   accessLevel: "public" | "authenticated" | "platform_private" | "conversation_private";
   publicUrl: string | null;
+  // Ссылка для скачивания: для public совпадает с publicUrl, для приватных —
+  // короткоживущая presigned-ссылка (или null, если файл недоступен запросившему).
+  downloadUrl?: string | null;
   createdAt: string;
 };
 

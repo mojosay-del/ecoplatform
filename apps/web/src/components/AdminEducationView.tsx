@@ -1052,6 +1052,9 @@ function LessonForm({
                       buttonLabel={attachment.fileId ? "Заменить файл" : "Загрузить файл"}
                       hideLabel
                       compact
+                      // Вложения уроков — приватные: уходят в приватный бакет и
+                      // отдаются ученику только presigned-ссылкой за paywall.
+                      accessLevel="authenticated"
                       value={attachment.fileId}
                       onChange={(fileId, asset) =>
                         updateAttachment(index, {

@@ -171,6 +171,13 @@ export type LessonAttachment = {
   fileId: string;
   displayName: string;
   position: number;
+  // Заполняются сервером только когда у пользователя есть доступ к уроку.
+  // downloadUrl приватных вложений — короткоживущая presigned-ссылка; null,
+  // если файл недоступен. originalName/mimeType — для иконки и подписи.
+  downloadUrl?: string | null;
+  originalName?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
 };
 
 export type LessonBlock = {
