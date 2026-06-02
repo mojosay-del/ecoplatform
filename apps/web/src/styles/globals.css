@@ -2487,8 +2487,9 @@ input[type="checkbox"]:focus-visible {
   align-items: center;
   flex-wrap: nowrap;
   gap: 2px;
-  width: 100%;
+  width: fit-content;
   max-width: 100%;
+  margin: 0 auto;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -12167,6 +12168,7 @@ li.tree-add-row + li.tree-add-row,
      (segmented control) и влезают целиком — раньше «6 мес» уезжал в скрытый
      горизонтальный скролл без видимой подсказки. */
   .index-period-tabs {
+    width: 100%;
     overflow-x: visible;
   }
 
