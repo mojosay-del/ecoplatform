@@ -12,6 +12,9 @@ function buildService(lockAcquired = true) {
     fileAsset: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    emailVerificationChallenge: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
   };
   const billing = {
     runHourlyCheck: vi.fn().mockResolvedValue({}),
@@ -190,5 +193,54 @@ describe("SchedulerService", () => {
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(files.deleteIfUnreferenced).not.toHaveBeenCalled();
+  });
+
+  it("удаляет отработавшие email-challenge старше суток по expiresAt", async () => {
+    const now = new Date("2026-06-02T04:00:00.000Z");
+    const prisma = {
+      emailVerificationChallenge: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 7 }),
+      },
+    };
+    const service = new SchedulerService(
+      { runHourlyCheck: vi.fn() } as any,
+      prisma as any,
+      { deleteIfUnreferenced: vi.fn() } as any,
+    );
+
+    const result = await service.cleanupExpiredEmailChallenges(now);
+
+    // грейс ровно сутки: cutoff = now - 24h
+    expect(prisma.emailVerificationChallenge.deleteMany).toHaveBeenCalledWith({
+      where: { expiresAt: { lt: new Date("2026-06-01T04:00:00.000Z") } },
+    });
+    expect(result).toEqual({ deleted: 7 });
+  });
+
+  it("запускает очистку email-challenge только под Postgres advisory lock", async () => {
+    const { prisma, service, tx } = buildService(true);
+
+    await service.handleEmailChallengeCleanup();
+
+    expect(tx.$queryRaw.mock.calls[0][1]).toBe("cron:cleanup-email-challenges");
+    expect(prisma.emailVerificationChallenge.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("пропускает очистку email-challenge, если advisory lock держит другая реплика", async () => {
+    const { prisma, service } = buildService(false);
+
+    await service.handleEmailChallengeCleanup();
+
+    expect(prisma.emailVerificationChallenge.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("не чистит email-challenge, когда scheduler отключён переменной окружения", async () => {
+    vi.stubEnv("SCHEDULER_DISABLED", "1");
+    const { prisma, service } = buildService(true);
+
+    await service.handleEmailChallengeCleanup();
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.emailVerificationChallenge.deleteMany).not.toHaveBeenCalled();
   });
 });

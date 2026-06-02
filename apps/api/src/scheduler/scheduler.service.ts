@@ -8,7 +8,15 @@ import { PrismaService } from "../prisma/prisma.service";
 const BILLING_HOURLY_LOCK_KEY = "cron:billing-hourly-check";
 const ACCOUNT_DELETION_CLEANUP_LOCK_KEY = "cron:cleanup-deleted-accounts";
 const ORPHAN_FILE_CLEANUP_LOCK_KEY = "cron:cleanup-orphan-files";
+const EMAIL_CHALLENGE_CLEANUP_LOCK_KEY = "cron:cleanup-email-challenges";
 const CRON_LOCK_TRANSACTION_TIMEOUT_MS = 15 * 60 * 1000;
+// Регистрационный challenge хранит хэш пароля + ПДн (телефон, ФИО, тип компании)
+// до подтверждения кода. После истечения (TTL 15 минут) или успешной верификации
+// эти данные больше не нужны: они либо «мёртвые», либо уже перенесены в созданного
+// User со своим собственным passwordHash. Держим сутки про запас (поддержка,
+// отладка спорных регистраций), затем физически удаляем — минимизация ПДн по
+// 152-ФЗ и защита таблицы от бесконечного роста.
+const EMAIL_CHALLENGE_RETENTION_MS = 24 * 60 * 60 * 1000;
 const ACCOUNT_DELETION_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
 const ACCOUNT_DELETION_BATCH_SIZE = 500;
 // Файл считается «осиротевшим» только спустя неделю после загрузки — большой
@@ -39,7 +47,8 @@ type AccountDeletionCleanupResult = {
  *  - раз в час BillingNotificationsService проверяет компании и шлёт
  *    уведомления о скором/случившемся истечении демо и подписки;
  *  - ночью чистятся аккаунты, прошедшие грейс удаления;
- *  - ночью удаляются осиротевшие загрузки (файлы без единой ссылки).
+ *  - ночью удаляются осиротевшие загрузки (файлы без единой ссылки);
+ *  - ночью удаляются отработавшие регистрационные challenge (хэш пароля + ПДн).
  *
  * Запуск задач можно полностью отключить переменной SCHEDULER_DISABLED=1
  * (актуально для integration-тестов — для биллинг-логики используется
@@ -127,6 +136,42 @@ export class SchedulerService {
     const deleted = await this.files.deleteIfUnreferenced(candidates.map((candidate) => candidate.id));
     this.logger.log(`Orphan file cleanup: scanned ${candidates.length}, deleted ${deleted}`);
     return { scanned: candidates.length, deleted };
+  }
+
+  @Cron("0 4 * * *", { name: "cleanup-email-challenges" })
+  async handleEmailChallengeCleanup() {
+    if (this.disabled) return;
+    try {
+      await this.runWithPostgresAdvisoryLock(EMAIL_CHALLENGE_CLEANUP_LOCK_KEY, () =>
+        this.cleanupExpiredEmailChallenges(),
+      );
+    } catch (error) {
+      this.logger.error("Email challenge cleanup failed", error as Error);
+    }
+  }
+
+  /**
+   * Физически удаляет отработавшие EmailVerificationChallenge: записи, чей
+   * `expiresAt` старше суток. Под этот фильтр попадают все три «мёртвых»
+   * случая, потому что TTL challenge — всего 15 минут:
+   *  - неподтверждённые просроченные (код так и не ввели);
+   *  - вытесненные новой попыткой регистрации (их expiresAt принудительно
+   *    выставляется в момент вытеснения);
+   *  - успешно верифицированные (verifiedAt проставлен, данные уже в User).
+   *
+   * Сутки грейса задаёт `EMAIL_CHALLENGE_RETENTION_MS`. Фильтр по `expiresAt`
+   * опирается на существующий индекс `@@index([expiresAt])`.
+   */
+  async cleanupExpiredEmailChallenges(now = new Date()): Promise<{ deleted: number }> {
+    const cutoff = new Date(now.getTime() - EMAIL_CHALLENGE_RETENTION_MS);
+    const { count } = await this.prisma.emailVerificationChallenge.deleteMany({
+      where: { expiresAt: { lt: cutoff } },
+    });
+
+    if (count > 0) {
+      this.logger.log(`Email challenge cleanup: deleted ${count} expired/verified challenges`);
+    }
+    return { deleted: count };
   }
 
   private async cleanupDeletedAccountsInTransaction(
