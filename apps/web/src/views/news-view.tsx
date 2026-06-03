@@ -212,7 +212,7 @@ export function NewsView() {
                           src={coverUrl!}
                           fill
                           loading={index < 4 ? "eager" : "lazy"}
-                          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                          sizes="(max-width: 640px) 100vw, (max-width: 880px) 50vw, (max-width: 1024px) 40vw, (max-width: 1360px) 25vw, 20vw"
                           style={{ objectFit: "cover" }}
                         />
                       </div>

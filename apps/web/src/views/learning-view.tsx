@@ -92,7 +92,7 @@ export function EducationView() {
                         alt=""
                         src={coverUrl}
                         fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                        sizes="(max-width: 880px) 100vw, (max-width: 1180px) 35vw, (max-width: 1500px) 25vw, 480px"
                         style={{ objectFit: "cover" }}
                       />
                     ) : (
