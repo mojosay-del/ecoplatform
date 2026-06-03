@@ -206,6 +206,17 @@ export function AdminSettingsView() {
 
   const groupDef = GROUPS.find((g) => g.id === activeGroup) ?? DEFAULT_GROUP;
   const groupItems = items.filter((item) => groupOf(item.key) === activeGroup);
+  // Показываем вкладки только для групп, где реально есть настройки.
+  const availableGroups = GROUPS.filter((group) => items.some((item) => groupOf(item.key) === group.id));
+
+  function selectGroup(id: string) {
+    setActiveGroup(id);
+    if (typeof window !== "undefined") {
+      // Обновляем hash, чтобы вкладка оставалась в URL (ссылку можно дать), но
+      // без замусоривания истории отдельной записью на каждый клик.
+      window.history.replaceState(null, "", `#${id}`);
+    }
+  }
 
   return (
     <AppShell>
@@ -223,6 +234,22 @@ export function AdminSettingsView() {
           </StatusPill>
         ) : null}
         {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
+
+        {availableGroups.length > 0 ? (
+          <nav className="settings-tabs" aria-label="Разделы настроек">
+            {availableGroups.map((group) => (
+              <button
+                aria-current={group.id === activeGroup ? "page" : undefined}
+                className={`settings-tab${group.id === activeGroup ? " is-active" : ""}`}
+                key={group.id}
+                onClick={() => selectGroup(group.id)}
+                type="button"
+              >
+                {group.title}
+              </button>
+            ))}
+          </nav>
+        ) : null}
 
         <div className="settings-pane">
           <header className="settings-pane-head">

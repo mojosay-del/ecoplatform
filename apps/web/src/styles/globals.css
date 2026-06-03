@@ -9702,6 +9702,45 @@ li.tree-add-row + li.tree-add-row,
   line-height: 1.4;
 }
 
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.settings-tab {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  padding: 7px 14px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.settings-tab:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.settings-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.settings-tab.is-active {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-active);
+}
+
 .settings-pane {
   background: var(--panel);
   border: 1px solid var(--line);
