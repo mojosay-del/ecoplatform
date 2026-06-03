@@ -13032,3 +13032,460 @@ li.tree-add-row + li.tree-add-row,
 .app-shell-no-sidebar .topbar {
   padding-top: calc(12px + env(safe-area-inset-top));
 }
+
+/* ===== Единый WYSIWYG-редактор (DocumentEditor, TipTap) ===== */
+.document-editor {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.document-editor .rich-text-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex-wrap: wrap;
+}
+
+.document-editor-surface {
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+}
+
+.document-editor-content {
+  padding: 16px 18px;
+  min-height: 220px;
+  outline: none;
+}
+
+.document-editor-content:focus {
+  outline: none;
+}
+
+/* Меню вставки блоков в панели */
+.doc-insert {
+  position: relative;
+  display: inline-flex;
+}
+
+.doc-insert-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: 220px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.16);
+}
+
+.doc-insert-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.doc-insert-menu-item:hover {
+  background: var(--surface-muted, rgb(0 0 0 / 0.05));
+}
+
+.doc-insert-menu-icon {
+  display: inline-flex;
+  color: var(--text-muted, #8a8f9b);
+}
+
+/* Редактируемая карточка блока внутри документа */
+.doc-block {
+  margin: 12px 0;
+}
+
+.doc-block-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-muted, rgb(0 0 0 / 0.03));
+  overflow: hidden;
+}
+
+.doc-block.ProseMirror-selectednode .doc-block-card {
+  border-color: var(--brand, #4d73d8);
+  box-shadow: 0 0 0 3px rgb(77 115 216 / 0.16);
+}
+
+.doc-block-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.doc-block-handle {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted, #8a8f9b);
+  cursor: grab;
+}
+
+.doc-block-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.doc-block-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted, #8a8f9b);
+  cursor: pointer;
+}
+
+.doc-block-delete:hover {
+  background: rgb(239 107 91 / 0.12);
+  color: var(--danger-text-strong, #ef6b5b);
+}
+
+.doc-block-body {
+  padding: 12px;
+}
+
+/* Галерея */
+.doc-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.doc-gallery-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.doc-gallery-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Задания урока */
+.doc-task-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.doc-task-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Тест */
+.doc-quiz-multiple {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted, #8a8f9b);
+  cursor: pointer;
+}
+
+.doc-quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-quiz-correct {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--success, #5da45c);
+}
+
+/* Сопоставление */
+.doc-pair-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-pair-link {
+  color: var(--text-muted, #8a8f9b);
+  flex-shrink: 0;
+}
+
+/* Меню по «/» (slash command) */
+.slash-popup {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+}
+
+.slash-menu {
+  width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.18);
+}
+
+.slash-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.slash-item.is-active {
+  background: rgb(77 115 216 / 0.12);
+}
+
+.slash-item-icon {
+  display: inline-flex;
+  color: var(--text-muted, #8a8f9b);
+}
+
+.slash-item-title {
+  font-size: 14px;
+}
+
+.slash-empty {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-muted, #8a8f9b);
+}
+
+.lesson-attach-reveal {
+  margin-top: 10px;
+}
+
+/* ===== Интерактив для ученика: тест и сопоставление ===== */
+.quiz-block,
+.matching-block {
+  margin: 18px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.quiz-question {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.quiz-option:hover {
+  border-color: var(--brand, #4d73d8);
+}
+
+.quiz-option-marker {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-strong, #c7ccd6);
+  border-radius: 50%;
+}
+
+.quiz-option-marker.is-multiple {
+  border-radius: 5px;
+}
+
+.quiz-option.is-selected {
+  border-color: var(--brand, #4d73d8);
+  background: rgb(77 115 216 / 0.06);
+}
+
+.quiz-option.is-selected .quiz-option-marker {
+  border-color: var(--brand, #4d73d8);
+  background: var(--brand, #4d73d8);
+  box-shadow: inset 0 0 0 3px var(--surface);
+}
+
+.quiz-option.is-correct {
+  border-color: var(--success, #5da45c);
+  background: rgb(93 164 92 / 0.1);
+}
+
+.quiz-option.is-correct .quiz-option-marker {
+  border-color: var(--success, #5da45c);
+  background: var(--success, #5da45c);
+  box-shadow: inset 0 0 0 3px var(--surface);
+}
+
+.quiz-option.is-wrong {
+  border-color: var(--danger, #ef6b5b);
+  background: rgb(239 107 91 / 0.08);
+}
+
+.quiz-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.quiz-verdict {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.quiz-verdict.is-correct {
+  color: var(--success-text-strong, #3f8f3e);
+}
+
+.quiz-verdict.is-wrong {
+  color: var(--danger-text-strong, #ef6b5b);
+}
+
+.quiz-explanation {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-muted, rgb(0 0 0 / 0.04));
+  font-size: 14px;
+  color: var(--text-muted, #5b606b);
+}
+
+.matching-instruction {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+.matching-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.matching-row {
+  display: grid;
+  grid-template-columns: 1fr auto minmax(40%, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.matching-row.is-correct {
+  border-color: var(--success, #5da45c);
+  background: rgb(93 164 92 / 0.08);
+}
+
+.matching-row.is-wrong {
+  border-color: var(--danger, #ef6b5b);
+  background: rgb(239 107 91 / 0.06);
+}
+
+.matching-left {
+  font-weight: 500;
+}
+
+.matching-arrow {
+  color: var(--text-muted, #8a8f9b);
+}
+
+.matching-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font: inherit;
+  color: var(--text);
+}
+
+@media (max-width: 560px) {
+  .matching-row {
+    grid-template-columns: 1fr;
+  }
+
+  .matching-arrow {
+    display: none;
+  }
+}

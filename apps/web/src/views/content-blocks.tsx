@@ -16,7 +16,7 @@ type RenderableBlock =
   | { type: "paragraph"; payload: { html: string } }
   | { type: "image"; payload: { fileId: string; caption?: string; altText?: string } }
   | { type: "gallery"; payload: { images: Array<{ fileId: string; caption?: string; altText?: string }> } }
-  | { type: "video"; payload: { rutubeUrl: string; caption?: string } }
+  | { type: "video"; payload: { fileId?: string; caption?: string } }
   | { type: "audio"; payload: { fileId: string; episodeTitle?: string; caption?: string; durationSeconds?: number } }
   | { type: "file"; payload: { fileId: string; displayName: string; description?: string } }
   | { type: "checklist"; payload: { title: string; style: string; items: string[] } }
@@ -80,29 +80,11 @@ export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
           );
         }
         if (block.type === "video") {
-          const payload = block.payload as { fileId?: string; rutubeUrl?: string; caption?: string };
-          // Приоритет — собственный загруженный файл (без рекламы). Если файла
-          // нет, fallback на старую rutube-ссылку для совместимости.
+          const payload = block.payload as { fileId?: string; caption?: string };
           const asset = payload.fileId ? assets.get(payload.fileId) : null;
-          const embedUrl = payload.rutubeUrl ? rutubeEmbedUrl(payload.rutubeUrl) : null;
           return (
             <figure className="media-block" key={index}>
-              {asset?.publicUrl ? (
-                <video controls preload="metadata" src={asset.publicUrl} />
-              ) : embedUrl ? (
-                <iframe
-                  allow="clipboard-write; autoplay"
-                  allowFullScreen
-                  src={embedUrl}
-                  title={payload.caption ?? "Видео"}
-                />
-              ) : payload.rutubeUrl ? (
-                <a className="button secondary" href={payload.rutubeUrl} rel="noreferrer" target="_blank">
-                  Открыть видео
-                </a>
-              ) : (
-                <MissingAsset />
-              )}
+              {asset?.publicUrl ? <video controls preload="metadata" src={asset.publicUrl} /> : <MissingAsset />}
               {payload.caption ? <figcaption>{payload.caption}</figcaption> : null}
             </figure>
           );
@@ -175,6 +157,12 @@ export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
             </div>
           );
         }
+        if (block.type === "quiz") {
+          return <QuizPlayer key={index} payload={block.payload as unknown as QuizPayload} />;
+        }
+        if (block.type === "matching") {
+          return <MatchingPlayer key={index} payload={block.payload as unknown as MatchingPayload} />;
+        }
         return null;
       })}
     </div>
@@ -242,19 +230,144 @@ function MissingAsset() {
   return <p className="page-subtitle">Файл недоступен.</p>;
 }
 
-function rutubeEmbedUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.toLowerCase();
-    // Строгая проверка: точный хост или его поддомен. `includes` пропускал бы
-    // подделки вроде `evil-rutube.ru` / `rutube.ru.attacker.com`.
-    if (host !== "rutube.ru" && !host.endsWith(".rutube.ru")) {
-      return null;
-    }
+// --- Интерактивные блоки для ученика (проверка на клиенте) ------------------
 
-    const match = parsed.pathname.match(/\/video\/([a-zA-Z0-9]+)/);
-    return match?.[1] ? `https://rutube.ru/play/embed/${match[1]}` : null;
-  } catch {
-    return null;
+type QuizPayload = {
+  question: string;
+  multiple?: boolean;
+  options: Array<{ text: string; correct: boolean }>;
+  explanation?: string;
+};
+
+function QuizPlayer({ payload }: { payload: QuizPayload }) {
+  const options = payload.options ?? [];
+  const multiple = Boolean(payload.multiple);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [checked, setChecked] = useState(false);
+
+  function toggle(index: number) {
+    setChecked(false);
+    setSelected((prev) => {
+      if (multiple) return prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index];
+      return [index];
+    });
   }
+
+  const isCorrect = useMemo(() => {
+    const correct = options.map((option, index) => (option.correct ? index : -1)).filter((i) => i >= 0);
+    return correct.length === selected.length && correct.every((i) => selected.includes(i));
+  }, [options, selected]);
+
+  return (
+    <div className="quiz-block">
+      <p className="quiz-question">{payload.question}</p>
+      <div className="quiz-options">
+        {options.map((option, index) => {
+          const isSelected = selected.includes(index);
+          let state = "";
+          if (checked) {
+            if (option.correct) state = "is-correct";
+            else if (isSelected) state = "is-wrong";
+          } else if (isSelected) {
+            state = "is-selected";
+          }
+          return (
+            <button
+              type="button"
+              key={index}
+              className={`quiz-option ${state}`}
+              onClick={() => toggle(index)}
+              aria-pressed={isSelected}
+            >
+              <span className={`quiz-option-marker${multiple ? " is-multiple" : ""}`} aria-hidden />
+              <span>{option.text}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="quiz-actions">
+        <button className="button" type="button" disabled={selected.length === 0} onClick={() => setChecked(true)}>
+          Проверить
+        </button>
+        {checked ? (
+          <span className={`quiz-verdict ${isCorrect ? "is-correct" : "is-wrong"}`}>
+            {isCorrect ? "Верно!" : "Не совсем — попробуйте ещё раз"}
+          </span>
+        ) : null}
+      </div>
+      {checked && payload.explanation ? <p className="quiz-explanation">{payload.explanation}</p> : null}
+    </div>
+  );
+}
+
+type MatchingPayload = {
+  instruction?: string;
+  pairs: Array<{ left: string; right: string }>;
+};
+
+function MatchingPlayer({ payload }: { payload: MatchingPayload }) {
+  const pairs = payload.pairs ?? [];
+  // Правый столбец показываем в перемешанном порядке. Перемешиваем после
+  // монтирования (useEffect), чтобы не было рассинхрона SSR/клиента.
+  const [rightOptions, setRightOptions] = useState<string[]>(() => pairs.map((pair) => pair.right));
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    const shuffled = [...pairs.map((pair) => pair.right)];
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+    }
+    setRightOptions(shuffled);
+  }, [payload]);
+
+  const allAnswered = pairs.length > 0 && pairs.every((_, index) => answers[index]);
+  const allCorrect = pairs.every((pair, index) => answers[index] === pair.right);
+
+  return (
+    <div className="matching-block">
+      {payload.instruction ? <p className="matching-instruction">{payload.instruction}</p> : null}
+      <div className="matching-rows">
+        {pairs.map((pair, index) => {
+          const chosen = answers[index] ?? "";
+          const correct = checked && chosen === pair.right;
+          const wrong = checked && Boolean(chosen) && chosen !== pair.right;
+          return (
+            <div className={`matching-row${correct ? " is-correct" : ""}${wrong ? " is-wrong" : ""}`} key={index}>
+              <span className="matching-left">{pair.left}</span>
+              <span className="matching-arrow" aria-hidden>
+                ↔
+              </span>
+              <select
+                className="matching-select"
+                value={chosen}
+                onChange={(event) => {
+                  setChecked(false);
+                  setAnswers((prev) => ({ ...prev, [index]: event.target.value }));
+                }}
+              >
+                <option value="">— выберите —</option>
+                {rightOptions.map((right, optionIndex) => (
+                  <option key={optionIndex} value={right}>
+                    {right}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
+      </div>
+      <div className="quiz-actions">
+        <button className="button" type="button" disabled={!allAnswered} onClick={() => setChecked(true)}>
+          Проверить
+        </button>
+        {checked ? (
+          <span className={`quiz-verdict ${allCorrect ? "is-correct" : "is-wrong"}`}>
+            {allCorrect ? "Всё верно!" : "Есть ошибки — поправьте пары"}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
 }

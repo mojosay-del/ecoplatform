@@ -12,6 +12,8 @@ export const contentBlockKinds = [
   "checklist",
   "image_checklist",
   "lesson_tasks",
+  "quiz",
+  "matching",
 ] as const;
 
 export type ContentBlockKind = (typeof contentBlockKinds)[number];
@@ -63,18 +65,12 @@ export const baseContentBlockSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("video"),
-    // Видео-блок: либо собственный файл (fileId, приоритет — без сторонней
-    // рекламы), либо ссылка на Rutube (rutubeUrl, для старых публикаций).
-    // Хотя бы одно поле должно быть заполнено.
-    payload: z
-      .object({
-        fileId: z.string().min(1).optional(),
-        rutubeUrl: z.string().url().optional(),
-        caption: z.string().optional(),
-      })
-      .refine((value) => Boolean(value.fileId) || Boolean(value.rutubeUrl), {
-        message: "Загрузите видеофайл или укажите ссылку на Rutube.",
-      }),
+    // Видео-блок: только собственный загруженный файл — без сторонних плееров
+    // и рекламы. Поддержка Rutube убрана осознанно (решение владельца 2026-06).
+    payload: z.object({
+      fileId: z.string().min(1),
+      caption: z.string().optional(),
+    }),
   }),
   z.object({
     type: z.literal("audio"),
@@ -128,7 +124,57 @@ export const lessonTasksBlockSchema = z.object({
   }),
 });
 
-export const lessonContentBlockSchema = z.union([baseContentBlockSchema, lessonTasksBlockSchema]);
+// --- Интерактивные блоки (только уроки) ---------------------------------
+
+export const quizBlockSchema = z.object({
+  type: z.literal("quiz"),
+  // Тест с выбором ответа. multiple=false — ровно один правильный вариант
+  // (radio), multiple=true — допускается несколько (checkbox). Поле correct
+  // помечает правильные варианты. Сама проверка ответа ученика — на стороне
+  // урока (рендер/рантайм), здесь только хранится «правильность».
+  payload: z
+    .object({
+      question: z.string().min(1),
+      multiple: z.boolean().default(false),
+      options: z
+        .array(
+          z.object({
+            text: z.string().min(1),
+            correct: z.boolean().default(false),
+          }),
+        )
+        .min(2),
+      explanation: z.string().optional(),
+    })
+    .refine((value) => value.options.some((option) => option.correct), {
+      message: "Отметьте хотя бы один правильный вариант ответа.",
+    }),
+});
+
+export const matchingBlockSchema = z.object({
+  type: z.literal("matching"),
+  // Сопоставление: ученик соединяет элементы левого столбца с правильными
+  // парами из правого (перетаскиванием). Храним список верных пар.
+  payload: z.object({
+    instruction: z.string().optional(),
+    pairs: z
+      .array(
+        z.object({
+          left: z.string().min(1),
+          right: z.string().min(1),
+        }),
+      )
+      .min(2),
+    explanation: z.string().optional(),
+  }),
+});
+
+export const lessonContentBlockSchema = z.union([
+  baseContentBlockSchema,
+  lessonTasksBlockSchema,
+  quizBlockSchema,
+  matchingBlockSchema,
+]);
 
 export type LessonContentBlock = z.infer<typeof lessonContentBlockSchema>;
 
@@ -137,9 +183,21 @@ export const newsBlockSchema = baseContentBlockSchema.refine(
   "Новости поддерживают только стандартные медиа- и текстовые блоки.",
 );
 
+const lessonAllowedKinds: readonly string[] = [
+  "heading",
+  "subheading",
+  "paragraph",
+  "image",
+  "gallery",
+  "video",
+  "lesson_tasks",
+  "quiz",
+  "matching",
+];
+
 export const lessonBlockSchema = lessonContentBlockSchema.refine(
-  (block) => ["heading", "subheading", "paragraph", "image", "gallery", "video", "lesson_tasks"].includes(block.type),
-  "Уроки поддерживают только учебные текстовые, медиа- и task-блоки.",
+  (block) => lessonAllowedKinds.includes(block.type),
+  "Уроки поддерживают только учебные текстовые, медиа-, task- и интерактивные блоки.",
 );
 
 export const knowledgeBaseSectionTitles = [

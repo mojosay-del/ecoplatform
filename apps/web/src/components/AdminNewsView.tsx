@@ -3,7 +3,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, ImageIcon, Plus, X } from "lucide-react";
 import { AppShell } from "./AppShell";
-import { Block, BlocksEditor, NEWS_BLOCK_KINDS } from "./BlocksEditor";
+import type { Block } from "../lib/editor/block-types";
+import { DocumentEditor } from "./editor/DocumentEditor";
+import type { AtomicBlockKind } from "../lib/editor/block-mapping";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../lib/api";
@@ -62,6 +64,10 @@ const EMPTY_DRAFT: DraftState = {
 };
 
 const NEWS_LIST_PAGE_SIZE = 20;
+
+// Атомарные блоки для новостей (текстовые блоки всегда доступны через панель
+// и меню «/»). Без чек-листов/файлов/урок-специфичных блоков.
+const NEWS_ATOMIC_KINDS: AtomicBlockKind[] = ["image", "gallery", "video", "audio"];
 
 export function AdminNewsView() {
   const { token } = useAuth();
@@ -439,10 +445,11 @@ export function AdminNewsView() {
 
               <div className="form-field">
                 <span>Содержание новости</span>
-                <BlocksEditor
+                <DocumentEditor
                   blocks={draft.blocks}
-                  onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks }))}
-                  allowedKinds={NEWS_BLOCK_KINDS}
+                  onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks: blocks as Block[] }))}
+                  allowedAtomicKinds={NEWS_ATOMIC_KINDS}
+                  placeholder="Текст новости — пишите или нажмите «/» для вставки блока…"
                 />
               </div>
 

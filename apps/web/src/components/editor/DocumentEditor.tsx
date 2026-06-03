@@ -1,0 +1,398 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { EditorContent, useEditor, type Editor } from "@tiptap/react";
+import Placeholder from "@tiptap/extension-placeholder";
+import {
+  Bold,
+  Heading2,
+  Heading3,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  Plus,
+  Quote,
+  Redo2,
+  RemoveFormatting,
+  Underline as UnderlineIcon,
+  Undo2,
+  Unlink,
+} from "lucide-react";
+import { createRichTextExtensions } from "../../lib/editor/rich-text-extensions";
+import { blocksToDoc, docToBlocks, type EditorBlock } from "../../lib/editor/serializer";
+import { ATOMIC_BLOCK_KINDS, ATOMIC_BLOCK_NODE_NAME, type AtomicBlockKind } from "../../lib/editor/block-mapping";
+import { ATOMIC_BLOCK_ICONS, ATOMIC_BLOCK_LABELS, atomicBlockNodes, atomicDefaultPayload } from "./atomic-nodes";
+import { createSlashCommand } from "./slash-command";
+
+const TEXT_COLORS = [
+  { value: "#1a202e", label: "Чёрный" },
+  { value: "#8a8f9b", label: "Серый" },
+  { value: "#f5773e", label: "Оранжевый" },
+  { value: "#5da45c", label: "Зелёный" },
+  { value: "#4d73d8", label: "Синий" },
+  { value: "#ef6b5b", label: "Красный" },
+  { value: "#e9b949", label: "Жёлтый" },
+];
+
+const FONT_SIZES = [
+  { value: "13px", label: "Мелкий" },
+  { value: "16px", label: "Обычный" },
+  { value: "18px", label: "Крупный" },
+  { value: "22px", label: "Большой" },
+];
+
+type DocumentEditorProps = {
+  blocks: EditorBlock[];
+  onChange: (blocks: EditorBlock[]) => void;
+  allowedAtomicKinds?: AtomicBlockKind[];
+  placeholder?: string;
+};
+
+export function DocumentEditor({
+  blocks,
+  onChange,
+  allowedAtomicKinds = ATOMIC_BLOCK_KINDS,
+  placeholder,
+}: DocumentEditorProps) {
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  // Последнее, что редактор сам отдал наружу — чтобы внешние setBlocks от того
+  // же значения не дёргали setContent (и не сбрасывали курсор).
+  const lastEmittedRef = useRef<string>(JSON.stringify(blocks));
+
+  const extensions = useMemo(
+    () => [
+      ...createRichTextExtensions(),
+      Placeholder.configure({ placeholder: placeholder ?? "Начните писать или нажмите «/» для вставки блока…" }),
+      ...atomicBlockNodes,
+      createSlashCommand(allowedAtomicKinds),
+    ],
+    [placeholder, allowedAtomicKinds],
+  );
+
+  const editor = useEditor({
+    extensions,
+    content: blocksToDoc(blocks),
+    immediatelyRender: false,
+    editorProps: { attributes: { class: "document-editor-content rich-text-content" } },
+    onUpdate({ editor }) {
+      const next = docToBlocks(editor.getJSON());
+      lastEmittedRef.current = JSON.stringify(next);
+      onChangeRef.current(next);
+    },
+  });
+
+  // Внешняя замена blocks (открыли другой урок/новость) — пересинхронизируем.
+  useEffect(() => {
+    if (!editor) return;
+    const incoming = JSON.stringify(blocks);
+    if (incoming === lastEmittedRef.current) return;
+    editor.commands.setContent(blocksToDoc(blocks), { emitUpdate: false });
+    lastEmittedRef.current = incoming;
+  }, [editor, blocks]);
+
+  if (!editor) return null;
+
+  return (
+    <div className="document-editor">
+      <Toolbar editor={editor} allowedAtomicKinds={allowedAtomicKinds} />
+      <EditorContent editor={editor} className="document-editor-surface" />
+    </div>
+  );
+}
+
+function Toolbar({ editor, allowedAtomicKinds }: { editor: Editor; allowedAtomicKinds: AtomicBlockKind[] }) {
+  const activeFontSize = (editor.getAttributes("textStyle") as { fontSize?: string }).fontSize ?? "";
+  const activeColor = (editor.getAttributes("textStyle") as { color?: string }).color ?? "#1a202e";
+
+  return (
+    <div className="rich-text-toolbar" role="toolbar" aria-label="Форматирование">
+      <div className="rich-text-toolbar-group">
+        <InsertMenu editor={editor} allowedAtomicKinds={allowedAtomicKinds} />
+      </div>
+
+      <div className="rich-text-toolbar-divider" aria-hidden />
+
+      <div className="rich-text-toolbar-group">
+        <ToolbarButton
+          active={editor.isActive("bold")}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          title="Жирный (Ctrl+B)"
+          ariaLabel="Жирный"
+        >
+          <Bold size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor.isActive("italic")}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          title="Курсив (Ctrl+I)"
+          ariaLabel="Курсив"
+        >
+          <Italic size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor.isActive("underline")}
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          title="Подчёркнутый (Ctrl+U)"
+          ariaLabel="Подчёркнутый"
+        >
+          <UnderlineIcon size={16} />
+        </ToolbarButton>
+      </div>
+
+      <div className="rich-text-toolbar-divider" aria-hidden />
+
+      <div className="rich-text-toolbar-group">
+        <select
+          className="rich-text-select"
+          aria-label="Размер шрифта"
+          value={activeFontSize}
+          onChange={(event) => {
+            const next = event.target.value;
+            if (!next) editor.chain().focus().unsetFontSize().run();
+            else editor.chain().focus().setFontSize(next).run();
+          }}
+        >
+          <option value="">Размер</option>
+          {FONT_SIZES.map((size) => (
+            <option key={size.value} value={size.value}>
+              {size.label}
+            </option>
+          ))}
+        </select>
+
+        <div className="rich-text-color-picker" role="group" aria-label="Цвет текста">
+          {TEXT_COLORS.map((color) => (
+            <button
+              key={color.value}
+              type="button"
+              className={`rich-text-color-swatch${activeColor.toLowerCase() === color.value.toLowerCase() ? " is-active" : ""}`}
+              style={{ background: color.value }}
+              onClick={() => {
+                if (color.value === "#1a202e") editor.chain().focus().unsetColor().run();
+                else editor.chain().focus().setColor(color.value).run();
+              }}
+              title={color.label}
+              aria-label={`Цвет: ${color.label}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="rich-text-toolbar-divider" aria-hidden />
+
+      <div className="rich-text-toolbar-group">
+        <ToolbarButton
+          active={editor.isActive("heading", { level: 2 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          title="Заголовок"
+          ariaLabel="Заголовок"
+        >
+          <Heading2 size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor.isActive("heading", { level: 3 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          title="Подзаголовок"
+          ariaLabel="Подзаголовок"
+        >
+          <Heading3 size={16} />
+        </ToolbarButton>
+      </div>
+
+      <div className="rich-text-toolbar-divider" aria-hidden />
+
+      <div className="rich-text-toolbar-group">
+        <ToolbarButton
+          active={editor.isActive("bulletList")}
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          title="Маркированный список"
+          ariaLabel="Маркированный список"
+        >
+          <List size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor.isActive("orderedList")}
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          title="Нумерованный список"
+          ariaLabel="Нумерованный список"
+        >
+          <ListOrdered size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor.isActive("blockquote")}
+          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+          title="Цитата"
+          ariaLabel="Цитата"
+        >
+          <Quote size={16} />
+        </ToolbarButton>
+      </div>
+
+      <div className="rich-text-toolbar-divider" aria-hidden />
+
+      <div className="rich-text-toolbar-group">
+        <ToolbarButton
+          active={editor.isActive("link")}
+          onClick={() => setLinkPrompt(editor)}
+          title="Ссылка"
+          ariaLabel="Ссылка"
+        >
+          <LinkIcon size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          disabled={!editor.isActive("link")}
+          onClick={() => editor.chain().focus().unsetLink().run()}
+          title="Убрать ссылку"
+          ariaLabel="Убрать ссылку"
+        >
+          <Unlink size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().unsetAllMarks().run()}
+          title="Очистить форматирование"
+          ariaLabel="Очистить форматирование"
+        >
+          <RemoveFormatting size={16} />
+        </ToolbarButton>
+      </div>
+
+      <div className="rich-text-toolbar-divider" aria-hidden />
+
+      <div className="rich-text-toolbar-group">
+        <ToolbarButton
+          disabled={!editor.can().undo()}
+          onClick={() => editor.chain().focus().undo().run()}
+          title="Отменить (Ctrl+Z)"
+          ariaLabel="Отменить"
+        >
+          <Undo2 size={16} />
+        </ToolbarButton>
+        <ToolbarButton
+          disabled={!editor.can().redo()}
+          onClick={() => editor.chain().focus().redo().run()}
+          title="Повторить (Ctrl+Shift+Z)"
+          ariaLabel="Повторить"
+        >
+          <Redo2 size={16} />
+        </ToolbarButton>
+      </div>
+    </div>
+  );
+}
+
+function setLinkPrompt(editor: Editor) {
+  const previous = (editor.getAttributes("link") as { href?: string }).href ?? "";
+  const raw = window.prompt("URL ссылки", previous);
+  if (raw === null) return;
+  const trimmed = raw.trim();
+  if (trimmed === "") {
+    editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    return;
+  }
+  const hasScheme = /^(https?:|mailto:|tel:|ftp:)/i.test(trimmed);
+  const href = hasScheme ? trimmed : `https://${trimmed}`;
+  if (editor.state.selection.empty && !editor.isActive("link")) {
+    editor
+      .chain()
+      .focus()
+      .insertContent({ type: "text", text: trimmed, marks: [{ type: "link", attrs: { href } }] })
+      .run();
+    return;
+  }
+  editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
+}
+
+function InsertMenu({ editor, allowedAtomicKinds }: { editor: Editor; allowedAtomicKinds: AtomicBlockKind[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  function insert(kind: AtomicBlockKind) {
+    setOpen(false);
+    editor
+      .chain()
+      .focus()
+      .insertContent({ type: ATOMIC_BLOCK_NODE_NAME[kind], attrs: { payload: atomicDefaultPayload(kind) } })
+      .run();
+  }
+
+  return (
+    <div className="doc-insert" ref={ref}>
+      <button
+        type="button"
+        className={`rich-text-button${open ? " is-active" : ""}`}
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Вставить блок"
+        aria-label="Вставить блок"
+      >
+        <Plus size={16} />
+      </button>
+      {open ? (
+        <div className="doc-insert-menu" role="menu">
+          {allowedAtomicKinds.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              role="menuitem"
+              className="doc-insert-menu-item"
+              onClick={() => insert(kind)}
+            >
+              <span className="doc-insert-menu-icon">{ATOMIC_BLOCK_ICONS[kind]}</span>
+              {ATOMIC_BLOCK_LABELS[kind]}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ToolbarButton({
+  active,
+  disabled,
+  onClick,
+  children,
+  title,
+  ariaLabel,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  title?: string;
+  ariaLabel?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`rich-text-button${active ? " is-active" : ""}`}
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+      aria-label={ariaLabel}
+      aria-pressed={active ? true : undefined}
+    >
+      {children}
+    </button>
+  );
+}

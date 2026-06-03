@@ -7,7 +7,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { ChevronRight, FileText, FolderOpen, GripVertical, Plus } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
-import { ALL_BLOCK_KINDS, Block, BlocksEditor } from "./BlocksEditor";
+import type { Block } from "../lib/editor/block-types";
+import { DocumentEditor } from "./editor/DocumentEditor";
+import type { AtomicBlockKind } from "../lib/editor/block-mapping";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, apiFetch } from "../lib/api";
@@ -72,6 +74,18 @@ const EMPTY_CATEGORY_DRAFT: DraftState = {
   position: 0,
   blocks: [],
 };
+
+// Атомарные блоки для базы знаний — всё, кроме урок-специфичных
+// (lesson_tasks/quiz/matching). Текстовые блоки всегда доступны.
+const KNOWLEDGE_ATOMIC_KINDS: AtomicBlockKind[] = [
+  "image",
+  "gallery",
+  "video",
+  "audio",
+  "file",
+  "checklist",
+  "image_checklist",
+];
 
 export function AdminKnowledgeView() {
   const { token } = useAuth();
@@ -640,10 +654,11 @@ export function AdminKnowledgeView() {
 
                     <fieldset className="form-fieldset">
                       <legend className="form-legend">Содержание</legend>
-                      <BlocksEditor
+                      <DocumentEditor
                         blocks={draft.blocks}
-                        onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks }))}
-                        allowedKinds={ALL_BLOCK_KINDS}
+                        onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks: blocks as Block[] }))}
+                        allowedAtomicKinds={KNOWLEDGE_ATOMIC_KINDS}
+                        placeholder="Текст статьи — пишите или нажмите «/» для вставки блока…"
                       />
                     </fieldset>
                   </>

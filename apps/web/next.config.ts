@@ -40,7 +40,9 @@ function buildContentSecurityPolicy(): string {
     "style-src 'self' 'unsafe-inline'",
     `connect-src ${connectSrc.join(" ")}`,
     "font-src 'self'",
-    "frame-src https://rutube.ru https://*.rutube.ru",
+    // Сторонних плееров/iframe больше нет (Rutube убран) — фреймы режем
+    // полностью, frame-src наследуется как default-src 'self' при отсутствии.
+    "frame-src 'none'",
     // Жёсткие запреты, которые не влияют на штатную работу приложения, но
     // закрывают классические XSS/clickjacking-векторы:
     "object-src 'none'", // нет <object>/<embed>/<applet> — режем плагины

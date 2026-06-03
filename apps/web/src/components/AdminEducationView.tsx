@@ -4,7 +4,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Paperclip, Plus, Trash2 } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
-import { Block, BlocksEditor, LESSON_BLOCK_KINDS, type BlockInsertExtraOption } from "./BlocksEditor";
+import type { Block } from "../lib/editor/block-types";
+import { DocumentEditor } from "./editor/DocumentEditor";
+import type { AtomicBlockKind } from "../lib/editor/block-mapping";
 import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { StatusPill } from "./StatusPill";
@@ -65,6 +67,11 @@ function normalizeAttachments(attachments: Attachment[]) {
     }))
     .filter((attachment) => attachment.fileId && attachment.displayName);
 }
+
+// Атомарные блоки, доступные в уроках (текстовые блоки всегда доступны через
+// панель и меню «/»). Аудио/файл/чек-листы в уроки не добавляем — для
+// материалов есть отдельная секция вложений.
+const LESSON_ATOMIC_KINDS: AtomicBlockKind[] = ["image", "gallery", "video", "lesson_tasks", "quiz", "matching"];
 
 export function AdminEducationView() {
   const { token } = useAuth();
@@ -918,21 +925,6 @@ function LessonForm({
   const [attachmentsBlockVisible, setAttachmentsBlockVisible] = useState(lesson.attachments.length > 0);
   const [saving, setSaving] = useState(false);
   const normalizedDraftAttachments = useMemo(() => normalizeAttachments(draft.attachments), [draft.attachments]);
-  const extraInsertOptions = useMemo<BlockInsertExtraOption[]>(
-    () =>
-      attachmentsBlockVisible
-        ? []
-        : [
-            {
-              id: "lesson_attachments",
-              label: "Прикреплённые файлы",
-              icon: <Paperclip size={16} />,
-              onPick: addAttachmentsBlock,
-            },
-          ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [attachmentsBlockVisible, draft.attachments.length],
-  );
 
   useEffect(() => {
     setDraft({
@@ -1031,12 +1023,17 @@ function LessonForm({
 
       <section className="lesson-section">
         <h3 className="lesson-section-title">Содержание</h3>
-        <BlocksEditor
+        <DocumentEditor
           blocks={draft.blocks}
-          onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks }))}
-          allowedKinds={LESSON_BLOCK_KINDS}
-          extraInsertOptions={extraInsertOptions}
+          onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks: blocks as Block[] }))}
+          allowedAtomicKinds={LESSON_ATOMIC_KINDS}
+          placeholder="Текст урока — пишите или нажмите «/» для вставки блока…"
         />
+        {!attachmentsBlockVisible ? (
+          <button type="button" className="button secondary lesson-attach-reveal" onClick={addAttachmentsBlock}>
+            <Paperclip size={14} /> Прикреплённые файлы
+          </button>
+        ) : null}
       </section>
 
       {attachmentsBlockVisible ? (
