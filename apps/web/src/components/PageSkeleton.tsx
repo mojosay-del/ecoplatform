@@ -1,6 +1,6 @@
-// Каркас страницы для Next.js loading.tsx. Рисует структуру с приглушёнными
-// блоками: пользователь сразу видит, что страница «грузится», а не пустой
-// экран. После загрузки чанка/данных React-дерево моментально подменяется.
+// Каркас страницы для Next.js loading.tsx. Рисует тот же app-shell, что и
+// защищённые страницы, чтобы при переходах не было скачка из полноэкранного
+// skeleton в layout с сайдбаром и топбаром.
 //
 // Использовать как `<PageSkeleton title="Новости" variant="grid" />`.
 // Server component — никакого client-state, иначе теряется смысл (skeleton
@@ -20,13 +20,52 @@ export function PageSkeleton({
   variant?: SkeletonVariant;
 }) {
   return (
-    <main className="page-skeleton" id="main-content" tabIndex={-1} aria-busy="true" aria-live="polite">
-      <header className="page-skeleton-header">
-        <h1>{title}</h1>
-        {subtitle ? <p>{subtitle}</p> : null}
-      </header>
-      <div className={`page-skeleton-body page-skeleton-${variant}`}>{renderBody(variant)}</div>
-    </main>
+    <div className="app-shell app-shell-loading" data-collapsed="false">
+      <aside className="sidebar app-shell-loading-sidebar" aria-hidden="true">
+        <div className="sidebar-head">
+          <div className="brand">
+            <span className="brand-mark">
+              <img alt="" height="32" src="/brand/logo.webp" width="32" />
+            </span>
+            <span className="brand-text">ЭкоПлатформа</span>
+          </div>
+        </div>
+        {["Главная", "Базы знаний", "Инструменты"].map((section, sectionIndex) => (
+          <nav className="nav-section" key={section}>
+            <p className="nav-title">{section}</p>
+            {Array.from({ length: sectionIndex === 0 ? 3 : 2 }).map((_, itemIndex) => (
+              <div className="nav-link app-shell-loading-nav-link" key={itemIndex}>
+                <span className="app-shell-loading-icon" />
+                <span className="app-shell-loading-line" />
+              </div>
+            ))}
+          </nav>
+        ))}
+      </aside>
+      <main className="main" id="main-content" tabIndex={-1} aria-busy="true" aria-live="polite">
+        <header className="topbar app-shell-loading-topbar" aria-hidden="true">
+          <span className="app-shell-loading-menu" />
+          <span className="app-shell-loading-breadcrumb" />
+          <div className="topbar-spacer" />
+          <span className="app-shell-loading-pill" />
+          <span className="app-shell-loading-avatar" />
+        </header>
+        <div className="page-surface">
+          <section className="page page-skeleton">
+            <header className="page-skeleton-header">
+              <h1>{title}</h1>
+              {subtitle ? <p>{subtitle}</p> : null}
+            </header>
+            <div className={`page-skeleton-body page-skeleton-${variant}`}>{renderBody(variant)}</div>
+          </section>
+        </div>
+      </main>
+      <footer className="app-shell-footer app-shell-loading-footer" aria-hidden="true">
+        <strong>ЭкоПлатформа</strong>
+        <span className="app-shell-footer-separator" />
+        <span className="app-shell-loading-footer-line" />
+      </footer>
+    </div>
   );
 }
 
