@@ -334,17 +334,12 @@ function AuthVisual({ mode }: { mode: AuthMode }) {
           одним обещанием. Минимум текста, максимум фокуса на знаке. */}
       <div className="auth-visual-hero">
         <div className="auth-visual-tile">
-          <span
-            className={`auth-visual-tile-icon${current.key === "logo" ? " is-logo" : ""}`}
-            key={current.key}
-          >
+          <span className={`auth-visual-tile-icon${current.key === "logo" ? " is-logo" : ""}`} key={current.key}>
             {current.node}
           </span>
         </div>
 
-        <h2 className="auth-visual-title">
-          Рынок вторсырья, каким он должен быть: прозрачным, понятным и удобным.
-        </h2>
+        <h2 className="auth-visual-title">Рынок вторсырья, каким он должен быть: прозрачным, понятным и удобным.</h2>
       </div>
 
       <ul className="auth-visual-trust">
