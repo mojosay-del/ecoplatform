@@ -85,6 +85,28 @@ describe("AdminDashboardService", () => {
       }),
     );
   });
+
+  it("отдаёт роль-сводку только под доступные секции", async () => {
+    const prisma = {
+      newsPost: { count: vi.fn().mockResolvedValue(3) },
+      lesson: { count: vi.fn().mockResolvedValue(2) },
+      knowledgeBaseArticle: { count: vi.fn().mockResolvedValue(1) },
+      moderationCase: { count: vi.fn().mockResolvedValue(5) },
+    } as unknown as PrismaService;
+    const service = new AdminDashboardService(prisma, createHealthMock());
+
+    const forContentManager = await service.getStaffSummary(["content_manager"]);
+    expect(forContentManager.content).toEqual({ newsDrafts: 3, lessonDrafts: 2, knowledgeDrafts: 1 });
+    expect(forContentManager.moderation).toBeNull();
+
+    const forModerator = await service.getStaffSummary(["moderator"]);
+    expect(forModerator.content).toBeNull();
+    expect(forModerator.moderation).toEqual({ openCases: 5 });
+
+    const forAdmin = await service.getStaffSummary(["admin"]);
+    expect(forAdmin.content).toEqual({ newsDrafts: 3, lessonDrafts: 2, knowledgeDrafts: 1 });
+    expect(forAdmin.moderation).toEqual({ openCases: 5 });
+  });
 });
 
 function createPrismaMock() {

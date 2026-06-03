@@ -3,20 +3,34 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { AdminDashboardSummary, AdminJournalActor } from "@ecoplatform/shared";
+import type { AdminDashboardSummary, AdminJournalActor, AdminStaffSummary } from "@ecoplatform/shared";
 import {
   Activity,
+  ArrowDown,
   ArrowRight,
+  ArrowUp,
+  BookOpen,
   CalendarClock,
   CreditCard,
   Database,
+  Eye,
+  EyeOff,
+  GraduationCap,
   HardDrive,
   Headphones,
   LockKeyhole,
+  Minus,
+  Newspaper,
+  Pencil,
+  Plus,
+  RefreshCw,
   ScrollText,
   Server,
+  Settings2,
   ShieldAlert,
   Trash2,
+  Unlock,
+  UserCog,
   UserPlus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -28,9 +42,11 @@ import { StatusPill } from "./StatusPill";
 import { visibleAdminHomeGroups } from "./admin-panel-tabs";
 
 type KpiKey = keyof AdminDashboardSummary["kpis"];
+type KpiTrendKey = keyof AdminDashboardSummary["kpiTrends"];
 type OperationKey = keyof AdminDashboardSummary["operations"];
 type HealthKey = keyof AdminDashboardSummary["systemHealth"];
 type KpiTone = "info" | "success" | "warning" | "danger" | "brand";
+type KpiPolarity = "up-good" | "up-bad";
 
 const KPI_CARDS: Array<{
   key: KpiKey;
@@ -39,6 +55,8 @@ const KPI_CARDS: Array<{
   href: string;
   tone: KpiTone;
   icon: LucideIcon;
+  trendKey?: KpiTrendKey;
+  polarity?: KpiPolarity;
 }> = [
   {
     key: "activeUsersToday",
@@ -47,6 +65,8 @@ const KPI_CARDS: Array<{
     href: "/admin/users",
     tone: "info",
     icon: Activity,
+    trendKey: "activeUsersToday",
+    polarity: "up-good",
   },
   {
     key: "registrationsToday",
@@ -55,6 +75,8 @@ const KPI_CARDS: Array<{
     href: "/admin/users",
     tone: "brand",
     icon: UserPlus,
+    trendKey: "registrationsToday",
+    polarity: "up-good",
   },
   {
     key: "activeSubscriptions",
@@ -63,6 +85,8 @@ const KPI_CARDS: Array<{
     href: "/admin/billing",
     tone: "success",
     icon: CreditCard,
+    trendKey: "activeSubscriptions",
+    polarity: "up-good",
   },
   {
     key: "subscriptionsExpiringSoon",
@@ -191,6 +215,7 @@ const DATE_TIME_FORMAT = new Intl.DateTimeFormat("ru-RU", {
   hour: "2-digit",
   minute: "2-digit",
 });
+const TIME_FORMAT = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" });
 
 export function AdminHomeView() {
   const router = useRouter();
@@ -201,6 +226,7 @@ export function AdminHomeView() {
   const [dashboard, setDashboard] = useState<AdminDashboardSummary | null>(null);
   const [dashboardState, setDashboardState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [staffSummary, setStaffSummary] = useState<AdminStaffSummary | null>(null);
 
   useEffect(() => {
     if (ready && roleKey.length === 0) {
@@ -238,6 +264,29 @@ export function AdminHomeView() {
     };
   }, [isAdmin, ready, token]);
 
+  // Роль-сводка нужна только не-админ-персоналу: у админа есть полный дашборд
+  // (включая модерацию), дублировать незачем.
+  useEffect(() => {
+    let isActive = true;
+    if (!ready || !token || isAdmin || roleKey.length === 0) {
+      setStaffSummary(null);
+      return;
+    }
+
+    api.admin
+      .overview({ token })
+      .then((data) => {
+        if (isActive) setStaffSummary(data);
+      })
+      .catch(() => {
+        if (isActive) setStaffSummary(null);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAdmin, ready, token, roleKey]);
+
   const groups = visibleAdminHomeGroups(roles);
   const maxRegistrations = useMemo(() => {
     if (!dashboard) return 1;
@@ -261,6 +310,8 @@ export function AdminHomeView() {
           />
         ) : null}
 
+        {!isAdmin && staffSummary ? <StaffRoleSummary summary={staffSummary} /> : null}
+
         {groups.length === 0 ? (
           <p className="page-subtitle">Открываем основной раздел…</p>
         ) : (
@@ -282,6 +333,15 @@ function AdminDashboard({
   maxRegistrations: number;
   state: "idle" | "loading" | "ready" | "error";
 }) {
+  const chartStats = useMemo(() => {
+    const series = dashboard?.registrationSeries ?? [];
+    if (series.length === 0) return { total: 0, avg: 0, peak: 0, avgRatio: 0 };
+    const total = series.reduce((sum, point) => sum + point.count, 0);
+    const peak = Math.max(...series.map((point) => point.count));
+    const avgExact = total / series.length;
+    return { total, avg: Math.round(avgExact), peak, avgRatio: peak > 0 ? avgExact / peak : 0 };
+  }, [dashboard]);
+
   if (state === "loading" && !dashboard) {
     return <AdminDashboardSkeleton />;
   }
@@ -301,6 +361,8 @@ function AdminDashboard({
       <div className="admin-kpi-grid">
         {KPI_CARDS.map((item, index) => {
           const Icon = item.icon;
+          const previous = item.trendKey ? dashboard.kpiTrends[item.trendKey] : null;
+          const delta = previous === null ? null : dashboard.kpis[item.key] - previous;
           return (
             <Link
               className={`admin-kpi-card admin-kpi-card-${item.tone}`}
@@ -314,6 +376,7 @@ function AdminDashboard({
               <span className="admin-kpi-card-copy">
                 <span className="admin-kpi-card-label">{item.label}</span>
                 <strong className="admin-kpi-card-value">{formatNumber(dashboard.kpis[item.key])}</strong>
+                {delta !== null ? <KpiDelta delta={delta} polarity={item.polarity ?? "up-good"} /> : null}
                 <small>{item.hint}</small>
               </span>
             </Link>
@@ -321,7 +384,11 @@ function AdminDashboard({
         })}
       </div>
 
-      <AdminOperationsPanels operations={dashboard.operations} systemHealth={dashboard.systemHealth} />
+      <AdminOperationsPanels
+        generatedAt={dashboard.generatedAt}
+        operations={dashboard.operations}
+        systemHealth={dashboard.systemHealth}
+      />
 
       <AdminBusinessPanels business={dashboard.business} />
 
@@ -332,32 +399,53 @@ function AdminDashboard({
               <h2 id="admin-registration-chart-title">Регистрации за 30 дней</h2>
               <p>Обновлено {DATE_TIME_FORMAT.format(new Date(dashboard.generatedAt))}</p>
             </div>
+            <dl className="admin-chart-legend">
+              <div>
+                <dt>Всего</dt>
+                <dd>{formatNumber(chartStats.total)}</dd>
+              </div>
+              <div>
+                <dt>Среднее</dt>
+                <dd>{formatNumber(chartStats.avg)}/дн</dd>
+              </div>
+              <div>
+                <dt>Пик</dt>
+                <dd>{formatNumber(chartStats.peak)}</dd>
+              </div>
+            </dl>
           </header>
-          <div className="admin-registration-chart" role="list">
-            {dashboard.registrationSeries.map((point, index) => {
-              const height = Math.max(8, Math.round((point.count / maxRegistrations) * 100));
-              const date = new Date(`${point.date}T00:00:00`);
-              const isEdgeLabel = index === 0 || index === dashboard.registrationSeries.length - 1;
-              return (
-                <div className="admin-chart-day" key={point.date} role="listitem">
-                  <span
-                    aria-label={`${DATE_FORMAT.format(date)}: ${point.count}`}
-                    className="admin-chart-bar"
-                    style={
-                      {
-                        "--bar-delay": `${index * 16}ms`,
-                        "--bar-height": `${height}%`,
-                      } as CSSProperties
-                    }
-                  >
-                    <span className="admin-chart-bar-tooltip">
-                      {DATE_FORMAT.format(date)} · {formatNumber(point.count)}
+          <div className="admin-chart-plot" style={{ "--avg-ratio": chartStats.avgRatio } as CSSProperties}>
+            <div className="admin-registration-chart" role="list">
+              {dashboard.registrationSeries.map((point, index) => {
+                const height = Math.max(8, Math.round((point.count / maxRegistrations) * 100));
+                const date = new Date(`${point.date}T00:00:00`);
+                const isEdgeLabel = index === 0 || index === dashboard.registrationSeries.length - 1;
+                return (
+                  <div className="admin-chart-day" key={point.date} role="listitem">
+                    <span
+                      aria-label={`${DATE_FORMAT.format(date)}: ${point.count}`}
+                      className="admin-chart-bar"
+                      style={
+                        {
+                          "--bar-delay": `${index * 16}ms`,
+                          "--bar-height": `${height}%`,
+                        } as CSSProperties
+                      }
+                    >
+                      <span className="admin-chart-bar-tooltip">
+                        {DATE_FORMAT.format(date)} · {formatNumber(point.count)}
+                      </span>
                     </span>
-                  </span>
-                  {isEdgeLabel ? <span className="admin-chart-day-label">{DATE_FORMAT.format(date)}</span> : null}
-                </div>
-              );
-            })}
+                    {isEdgeLabel ? <span className="admin-chart-day-label">{DATE_FORMAT.format(date)}</span> : null}
+                  </div>
+                );
+              })}
+            </div>
+            {chartStats.total > 0 ? (
+              <span className="admin-chart-avg" aria-hidden>
+                <span className="admin-chart-avg-label">среднее {formatNumber(chartStats.avg)}</span>
+              </span>
+            ) : null}
           </div>
         </section>
 
@@ -374,18 +462,27 @@ function AdminDashboard({
           </header>
           {dashboard.recentAuditEvents.length ? (
             <ol className="admin-audit-feed">
-              {dashboard.recentAuditEvents.map((event) => (
-                <li className="admin-audit-feed-item" key={event.id}>
-                  <span className="admin-audit-feed-dot" aria-hidden />
-                  <span className="admin-audit-feed-copy">
-                    <strong>{formatAction(event.action)}</strong>
-                    <small>
-                      {event.entityLabel} · {formatActor(event.actor)} ·{" "}
-                      {DATE_TIME_FORMAT.format(new Date(event.createdAt))}
-                    </small>
-                  </span>
-                </li>
-              ))}
+              {dashboard.recentAuditEvents.map((event) => {
+                const visual = auditVisual(event.action);
+                const Icon = visual.icon;
+                const createdAt = new Date(event.createdAt);
+                return (
+                  <li className="admin-audit-feed-item" key={event.id}>
+                    <span className={`admin-audit-feed-icon admin-audit-tone-${visual.tone}`} aria-hidden>
+                      <Icon size={13} />
+                    </span>
+                    <span className="admin-audit-feed-copy">
+                      <strong>{formatAction(event.action)}</strong>
+                      <small>
+                        {event.entityLabel} · {formatActor(event.actor)} ·{" "}
+                        <time dateTime={event.createdAt} title={DATE_TIME_FORMAT.format(createdAt)}>
+                          {formatRelativeTime(createdAt)}
+                        </time>
+                      </small>
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
           ) : (
             <p className="page-subtitle">Событий пока нет.</p>
@@ -397,9 +494,11 @@ function AdminDashboard({
 }
 
 function AdminOperationsPanels({
+  generatedAt,
   operations,
   systemHealth,
 }: {
+  generatedAt: string;
   operations: AdminDashboardSummary["operations"];
   systemHealth: AdminDashboardSummary["systemHealth"];
 }) {
@@ -440,7 +539,7 @@ function AdminOperationsPanels({
         <header className="admin-dashboard-panel-head">
           <div>
             <h2>Здоровье системы</h2>
-            <p>Короткий статус ключевых зависимостей</p>
+            <p>Ключевые зависимости · проверено в {TIME_FORMAT.format(new Date(generatedAt))}</p>
           </div>
         </header>
         <dl className="admin-health-list">
@@ -584,6 +683,125 @@ function AdminQuickLinks({ groups }: { groups: ReturnType<typeof visibleAdminHom
       </div>
     </section>
   );
+}
+
+const STAFF_CONTENT_METRICS: Array<{
+  key: keyof NonNullable<AdminStaffSummary["content"]>;
+  label: string;
+  href: string;
+  icon: LucideIcon;
+}> = [
+  { key: "newsDrafts", label: "Черновики новостей", href: "/admin/content/news", icon: Newspaper },
+  { key: "lessonDrafts", label: "Уроки без публикации", href: "/admin/content/education", icon: GraduationCap },
+  { key: "knowledgeDrafts", label: "Статьи без публикации", href: "/admin/content/knowledge-base", icon: BookOpen },
+];
+
+function StaffRoleSummary({ summary }: { summary: AdminStaffSummary }) {
+  const { content, moderation } = summary;
+  if (!content && !moderation) return null;
+
+  return (
+    <section className="admin-staff-summary" aria-label="Сводка по вашим задачам">
+      {content ? (
+        <section className="admin-staff-card">
+          <header className="admin-dashboard-panel-head">
+            <div>
+              <h2>Контент в работе</h2>
+              <p>Черновики, ожидающие публикации</p>
+            </div>
+          </header>
+          <div className="admin-staff-metrics">
+            {STAFF_CONTENT_METRICS.map((metric) => {
+              const Icon = metric.icon;
+              return (
+                <Link className="admin-staff-metric" href={metric.href} key={metric.key}>
+                  <span className="admin-staff-metric-icon" aria-hidden>
+                    <Icon size={18} />
+                  </span>
+                  <strong className="admin-staff-metric-value">{formatNumber(content[metric.key])}</strong>
+                  <span className="admin-staff-metric-label">{metric.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {moderation ? (
+        <section className="admin-staff-card">
+          <header className="admin-dashboard-panel-head">
+            <div>
+              <h2>Модерация</h2>
+              <p>Кейсы, требующие решения</p>
+            </div>
+          </header>
+          <Link
+            className={`admin-staff-queue${moderation.openCases > 0 ? " is-attention" : ""}`}
+            href="/admin/moderation"
+          >
+            <span className="admin-staff-queue-icon" aria-hidden>
+              <ShieldAlert size={22} />
+            </span>
+            <span className="admin-staff-queue-copy">
+              <strong>Очередь модерации</strong>
+              <small>{moderation.openCases > 0 ? "Есть кейсы в работе" : "Очередь пуста"}</small>
+            </span>
+            <span className="admin-staff-queue-value">{formatNumber(moderation.openCases)}</span>
+          </Link>
+        </section>
+      ) : null}
+    </section>
+  );
+}
+
+type AuditTone = "create" | "update" | "publish" | "security" | "danger" | "neutral";
+
+function auditVisual(action: string): { icon: LucideIcon; tone: AuditTone } {
+  if (action.endsWith(".delete")) return { icon: Trash2, tone: "danger" };
+  if (action.includes("unpublish")) return { icon: EyeOff, tone: "neutral" };
+  if (action.includes("publish")) return { icon: Eye, tone: "publish" };
+  if (action.endsWith(".create")) return { icon: Plus, tone: "create" };
+  if (action.includes("user.block")) return { icon: LockKeyhole, tone: "danger" };
+  if (action.includes("user.unblock")) return { icon: Unlock, tone: "publish" };
+  if (action.includes("platform_roles") || action.includes("staff")) return { icon: UserCog, tone: "security" };
+  if (action.includes("subscription")) return { icon: CreditCard, tone: "create" };
+  if (action.includes("moderation")) return { icon: ShieldAlert, tone: "danger" };
+  if (action.includes("setting")) return { icon: Settings2, tone: "security" };
+  if (action.includes("status")) return { icon: RefreshCw, tone: "update" };
+  if (action.includes("update") || action.includes("move")) return { icon: Pencil, tone: "update" };
+  return { icon: Activity, tone: "neutral" };
+}
+
+function formatRelativeTime(date: Date): string {
+  const seconds = Math.round((Date.now() - date.getTime()) / 1000);
+  if (seconds < 45) return "только что";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} мин назад`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} ч назад`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days} дн назад`;
+  return DATE_FORMAT.format(date);
+}
+
+function KpiDelta({ delta, polarity }: { delta: number; polarity: KpiPolarity }) {
+  const tone = deltaTone(delta, polarity);
+  const Icon = delta > 0 ? ArrowUp : delta < 0 ? ArrowDown : Minus;
+  const sign = delta > 0 ? "+" : "";
+  return (
+    <span className={`admin-kpi-delta admin-kpi-delta-${tone}`} title="За сутки — к этому же времени вчера">
+      <Icon aria-hidden size={12} />
+      {sign}
+      {formatNumber(delta)}
+    </span>
+  );
+}
+
+function deltaTone(delta: number, polarity: KpiPolarity): "good" | "bad" | "flat" {
+  if (delta === 0) return "flat";
+  const positiveIsGood = polarity !== "up-bad";
+  const isGood = delta > 0 ? positiveIsGood : !positiveIsGood;
+  return isGood ? "good" : "bad";
 }
 
 function formatNumber(value: number) {

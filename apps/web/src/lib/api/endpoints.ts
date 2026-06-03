@@ -14,6 +14,7 @@ import type {
   ConsentRecordItem,
   ConsentSource,
   AdminDashboardSummary,
+  AdminStaffSummary,
   KnowledgeArticleDetail,
   KnowledgeNode,
   LearningModuleDetail,
@@ -215,6 +216,8 @@ export const api = {
   admin: {
     dashboard: (options: ApiRequestOptions = {}) =>
       apiFetch<AdminDashboardSummary>("/admin/dashboard", { token: options.token }),
+    overview: (options: ApiRequestOptions = {}) =>
+      apiFetch<AdminStaffSummary>("/admin/overview", { token: options.token }),
     news: {
       // Возвращает paginated envelope БЕЗ blocks (для таблицы).
       // Получение detail для редактора — `admin.news.get(id)`.

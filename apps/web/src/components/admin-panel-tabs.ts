@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
   BookOpen,
   Building2,
   CreditCard,
@@ -13,9 +12,7 @@ import {
   SlidersHorizontal,
   TrendingUp,
   UserCog,
-  UserPlus,
   Users,
-  Wrench,
 } from "lucide-react";
 
 export type AdminPanelTab = {
@@ -169,40 +166,12 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
     title: "Настройки",
     items: [
       {
-        href: "/admin/settings#demo",
-        label: "Демо-доступ",
+        href: "/admin/settings",
+        label: "Настройки платформы",
         pathname: "/admin/settings",
-        hash: "demo",
         roles: ["admin"],
-        description: "Параметры пробного периода.",
-        icon: BarChart3,
-      },
-      {
-        href: "/admin/settings#indices",
-        label: "Индексы",
-        pathname: "/admin/settings",
-        hash: "indices",
-        roles: ["admin"],
-        description: "Пороговые значения и рыночные настройки.",
+        description: "Регистрация, демо-доступ, пороги индексов и прочие параметры.",
         icon: SlidersHorizontal,
-      },
-      {
-        href: "/admin/settings#auth",
-        label: "Регистрация",
-        pathname: "/admin/settings",
-        hash: "auth",
-        roles: ["admin"],
-        description: "Включить или выключить регистрацию новых пользователей.",
-        icon: UserPlus,
-      },
-      {
-        href: "/admin/settings#other",
-        label: "Прочее",
-        pathname: "/admin/settings",
-        hash: "other",
-        roles: ["admin"],
-        description: "Остальные параметры платформы.",
-        icon: Wrench,
       },
     ],
   },

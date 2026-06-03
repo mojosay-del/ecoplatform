@@ -1,12 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import {
   CompanyStatus,
+  ContentStatus,
   ModerationCaseStatus,
   SubscriptionPlan,
   SubscriptionStatus,
   SupportTicketStatus,
 } from "@prisma/client";
-import type { AdminDashboardSummary, AdminHealthStatus } from "@ecoplatform/shared";
+import type { AdminDashboardSummary, AdminHealthStatus, AdminStaffSummary, PlatformRole } from "@ecoplatform/shared";
 import { HealthDependencyIndicator } from "../../health/health-dependency.indicator";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -16,6 +17,8 @@ type RegistrationRow = {
 };
 
 type HealthCheckDetails = Record<string, { configured?: boolean; required?: boolean; status?: string }>;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const ACTIVE_MODERATION_STATUSES = [
   ModerationCaseStatus.open,
@@ -60,6 +63,12 @@ export class AdminDashboardService {
     const tomorrowStart = addDays(todayStart, 1);
     const chartStart = addDays(todayStart, -29);
     const expiringCutoff = addDays(now, 7);
+    // Для дельт сравниваем с тем же моментом вчера: «сегодня к этому часу» против
+    // «вчера к этому же часу» — честно даже в середине дня. Подписки — состояние
+    // 24 ч назад.
+    const yesterdayStart = addDays(todayStart, -1);
+    const yesterdayCutoff = new Date(yesterdayStart.getTime() + (now.getTime() - todayStart.getTime()));
+    const dayAgo = new Date(now.getTime() - DAY_MS);
 
     const [
       activeSessionsToday,
@@ -73,6 +82,9 @@ export class AdminDashboardService {
       business,
       operations,
       systemHealth,
+      previousActiveSessions,
+      previousRegistrations,
+      previousActiveSubscriptions,
     ] = await Promise.all([
       this.prisma.session.findMany({
         where: {
@@ -112,6 +124,27 @@ export class AdminDashboardService {
       this.businessSummary(now),
       this.operationsSummary(now),
       this.systemHealthSummary(),
+      // Активные сессии вчера к этому же времени.
+      this.prisma.session.findMany({
+        where: {
+          updatedAt: { gte: yesterdayStart, lt: yesterdayCutoff },
+          revokedAt: null,
+        },
+        distinct: ["userId"],
+        select: { userId: true },
+      }),
+      // Регистрации вчера к этому же времени.
+      this.prisma.user.count({
+        where: { createdAt: { gte: yesterdayStart, lt: yesterdayCutoff } },
+      }),
+      // Активные подписки по состоянию на 24 ч назад.
+      this.prisma.subscription.count({
+        where: {
+          status: SubscriptionStatus.active,
+          startsAt: { lte: dayAgo },
+          endsAt: { gt: dayAgo },
+        },
+      }),
     ]);
 
     return {
@@ -124,12 +157,54 @@ export class AdminDashboardService {
         openModerationCases,
         activeSupportTickets,
       },
+      kpiTrends: {
+        activeUsersToday: previousActiveSessions.length,
+        registrationsToday: previousRegistrations,
+        activeSubscriptions: previousActiveSubscriptions,
+      },
       business,
       operations,
       systemHealth,
       registrationSeries: registrationRows,
       recentAuditEvents,
     };
+  }
+
+  // Роль-сводка для рабочего стола не-админ-персонала. Секции считаются только
+  // под доступные роли, чтобы лишних запросов и данных не было.
+  async getStaffSummary(roles: PlatformRole[]): Promise<AdminStaffSummary> {
+    const isAdmin = roles.includes("admin");
+    const canSeeContent = isAdmin || roles.includes("content_manager");
+    const canSeeModeration = isAdmin || roles.includes("moderator");
+
+    const [content, moderation] = await Promise.all([
+      canSeeContent ? this.contentDraftsSummary() : Promise.resolve(null),
+      canSeeModeration ? this.moderationQueueSummary() : Promise.resolve(null),
+    ]);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      content,
+      moderation,
+    };
+  }
+
+  private async contentDraftsSummary(): Promise<NonNullable<AdminStaffSummary["content"]>> {
+    const [newsDrafts, lessonDrafts, knowledgeDrafts] = await Promise.all([
+      this.prisma.newsPost.count({ where: { status: ContentStatus.draft } }),
+      this.prisma.lesson.count({ where: { status: ContentStatus.draft } }),
+      this.prisma.knowledgeBaseArticle.count({ where: { status: ContentStatus.draft } }),
+    ]);
+
+    return { newsDrafts, lessonDrafts, knowledgeDrafts };
+  }
+
+  private async moderationQueueSummary(): Promise<NonNullable<AdminStaffSummary["moderation"]>> {
+    const openCases = await this.prisma.moderationCase.count({
+      where: { status: { in: ACTIVE_MODERATION_STATUSES } },
+    });
+
+    return { openCases };
   }
 
   private async businessSummary(now: Date): Promise<AdminDashboardSummary["business"]> {

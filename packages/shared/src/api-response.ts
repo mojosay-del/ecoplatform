@@ -462,6 +462,13 @@ export type AdminDashboardSummary = {
     openModerationCases: number;
     activeSupportTickets: number;
   };
+  // Значения за предыдущий сопоставимый период (к тому же моменту вчера / 24 ч
+  // назад) для метрик, где сравнение корректно. Фронт показывает дельту-чип.
+  kpiTrends: {
+    activeUsersToday: number;
+    registrationsToday: number;
+    activeSubscriptions: number;
+  };
   business: {
     conversion: {
       convertedCompanies: number;
@@ -498,4 +505,19 @@ export type AdminDashboardSummary = {
     comment: string | null;
     createdAt: IsoDateString;
   }>;
+};
+
+// Лёгкая сводка для не-админ-персонала (контент-менеджер, модератор). Секции
+// присутствуют только под роли запросившего: content — для контент-менеджера,
+// moderation — для модератора; админ получает обе.
+export type AdminStaffSummary = {
+  generatedAt: IsoDateString;
+  content: {
+    newsDrafts: number;
+    lessonDrafts: number;
+    knowledgeDrafts: number;
+  } | null;
+  moderation: {
+    openCases: number;
+  } | null;
 };
