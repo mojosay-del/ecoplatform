@@ -3849,9 +3849,8 @@ body.news-modal-open .app-shell {
 .auth-layout {
   min-height: 100vh;
   display: grid;
-  /* Левая половина чуть шире — это «билборд» бренда, ему нужно больше
-     воздуха; форма же ужимается до читаемой ширины. */
-  grid-template-columns: 1.1fr 0.9fr;
+  /* Две равные половины: билборд бренда и зона формы выглядят симметрично. */
+  grid-template-columns: 1fr 1fr;
   gap: 0;
 }
 
@@ -4102,14 +4101,14 @@ body.news-modal-open .app-shell {
   background: rgb(var(--white-rgb) / 0.6);
 }
 
-/* Правая панель: тёплый off-white, мягче переход с оранжевого. */
+/* Правая панель: белая поверхность, как основное меню приложения. */
 .auth-form-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 48px 56px;
-  background: var(--surface-auth);
+  background: var(--surface-elevated);
   min-width: 0;
 }
 
@@ -4173,10 +4172,9 @@ body.news-modal-open .app-shell {
   font-weight: 600;
 }
 
-/* Регистрация (auth-card-wide): шапку — заголовок и строку про доступ —
-   центрируем. На логине (обычный auth-card) остаётся выравнивание по левому. */
-.auth-card-wide .auth-card-head,
-.auth-card-wide .auth-card-title {
+/* Шапка auth-форм центрируется одинаково на входе и регистрации. */
+.auth-card .auth-card-head,
+.auth-card .auth-card-title {
   text-align: center;
 }
 
