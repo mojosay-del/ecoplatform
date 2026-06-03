@@ -3398,14 +3398,18 @@ body.news-modal-open .app-shell {
   grid-template-rows: auto 1fr auto;
   align-items: center;
   color: var(--white);
-  padding: 36px 40px;
+  /* Нижний паддинг учитывает парящий cookie-баннер, чтобы строка доверия не
+     пряталась под ним на первом визите. На ≤960px медиа-запрос задаёт свой
+     padding и этот расчёт не применяется. */
+  padding: 36px 40px calc(36px + var(--cookie-banner-height, 0px));
   /* Тонкая разделяющая полоска вместо «жёсткого стыка» двух цветов. */
   border-right: 1px solid rgb(var(--white-rgb) / 0.12);
+  /* Глубокий «ember»: тёмный угол снизу-справа + тёплый свет сверху-слева
+     дают объём вместо плоской ярко-оранжевой плашки. */
   background:
-    radial-gradient(circle at 22% 18%, rgb(var(--auth-glow-rgb) / 0.55), transparent 32%),
-    radial-gradient(circle at 78% 24%, rgb(var(--white-rgb) / 0.22), transparent 26%),
-    radial-gradient(circle at 56% 92%, rgb(var(--brand-ember-rgb) / 0.28), transparent 38%),
-    linear-gradient(135deg, var(--auth-gradient-start) 0%, var(--brand) 42%, var(--auth-gradient-end) 100%);
+    radial-gradient(80% 70% at 16% 12%, rgb(var(--auth-glow-rgb) / 0.5), transparent 55%),
+    radial-gradient(90% 90% at 88% 100%, rgb(var(--brand-ink-rgb) / 0.85), transparent 58%),
+    linear-gradient(155deg, #8f3409 0%, #cf5a22 46%, #f5773e 100%);
 }
 
 .auth-visual::before,
@@ -3433,6 +3437,32 @@ body.news-modal-open .app-shell {
   mix-blend-mode: overlay;
 }
 
+/* Анимированная «аврора»: два больших размытых световых пятна медленно
+   дрейфуют — фон дышит, но не отвлекает. На transform/opacity = дёшево для GPU. */
+.auth-visual-aurora {
+  position: absolute;
+  inset: -25%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(closest-side, rgb(var(--auth-glow-rgb) / 0.55), transparent 70%) 18% 22% / 58% 58% no-repeat,
+    radial-gradient(closest-side, rgb(var(--brand-ember-rgb) / 0.6), transparent 70%) 82% 78% / 64% 64% no-repeat;
+  filter: blur(36px);
+  animation: auth-aurora-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes auth-aurora-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2.5%, -3%, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(-2.5%, 2.5%, 0) scale(1.05);
+  }
+}
+
 /* Wordmark в верхнем углу — пользователь всегда видит где он. */
 .auth-visual-wordmark {
   position: relative;
@@ -3447,59 +3477,111 @@ body.news-modal-open .app-shell {
 
 /* Центральный блок с иконкой. Stage даёт стабильную геометрию, чтобы
    иконка не «прыгала» при смене кадра. */
-.auth-visual-stage {
+/* Левый «герой» — единый левый-выровненный блок, вертикально центрированный
+   в своей строке грид-сетки. Больше нет разрыва «иконка по центру / текст в
+   углу». */
+/* Центрированный «герой»: крупный тайл-знак над одним обещанием. */
+.auth-visual-hero {
   position: relative;
   z-index: 1;
+  max-width: 440px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 24px;
-  max-width: 480px;
-  width: 100%;
-  margin: 0 auto;
+  text-align: center;
+  gap: 30px;
+  animation: auth-hero-enter 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.auth-visual-icon {
+@keyframes auth-hero-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Крупный стеклянный тайл со знаком бренда — центральный акцент билборда. */
+.auth-visual-tile {
   position: relative;
-  z-index: 1;
-  width: min(260px, 44vw);
-  aspect-ratio: 1;
+  width: 128px;
+  height: 128px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 30px;
+  background: rgb(var(--white-rgb) / 0.14);
+  border: 1px solid rgb(var(--white-rgb) / 0.3);
+  box-shadow:
+    0 26px 60px rgb(var(--brand-ink-rgb) / 0.45),
+    inset 0 1px 0 rgb(var(--white-rgb) / 0.4);
+  backdrop-filter: blur(8px);
+  animation: auth-icon-float 5.4s ease-in-out infinite;
+}
+
+/* Мягкое пульсирующее свечение за тайлом — добавляет «жизни». */
+.auth-visual-tile::after {
+  content: "";
+  position: absolute;
+  inset: -34%;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(closest-side, rgb(var(--white-rgb) / 0.42), transparent 72%);
+  filter: blur(18px);
+  animation: auth-tile-glow 4.2s ease-in-out infinite;
+}
+
+@keyframes auth-tile-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.auth-visual-tile-icon {
+  width: 66px;
+  height: 66px;
   display: grid;
   place-items: center;
   color: var(--white);
-  animation:
-    auth-icon-enter 360ms ease-out both,
-    auth-icon-float 4.8s ease-in-out 360ms infinite;
+  animation: auth-icon-enter 420ms ease-out both;
 }
 
-.auth-visual-icon svg {
+.auth-visual-tile-icon svg {
   width: 100%;
   height: 100%;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.65;
+  stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 18px 28px rgb(var(--brand-shadow-rgb) / 0.28));
+  filter: drop-shadow(0 8px 16px rgb(var(--brand-ink-rgb) / 0.4));
 }
 
-/* Логотип — заливка вместо обводки, и масштаб 1.35: реальный bounding-box
-   знака занимает только центр viewBox, без увеличения он выглядел мельче
-   других иконок и «дёргал» восприятие при смене кадра. */
-.auth-visual-icon.is-logo svg {
+/* Логотип — заливка вместо обводки + лёгкий апскейл (реальный силуэт знака
+   занимает только центр viewBox). */
+.auth-visual-tile-icon.is-logo svg {
   fill: var(--white);
   stroke: none;
-  transform: scale(1.35);
+  transform: scale(1.28);
 }
 
 @keyframes auth-icon-enter {
   from {
     opacity: 0;
-    filter: blur(5px);
+    transform: scale(0.86);
+    filter: blur(4px);
   }
   to {
     opacity: 1;
+    transform: scale(1);
     filter: blur(0);
   }
 }
@@ -3510,12 +3592,50 @@ body.news-modal-open .app-shell {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-8px);
+    transform: translateY(-6px);
   }
 }
 
-.auth-visual-foot {
-  height: 1px; /* зарезервированный slot, чтобы grid 3-rows был стабилен */
+.auth-visual-title {
+  margin: 0;
+  font-size: clamp(23px, 2.2vw, 30px);
+  line-height: 1.28;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--white);
+  text-wrap: balance;
+  text-shadow: 0 2px 18px rgb(var(--brand-ink-rgb) / 0.35);
+}
+
+.auth-visual-trust {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgb(var(--white-rgb) / 0.92);
+}
+
+.auth-visual-trust li {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+/* Ведущий маркер пункта доверия (не иконка — чистый CSS-кружок). */
+.auth-visual-trust li::before {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgb(var(--white-rgb) / 0.6);
 }
 
 /* Правая панель: тёплый off-white, мягче переход с оранжевого. */
@@ -3539,6 +3659,19 @@ body.news-modal-open .app-shell {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* Деликатное появление формы при загрузке. */
+  animation: auth-card-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes auth-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .auth-card-wide {
@@ -3574,6 +3707,63 @@ body.news-modal-open .app-shell {
 .auth-card-sub a {
   color: var(--brand);
   font-weight: 600;
+}
+
+/* Регистрация (auth-card-wide): шапку — заголовок и строку про доступ —
+   центрируем. На логине (обычный auth-card) остаётся выравнивание по левому. */
+.auth-card-wide .auth-card-head,
+.auth-card-wide .auth-card-title {
+  text-align: center;
+}
+
+/* Контролы формы тянем до тач-таргета 44px (скоп только на auth, чтобы не
+   трогать формы остального приложения). */
+.auth-card .input,
+.auth-card .select,
+.auth-card .password-input,
+.auth-card .phone-input,
+.auth-card .button {
+  padding-block: 12px;
+}
+
+/* Главная кнопка — мягкий вертикальный градиент бренда + тёплая тень.
+   Раньше была плоско-ровной. На :disabled остаётся серой (правило .button). */
+.auth-submit:not(:disabled) {
+  background: linear-gradient(180deg, var(--auth-gradient-start) 0%, var(--brand) 100%);
+  box-shadow: 0 8px 20px rgb(var(--brand-shadow-rgb) / 0.22);
+}
+
+.auth-submit:not(:disabled):hover {
+  background: linear-gradient(180deg, var(--brand) 0%, var(--brand-hover) 100%);
+  box-shadow: 0 10px 24px rgb(var(--brand-shadow-rgb) / 0.28);
+}
+
+.auth-submit:not(:disabled):active {
+  box-shadow: 0 4px 12px rgb(var(--brand-shadow-rgb) / 0.2);
+}
+
+/* Подсказка-причина под заблокированной кнопкой регистрации. */
+.auth-submit-hint {
+  margin: -4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Микрокопия доверия под основной кнопкой. */
+.auth-secure-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.auth-secure-note svg {
+  color: var(--success-text);
 }
 
 .forgot-support-contact {
@@ -3690,40 +3880,84 @@ body.news-modal-open .app-shell {
   }
 }
 
-.auth-progress {
+/* Сегментированный степпер регистрации: кружок-номер (или галочка) + подпись,
+   соединённые линией. Заменил тонкую полоску прогресса. */
+.auth-stepper {
+  display: flex;
+  list-style: none;
+  margin: 2px 0 10px;
+  padding: 0;
+}
+
+.auth-stepper-item {
+  position: relative;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 2px 0 4px;
-}
-
-.auth-progress-row {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-secondary);
+  gap: 8px;
+  text-align: center;
+  min-width: 0;
 }
 
-.auth-progress-row span:first-child {
-  color: var(--brand);
+/* Соединительная линия до следующего кружка (от центра текущего). */
+.auth-stepper-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border-strong);
+  transition: background 220ms ease;
 }
 
-.auth-progress-track {
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--button-secondary-bg);
-}
-
-.auth-progress-track span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
+.auth-stepper-item.is-done::before {
   background: var(--brand);
-  transition: width 160ms ease;
+}
+
+.auth-stepper-dot {
+  position: relative;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--surface-elevated);
+  border: 2px solid var(--border-strong);
+  color: var(--text-muted);
+  transition:
+    background 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.auth-stepper-item.is-active .auth-stepper-dot {
+  border-color: var(--brand);
+  color: var(--brand);
+  box-shadow: 0 0 0 4px rgb(var(--brand-rgb) / 0.14);
+}
+
+.auth-stepper-item.is-done .auth-stepper-dot {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--white);
+}
+
+.auth-stepper-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: color 220ms ease;
+}
+
+.auth-stepper-item.is-active .auth-stepper-label,
+.auth-stepper-item.is-done .auth-stepper-label {
+  color: var(--text);
 }
 
 /* Поле формы: label сверху, контрол снизу. Один паттерн для всех. */
@@ -3739,6 +3973,52 @@ body.news-modal-open .app-shell {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0;
+  transition: color 150ms ease;
+}
+
+/* Фокус поля мягко подсвечивает его лейбл — «анимация при вводе». */
+.auth-field:focus-within .auth-field-label {
+  color: var(--brand);
+}
+
+/* Поле с ведущей иконкой (email/пароль): иконка слева, при фокусе — бренд. */
+.auth-field-affix {
+  position: relative;
+}
+
+.auth-field-affix-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-subtle);
+  pointer-events: none;
+  transition: color 150ms ease;
+}
+
+.auth-field-affix:focus-within .auth-field-affix-icon {
+  color: var(--brand);
+}
+
+.auth-input-leading {
+  padding-left: 40px;
+}
+
+/* Спиннер внутри кнопки во время отправки. */
+.auth-btn-spinner {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--text-rgb) / 0.2);
+  border-top-color: var(--brand);
+  animation: auth-btn-spin 0.7s linear infinite;
+}
+
+@keyframes auth-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .phone-input-wrap {
@@ -3777,67 +4057,23 @@ body.news-modal-open .app-shell {
   box-shadow: var(--focus-ring);
 }
 
+/* Обёртка под настоящий SVG-флаг (country-flag-icons). Фиксированная рамка
+   с клипом по радиусу; svg заполняет её. */
 .phone-country-flag {
   width: 22px;
   height: 15px;
+  flex: none;
+  display: inline-flex;
+  overflow: hidden;
   border-radius: 3px;
   border: 1px solid rgb(var(--text-rgb) / 0.16);
-  background: var(--white);
   box-shadow: 0 1px 2px rgb(var(--text-rgb) / 0.12);
 }
 
-.phone-flag-ru {
-  background: linear-gradient(
-    to bottom,
-    var(--white) 0 33.333%,
-    var(--flag-ru-blue) 33.333% 66.666%,
-    var(--flag-ru-red) 66.666% 100%
-  );
-}
-
-.phone-flag-by {
-  background:
-    linear-gradient(to right, #ffffff 0 18%, transparent 18%),
-    linear-gradient(to bottom, #c8313e 0 68%, #2b8f3f 68% 100%);
-}
-
-.phone-flag-kz {
-  background: radial-gradient(circle at 50% 50%, #f6c344 0 20%, transparent 21%), #1aa3c8;
-}
-
-.phone-flag-am {
-  background: linear-gradient(to bottom, #d90012 0 33.333%, #0033a0 33.333% 66.666%, #f2a800 66.666% 100%);
-}
-
-.phone-flag-kg {
-  background: radial-gradient(circle at 50% 50%, #ffd34d 0 20%, transparent 21%), #e8112d;
-}
-
-.phone-flag-uz {
-  background: linear-gradient(
-    to bottom,
-    #1eb4e8 0 30%,
-    #ce1126 30% 35%,
-    var(--white) 35% 62%,
-    #ce1126 62% 67%,
-    #009b3a 67% 100%
-  );
-}
-
-.phone-flag-tj {
-  background: linear-gradient(to bottom, #cc0000 0 33.333%, var(--white) 33.333% 66.666%, #00843d 66.666% 100%);
-}
-
-.phone-flag-az {
-  background: linear-gradient(to bottom, #00b5e2 0 33.333%, #ef3340 33.333% 66.666%, #509e2f 66.666% 100%);
-}
-
-.phone-flag-md {
-  background: linear-gradient(to right, #0032a0 0 33.333%, #ffd100 33.333% 66.666%, #c8102e 66.666% 100%);
-}
-
-.phone-flag-tm {
-  background: linear-gradient(to right, #b31b1b 0 20%, #00843d 20% 100%);
+.phone-country-flag svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .phone-country-code {
@@ -3893,7 +4129,9 @@ body.news-modal-open .app-shell {
 }
 
 .phone-input {
-  padding-left: 100px;
+  /* Запасной отступ под селектор страны до того, как JS измерит точную ширину
+     кнопки и выставит padding-left под конкретный код (+7 уже / +998 шире). */
+  padding-left: 64px;
 }
 
 .password-input-wrap {
@@ -3999,7 +4237,7 @@ body.news-modal-open .app-shell {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .auth-section-title {
@@ -4009,12 +4247,12 @@ body.news-modal-open .app-shell {
   font-weight: 700;
   color: var(--text);
   padding: 0;
-  margin: 6px 0 4px;
+  margin: 0 0 2px;
 }
 
 .auth-section + .auth-section {
   /* Воздух между секциями, чтобы группировка читалась. */
-  margin-top: 6px;
+  margin-top: 16px;
 }
 
 /* Строка «запомнить меня» + «забыли пароль» — стандартный паттерн. */
@@ -4146,14 +4384,16 @@ body.news-modal-open .app-shell {
   line-height: 1.2;
 }
 
-.auth-verification-mark {
-  width: 44px;
-  height: 44px;
-  color: var(--text);
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 5;
-  stroke-linecap: square;
+.auth-verification-badge {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-soft-strong);
+  box-shadow: 0 10px 26px rgb(var(--brand-rgb) / 0.18);
 }
 
 .auth-verification-copy {
@@ -4207,7 +4447,7 @@ body.news-modal-open .app-shell {
 }
 
 .auth-code-box.is-filled {
-  border-color: var(--success);
+  border-color: var(--brand);
 }
 
 .auth-code-box:hover:not(:disabled) {
@@ -4216,10 +4456,10 @@ body.news-modal-open .app-shell {
 
 .auth-code-box:focus {
   outline: none;
-  border-color: var(--success);
+  border-color: var(--brand);
   box-shadow:
-    0 0 0 3px rgb(var(--success-rgb) / 0.16),
-    0 10px 24px -18px rgb(var(--success-rgb) / 0.7);
+    0 0 0 3px rgb(var(--brand-rgb) / 0.16),
+    0 10px 24px -18px rgb(var(--brand-rgb) / 0.7);
 }
 
 .auth-code-box:disabled {
@@ -4364,7 +4604,12 @@ body.news-modal-open .app-shell {
 
 @media (prefers-reduced-motion: reduce) {
   /* При системной настройке «уменьшить движение» — анимаций нет. */
-  .auth-visual-icon,
+  .auth-visual-aurora,
+  .auth-visual-hero,
+  .auth-visual-tile,
+  .auth-visual-tile::after,
+  .auth-visual-tile-icon,
+  .auth-card,
   .auth-code-digits,
   .auth-code-orb,
   .auth-code-spinner,
@@ -4387,17 +4632,27 @@ body.news-modal-open .app-shell {
     border-bottom: 1px solid rgb(var(--white-rgb) / 0.12);
   }
 
-  .auth-visual-stage {
-    gap: 14px;
-  }
-
-  .auth-visual-icon {
-    width: min(160px, 38vw);
-  }
-
   /* На мобильном grain отвлекает на маленькой плоскости — выключаем. */
   .auth-visual::after {
     display: none;
+  }
+
+  /* Билборд сжимается в узкую верхнюю полосу — обещание и строка доверия
+     там не помещаются. Оставляем тайл-знак бренда. */
+  .auth-visual-title,
+  .auth-visual-trust {
+    display: none;
+  }
+
+  .auth-visual-tile {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+  }
+
+  .auth-visual-tile-icon {
+    width: 38px;
+    height: 38px;
   }
 
   .auth-form-panel {
@@ -4407,12 +4662,18 @@ body.news-modal-open .app-shell {
 
 @media (max-width: 540px) {
   .auth-visual {
-    min-height: 180px;
+    min-height: 160px;
     padding: 22px 20px;
   }
 
-  .auth-visual-icon {
-    width: 120px;
+  .auth-visual-tile {
+    width: 56px;
+    height: 56px;
+  }
+
+  .auth-visual-tile-icon {
+    width: 30px;
+    height: 30px;
   }
 
   .auth-card-title {
@@ -11377,19 +11638,35 @@ li.tree-add-row + li.tree-add-row,
 .consent-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgb(var(--white-rgb) / 0.7);
+  background: rgb(var(--white-rgb) / 0.45);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--white-rgb) / 0.6),
+    0 6px 20px rgb(var(--shadow-rgb) / 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .consent-row {
   position: relative;
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
   align-items: flex-start;
-  font-size: 12px;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 13px;
   color: var(--text);
-  line-height: 1.35;
+  line-height: 1.4;
   cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.consent-row:hover {
+  background: rgb(var(--white-rgb) / 0.55);
 }
 
 .consent-input {
@@ -11401,12 +11678,12 @@ li.tree-add-row + li.tree-add-row,
 }
 
 .consent-box {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   margin-top: 1px;
-  border-radius: 5px;
+  border-radius: 6px;
   border: 1.5px solid var(--line-strong);
-  background: rgb(var(--white-rgb) / 0.82);
+  background: var(--surface-elevated);
   position: relative;
   transition:
     background 120ms ease,
@@ -11417,10 +11694,10 @@ li.tree-add-row + li.tree-add-row,
 .consent-box::after {
   content: "";
   position: absolute;
-  left: 5px;
+  left: 6px;
   top: 2px;
-  width: 5px;
-  height: 9px;
+  width: 6px;
+  height: 10px;
   border: solid var(--white);
   border-width: 0 2px 2px 0;
   opacity: 0;

@@ -4,7 +4,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ChangeEvent, FormEvent, KeyboardEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Eye, EyeOff, Factory, Forklift, Package, RussianRuble, Truck, X } from "lucide-react";
+import {
+  Building2,
+  Check,
+  Eye,
+  EyeOff,
+  Factory,
+  Forklift,
+  Lock,
+  type LucideIcon,
+  Mail,
+  Package,
+  RussianRuble,
+  ShieldCheck,
+  Tag,
+  Truck,
+  User,
+  Users,
+  X,
+} from "lucide-react";
+import { AM, AZ, BY, KG, KZ, MD, RU, TJ, TM, UZ } from "country-flag-icons/react/3x2";
 import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -25,6 +44,10 @@ const genderOptions = [
 type AuthIcon = {
   key: string;
   hold: number;
+  // Подпись синхронна с иконкой: абстрактный цикл иконок превращается в
+  // мини-онбординг — пользователь читает, какой кусок отрасли закрывает
+  // платформа на каждом кадре.
+  caption: string;
   node: ReactNode;
 };
 
@@ -32,26 +55,31 @@ const AUTH_ICONS: AuthIcon[] = [
   {
     key: "factory",
     hold: 1500,
+    caption: "Переработка",
     node: <Factory aria-hidden="true" />,
   },
   {
     key: "forklift",
     hold: 1500,
+    caption: "Склад и отгрузка",
     node: <Forklift aria-hidden="true" />,
   },
   {
     key: "bale",
     hold: 1500,
+    caption: "Партии вторсырья",
     node: <Package aria-hidden="true" />,
   },
   {
     key: "truck",
     hold: 1500,
+    caption: "Логистика",
     node: <Truck aria-hidden="true" />,
   },
   {
     key: "ruble",
     hold: 1500,
+    caption: "Прозрачная цена",
     node: <RussianRuble aria-hidden="true" />,
   },
   // Финальный кадр — логотип ЭкоПлатформы. Заливка (а не обводка), потому
@@ -61,6 +89,7 @@ const AUTH_ICONS: AuthIcon[] = [
   {
     key: "logo",
     hold: 4000,
+    caption: "Всё в одном месте",
     node: (
       <svg viewBox="0 0 1024 1024" aria-hidden="true">
         <path
@@ -94,7 +123,6 @@ type PhoneCountry = {
   nationalLength: number;
   groups: number[];
   placeholder: string;
-  flagClassName: string;
 };
 
 type PhoneCountryId = "ru" | "by" | "kz" | "am" | "kg" | "uz" | "tj" | "az" | "md" | "tm";
@@ -107,7 +135,6 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 10,
     groups: [3, 3, 2, 2],
     placeholder: "999 123-45-67",
-    flagClassName: "phone-flag-ru",
   },
   {
     id: "by",
@@ -116,7 +143,6 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 9,
     groups: [2, 3, 2, 2],
     placeholder: "29 123-45-67",
-    flagClassName: "phone-flag-by",
   },
   {
     id: "kz",
@@ -125,7 +151,6 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 10,
     groups: [3, 3, 2, 2],
     placeholder: "700 123-45-67",
-    flagClassName: "phone-flag-kz",
   },
   {
     id: "am",
@@ -134,7 +159,6 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 8,
     groups: [2, 3, 3],
     placeholder: "77 123-456",
-    flagClassName: "phone-flag-am",
   },
   {
     id: "kg",
@@ -143,7 +167,6 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 9,
     groups: [3, 3, 3],
     placeholder: "700 123 456",
-    flagClassName: "phone-flag-kg",
   },
   {
     id: "uz",
@@ -152,7 +175,6 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 9,
     groups: [2, 3, 2, 2],
     placeholder: "90 123-45-67",
-    flagClassName: "phone-flag-uz",
   },
   {
     id: "tj",
@@ -161,7 +183,6 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 9,
     groups: [2, 3, 2, 2],
     placeholder: "93 123-45-67",
-    flagClassName: "phone-flag-tj",
   },
   {
     id: "az",
@@ -170,7 +191,6 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 9,
     groups: [2, 3, 2, 2],
     placeholder: "50 123-45-67",
-    flagClassName: "phone-flag-az",
   },
   {
     id: "md",
@@ -179,7 +199,6 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 8,
     groups: [2, 3, 3],
     placeholder: "69 123 456",
-    flagClassName: "phone-flag-md",
   },
   {
     id: "tm",
@@ -188,11 +207,33 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
     nationalLength: 8,
     groups: [2, 3, 3],
     placeholder: "65 123 456",
-    flagClassName: "phone-flag-tm",
   },
 ];
 
 const DEFAULT_PHONE_COUNTRY = PHONE_COUNTRIES[0]!;
+
+// Настоящие SVG-флаги (country-flag-icons) вместо приблизительных CSS-градиентов.
+const FLAG_BY_ID: Record<PhoneCountryId, typeof RU> = {
+  ru: RU,
+  by: BY,
+  kz: KZ,
+  am: AM,
+  kg: KG,
+  uz: UZ,
+  tj: TJ,
+  az: AZ,
+  md: MD,
+  tm: TM,
+};
+
+function CountryFlag({ id }: { id: PhoneCountryId }) {
+  const Flag = FLAG_BY_ID[id];
+  return (
+    <span className="phone-country-flag" aria-hidden="true">
+      <Flag />
+    </span>
+  );
+}
 const ORGANIZATION_NAME_EXAMPLES = ["ИП Иванов И.И.", "ООО Экология"];
 const ORGANIZATION_TYPE_DELAY = 150;
 const ORGANIZATION_ERASE_DELAY = 90;
@@ -282,17 +323,35 @@ function AuthVisual({ mode }: { mode: AuthMode }) {
 
   return (
     <section className="auth-visual" data-mode={mode} aria-hidden="true">
+      {/* Медленно дрейфующая «аврора» — даёт глубину и жизнь фону. */}
+      <div className="auth-visual-aurora" />
+
       {/* Лёгкий wordmark вверху — без него левая панель пустая, пользователь
           теряет контекст где находится. */}
       <div className="auth-visual-wordmark">ЭкоПлатформа</div>
 
-      <div className="auth-visual-stage">
-        <div className={`auth-visual-icon${current.key === "logo" ? " is-logo" : ""}`} key={current.key}>
-          {current.node}
+      {/* Центрированный «герой»: крупный стеклянный тайл с иконкой бренда над
+          одним обещанием. Минимум текста, максимум фокуса на знаке. */}
+      <div className="auth-visual-hero">
+        <div className="auth-visual-tile">
+          <span
+            className={`auth-visual-tile-icon${current.key === "logo" ? " is-logo" : ""}`}
+            key={current.key}
+          >
+            {current.node}
+          </span>
         </div>
+
+        <h2 className="auth-visual-title">
+          Рынок вторсырья, каким он должен быть: прозрачным, понятным и удобным.
+        </h2>
       </div>
 
-      <div className="auth-visual-foot" />
+      <ul className="auth-visual-trust">
+        <li>Соответствие 152-ФЗ</li>
+        <li>Защищённое соединение</li>
+        <li>Регистрация за пару минут</li>
+      </ul>
     </section>
   );
 }
@@ -336,6 +395,17 @@ function AuthField({ label, hint, children }: { label: string; hint?: string; ch
   );
 }
 
+// Обёртка поля с ведущей иконкой слева. Контрол внутри должен иметь класс
+// `auth-input-leading` (отступ под иконку).
+function FieldAffix({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+  return (
+    <div className="auth-field-affix">
+      <Icon className="auth-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
+      {children}
+    </div>
+  );
+}
+
 function EmailInput({
   name,
   autoComplete,
@@ -348,24 +418,27 @@ function EmailInput({
   onValueChange?: (value: string) => void;
 }) {
   return (
-    <input
-      className="input"
-      name={name}
-      type="email"
-      autoComplete={autoComplete}
-      inputMode="email"
-      autoCapitalize="none"
-      spellCheck={false}
-      placeholder="name@example.ru"
-      required
-      value={value}
-      onChange={onValueChange ? (event) => onValueChange(event.currentTarget.value) : undefined}
-      onBlur={(event) => {
-        const normalized = normalizeEmailValue(event.currentTarget.value);
-        event.currentTarget.value = normalized;
-        onValueChange?.(normalized);
-      }}
-    />
+    <div className="auth-field-affix">
+      <Mail className="auth-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
+      <input
+        className="input auth-input-leading"
+        name={name}
+        type="email"
+        autoComplete={autoComplete}
+        inputMode="email"
+        autoCapitalize="none"
+        spellCheck={false}
+        placeholder="name@example.ru"
+        required
+        value={value}
+        onChange={onValueChange ? (event) => onValueChange(event.currentTarget.value) : undefined}
+        onBlur={(event) => {
+          const normalized = normalizeEmailValue(event.currentTarget.value);
+          event.currentTarget.value = normalized;
+          onValueChange?.(normalized);
+        }}
+      />
+    </div>
   );
 }
 
@@ -429,7 +502,7 @@ function OrganizationNameInput({ value, onValueChange }: { value?: string; onVal
 
   return (
     <input
-      className="input"
+      className="input auth-input-leading"
       name="organizationName"
       placeholder={placeholder}
       autoComplete="organization"
@@ -454,9 +527,22 @@ function PhoneInput({
   onDigitsChange: (digits: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const countryButtonRef = useRef<HTMLButtonElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const country = getPhoneCountry(countryId);
   const displayValue = formatPhoneLocal(digits, country);
   const fullValue = formatPhoneFull(country, digits);
+
+  // Отступ под селектор страны считаем по фактической ширине кнопки: для
+  // короткого «+7» он небольшой, для «+998» — больше. Раньше был жёсткий
+  // padding-left: 100px под самый длинный код → у +7 зиял большой зазор.
+  useEffect(() => {
+    const button = countryButtonRef.current;
+    const input = phoneInputRef.current;
+    if (button && input) {
+      input.style.paddingLeft = `${button.offsetWidth + 8}px`;
+    }
+  }, [countryId]);
 
   function setPhoneValidity(input: HTMLInputElement, valueDigits: string) {
     input.setCustomValidity(
@@ -490,6 +576,7 @@ function PhoneInput({
       }}
     >
       <button
+        ref={countryButtonRef}
         className="phone-country"
         type="button"
         aria-label={`Выбрать страну телефона. Сейчас ${country.name} ${country.dialCode}`}
@@ -497,7 +584,7 @@ function PhoneInput({
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <span className={`phone-country-flag ${country.flagClassName}`} aria-hidden="true" />
+        <CountryFlag id={country.id as PhoneCountryId} />
         <span className="phone-country-code">{country.dialCode}</span>
       </button>
       {open ? (
@@ -512,7 +599,7 @@ function PhoneInput({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => selectCountry(option.id as PhoneCountryId)}
             >
-              <span className={`phone-country-flag ${option.flagClassName}`} aria-hidden="true" />
+              <CountryFlag id={option.id as PhoneCountryId} />
               <span className="phone-country-name">{option.name}</span>
               <span className="phone-country-option-code">{option.dialCode}</span>
             </button>
@@ -520,6 +607,7 @@ function PhoneInput({
         </div>
       ) : null}
       <input
+        ref={phoneInputRef}
         className="input phone-input"
         type="tel"
         inputMode="numeric"
@@ -558,9 +646,10 @@ function PasswordInput({
   const Icon = visible ? EyeOff : Eye;
 
   return (
-    <div className="password-input-wrap">
+    <div className="password-input-wrap auth-field-affix">
+      <Lock className="auth-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
       <input
-        className="input password-input"
+        className="input password-input auth-input-leading"
         name={name}
         type={visible ? "text" : "password"}
         autoComplete={autoComplete}
@@ -607,11 +696,33 @@ function PasswordStrengthMeter({ password }: { password: string }) {
   );
 }
 
-function AuthVerificationMark() {
+const REGISTER_STEPS: { n: number; label: string }[] = [
+  { n: 1, label: "О компании" },
+  { n: 2, label: "О вас" },
+  { n: 3, label: "Почта" },
+];
+
+// Сегментированный степпер: кружок с номером (или галочкой для пройденных) +
+// подпись, соединённые линией. Даёт чёткую ориентацию в 3-шаговой форме.
+function RegisterStepper({ current }: { current: number }) {
   return (
-    <svg className="auth-verification-mark" viewBox="0 0 64 64" aria-hidden="true">
-      <path d="M32 6v52M6 32h52M13.6 13.6l36.8 36.8M50.4 13.6 13.6 50.4" />
-    </svg>
+    <ol className="auth-stepper" aria-label={`Шаг ${current} из ${REGISTER_STEP_TOTAL}`}>
+      {REGISTER_STEPS.map((step) => {
+        const state = step.n < current ? "done" : step.n === current ? "active" : "upcoming";
+        return (
+          <li
+            key={step.n}
+            className={`auth-stepper-item is-${state}`}
+            aria-current={state === "active" ? "step" : undefined}
+          >
+            <span className="auth-stepper-dot">
+              {state === "done" ? <Check size={15} strokeWidth={3} aria-hidden="true" /> : step.n}
+            </span>
+            <span className="auth-stepper-label">{step.label}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -675,8 +786,20 @@ export function LoginForm() {
         {error ? <p className="auth-error">{error}</p> : null}
 
         <button className="button auth-submit" type="submit" disabled={submitting}>
-          {submitting ? "Входим…" : "Войти"}
+          {submitting ? (
+            <>
+              <span className="auth-btn-spinner" aria-hidden="true" />
+              Входим…
+            </>
+          ) : (
+            "Войти"
+          )}
         </button>
+
+        <p className="auth-secure-note">
+          <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
+          Соединение защищено
+        </p>
       </form>
     </AuthShell>
   );
@@ -752,9 +875,19 @@ export function RegisterForm() {
   // все обязательные, а пароль не дошёл до зелёной шкалы. Бэк сохраняет
   // двойную защиту на те же документы и пароль.
   const canSubmit = legalDocs.length > 0 && requiredAccepted && passwordReady;
+  // Кнопка «Создать аккаунт» блокируется, пока не выполнены условия. Раньше она
+  // была просто серой и непонятно, что мешает — подсказка снимает этот тупик.
+  const submitHint =
+    legalDocs.length === 0
+      ? null
+      : !requiredAccepted && !passwordReady
+        ? `Отметьте обязательные согласия и доведите пароль до зелёного (минимум ${MIN_PASSWORD_LENGTH} символов, буква и цифра).`
+        : !requiredAccepted
+          ? "Отметьте все обязательные согласия, чтобы продолжить."
+          : !passwordReady
+            ? `Пароль должен стать зелёным: минимум ${MIN_PASSWORD_LENGTH} символов, буква и цифра.`
+            : null;
   const currentStepNumber = step === "company" ? 1 : step === "person" ? 2 : 3;
-  const currentStepLabel = step === "company" ? "О компании" : step === "person" ? "О вас" : "Почта";
-  const progressWidth = `${(currentStepNumber / REGISTER_STEP_TOTAL) * 100}%`;
   const verificationExpiresAt = verification
     ? new Date(verification.expiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
     : "";
@@ -1023,89 +1156,86 @@ export function RegisterForm() {
           <header className="auth-card-head">
             <h1 className="auth-card-title">Создать аккаунт</h1>
             <p className="auth-card-sub">
-              Доступ на 24 часа · <Link href="/login">Уже есть аккаунт</Link>
+              Пробный доступ на 24 часа · <Link href="/login">Уже есть аккаунт</Link>
             </p>
           </header>
         ) : null}
 
-        {step !== "verification" ? (
-          <div className="auth-progress" aria-label={`Шаг ${currentStepNumber} из ${REGISTER_STEP_TOTAL}`}>
-            <div className="auth-progress-row">
-              <span>
-                Шаг {currentStepNumber} из {REGISTER_STEP_TOTAL}
-              </span>
-              <span>{currentStepLabel}</span>
-            </div>
-            <div className="auth-progress-track" aria-hidden="true">
-              <span style={{ width: progressWidth }} />
-            </div>
-          </div>
-        ) : null}
+        <RegisterStepper current={currentStepNumber} />
 
         {step === "company" ? (
-          <fieldset className="auth-section">
-            <legend className="auth-section-title">О компании</legend>
+          <div className="auth-section">
             <AuthField label="Наименование компании">
-              <OrganizationNameInput
-                value={values.organizationName}
-                onValueChange={(value) => setField("organizationName", value)}
-              />
+              <FieldAffix icon={Building2}>
+                <OrganizationNameInput
+                  value={values.organizationName}
+                  onValueChange={(value) => setField("organizationName", value)}
+                />
+              </FieldAffix>
             </AuthField>
             <AuthField label="Тип компании">
-              <select
-                className="select"
-                name="companyType"
-                value={values.companyType}
-                onChange={(event) => setField("companyType", event.currentTarget.value)}
-                required
-              >
-                {companyTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <FieldAffix icon={Tag}>
+                <select
+                  className="select auth-input-leading"
+                  name="companyType"
+                  value={values.companyType}
+                  onChange={(event) => setField("companyType", event.currentTarget.value)}
+                  required
+                >
+                  {companyTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </FieldAffix>
             </AuthField>
-          </fieldset>
+          </div>
         ) : step === "person" ? (
           <>
             <fieldset className="auth-section">
               <legend className="auth-section-title">О вас</legend>
               <div className="auth-grid-2">
                 <AuthField label="Фамилия">
-                  <input
-                    className="input"
-                    name="lastName"
-                    value={values.lastName}
-                    onChange={(event) => setField("lastName", event.currentTarget.value)}
-                    required
-                  />
+                  <FieldAffix icon={User}>
+                    <input
+                      className="input auth-input-leading"
+                      name="lastName"
+                      value={values.lastName}
+                      onChange={(event) => setField("lastName", event.currentTarget.value)}
+                      required
+                    />
+                  </FieldAffix>
                 </AuthField>
                 <AuthField label="Имя">
-                  <input
-                    className="input"
-                    name="firstName"
-                    value={values.firstName}
-                    onChange={(event) => setField("firstName", event.currentTarget.value)}
-                    required
-                  />
+                  <FieldAffix icon={User}>
+                    <input
+                      className="input auth-input-leading"
+                      name="firstName"
+                      value={values.firstName}
+                      onChange={(event) => setField("firstName", event.currentTarget.value)}
+                      required
+                    />
+                  </FieldAffix>
                 </AuthField>
               </div>
               <div className="auth-grid-2">
                 <AuthField label="Пол">
-                  <select
-                    className="select"
-                    name="gender"
-                    value={values.gender}
-                    onChange={(event) => setField("gender", event.currentTarget.value)}
-                    required
-                  >
-                    {genderOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <FieldAffix icon={Users}>
+                    <select
+                      className="select auth-input-leading"
+                      name="gender"
+                      value={values.gender}
+                      onChange={(event) => setField("gender", event.currentTarget.value)}
+                      required
+                    >
+                      {genderOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </FieldAffix>
                 </AuthField>
                 <AuthField label="Телефон">
                   <PhoneInput
@@ -1167,7 +1297,9 @@ export function RegisterForm() {
         ) : (
           <fieldset className="auth-section auth-verification-section">
             <legend className="auth-section-title auth-verification-title">
-              <AuthVerificationMark />
+              <span className="auth-verification-badge" aria-hidden="true">
+                <Mail size={26} strokeWidth={2} />
+              </span>
               <span>Подтвердите почту</span>
             </legend>
             <p className="auth-card-sub auth-verification-copy">
@@ -1221,14 +1353,28 @@ export function RegisterForm() {
             Далее
           </button>
         ) : step === "person" ? (
-          <div className="auth-step-actions">
-            <button className="button secondary" type="button" onClick={goBackToCompanyStep} disabled={submitting}>
-              Назад
-            </button>
-            <button className="button auth-submit" type="submit" disabled={submitting || !canSubmit}>
-              {submitting ? "Отправляем код…" : "Создать аккаунт"}
-            </button>
-          </div>
+          <>
+            <div className="auth-step-actions">
+              <button className="button secondary" type="button" onClick={goBackToCompanyStep} disabled={submitting}>
+                Назад
+              </button>
+              <button className="button auth-submit" type="submit" disabled={submitting || !canSubmit}>
+                {submitting ? (
+                  <>
+                    <span className="auth-btn-spinner" aria-hidden="true" />
+                    Отправляем код…
+                  </>
+                ) : (
+                  "Создать аккаунт"
+                )}
+              </button>
+            </div>
+            {!canSubmit && submitHint ? <p className="auth-submit-hint">{submitHint}</p> : null}
+            <p className="auth-secure-note">
+              <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
+              Соединение защищено
+            </p>
+          </>
         ) : (
           <div className="auth-verification-actions">
             <button
@@ -1242,7 +1388,7 @@ export function RegisterForm() {
                   ? "Готово"
                   : verificationPhase === "error"
                     ? "Код не подошёл"
-                    : "Создать аккаунт"}
+                    : "Подтвердить"}
             </button>
             <div className="auth-verification-secondary">
               <button
