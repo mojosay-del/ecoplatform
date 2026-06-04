@@ -118,6 +118,7 @@ export type NomenclatureListItem = {
   id: string;
   name: string;
   code: string;
+  position: number;
   unit: string | null;
   priceIndex: {
     id: string;

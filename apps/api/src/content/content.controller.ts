@@ -24,6 +24,7 @@ import {
   newsInputSchema,
   newsTagsQuerySchema,
   nomenclatureInputSchema,
+  nomenclatureMoveInputSchema,
   nomenclatureUpdateInputSchema,
   priceIndexInputSchema,
   priceIndexValueInputSchema,
@@ -247,6 +248,13 @@ export class ContentController {
   @Post("admin/content/indices/nomenclature")
   async createNomenclature(@Body() body: unknown, @CurrentUser() user: RequestUser) {
     return this.indices.createNomenclature(parseBody(nomenclatureInputSchema, body), user);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @Patch("admin/content/indices/nomenclature/:id/move")
+  async moveNomenclature(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.indices.moveNomenclature(id, parseBody(nomenclatureMoveInputSchema, body), user);
   }
 
   @UseGuards(RolesGuard)

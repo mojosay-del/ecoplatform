@@ -5918,9 +5918,7 @@ body.news-modal-open .app-shell {
   padding: 18px;
   border: 1.5px dashed var(--line-strong);
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(180deg, rgb(var(--white-rgb) / 0.55), rgb(var(--white-rgb) / 0.15)),
-    var(--panel-soft);
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.55), rgb(var(--white-rgb) / 0.15)), var(--panel-soft);
   color: var(--text-secondary);
   text-align: left;
   cursor: pointer;
@@ -8099,9 +8097,7 @@ body.news-modal-open .app-shell {
   min-height: 152px;
   align-items: center;
   border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgb(var(--white-rgb) / 0.68), rgb(var(--white-rgb) / 0.28)),
-    var(--panel-soft);
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.68), rgb(var(--white-rgb) / 0.28)), var(--panel-soft);
 }
 
 .news-form-preview .file-upload-preview {
@@ -8223,6 +8219,10 @@ body.news-modal-open .app-shell {
     grid-template-columns: 1fr;
   }
 
+  .indices-editor-head {
+    flex-direction: column;
+  }
+
   .moderation-detail-heading {
     flex-direction: column;
   }
@@ -8243,9 +8243,7 @@ body.news-modal-open .app-shell {
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgb(var(--white-rgb) / 0.82), rgb(var(--white-rgb) / 0.48)),
-    var(--panel-soft);
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.82), rgb(var(--white-rgb) / 0.48)), var(--panel-soft);
   min-height: 38px;
   transition:
     border-color 120ms ease,
@@ -8370,6 +8368,46 @@ body.news-modal-open .app-shell {
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   background: var(--panel-soft);
+}
+
+.indices-inline-form .form-field > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.indices-editor-form {
+  gap: 16px;
+}
+
+.indices-editor-head {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.indices-title-field,
+.indices-editor-field {
+  display: grid;
+  gap: 6px;
+}
+
+.indices-title-field > span,
+.indices-editor-field > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.indices-code-title {
+  font-size: 18px;
+  font-weight: 650;
+  color: var(--text-secondary);
 }
 
 .tree-row-dot.is-muted {
@@ -8883,9 +8921,7 @@ body.news-modal-open .app-shell {
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgb(var(--white-rgb) / 0.82), rgb(var(--white-rgb) / 0.48)),
-    var(--panel-soft);
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.82), rgb(var(--white-rgb) / 0.48)), var(--panel-soft);
   color: var(--muted);
   appearance: none;
   transition:
@@ -9103,7 +9139,8 @@ body.news-modal-open .app-shell {
 
 .tree-row:hover .tree-row-drag-handle,
 .tree-row-drag-handle:focus-visible,
-.knowledge-sortable-item.is-dragging .tree-row-drag-handle {
+.knowledge-sortable-item.is-dragging .tree-row-drag-handle,
+.indices-sortable-item.is-dragging .tree-row-drag-handle {
   opacity: 1;
 }
 
@@ -9116,7 +9153,8 @@ body.news-modal-open .app-shell {
   cursor: grabbing;
 }
 
-.knowledge-sortable-item.is-dragging {
+.knowledge-sortable-item.is-dragging,
+.indices-sortable-item.is-dragging {
   z-index: 5;
 }
 
@@ -14220,9 +14258,7 @@ body.account-password-modal-open {
   padding: 13px 15px;
   border: 1px solid rgb(var(--brand-rgb) / 0.16);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgb(var(--white-rgb) / 0.88), rgb(var(--white-rgb) / 0.58)),
-    var(--panel);
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.88), rgb(var(--white-rgb) / 0.58)), var(--panel);
   color: var(--text);
   font: inherit;
   font-weight: 600;
@@ -14257,9 +14293,7 @@ body.account-password-modal-open {
 .matching-left-card.is-active,
 .matching-right-card.is-targetable:hover {
   border-color: rgb(var(--brand-rgb) / 0.48);
-  background:
-    linear-gradient(180deg, rgb(var(--white-rgb) / 0.96), rgb(var(--brand-rgb) / 0.08)),
-    var(--panel);
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.96), rgb(var(--brand-rgb) / 0.08)), var(--panel);
   box-shadow:
     var(--focus-ring),
     0 14px 28px -24px rgb(var(--brand-rgb) / 0.65);
@@ -14281,16 +14315,12 @@ body.account-password-modal-open {
 
 .matching-card.is-correct {
   border-color: var(--success);
-  background:
-    linear-gradient(180deg, rgb(var(--white-rgb) / 0.94), rgb(var(--success-rgb) / 0.1)),
-    var(--panel);
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.94), rgb(var(--success-rgb) / 0.1)), var(--panel);
 }
 
 .matching-card.is-wrong {
   border-color: var(--danger);
-  background:
-    linear-gradient(180deg, rgb(var(--white-rgb) / 0.94), rgb(var(--danger-rgb) / 0.08)),
-    var(--panel);
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.94), rgb(var(--danger-rgb) / 0.08)), var(--panel);
 }
 
 .matching-card-dot {

@@ -1,10 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ChevronRight, FolderOpen, Package, Plus, Trash2 } from "lucide-react";
+import { type CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ChevronRight, FolderOpen, GripVertical, Package, Plus, Trash2 } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { RowKebab, type ActionItem } from "./RowKebab";
+import { StatusPill } from "./StatusPill";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
@@ -24,6 +28,7 @@ type Nomenclature = {
   name: string;
   unit: string;
   description: string | null;
+  position: number;
   isActive: boolean;
   priceIndex: PriceIndex | null;
 };
@@ -45,6 +50,7 @@ export function AdminIndicesView() {
   const [selection, setSelection] = useState<Selection>({ kind: "none" });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState<null | "category" | { type: "nomenclature"; categoryId: string }>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
     void loadAll();
@@ -133,6 +139,44 @@ export function AdminIndicesView() {
     }
   }
 
+  async function reorderNomenclatures(categoryId: string, event: DragEndEvent) {
+    if (!token) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const category = categories.find((item) => item.id === categoryId);
+    const nomenclatures = category?.nomenclatures ?? [];
+    const from = nomenclatures.findIndex((item) => item.id === String(active.id));
+    const to = nomenclatures.findIndex((item) => item.id === String(over.id));
+    if (from === -1 || to === -1) return;
+
+    const ordered = arrayMove(nomenclatures, from, to);
+    setCategories((prev) =>
+      prev.map((item) =>
+        item.id === categoryId
+          ? { ...item, nomenclatures: ordered.map((nomenclature, position) => ({ ...nomenclature, position })) }
+          : item,
+      ),
+    );
+
+    try {
+      await apiFetch(`/admin/content/indices/nomenclature/${active.id}/move`, {
+        method: "PATCH",
+        token,
+        body: { categoryId, position: to },
+      });
+      await loadAll();
+      setMessage("Порядок номенклатур сохранён.");
+    } catch (error) {
+      await loadAll();
+      setMessage(
+        error instanceof Error
+          ? `Не удалось сохранить порядок номенклатур: ${error.message}. Список обновлён с сервера.`
+          : "Не удалось сохранить порядок номенклатур. Список обновлён с сервера.",
+      );
+    }
+  }
+
   return (
     <AppShell>
       <section className="page">
@@ -218,75 +262,50 @@ export function AdminIndicesView() {
                       <RowKebab actions={categoryActions} />
                     </div>
                     {isExpanded ? (
-                      <ul className="tree-children" role="group">
-                        {category.nomenclatures.map((nomenclature) => {
-                          const hasIndex = Boolean(nomenclature.priceIndex);
-                          const isPublished = nomenclature.priceIndex?.status === "published";
-                          const nomActions: ActionItem[] = [
-                            {
-                              label: "Удалить номенклатуру",
-                              danger: true,
-                              onClick: () => void deleteNomenclature(nomenclature),
-                            },
-                          ];
-                          return (
-                            <li key={nomenclature.id} role="treeitem">
-                              <div
-                                className={`tree-row depth-1${
-                                  selection.kind === "nomenclature" && selection.id === nomenclature.id
-                                    ? " is-active"
-                                    : ""
-                                }`}
-                              >
-                                <button type="button" className="tree-row-chevron" disabled aria-hidden />
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(event) => void reorderNomenclatures(category.id, event)}
+                      >
+                        <SortableContext
+                          items={category.nomenclatures.map((nomenclature) => nomenclature.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <ul className="tree-children" role="group">
+                            {category.nomenclatures.map((nomenclature) => (
+                              <SortableNomenclatureRow
+                                key={nomenclature.id}
+                                nomenclature={nomenclature}
+                                active={selection.kind === "nomenclature" && selection.id === nomenclature.id}
+                                onSelect={() => setSelection({ kind: "nomenclature", id: nomenclature.id })}
+                                onDelete={() => void deleteNomenclature(nomenclature)}
+                              />
+                            ))}
+                            {createOpen &&
+                            typeof createOpen === "object" &&
+                            createOpen.type === "nomenclature" &&
+                            createOpen.categoryId === category.id ? (
+                              <li className="tree-add-row" style={{ paddingLeft: 44 }}>
+                                <NomenclatureCreateForm
+                                  categoryId={category.id}
+                                  onMutate={mutate}
+                                  onClose={() => setCreateOpen(null)}
+                                />
+                              </li>
+                            ) : (
+                              <li className="tree-add-row" style={{ paddingLeft: 44 }}>
                                 <button
                                   type="button"
-                                  className="tree-row-main"
-                                  onClick={() => setSelection({ kind: "nomenclature", id: nomenclature.id })}
+                                  className="tree-add-button"
+                                  onClick={() => setCreateOpen({ type: "nomenclature", categoryId: category.id })}
                                 >
-                                  <span className="tree-row-icon">
-                                    <Package size={16} />
-                                  </span>
-                                  {hasIndex ? (
-                                    <span
-                                      className={`tree-row-dot${isPublished ? " is-published" : ""}`}
-                                      title={CONTENT_STATUS_LABELS[nomenclature.priceIndex!.status]}
-                                      aria-hidden
-                                    />
-                                  ) : (
-                                    <span className="tree-row-dot is-muted" aria-hidden />
-                                  )}
-                                  <span className="tree-row-title">{nomenclature.name}</span>
-                                  <span className="tree-row-meta">{nomenclature.code}</span>
+                                  <Plus size={14} /> Номенклатура
                                 </button>
-                                <RowKebab actions={nomActions} />
-                              </div>
-                            </li>
-                          );
-                        })}
-                        {createOpen &&
-                        typeof createOpen === "object" &&
-                        createOpen.type === "nomenclature" &&
-                        createOpen.categoryId === category.id ? (
-                          <li className="tree-add-row" style={{ paddingLeft: 44 }}>
-                            <NomenclatureCreateForm
-                              categoryId={category.id}
-                              onMutate={mutate}
-                              onClose={() => setCreateOpen(null)}
-                            />
-                          </li>
-                        ) : (
-                          <li className="tree-add-row" style={{ paddingLeft: 44 }}>
-                            <button
-                              type="button"
-                              className="tree-add-button"
-                              onClick={() => setCreateOpen({ type: "nomenclature", categoryId: category.id })}
-                            >
-                              <Plus size={14} /> Номенклатура
-                            </button>
-                          </li>
-                        )}
-                      </ul>
+                              </li>
+                            )}
+                          </ul>
+                        </SortableContext>
+                      </DndContext>
                     ) : null}
                   </li>
                 );
@@ -302,7 +321,6 @@ export function AdminIndicesView() {
                 nomenclature={activeNomenclature.nomenclature}
                 onMutate={mutate}
                 onDeleteNomenclature={deleteNomenclature}
-                categories={categories}
               />
             ) : activeCategory ? (
               <CategoryEditor key={activeCategory.id} category={activeCategory} onMutate={mutate} />
@@ -319,6 +337,71 @@ export function AdminIndicesView() {
         </div>
       </section>
     </AppShell>
+  );
+}
+
+function SortableNomenclatureRow({
+  nomenclature,
+  active,
+  onSelect,
+  onDelete,
+}: {
+  nomenclature: Nomenclature;
+  active: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: nomenclature.id,
+  });
+  const hasIndex = Boolean(nomenclature.priceIndex);
+  const isPublished = nomenclature.priceIndex?.status === "published";
+  const actions: ActionItem[] = [{ label: "Удалить номенклатуру", danger: true, onClick: onDelete }];
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.55 : 1,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      role="treeitem"
+      className={isDragging ? "indices-sortable-item is-dragging" : "indices-sortable-item"}
+    >
+      <div className={`tree-row has-drag-handle depth-1${active ? " is-active" : ""}`}>
+        <span className="tree-row-drag">
+          <button
+            type="button"
+            className="tree-row-drag-handle"
+            aria-label="Перетащить номенклатуру"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={14} />
+          </button>
+        </span>
+        <button type="button" className="tree-row-chevron" disabled aria-hidden />
+        <button type="button" className="tree-row-main" onClick={onSelect}>
+          <span className="tree-row-icon">
+            <Package size={16} />
+          </span>
+          {hasIndex ? (
+            <span
+              className={`tree-row-dot${isPublished ? " is-published" : ""}`}
+              title={CONTENT_STATUS_LABELS[nomenclature.priceIndex!.status]}
+              aria-hidden
+            />
+          ) : (
+            <span className="tree-row-dot is-muted" aria-hidden />
+          )}
+          <span className="tree-row-title">{nomenclature.name}</span>
+          <span className="tree-row-meta">{nomenclature.code}</span>
+        </button>
+        <RowKebab actions={actions} />
+      </div>
+    </li>
   );
 }
 
@@ -393,7 +476,7 @@ function NomenclatureCreateForm({
   onMutate: (path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) => Promise<boolean>;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState({ code: "", name: "", unit: "₽/т", description: "" });
+  const [draft, setDraft] = useState({ name: "", code: "" });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -402,8 +485,6 @@ function NomenclatureCreateForm({
       categoryId,
       code: draft.code.trim(),
       name: draft.name.trim(),
-      unit: draft.unit.trim() || "₽/т",
-      description: draft.description.trim() || undefined,
     });
     if (ok) onClose();
   }
@@ -411,42 +492,23 @@ function NomenclatureCreateForm({
   return (
     <form className="card form indices-inline-form" onSubmit={submit}>
       <label className="form-field">
-        <span>Код</span>
+        <span>Название сырья</span>
         <input
           className="input"
           autoFocus
-          placeholder="например, МКР-КРТ-001"
-          value={draft.code}
-          onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))}
-          required
-        />
-      </label>
-      <label className="form-field">
-        <span>Название</span>
-        <input
-          className="input"
           value={draft.name}
           onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
           required
         />
       </label>
-      <div className="form-grid-2">
-        <label className="form-field">
-          <span>Единица измерения</span>
-          <input
-            className="input"
-            value={draft.unit}
-            onChange={(event) => setDraft((prev) => ({ ...prev, unit: event.target.value }))}
-          />
-        </label>
-      </div>
       <label className="form-field">
-        <span>Описание (необязательно)</span>
-        <textarea
-          className="textarea small"
-          rows={2}
-          value={draft.description}
-          onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
+        <span>Код</span>
+        <input
+          className="input"
+          placeholder="например, МС5-Б"
+          value={draft.code}
+          onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))}
+          required
         />
       </label>
       <div className="auth-actions">
@@ -509,7 +571,7 @@ function CategoryEditor({
         />
       </label>
       <p className="page-subtitle">Номенклатур в этой категории: {category.nomenclatures.length}</p>
-      <div className="lesson-save-bar">
+      <div className="lesson-save-bar news-save-bar">
         <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>
           {saving ? "Сохраняю…" : hasChanges ? "Есть несохранённые изменения" : "Всё сохранено"}
         </span>
@@ -528,20 +590,15 @@ function PriceIndexCard({
   nomenclature,
   onMutate,
   onDeleteNomenclature,
-  categories,
 }: {
   category: Category;
   nomenclature: Nomenclature;
   onMutate: (path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) => Promise<boolean>;
   onDeleteNomenclature: (nomenclature: Nomenclature) => Promise<void>;
-  categories: Category[];
 }) {
   const [draft, setDraft] = useState({
-    categoryId: nomenclature.categoryId,
     code: nomenclature.code,
     name: nomenclature.name,
-    unit: nomenclature.unit,
-    description: nomenclature.description ?? "",
     indexDescription: nomenclature.priceIndex?.description ?? "",
   });
   const [valueDraft, setValueDraft] = useState({ date: "", price: "" });
@@ -549,49 +606,26 @@ function PriceIndexCard({
 
   useEffect(() => {
     setDraft({
-      categoryId: nomenclature.categoryId,
       code: nomenclature.code,
       name: nomenclature.name,
-      unit: nomenclature.unit,
-      description: nomenclature.description ?? "",
       indexDescription: nomenclature.priceIndex?.description ?? "",
     });
-  }, [
-    nomenclature.id,
-    nomenclature.categoryId,
-    nomenclature.code,
-    nomenclature.name,
-    nomenclature.unit,
-    nomenclature.description,
-    nomenclature.priceIndex?.description,
-  ]);
+  }, [nomenclature.id, nomenclature.code, nomenclature.name, nomenclature.priceIndex?.description]);
 
-  const hasChanges =
-    draft.categoryId !== nomenclature.categoryId ||
-    draft.code !== nomenclature.code ||
-    draft.name !== nomenclature.name ||
-    draft.unit !== nomenclature.unit ||
-    draft.description !== (nomenclature.description ?? "") ||
-    draft.indexDescription !== (nomenclature.priceIndex?.description ?? "");
+  const hasChanges = draft.code !== nomenclature.code || draft.name !== nomenclature.name;
 
   const priceIndex = nomenclature.priceIndex;
   const values = priceIndex?.values ?? [];
-  const latestValue = values[values.length - 1];
+  const indexStatusLabel = priceIndex ? CONTENT_STATUS_LABELS[priceIndex.status] : "Индекс не создан";
+  const indexStatusVariant = priceIndex?.status === "published" ? "success" : "neutral";
 
   async function saveNomenclature() {
     if (!draft.code.trim() || !draft.name.trim()) return;
     setSaving(true);
     await onMutate(`/admin/content/indices/nomenclature/${nomenclature.id}`, "PATCH", {
-      categoryId: draft.categoryId,
       code: draft.code.trim(),
       name: draft.name.trim(),
-      unit: draft.unit.trim() || "₽/т",
-      description: draft.description.trim() || null,
     });
-    if (priceIndex && draft.indexDescription !== (priceIndex.description ?? "")) {
-      // У бэка нет PATCH /indices/:id для описания — описание задаётся при создании.
-      // Пропускаем тихо; в будущей итерации можно добавить отдельный endpoint.
-    }
     setSaving(false);
   }
 
@@ -637,69 +671,37 @@ function PriceIndexCard({
   }
 
   return (
-    <div className="form news-form">
-      <div className="news-form-head">
-        <span className="news-form-mode">
-          {category.name} · {nomenclature.code}
-        </span>
+    <div className="form news-form indices-editor-form">
+      <div className="news-form-head indices-editor-head">
+        <div>
+          <span className="news-form-mode">
+            {category.name} · {nomenclature.code}
+          </span>
+        </div>
+        <StatusPill variant={indexStatusVariant}>{indexStatusLabel}</StatusPill>
       </div>
 
-      <input
-        className="news-form-title"
-        value={draft.name}
-        onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
-        required
-      />
-
-      <div className="form-grid-2">
-        <label className="form-field">
-          <span>Категория</span>
-          <select
-            className="select"
-            value={draft.categoryId}
-            onChange={(event) => setDraft((prev) => ({ ...prev, categoryId: event.target.value }))}
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Код</span>
-          <input
-            className="input"
-            value={draft.code}
-            onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))}
-            required
-          />
-        </label>
-      </div>
-
-      <div className="form-grid-2">
-        <label className="form-field">
-          <span>Единица измерения</span>
-          <input
-            className="input"
-            value={draft.unit}
-            onChange={(event) => setDraft((prev) => ({ ...prev, unit: event.target.value }))}
-          />
-        </label>
-      </div>
-
-      <label className="form-field">
-        <span>Описание номенклатуры</span>
-        <textarea
-          className="textarea small"
-          rows={2}
-          value={draft.description}
-          onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
+      <label className="indices-title-field">
+        <span>Название сырья</span>
+        <input
+          className="news-form-title"
+          value={draft.name}
+          onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
+          required
         />
       </label>
 
-      {/* Сводка индекса */}
-      <div className="form-field">
+      <label className="indices-title-field">
+        <span>Код</span>
+        <input
+          className="news-form-title indices-code-title"
+          value={draft.code}
+          onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))}
+          required
+        />
+      </label>
+
+      <div className="form-field indices-editor-field">
         <span>Индекс цен</span>
         {!priceIndex ? (
           <div className="indices-no-index">
@@ -717,21 +719,6 @@ function PriceIndexCard({
           </div>
         ) : (
           <div className="indices-summary-card">
-            <div className="indices-summary-grid">
-              <div>
-                <span>Статус</span>
-                <strong>{CONTENT_STATUS_LABELS[priceIndex.status]}</strong>
-              </div>
-              <div>
-                <span>Значений</span>
-                <strong>{values.length}</strong>
-              </div>
-              <div>
-                <span>Последнее</span>
-                <strong>{latestValue ? `${formatIndexPrice(latestValue.price)} ${nomenclature.unit}` : "—"}</strong>
-              </div>
-            </div>
-
             <div className="indices-values-section">
               <h3 className="indices-values-title">История цен</h3>
               {values.length === 0 ? (
@@ -786,7 +773,7 @@ function PriceIndexCard({
         )}
       </div>
 
-      <div className="lesson-save-bar">
+      <div className="lesson-save-bar news-save-bar">
         <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>
           {saving ? "Сохраняю…" : hasChanges ? "Есть несохранённые изменения" : "Всё сохранено"}
         </span>

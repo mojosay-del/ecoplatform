@@ -11,6 +11,7 @@ import type {
   categoryInputSchema,
   categoryUpdateInputSchema,
   nomenclatureInputSchema,
+  nomenclatureMoveInputSchema,
   nomenclatureUpdateInputSchema,
   priceIndexInputSchema,
   priceIndexValueInputSchema,
@@ -20,6 +21,7 @@ import { ContentCommonService } from "./content-common.service";
 type CategoryInput = z.infer<typeof categoryInputSchema>;
 type CategoryUpdateInput = z.infer<typeof categoryUpdateInputSchema>;
 type NomenclatureInput = z.infer<typeof nomenclatureInputSchema>;
+type NomenclatureMoveInput = z.infer<typeof nomenclatureMoveInputSchema>;
 type NomenclatureUpdateInput = z.infer<typeof nomenclatureUpdateInputSchema>;
 type PriceIndexInput = z.infer<typeof priceIndexInputSchema>;
 type PriceIndexValueInput = z.infer<typeof priceIndexValueInputSchema>;
@@ -53,7 +55,7 @@ export class IndicesService {
           nomenclatures: {
             where: { isActive: true, priceIndex: { is: { status: ContentStatus.published } } },
             include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } },
-            orderBy: { name: "asc" },
+            orderBy: [{ position: "asc" }, { name: "asc" }],
           },
         },
       }),
@@ -98,7 +100,10 @@ export class IndicesService {
         take: pagination.limit,
         skip: pagination.offset,
         include: {
-          nomenclatures: { include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } } },
+          nomenclatures: {
+            include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } },
+            orderBy: [{ position: "asc" }, { name: "asc" }],
+          },
         },
       }),
     ]);
@@ -175,13 +180,62 @@ export class IndicesService {
   }
 
   async createNomenclature(input: NomenclatureInput, user: RequestUser) {
-    const nomenclature = await this.prisma.nomenclature.create({ data: input });
+    const { position, ...rest } = input;
+    const nomenclature = await this.prisma.nomenclature.create({
+      data: {
+        ...rest,
+        position: position ?? (await this.nextNomenclaturePosition(rest.categoryId)),
+      },
+    });
 
     await this.auditLog.record({
       actorId: user.id,
       action: "indices.nomenclature.create",
       entityType: "Nomenclature",
       entityId: nomenclature.id,
+    });
+
+    return nomenclature;
+  }
+
+  async moveNomenclature(id: string, input: NomenclatureMoveInput, user: RequestUser) {
+    const existing = await this.prisma.nomenclature.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Номенклатура не найдена.");
+    }
+    if (existing.categoryId !== input.categoryId) {
+      throw new ForbiddenException("Номенклатуру можно перемещать только внутри текущей категории.");
+    }
+
+    const nomenclature = await this.prisma.$transaction(async (tx) => {
+      const siblings = await tx.nomenclature.findMany({
+        where: { categoryId: existing.categoryId },
+        orderBy: [{ position: "asc" }, { name: "asc" }, { id: "asc" }],
+        select: { id: true },
+      });
+      const ordered = siblings.map((item) => item.id).filter((itemId) => itemId !== id);
+      const clamped = Math.max(0, Math.min(input.position, ordered.length));
+      ordered.splice(clamped, 0, id);
+
+      for (let position = 0; position < ordered.length; position++) {
+        await tx.nomenclature.update({
+          where: { id: ordered[position]! },
+          data: { position },
+        });
+      }
+
+      return tx.nomenclature.findUniqueOrThrow({ where: { id } });
+    });
+
+    await this.auditLog.record({
+      actorId: user.id,
+      action: "indices.nomenclature.move",
+      entityType: "Nomenclature",
+      entityId: id,
+      payload: {
+        from: { categoryId: existing.categoryId, position: existing.position },
+        to: { categoryId: input.categoryId, position: input.position },
+      },
     });
 
     return nomenclature;
@@ -370,5 +424,14 @@ export class IndicesService {
     });
 
     return { ok: true };
+  }
+
+  private async nextNomenclaturePosition(categoryId: string) {
+    const last = await this.prisma.nomenclature.findFirst({
+      where: { categoryId },
+      orderBy: { position: "desc" },
+      select: { position: true },
+    });
+    return (last?.position ?? -1) + 1;
   }
 }

@@ -794,13 +794,15 @@ model Nomenclature {
   description String?
   categoryId  String
   category    NomenclatureCategory @relation(fields: [categoryId], references: [id])
+  position    Int                  @default(0)
   isActive    Boolean              @default(true)
   priceIndex  PriceIndex?
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
 
-  // FK на категорию: список номенклатур категории.
+  // FK + порядок: список номенклатур категории и публичная сортировка /indices.
   @@index([categoryId])
+  @@index([categoryId, position])
 }
 
 model PriceIndex {

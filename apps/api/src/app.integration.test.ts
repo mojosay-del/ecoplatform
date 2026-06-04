@@ -3679,6 +3679,70 @@ describe("Content lifecycle: price indices", () => {
     return { indexId: indexRes.body.id as string, nomenclatureId: nomenclature.body.id as string };
   }
 
+  it("move номенклатуры меняет порядок внутри категории в админке и на /indices", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800019");
+    const category = await ctx.http
+      .post("/api/admin/content/indices/categories")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "Категория reorder", position: 0 });
+    expect(category.status).toBe(201);
+
+    async function createPublishedNomenclature(code: string, name: string, price: number) {
+      const nomenclature = await ctx.http
+        .post("/api/admin/content/indices/nomenclature")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ categoryId: category.body.id, code, name });
+      expect(nomenclature.status).toBe(201);
+
+      const indexRes = await ctx.http
+        .post("/api/admin/content/indices")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ nomenclatureId: nomenclature.body.id });
+      expect(indexRes.status).toBe(201);
+
+      const valueRes = await ctx.http
+        .post(`/api/admin/content/indices/${indexRes.body.id}/values`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ date: "2026-05-19T00:00:00.000Z", price });
+      expect(valueRes.status).toBe(201);
+
+      const publish = await ctx.http
+        .post(`/api/admin/content/indices/${indexRes.body.id}/publish`)
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(publish.status).toBe(201);
+
+      return nomenclature.body.id as string;
+    }
+
+    const firstId = await createPublishedNomenclature("REORDER-1", "Первая", 12000);
+    const secondId = await createPublishedNomenclature("REORDER-2", "Вторая", 13000);
+    const thirdId = await createPublishedNomenclature("REORDER-3", "Третья", 14000);
+
+    const move = await ctx.http
+      .patch(`/api/admin/content/indices/nomenclature/${thirdId}/move`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ categoryId: category.body.id, position: 0 });
+    expect(move.status).toBe(200);
+    expect(move.body.position).toBe(0);
+
+    const adminList = await ctx.http.get("/api/admin/content/indices").set("Authorization", `Bearer ${adminToken}`);
+    const adminCategory = adminList.body.items.find((item: { id: string }) => item.id === category.body.id);
+    expect(adminCategory.nomenclatures.map((item: { id: string }) => item.id)).toEqual([thirdId, firstId, secondId]);
+
+    const publicList = await ctx.http.get("/api/indices").set("Authorization", `Bearer ${reader.token}`);
+    const publicCategory = publicList.body.items.find((item: { id: string }) => item.id === category.body.id);
+    expect(publicCategory.nomenclatures.map((item: { id: string }) => item.id)).toEqual([thirdId, firstId, secondId]);
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: thirdId, action: "indices.nomenclature.move" },
+    });
+    expect(log?.payload).toMatchObject({
+      from: { categoryId: category.body.id, position: 2 },
+      to: { categoryId: category.body.id, position: 0 },
+    });
+  });
+
   it("publish индекса делает его видимым в /indices, unpublish скрывает, delete удаляет", async () => {
     const adminToken = await loginAdmin();
     const reader = await registerCompany("0800020");
