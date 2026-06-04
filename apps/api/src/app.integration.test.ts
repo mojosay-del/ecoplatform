@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hash } from "bcryptjs";
 import {
   CommentStatus,
+  CompanyRole,
   CompanyStatus,
   ContentStatus,
   FileAccessLevel,
@@ -847,6 +848,58 @@ describe("Auth", () => {
     await expect(ctx.prisma.company.findUnique({ where: { id: companyId } })).resolves.toBeNull();
     await expect(ctx.prisma.address.findUnique({ where: { id: address.id } })).resolves.toBeNull();
     await expect(ctx.prisma.fileAsset.findFirst({ where: { uploadedById: userId } })).resolves.toBeNull();
+  });
+
+  it("участник (member) удаляет свой аккаунт, не роняя компанию в pending_deletion", async () => {
+    const { companyId, userId: ownerId } = await registerCompany("0000008");
+
+    const owner = await ctx.prisma.user.findUniqueOrThrow({ where: { id: ownerId } });
+    expect(owner.companyRole).toBe(CompanyRole.owner);
+
+    // Флоу приёма приглашений ещё не реализован — сотрудника-участника
+    // создаём напрямую и привязываем к той же компании с ролью member.
+    const member = await ctx.prisma.user.create({
+      data: {
+        email: "member0000008@test.local",
+        firstName: "Пётр",
+        lastName: "Сотрудников",
+        phone: "+79010000008",
+        passwordHash: await hash("Member12345678", 4),
+        companyId,
+        companyRole: CompanyRole.member,
+      },
+    });
+
+    const memberLogin = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "member0000008@test.local", password: "Member12345678" });
+    expect(memberLogin.status).toBe(201);
+
+    const requestDeletion = await ctx.http
+      .post("/api/auth/me/request-deletion")
+      .set("Authorization", `Bearer ${memberLogin.body.accessToken}`);
+    expect(requestDeletion.status).toBe(201);
+
+    // Помечен на удаление только аккаунт участника; компания остаётся в demo.
+    const memberAfter = await ctx.prisma.user.findUniqueOrThrow({ where: { id: member.id } });
+    const companyAfter = await ctx.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    expect(memberAfter.deletionRequestedAt).toBeInstanceOf(Date);
+    expect(companyAfter.status).toBe(CompanyStatus.demo);
+    expect(companyAfter.statusBeforeDeletion).toBeNull();
+
+    // По истечении грейс-периода крон вычищает только участника — компания и
+    // её владелец продолжают работать.
+    await ctx.prisma.user.update({
+      where: { id: member.id },
+      data: { deletionRequestedAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) },
+    });
+    const scheduler = ctx.app.get(SchedulerService);
+    await scheduler.cleanupDeletedAccounts(new Date());
+
+    await expect(ctx.prisma.user.findUnique({ where: { id: member.id } })).resolves.toBeNull();
+    await expect(ctx.prisma.user.findUnique({ where: { id: ownerId } })).resolves.not.toBeNull();
+    const companyAfterCleanup = await ctx.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    expect(companyAfterCleanup.status).toBe(CompanyStatus.demo);
   });
 });
 

@@ -8,7 +8,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { CompanyStatus, NotificationCategory, UserStatus } from "@prisma/client";
+import { CompanyRole, CompanyStatus, NotificationCategory, UserStatus } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "crypto";
 import {
@@ -210,6 +210,9 @@ export class AuthService {
           gender: challenge.gender,
           passwordHash: challenge.passwordHash,
           companyId: company.id,
+          // Создатель компании при регистрации — её владелец. Приглашённые
+          // сотрудники будут привязываться с ролью member.
+          companyRole: CompanyRole.owner,
         },
       });
 
@@ -499,7 +502,19 @@ export class AuthService {
         });
       }
 
-      if (user.company && user.company.status !== CompanyStatus.pending_deletion) {
+      // В pending_deletion переводим ВСЮ компанию только когда удаляется её
+      // владелец: уход владельца = закрытие компании со всеми сотрудниками
+      // (крон-чистка удалит компанию, когда не останется пользователей).
+      // Участник (member) удаляет лишь свой аккаунт — компания и доступ
+      // остальных сотрудников не страдают; крон вычистит только его user-строку
+      // по deletionRequestedAt, оставив компанию работать.
+      //
+      // На вырост: для multi-user компаний удаление владельца стоит заменить на
+      // передачу прав владельца другому сотруднику — иначе уход владельца
+      // закрывает доступ всем. Пока в проде компании 1:1, поэтому сохраняем
+      // прежнее поведение «владелец ушёл → компания закрывается».
+      const isOwner = user.companyRole === CompanyRole.owner;
+      if (user.company && isOwner && user.company.status !== CompanyStatus.pending_deletion) {
         await tx.company.update({
           where: { id: user.company.id },
           data: {

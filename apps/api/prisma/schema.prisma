@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // native       — локальная разработка (macOS arm64 / linux x64).
   // linux-musl-* — alpine-образы в Docker (наш прод-вариант).
   // debian-*     — запасной вариант, если перейдём на bookworm-slim.
@@ -50,6 +50,31 @@ enum PlatformRole {
   admin
   moderator
   content_manager
+}
+
+// Роль пользователя ВНУТРИ его компании (не путать с PlatformRole —
+// это роль сотрудника платформы). `owner` — тот, кто зарегистрировал
+// компанию: управляет составом сотрудников, биллингом и местами (seats),
+// приглашает других. `member` — приглашённый сотрудник: пользуется
+// доступом компании, но не управляет ей. На вырост: при появлении более
+// тонких прав внутри компании сюда добавятся новые значения (например,
+// billing_manager) без расщепления модели User.
+enum CompanyRole {
+  owner
+  member
+}
+
+// Жизненный цикл приглашения сотрудника в компанию (см. модель
+// CompanyInvitation). `pending` — отправлено, ждёт принятия; `accepted` —
+// принято, пользователь привязан к компании; `revoked` — отозвано
+// владельцем до принятия; `expired` — протухло по expiresAt (крон/ленивая
+// проверка). UI и рассылка писем в MVP не реализованы — модель заложена
+// «на вырост» под мультипользовательские компании.
+enum CompanyInvitationStatus {
+  pending
+  accepted
+  revoked
+  expired
 }
 
 enum ContentStatus {
@@ -220,34 +245,40 @@ enum DiscussionTargetType {
 }
 
 model User {
-  id                      String                       @id @default(cuid())
-  email                   String                       @unique
-  phone                   String                       @unique
-  firstName               String
-  lastName                String
-  gender                  UserGender                   @default(male)
-  passwordHash            String
-  status                  UserStatus                   @default(active)
-  failedLoginAttempts     Int                          @default(0)
+  id                         String                       @id @default(cuid())
+  email                      String                       @unique
+  phone                      String                       @unique
+  firstName                  String
+  lastName                   String
+  gender                     UserGender                   @default(male)
+  passwordHash               String
+  status                     UserStatus                   @default(active)
+  failedLoginAttempts        Int                          @default(0)
   failedLoginWindowStartedAt DateTime?
-  lockedUntil             DateTime?
-  deletionRequestedAt     DateTime?
-  companyId               String?
-  company                 Company?                     @relation(fields: [companyId], references: [id])
-  platformStaff           PlatformStaff?
-  sessions                Session[]
-  newsLikes               NewsLike[]
-  comments                Comment[]
-  commentLikes            CommentLike[]
-  lessonProgress          LessonProgress[]
-  supportTickets          SupportTicket[]              @relation("SupportTicketAuthor")
-  notifications           InAppNotification[]
-  notificationDeliveries  NotificationDelivery[]       @relation("NotificationRecipient")
-  notificationPreferences UserNotificationPreferences?
-  moduleRestrictions      UserModuleRestriction[]
-  consents                ConsentRecord[]
-  createdAt               DateTime                     @default(now())
-  updatedAt               DateTime                     @updatedAt
+  lockedUntil                DateTime?
+  deletionRequestedAt        DateTime?
+  companyId                  String?
+  company                    Company?                     @relation(fields: [companyId], references: [id])
+  // Роль внутри компании. По умолчанию `member` (минимум прав): владельцем
+  // становится только тот, кто создаёт компанию при регистрации, и
+  // приглашающий явно проставляет роль приглашённому. Существующие
+  // пользователи переведены в `owner` бэкфиллом в миграции (каждый из них —
+  // единственный пользователь своей компании).
+  companyRole                CompanyRole                  @default(member)
+  platformStaff              PlatformStaff?
+  sessions                   Session[]
+  newsLikes                  NewsLike[]
+  comments                   Comment[]
+  commentLikes               CommentLike[]
+  lessonProgress             LessonProgress[]
+  supportTickets             SupportTicket[]              @relation("SupportTicketAuthor")
+  notifications              InAppNotification[]
+  notificationDeliveries     NotificationDelivery[]       @relation("NotificationRecipient")
+  notificationPreferences    UserNotificationPreferences?
+  moduleRestrictions         UserModuleRestriction[]
+  consents                   ConsentRecord[]
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
 
   @@index([status])
   @@index([lockedUntil])
@@ -278,24 +309,30 @@ model EmailVerificationChallenge {
 }
 
 model Company {
-  id                       String            @id @default(cuid())
+  id                       String              @id @default(cuid())
   organizationName         String
-  type                     CompanyType       @default(collector)
-  status                   CompanyStatus     @default(demo)
+  type                     CompanyType         @default(collector)
+  status                   CompanyStatus       @default(demo)
   statusBeforeDeletion     CompanyStatus?
   demoEndsAt               DateTime?
   subscriptionPlan         SubscriptionPlan?
   subscriptionEndsAt       DateTime?
+  // Оплаченные «места» (per-seat). Сколько пользователей компании могут
+  // одновременно иметь активный доступ. Владелец занимает первое место —
+  // поэтому дефолт 1. Добавление сотрудника = докупленное место; при
+  // подключении биллинга это число будет расти после оплаты. Денормализовано
+  // на компанию (текущее состояние), история мест — в Subscription.seats.
+  seatsPurchased           Int                 @default(1)
   billingInn               String?
   billingKpp               String?
   // Старое текстовое поле legalAddress оставлено для обратной совместимости
   // (на форму биллинга, где адрес показывается как одна строка). Полноценная
   // структура адреса — в Address (factualAddress/legalAddress relation'ами).
   legalAddress             String?
-  factualAddressId         String?           @unique
-  factualAddress           Address?          @relation("CompanyFactualAddress", fields: [factualAddressId], references: [id])
-  structuredLegalAddressId String?           @unique
-  structuredLegalAddress   Address?          @relation("CompanyStructuredLegalAddress", fields: [structuredLegalAddressId], references: [id])
+  factualAddressId         String?             @unique
+  factualAddress           Address?            @relation("CompanyFactualAddress", fields: [factualAddressId], references: [id])
+  structuredLegalAddressId String?             @unique
+  structuredLegalAddress   Address?            @relation("CompanyStructuredLegalAddress", fields: [structuredLegalAddressId], references: [id])
   // Контакты компании. Все опциональные, заполняются в /account → Компания.
   websiteUrl               String?
   corporatePhone           String?
@@ -312,13 +349,14 @@ model Company {
   bankAccount              String?
   correspondentAccount     String?
   users                    User[]
+  invitations              CompanyInvitation[]
   subscriptions            Subscription[]
   supportTickets           SupportTicket[]
   paymentMethods           PaymentMethod[]
   payments                 Payment[]
   apiKeys                  ApiKey[]
-  createdAt                DateTime          @default(now())
-  updatedAt                DateTime          @updatedAt
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
 }
 
 // Сохранённый способ оплаты компании. В MVP UI заглушен «Подключим в
@@ -436,6 +474,10 @@ model Subscription {
   status    SubscriptionStatus @default(active)
   startsAt  DateTime
   endsAt    DateTime
+  // Сколько мест оплачено в рамках этого периода подписки (per-seat).
+  // Текущее (актуальное) значение продублировано в Company.seatsPurchased;
+  // здесь — для истории, чтобы видеть, сколько мест было в каждом периоде.
+  seats     Int                @default(1)
   reason    String?
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
@@ -445,6 +487,43 @@ model Subscription {
   // под этот индекс.
   @@index([companyId, createdAt(sort: Desc)])
   @@index([status, endsAt])
+}
+
+// Приглашение сотрудника в компанию (мультипользовательские компании).
+// Владелец (CompanyRole.owner) приглашает человека по email → тот
+// регистрируется/принимает приглашение и привязывается к компании с ролью
+// `member`. По безопасности храним bcrypt-hash токена приглашения
+// (`tokenHash`), а не сам токен — по аналогии с EmailVerificationChallenge.
+// Сам токен уходит в письмо/ссылку один раз и в БД не лежит.
+//
+// `invitedById` / `acceptedUserId` — это User.id; FK-связи намеренно нет
+// (как у createdById/uploadedById в остальной схеме), чтобы удаление
+// пригласившего не каскадило на историю приглашений.
+//
+// В MVP UI, рассылка писем и эндпоинты приёма не реализованы — модель
+// заложена «на вырост». Срок жизни ограничен `expiresAt`; протухшие
+// приглашения отбраковываются по статусу/крону.
+model CompanyInvitation {
+  id             String                  @id @default(cuid())
+  companyId      String
+  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email          String
+  invitedById    String
+  role           CompanyRole             @default(member)
+  status         CompanyInvitationStatus @default(pending)
+  tokenHash      String                  @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  acceptedUserId String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  // Список приглашений компании в админке/кабинете: where companyId+status.
+  @@index([companyId, status])
+  // Поиск приглашений по email при регистрации/принятии.
+  @@index([email, status])
+  // Крон отбраковки протухших приглашений.
+  @@index([expiresAt])
 }
 
 model Session {
@@ -506,11 +585,11 @@ model IdempotencyKey {
 }
 
 model PlatformSetting {
-  key           String   @id
-  value         Json
-  updatedById   String?
-  updatedAt     DateTime @updatedAt
-  createdAt     DateTime @default(now())
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
 }
 
 model FileAsset {
@@ -534,13 +613,13 @@ model FileAsset {
 // На прод-стенде заполняется backfill'ом при первом запуске (если таблица
 // пустая, но есть существующий контент).
 model FileReference {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   fileId     String
   file       FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
   // 'news_post' | 'learning_module' | 'lesson' | 'knowledge_base_article' | 'comment'
   entityType String
   entityId   String
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   // Один файл может быть упомянут только один раз в рамках одной сущности;
   // повторные ссылки внутри блоков схлопываются в одну строку.
@@ -840,11 +919,10 @@ model KnowledgeBaseArticle {
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
 
+  @@unique([parentId, position])
   // Tree-выдача: парентом сортируем по position, фильтруем по status.
   @@index([parentId, status, position])
   @@index([status, position])
-
-  @@unique([parentId, position])
 }
 
 model KnowledgeBaseBlock {
