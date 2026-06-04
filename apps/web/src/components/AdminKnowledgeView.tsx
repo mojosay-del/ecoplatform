@@ -409,6 +409,9 @@ export function AdminKnowledgeView() {
     setItems((prev) =>
       prev.map((item) => (positions.has(item.id) ? { ...item, position: positions.get(item.id)! } : item)),
     );
+    setDraft((prev) =>
+      prev.id && positions.has(prev.id) ? { ...prev, parentId: categoryId, position: positions.get(prev.id)! } : prev,
+    );
 
     try {
       await apiFetch(`/admin/content/knowledge-base/${active.id}/move`, {
@@ -464,6 +467,10 @@ export function AdminKnowledgeView() {
       ? "has-changes"
       : "is-saved";
   const draftLabel = draft.kind === "category" ? "Категория" : "Материал";
+  const activeCategoryTitle =
+    draft.kind === "material" && draft.parentId
+      ? (categories.find((category) => category.id === draft.parentId)?.title ?? null)
+      : null;
 
   return (
     <AppShell>
@@ -560,9 +567,7 @@ export function AdminKnowledgeView() {
                   </fieldset>
                 ) : (
                   <>
-                    <fieldset className="form-fieldset">
-                      <legend className="form-legend">Основное</legend>
-
+                    <div className="news-form-preview">
                       <FileUploadField
                         accept="image/*"
                         buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
@@ -571,81 +576,37 @@ export function AdminKnowledgeView() {
                         value={draft.coverImageId}
                         onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
                       />
-
-                      <label className="form-field">
-                        <span>Заголовок</span>
+                      <div className="news-form-copy">
+                        <span className="news-tile-category">{activeCategoryTitle ?? "Материал базы знаний"}</span>
                         <input
                           className="news-form-title"
-                          placeholder="Например: «Как сортировать стекло»"
+                          placeholder="Заголовок материала…"
                           value={draft.title}
                           onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
                           required
                         />
-                      </label>
+                      </div>
+                    </div>
 
-                      <label className="form-field">
-                        <span>Подзаголовок</span>
-                        <input
-                          className="input"
-                          placeholder="Короткое уточнение (необязательно)"
-                          value={draft.subtitle}
-                          onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
-                        />
-                      </label>
-                    </fieldset>
+                    <label className="news-lead-field">
+                      <input
+                        className="news-form-lead"
+                        aria-label="Подзаголовок материала"
+                        placeholder="Подзаголовок материала"
+                        value={draft.subtitle}
+                        onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
+                      />
+                    </label>
 
-                    <fieldset className="form-fieldset">
-                      <legend className="form-legend">Размещение</legend>
-
-                      <label className="form-field">
-                        <span>Раздел</span>
-                        <select
-                          className="select"
-                          value={draft.parentId ?? ""}
-                          onChange={(event) => {
-                            const nextParentId = event.target.value;
-                            const nextSiblings = materialsByCategory.get(nextParentId) ?? [];
-                            setDraft((prev) => ({
-                              ...prev,
-                              parentId: nextParentId,
-                              position: prev.parentId === nextParentId ? prev.position : nextSiblings.length,
-                            }));
-                          }}
-                          required
-                        >
-                          <option value="">Выберите категорию</option>
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.id}>
-                              {category.title}
-                            </option>
-                          ))}
-                        </select>
-                        <small className="form-field-hint">
-                          Это категория базы знаний, не справочник индексов цен.
-                        </small>
-                      </label>
-
-                      <label className="form-field">
-                        <span>Порядок в категории</span>
-                        <input
-                          className="input"
-                          type="number"
-                          min={0}
-                          value={draft.position}
-                          onChange={(event) => setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))}
-                        />
-                      </label>
-                    </fieldset>
-
-                    <fieldset className="form-fieldset">
-                      <legend className="form-legend">Содержание</legend>
+                    <div className="form-field news-content-field">
+                      <span>Содержание материала</span>
                       <DocumentEditor
                         blocks={draft.blocks}
                         onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks: blocks as Block[] }))}
                         allowedAtomicKinds={KNOWLEDGE_ATOMIC_KINDS}
                         placeholder="Текст статьи — пишите или нажмите «/» для вставки блока…"
                       />
-                    </fieldset>
+                    </div>
                   </>
                 )}
 
