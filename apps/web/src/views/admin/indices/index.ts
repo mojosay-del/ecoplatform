@@ -1,0 +1,1 @@
+export { AdminIndicesView } from "./AdminIndicesView";
