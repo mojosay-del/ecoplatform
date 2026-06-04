@@ -83,7 +83,7 @@ export const priceIndexInputSchema = z.object({
 
 export const priceIndexValueInputSchema = z.object({
   date: z.string().datetime(),
-  price: z.number().positive(),
+  price: z.number().int().positive(),
 });
 
 export const learningModuleInputSchema = z.object({

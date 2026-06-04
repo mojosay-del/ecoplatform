@@ -9,6 +9,7 @@ import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { StatusPill } from "./StatusPill";
+import { normalizeIntegerPriceInput, parseIntegerPriceInput } from "./admin-indices-price";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
@@ -421,10 +422,6 @@ function formatIndexPrice(value: string | number) {
   });
 }
 
-function parseIndexPrice(value: string) {
-  return Number(value.replace(",", "."));
-}
-
 function CategoryCreateForm({
   position,
   onMutate,
@@ -639,8 +636,8 @@ function PriceIndexCard({
   async function addValue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!priceIndex || !valueDraft.date || !valueDraft.price) return;
-    const price = parseIndexPrice(valueDraft.price);
-    if (!Number.isFinite(price) || price <= 0) return;
+    const price = parseIntegerPriceInput(valueDraft.price);
+    if (price === null) return;
 
     const ok = await onMutate(`/admin/content/indices/${priceIndex.id}/values`, "POST", {
       date: `${valueDraft.date}T00:00:00.000Z`,
@@ -756,13 +753,16 @@ function PriceIndexCard({
               />
               <input
                 className="input"
-                type="number"
-                inputMode="decimal"
-                min="0.1"
-                step="0.1"
-                placeholder="Цена"
+                type="text"
+                inputMode="numeric"
+                placeholder="12 300"
                 value={valueDraft.price}
-                onChange={(event) => setValueDraft((prev) => ({ ...prev, price: event.target.value }))}
+                onChange={(event) => {
+                  const normalized = normalizeIntegerPriceInput(event.target.value);
+                  if (normalized !== null) {
+                    setValueDraft((prev) => ({ ...prev, price: normalized }));
+                  }
+                }}
                 required
               />
               <button className="button secondary" type="submit">

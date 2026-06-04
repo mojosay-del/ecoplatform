@@ -8,6 +8,7 @@ function indexItem(id: string, weeklyChange: number | null): NomenclatureListIte
     name: `Индекс ${id}`,
     code: id.toUpperCase(),
     unit: "₽/т",
+    position: 0,
     priceIndex: {
       id: `price-${id}`,
       status: "published",
