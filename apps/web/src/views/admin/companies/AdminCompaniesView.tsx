@@ -3,18 +3,18 @@
 import { FormEvent, useMemo, useState } from "react";
 import { RotateCcw, Search } from "lucide-react";
 import { companyStatuses, subscriptionPlans, type PaginatedResponse } from "@ecoplatform/shared";
-import { AdminSortButton } from "./AdminSortButton";
-import { AppShell } from "./AppShell";
+import { AdminSortButton } from "../../../components/AdminSortButton";
+import { AppShell } from "../../../components/AppShell";
 import {
   StatusPill,
   companyStatusPillVariant,
   subscriptionStatusPillVariant,
   supportStatusPillVariant,
   userStatusPillVariant,
-} from "./StatusPill";
-import { sortItems, type SortState } from "./admin-table-utils";
-import { apiFetch } from "../lib/api";
-import { useAuth } from "../lib/auth";
+} from "../../../components/StatusPill";
+import { sortItems, type SortState } from "../../../components/admin-table-utils";
+import { apiFetch } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
 import {
   COMPANY_STATUS_LABELS,
   MODERATION_REASON_LABELS,
@@ -23,8 +23,8 @@ import {
   SUPPORT_CATEGORY_LABELS,
   SUPPORT_STATUS_LABELS,
   USER_STATUS_LABELS,
-} from "../lib/display-labels";
-import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
+} from "../../../lib/display-labels";
+import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 
 type AdminCompanyListItem = {
   id: string;
