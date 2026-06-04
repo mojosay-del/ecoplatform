@@ -2,12 +2,16 @@
 
 import { FormEvent, useEffect, useRef, useState, type SetStateAction } from "react";
 import { subscriptionPlans } from "@ecoplatform/shared";
-import { AppShell } from "./AppShell";
-import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "./StatusPill";
-import { apiFetch } from "../lib/api";
-import { useAuth } from "../lib/auth";
-import { COMPANY_STATUS_LABELS, SUBSCRIPTION_PLAN_LABELS, SUBSCRIPTION_STATUS_LABELS } from "../lib/display-labels";
-import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
+import { AppShell } from "../../../components/AppShell";
+import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "../../../components/StatusPill";
+import { apiFetch } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
+import {
+  COMPANY_STATUS_LABELS,
+  SUBSCRIPTION_PLAN_LABELS,
+  SUBSCRIPTION_STATUS_LABELS,
+} from "../../../lib/display-labels";
+import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 
 type CompanyItem = {
   id: string;
