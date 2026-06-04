@@ -1,4 +1,4 @@
-import { NewsPostView } from "../../../src/views/news-view";
+import { NewsPostView } from "../../../src/views/news";
 
 export default async function NewsPostPage({
   params,
