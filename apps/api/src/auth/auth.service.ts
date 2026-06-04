@@ -8,7 +8,7 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import { CompanyRole, CompanyStatus, NotificationCategory, UserStatus } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
-import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "crypto";
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "crypto";
 import {
   MIN_PASSWORD_LENGTH,
   type AuthMeUser,
@@ -22,12 +22,18 @@ import { EmailService } from "../email/email.service";
 import { recordUserRegistered } from "../observability/metrics.registry";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
+import {
+  createAuthSession,
+  listAuthSessions,
+  logoutAllAuthSessions,
+  logoutAuthSession,
+  refreshAuthSession,
+  revokeAuthSession,
+  type AuthSessionMeta,
+  type AuthSessionTokens,
+  type AuthSessionWorkflowDeps,
+} from "./auth-session-workflow.helpers";
 import { PasswordPolicyService } from "./password-policy.service";
-
-type SessionTokens = {
-  accessToken: string;
-  refreshToken: string;
-};
 
 // Реальный bcrypt-compare должен выполняться и для неизвестного email,
 // иначе login выдаёт существование пользователя через заметно более быстрый ответ.
@@ -125,7 +131,7 @@ export class AuthService {
   async verifyRegistration(
     input: RegistrationVerifyDto,
     meta: { userAgent?: string; ipAddress?: string },
-  ): Promise<SessionTokens> {
+  ): Promise<AuthSessionTokens> {
     const now = new Date();
     const challenge = await this.prisma.emailVerificationChallenge.findUnique({
       where: { id: input.verificationId },
@@ -334,7 +340,7 @@ export class AuthService {
     return secret;
   }
 
-  async login(input: LoginDto, meta: { userAgent?: string; ipAddress?: string }): Promise<SessionTokens> {
+  async login(input: LoginDto, meta: { userAgent?: string; ipAddress?: string }): Promise<AuthSessionTokens> {
     const user = await this.prisma.user.findUnique({
       where: { email: input.email.toLowerCase() },
       include: { company: true },
@@ -564,97 +570,16 @@ export class AuthService {
     return serializeAccountDeletion(null);
   }
 
-  async refresh(refreshToken: string | undefined): Promise<SessionTokens> {
-    if (!refreshToken) {
-      throw new UnauthorizedException("Refresh token отсутствует.");
-    }
-
-    // Формат токена — `${sessionId}.${tail}`: id сессии нужен, чтобы достать
-    // ровно одну запись и сделать одно bcrypt-сравнение. Без id-привязки
-    // пришлось бы перебирать все активные сессии в системе.
-    const dot = refreshToken.indexOf(".");
-    if (dot <= 0 || dot === refreshToken.length - 1) {
-      throw new UnauthorizedException("Refresh token недействителен.");
-    }
-    const sessionId = refreshToken.slice(0, dot);
-    const tail = refreshToken.slice(dot + 1);
-
-    const session = await this.prisma.session.findUnique({
-      where: { id: sessionId },
-      include: { user: { include: { company: true } } },
-    });
-
-    if (!session || session.revokedAt !== null || session.expiresAt <= new Date()) {
-      throw new UnauthorizedException("Refresh token недействителен.");
-    }
-
-    const ok = await compare(tail, session.refreshTokenHash);
-    if (!ok) {
-      throw new UnauthorizedException("Refresh token недействителен.");
-    }
-
-    // Зеркало login: заблокированный пользователь или компания не должны
-    // получить новую сессию, даже если refresh-токен формально валиден.
-    if (session.user.status === UserStatus.blocked) {
-      await this.prisma.session.update({
-        where: { id: session.id },
-        data: { revokedAt: new Date() },
-      });
-      throw new UnauthorizedException("Учётная запись заблокирована.");
-    }
-    if (
-      session.user.company?.status === CompanyStatus.blocked ||
-      session.user.company?.status === CompanyStatus.archived
-    ) {
-      await this.prisma.session.update({
-        where: { id: session.id },
-        data: { revokedAt: new Date() },
-      });
-      throw new UnauthorizedException("Доступ к кабинету компании закрыт.");
-    }
-
-    await this.prisma.session.update({
-      where: { id: session.id },
-      data: { revokedAt: new Date() },
-    });
-    await this.sessionCache.invalidateSession(session.id);
-
-    return this.createSession(session.userId, {}, session.rememberMe);
+  async refresh(refreshToken: string | undefined): Promise<AuthSessionTokens> {
+    return refreshAuthSession(this.sessionWorkflowDeps, refreshToken);
   }
 
   async logout(sessionId: string): Promise<{ ok: true }> {
-    await this.prisma.session.updateMany({
-      where: { id: sessionId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-    await this.sessionCache.invalidateSession(sessionId);
-
-    return { ok: true };
+    return logoutAuthSession(this.sessionWorkflowDeps, sessionId);
   }
 
   async listSessions(userId: string, currentSessionId: string) {
-    const sessions = await this.prisma.session.findMany({
-      where: {
-        userId,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        userAgent: true,
-        ipAddress: true,
-        rememberMe: true,
-        expiresAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    return sessions.map((session) => ({
-      ...session,
-      current: session.id === currentSessionId,
-    }));
+    return listAuthSessions(this.sessionWorkflowDeps, userId, currentSessionId);
   }
 
   async revokeSession(
@@ -662,27 +587,11 @@ export class AuthService {
     currentSessionId: string,
     sessionId: string,
   ): Promise<{ ok: true; revokedCurrent: boolean }> {
-    const result = await this.prisma.session.updateMany({
-      where: { id: sessionId, userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-
-    if (result.count === 0) {
-      throw new BadRequestException("Сессия уже завершена или не найдена.");
-    }
-    await this.sessionCache.invalidateSession(sessionId);
-
-    return { ok: true, revokedCurrent: sessionId === currentSessionId };
+    return revokeAuthSession(this.sessionWorkflowDeps, userId, currentSessionId, sessionId);
   }
 
   async logoutAllSessions(userId: string): Promise<{ ok: true; revoked: number }> {
-    const result = await this.prisma.session.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-    await this.sessionCache.invalidateUser(userId);
-
-    return { ok: true, revoked: result.count };
+    return logoutAllAuthSessions(this.sessionWorkflowDeps, userId);
   }
 
   async me(userId: string): Promise<AuthMeUser> {
@@ -754,40 +663,16 @@ export class AuthService {
     return acceptedCount < requiredActive.length;
   }
 
-  private async createSession(
-    userId: string,
-    meta: { userAgent?: string; ipAddress?: string },
-    rememberMe: boolean,
-  ): Promise<SessionTokens> {
-    // Хешируем только случайный хвост; sessionId сам по себе не секрет —
-    // он лишь индекс для поиска сессии при refresh.
-    const tail = randomBytes(48).toString("base64url");
-    const refreshTokenHash = await hash(tail, 12);
-    const expiresAt = new Date(Date.now() + (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000);
+  private async createSession(userId: string, meta: AuthSessionMeta, rememberMe: boolean): Promise<AuthSessionTokens> {
+    return createAuthSession(this.sessionWorkflowDeps, userId, meta, rememberMe);
+  }
 
-    const session = await this.prisma.session.create({
-      data: {
-        userId,
-        refreshTokenHash,
-        rememberMe,
-        expiresAt,
-        userAgent: meta.userAgent,
-        ipAddress: meta.ipAddress,
-      },
-    });
-
-    const refreshToken = `${session.id}.${tail}`;
-
-    const accessToken = await this.jwt.signAsync(
-      { sub: userId, sessionId: session.id },
-      {
-        // Секрет проверяется в bootstrap() — здесь полагаемся, что он валиден.
-        secret: process.env.JWT_ACCESS_SECRET as string,
-        expiresIn: "15m",
-      },
-    );
-
-    return { accessToken, refreshToken };
+  private get sessionWorkflowDeps(): AuthSessionWorkflowDeps {
+    return {
+      prisma: this.prisma,
+      jwt: this.jwt,
+      sessionCache: this.sessionCache,
+    };
   }
 }
 
