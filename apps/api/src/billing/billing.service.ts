@@ -1,13 +1,5 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
-import { createHash } from "crypto";
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { CompanyStatus, NotificationCategory, Prisma, SubscriptionStatus } from "@prisma/client";
-import type { Company, Subscription } from "@prisma/client";
 import type {
   AddressDto,
   CompanyProfileUpdateDto,
@@ -20,17 +12,24 @@ import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
+import {
+  addDays,
+  hashManualSubscriptionRequest,
+  hashSelfSubscriptionRequest,
+  isCompanySubscriptionCurrentlyActive,
+  isUniqueConstraintError,
+  normalizeIdempotencyKey,
+  replayManualSubscription,
+  serializeCompany,
+  serializeSubscription,
+  type ManualSubscriptionResponse,
+} from "./billing-subscription.helpers";
 
 const MANUAL_SUBSCRIPTION_ENDPOINT = "POST /api/admin/billing/manual-subscriptions";
 const MANUAL_SUBSCRIPTION_ACTION = "manual_subscription_activation";
 const SELF_SUBSCRIPTION_ENDPOINT = "POST /api/billing/subscriptions";
 const SELF_SUBSCRIPTION_ACTION = "self_subscription_activation";
 const SELF_SUBSCRIPTION_DAYS = 30;
-
-type ManualSubscriptionResponse = {
-  company: ReturnType<typeof serializeCompany>;
-  subscription: ReturnType<typeof serializeSubscription>;
-};
 
 @Injectable()
 export class BillingService {
@@ -491,126 +490,6 @@ export class BillingService {
       ),
     );
   }
-}
-
-function normalizeIdempotencyKey(key: string | undefined): string {
-  const normalized = key?.trim();
-
-  if (!normalized) {
-    throw new BadRequestException("Idempotency-Key обязателен для активации подписки.");
-  }
-
-  if (normalized.length < 8 || normalized.length > 128) {
-    throw new BadRequestException("Idempotency-Key должен быть от 8 до 128 символов.");
-  }
-
-  if (!/^[A-Za-z0-9._:-]+$/.test(normalized)) {
-    throw new BadRequestException("Idempotency-Key содержит недопустимые символы.");
-  }
-
-  return normalized;
-}
-
-function hashManualSubscriptionRequest(input: ManualSubscriptionDto): string {
-  return createHash("sha256")
-    .update(
-      stableStringify({
-        companyId: input.companyId,
-        endsAt: new Date(input.endsAt).toISOString(),
-        plan: input.plan,
-        reason: input.reason,
-      }),
-    )
-    .digest("hex");
-}
-
-function hashSelfSubscriptionRequest(input: SelfSubscriptionDto, companyId: string): string {
-  return createHash("sha256")
-    .update(
-      stableStringify({
-        companyId,
-        plan: input.plan,
-      }),
-    )
-    .digest("hex");
-}
-
-function replayManualSubscription(
-  existing: { requestHash: string; response: Prisma.JsonValue | null },
-  requestHash: string,
-): ManualSubscriptionResponse {
-  if (existing.requestHash !== requestHash) {
-    throw new ConflictException("Idempotency-Key уже использован с другим payload.");
-  }
-
-  if (!existing.response) {
-    throw new ConflictException("Запрос с этим Idempotency-Key ещё обрабатывается. Повторите позже.");
-  }
-
-  return existing.response as unknown as ManualSubscriptionResponse;
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
-}
-
-function serializeCompany(company: Company) {
-  return {
-    id: company.id,
-    organizationName: company.organizationName,
-    type: company.type,
-    status: company.status,
-    demoEndsAt: company.demoEndsAt?.toISOString() ?? null,
-    subscriptionPlan: company.subscriptionPlan,
-    subscriptionEndsAt: company.subscriptionEndsAt?.toISOString() ?? null,
-    billingInn: company.billingInn,
-    billingKpp: company.billingKpp,
-    legalAddress: company.legalAddress,
-    bankName: company.bankName,
-    bankBik: company.bankBik,
-    bankAccount: company.bankAccount,
-    correspondentAccount: company.correspondentAccount,
-    createdAt: company.createdAt.toISOString(),
-    updatedAt: company.updatedAt.toISOString(),
-  };
-}
-
-function serializeSubscription(subscription: Subscription) {
-  return {
-    id: subscription.id,
-    companyId: subscription.companyId,
-    plan: subscription.plan,
-    status: subscription.status,
-    startsAt: subscription.startsAt.toISOString(),
-    endsAt: subscription.endsAt.toISOString(),
-    reason: subscription.reason,
-    createdAt: subscription.createdAt.toISOString(),
-    updatedAt: subscription.updatedAt.toISOString(),
-  };
-}
-
-function addDays(date: Date, days: number): Date {
-  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
-}
-
-function isCompanySubscriptionCurrentlyActive(company: Company, now = new Date()): boolean {
-  return (
-    company.status === CompanyStatus.active &&
-    Boolean(company.subscriptionPlan) &&
-    Boolean(company.subscriptionEndsAt) &&
-    company.subscriptionEndsAt!.getTime() > now.getTime()
-  );
-}
-
-function stableStringify(value: Record<string, unknown>): string {
-  return JSON.stringify(
-    Object.keys(value)
-      .sort()
-      .reduce<Record<string, unknown>>((acc, key) => {
-        acc[key] = value[key];
-        return acc;
-      }, {}),
-  );
 }
 
 // Пустую строку из формы трактуем как «очистить». Trim'аем заранее в Zod-схеме,
