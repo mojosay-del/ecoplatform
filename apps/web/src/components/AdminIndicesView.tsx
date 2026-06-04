@@ -596,18 +596,17 @@ function PriceIndexCard({
   const [draft, setDraft] = useState({
     code: nomenclature.code,
     name: nomenclature.name,
-    indexDescription: nomenclature.priceIndex?.description ?? "",
   });
   const [valueDraft, setValueDraft] = useState({ date: "", price: "" });
   const [saving, setSaving] = useState(false);
+  const [creatingIndex, setCreatingIndex] = useState(false);
 
   useEffect(() => {
     setDraft({
       code: nomenclature.code,
       name: nomenclature.name,
-      indexDescription: nomenclature.priceIndex?.description ?? "",
     });
-  }, [nomenclature.id, nomenclature.code, nomenclature.name, nomenclature.priceIndex?.description]);
+  }, [nomenclature.id, nomenclature.code, nomenclature.name]);
 
   const hasChanges = draft.code !== nomenclature.code || draft.name !== nomenclature.name;
 
@@ -627,10 +626,12 @@ function PriceIndexCard({
   }
 
   async function createIndex() {
-    await onMutate("/admin/content/indices", "POST", {
-      nomenclatureId: nomenclature.id,
-      description: draft.indexDescription.trim() || undefined,
-    });
+    setCreatingIndex(true);
+    try {
+      await onMutate("/admin/content/indices", "POST", { nomenclatureId: nomenclature.id });
+    } finally {
+      setCreatingIndex(false);
+    }
   }
 
   async function addValue(event: FormEvent<HTMLFormElement>) {
@@ -698,23 +699,9 @@ function PriceIndexCard({
         />
       </label>
 
-      <div className="form-field indices-editor-field">
-        <span>Индекс цен</span>
-        {!priceIndex ? (
-          <div className="indices-no-index">
-            <p>Индекс ещё не создан. Опишите его и нажмите «Создать индекс».</p>
-            <textarea
-              className="textarea small"
-              rows={2}
-              placeholder="Служебное описание (необязательно)"
-              value={draft.indexDescription}
-              onChange={(event) => setDraft((prev) => ({ ...prev, indexDescription: event.target.value }))}
-            />
-            <button className="button" type="button" onClick={createIndex}>
-              Создать индекс
-            </button>
-          </div>
-        ) : (
+      {priceIndex ? (
+        <div className="form-field indices-editor-field">
+          <span>Индекс цен</span>
           <div className="indices-summary-card">
             <div className="indices-values-section">
               <h3 className="indices-values-title">История цен</h3>
@@ -770,8 +757,8 @@ function PriceIndexCard({
               </button>
             </form>
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       <div className="lesson-save-bar news-save-bar">
         <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : ""}`}>
@@ -794,7 +781,11 @@ function PriceIndexCard({
                 {priceIndex.status === "published" ? "Снять с публикации" : "Опубликовать"}
               </button>
             </>
-          ) : null}
+          ) : (
+            <button className="button secondary" type="button" disabled={creatingIndex} onClick={createIndex}>
+              {creatingIndex ? "Создаю…" : "Создать индекс"}
+            </button>
+          )}
           <button className="button" type="button" disabled={!hasChanges || saving} onClick={saveNomenclature}>
             {saving ? "Сохраняю…" : "Сохранить"}
           </button>

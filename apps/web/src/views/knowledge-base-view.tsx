@@ -111,7 +111,6 @@ function KnowledgeBaseLayout({
               <>
                 <div className="knowledge-content-head">
                   <div className="knowledge-title-row">
-                    <span className="knowledge-material-icon" aria-hidden="true" />
                     <div>
                       {breadcrumbs.length > 0 ? (
                         <p className="knowledge-breadcrumbs">
@@ -123,32 +122,43 @@ function KnowledgeBaseLayout({
                           ))}
                         </p>
                       ) : null}
-                      <h1>{active.title}</h1>
-                      {active.subtitle ? <p>{active.subtitle}</p> : null}
+                      <h1>
+                        {active.title}
+                        {active.subtitle ? <span> · {active.subtitle}</span> : null}
+                      </h1>
                     </div>
                   </div>
                 </div>
 
                 {activeCoverUrl ? (
-                  <figure className="knowledge-cover">
-                    <Image
-                      alt={activeCover?.originalName ?? active.title}
-                      src={activeCoverUrl}
-                      fill
-                      loading="eager"
-                      sizes="(max-width: 1024px) 100vw, 800px"
-                      style={{ objectFit: "cover" }}
-                    />
-                  </figure>
-                ) : null}
-
-                <article className="knowledge-article-card content-article">
-                  {(active.blocks ?? []).length > 0 ? (
-                    <ContentBlocks blocks={active.blocks ?? []} />
-                  ) : (
-                    <p className="page-subtitle">Описание появится после наполнения материала.</p>
-                  )}
-                </article>
+                  <div className="knowledge-article-shell">
+                    <figure className="knowledge-cover">
+                      <Image
+                        alt={activeCover?.originalName ?? active.title}
+                        src={activeCoverUrl}
+                        fill
+                        loading="eager"
+                        sizes="(max-width: 1024px) 100vw, 800px"
+                        style={{ objectFit: "cover" }}
+                      />
+                    </figure>
+                    <article className="knowledge-article-card content-article">
+                      {(active.blocks ?? []).length > 0 ? (
+                        <ContentBlocks blocks={active.blocks ?? []} />
+                      ) : (
+                        <p className="page-subtitle">Описание появится после наполнения материала.</p>
+                      )}
+                    </article>
+                  </div>
+                ) : (
+                  <article className="knowledge-article-card content-article">
+                    {(active.blocks ?? []).length > 0 ? (
+                      <ContentBlocks blocks={active.blocks ?? []} />
+                    ) : (
+                      <p className="page-subtitle">Описание появится после наполнения материала.</p>
+                    )}
+                  </article>
+                )}
 
                 {activeChildren.length > 0 ? (
                   <section className="knowledge-child-section" aria-label="Материалы раздела">
@@ -199,7 +209,6 @@ function KnowledgeNavNode({ node, activeSlug }: { node: KnowledgeNode; activeSlu
   return (
     <div className={`knowledge-nav-group ${hasActiveChild ? "has-active-child" : ""}`}>
       <Link className={`knowledge-nav-link ${isActive ? "active" : ""}`} href={`/knowledge-base/${node.slug}`}>
-        <span className={`knowledge-nav-dot ${children.length > 0 ? "category" : ""}`} aria-hidden="true" />
         <span>{node.title}</span>
       </Link>
       {children.length > 0 ? (

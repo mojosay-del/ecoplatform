@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState, type CSSPropertie
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronRight, FileText, FolderOpen, GripVertical, Plus } from "lucide-react";
+import { ChevronRight, GripVertical, Plus } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
 import type { Block } from "../lib/editor/block-types";
@@ -141,7 +141,6 @@ export function AdminKnowledgeView() {
         draft.title.trim().length > 0 ||
         draft.subtitle.trim().length > 0 ||
         draft.coverImageId.trim().length > 0 ||
-        draft.iconType.trim().length > 0 ||
         draft.blocks.length > 0
       );
     }
@@ -157,7 +156,6 @@ export function AdminKnowledgeView() {
     }
 
     if ((draft.coverImageId || "") !== (original.coverImageId ?? "")) return true;
-    if ((draft.iconType || "") !== (original.iconType ?? "")) return true;
     if (draft.parentId !== original.parentId) return true;
     if (
       JSON.stringify(draft.blocks) !==
@@ -288,7 +286,6 @@ export function AdminKnowledgeView() {
       title: draft.title.trim(),
       subtitle: draft.subtitle.trim() || undefined,
       coverImageId: draft.coverImageId.trim() || null,
-      iconType: draft.iconType.trim() || undefined,
       position: draft.position,
       blocks: draft.blocks,
     };
@@ -628,40 +625,16 @@ export function AdminKnowledgeView() {
                         </small>
                       </label>
 
-                      <div className="form-grid-2">
-                        <label className="form-field">
-                          <span>Порядок в категории</span>
-                          <input
-                            className="input"
-                            type="number"
-                            min={0}
-                            value={draft.position}
-                            onChange={(event) =>
-                              setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))
-                            }
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>Иконка материала</span>
-                          <input
-                            className="input"
-                            list="knowledge-icon-types"
-                            placeholder="Например: paper"
-                            value={draft.iconType}
-                            onChange={(event) => setDraft((prev) => ({ ...prev, iconType: event.target.value }))}
-                          />
-                          <datalist id="knowledge-icon-types">
-                            <option value="paper" />
-                            <option value="plastic" />
-                            <option value="glass" />
-                            <option value="metal" />
-                            <option value="rubber" />
-                            <option value="electronics" />
-                            <option value="textile" />
-                            <option value="organic" />
-                          </datalist>
-                        </label>
-                      </div>
+                      <label className="form-field">
+                        <span>Порядок в категории</span>
+                        <input
+                          className="input"
+                          type="number"
+                          min={0}
+                          value={draft.position}
+                          onChange={(event) => setDraft((prev) => ({ ...prev, position: Number(event.target.value) }))}
+                        />
+                      </label>
                     </fieldset>
 
                     <fieldset className="form-fieldset">
@@ -821,7 +794,6 @@ function KnowledgeCategoryNode({
         onToggle={onToggle}
         onSelect={() => onSelect(category)}
         active={draftId === category.id}
-        icon={<FolderOpen size={16} />}
         status={category.status}
         title={category.title}
         meta={`${materials.length} ${pluralize(materials.length, "материал", "материала", "материалов")}`}
@@ -930,7 +902,6 @@ function KnowledgeUncategorizedNode({
         onToggle={onToggle}
         onSelect={onToggle}
         active={false}
-        icon={<FolderOpen size={16} />}
         title="Без категории"
         meta={`${materials.length} ${pluralize(materials.length, "материал", "материала", "материалов")}`}
         actions={[]}
@@ -982,7 +953,6 @@ function KnowledgeMaterialRow({
       depth={1}
       onSelect={() => onSelect(material)}
       active={active}
-      icon={<FileText size={16} />}
       status={material.status}
       title={material.title}
       meta={`${material.blocks.length} ${pluralize(material.blocks.length, "блок", "блока", "блоков")}`}
@@ -999,7 +969,6 @@ function KnowledgeTreeRow({
   onToggle,
   onSelect,
   active,
-  icon,
   status,
   title,
   meta,
@@ -1012,7 +981,6 @@ function KnowledgeTreeRow({
   onToggle?: () => void;
   onSelect: () => void;
   active: boolean;
-  icon: ReactNode;
   status?: "draft" | "published";
   title: string;
   meta?: string;
@@ -1035,7 +1003,6 @@ function KnowledgeTreeRow({
         {expandable ? <ChevronRight size={14} className={expanded ? "is-expanded" : ""} /> : null}
       </button>
       <button type="button" className="tree-row-main" onClick={onSelect}>
-        <span className="tree-row-icon">{icon}</span>
         {status ? (
           <span
             className={`tree-row-dot${status === "published" ? " is-published" : ""}`}
@@ -1054,7 +1021,6 @@ function KnowledgeTreeRow({
 function KnowledgeEmptyDetail({ categoriesCount }: { categoriesCount: number }) {
   return (
     <div className="indices-empty-detail">
-      <FolderOpen size={28} />
       <h2>Выберите категорию или материал слева</h2>
       <p>
         {categoriesCount > 0
