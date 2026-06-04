@@ -1,52 +1,45 @@
 "use client";
 
+// Полный дашборд администратора: KPI-карточки, операционные сигналы, здоровье
+// системы, бизнес-метрики, график регистраций и лента аудита. Видит только
+// роль admin (для остального персонала — StaffRoleSummary в quick-links.tsx).
+
+import { useMemo, type CSSProperties } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { AdminDashboardSummary, AdminJournalActor, AdminStaffSummary } from "@ecoplatform/shared";
 import {
   Activity,
   ArrowDown,
-  ArrowRight,
   ArrowUp,
-  BookOpen,
   CalendarClock,
   CreditCard,
   Database,
-  Eye,
-  EyeOff,
-  GraduationCap,
   HardDrive,
   Headphones,
   LockKeyhole,
   Minus,
-  Newspaper,
-  Pencil,
-  Plus,
-  RefreshCw,
   ScrollText,
   Server,
-  Settings2,
   ShieldAlert,
   Trash2,
-  Unlock,
-  UserCog,
   UserPlus,
+  type LucideIcon,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { api } from "../lib/api";
-import { useAuth } from "../lib/auth";
-import { COMPANY_STATUS_LABELS, SUBSCRIPTION_PLAN_LABELS, labelFromMap } from "../lib/display-labels";
-import { AppShell } from "./AppShell";
-import { StatusPill } from "./StatusPill";
-import { visibleAdminHomeGroups } from "./admin-panel-tabs";
-
-type KpiKey = keyof AdminDashboardSummary["kpis"];
-type KpiTrendKey = keyof AdminDashboardSummary["kpiTrends"];
-type OperationKey = keyof AdminDashboardSummary["operations"];
-type HealthKey = keyof AdminDashboardSummary["systemHealth"];
-type KpiTone = "info" | "success" | "warning" | "danger" | "brand";
-type KpiPolarity = "up-good" | "up-bad";
+import type { AdminDashboardSummary } from "@ecoplatform/shared";
+import { StatusPill } from "../../../components/StatusPill";
+import { COMPANY_STATUS_LABELS, SUBSCRIPTION_PLAN_LABELS, labelFromMap } from "../../../lib/display-labels";
+import type { HealthKey, KpiKey, KpiPolarity, KpiTone, KpiTrendKey, OperationKey } from "./types";
+import {
+  DATE_FORMAT,
+  DATE_TIME_FORMAT,
+  TIME_FORMAT,
+  auditVisual,
+  deltaTone,
+  formatAction,
+  formatActor,
+  formatHealthStatus,
+  formatNumber,
+  formatRelativeTime,
+} from "./format";
 
 const KPI_CARDS: Array<{
   key: KpiKey;
@@ -155,174 +148,7 @@ const HEALTH_DEPENDENCIES: Array<{
   { key: "storage", label: "S3", hint: "Файлы и изображения", icon: HardDrive },
 ];
 
-const ACTION_LABELS: Record<string, string> = {
-  "admin.company.status": "Статус компании изменён",
-  "admin.legal.document.create": "Юридический документ создан",
-  "admin.legal.document.publish": "Юридический документ опубликован",
-  "admin.setting.update": "Настройка изменена",
-  "admin.staff.create": "Сотрудник добавлен",
-  "admin.staff.update": "Сотрудник обновлён",
-  "admin.user.block": "Пользователь заблокирован",
-  "admin.user.platform_roles": "Роли пользователя изменены",
-  "admin.user.unblock": "Пользователь разблокирован",
-  "indices.category.create": "Категория индексов создана",
-  "indices.category.delete": "Категория индексов удалена",
-  "indices.category.update": "Категория индексов обновлена",
-  "indices.index.create": "Индекс создан",
-  "indices.index.delete": "Индекс удалён",
-  "indices.index.publish": "Индекс опубликован",
-  "indices.index.unpublish": "Индекс снят с публикации",
-  "indices.nomenclature.create": "Номенклатура создана",
-  "indices.nomenclature.delete": "Номенклатура удалена",
-  "indices.nomenclature.update": "Номенклатура обновлена",
-  "indices.value.delete": "Значение индекса удалено",
-  "knowledge.create": "Статья базы знаний создана",
-  "knowledge.delete": "Статья базы знаний удалена",
-  "knowledge.move": "Статья базы знаний перемещена",
-  "knowledge.publish": "Статья базы знаний опубликована",
-  "knowledge.unpublish": "Статья базы знаний снята с публикации",
-  "knowledge.update": "Статья базы знаний обновлена",
-  "learning.chapter.create": "Глава курса создана",
-  "learning.chapter.delete": "Глава курса удалена",
-  "learning.chapter.update": "Глава курса обновлена",
-  "learning.lesson.create": "Урок создан",
-  "learning.lesson.delete": "Урок удалён",
-  "learning.lesson.publish": "Урок опубликован",
-  "learning.lesson.unpublish": "Урок снят с публикации",
-  "learning.lesson.update": "Урок обновлён",
-  "learning.module.create": "Курс создан",
-  "learning.module.delete": "Курс удалён",
-  "learning.module.publish": "Курс опубликован",
-  "learning.module.unpublish": "Курс снят с публикации",
-  "learning.module.update": "Курс обновлён",
-  manual_subscription_activation: "Подписка активирована вручную",
-  self_subscription_activation: "Подписка выбрана пользователем",
-  "moderation.admin_sanction.module_restriction": "Ограничение модуля применено",
-  "moderation.case.lock": "Кейс модерации взят в работу",
-  "moderation.case.release": "Кейс модерации освобождён",
-  "news.create": "Новость создана",
-  "news.delete": "Новость удалена",
-  "news.publish": "Новость опубликована",
-  "news.unpublish": "Новость снята с публикации",
-  "news.update": "Новость обновлена",
-};
-
-const NUMBER_FORMAT = new Intl.NumberFormat("ru-RU");
-const DATE_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit" });
-const DATE_TIME_FORMAT = new Intl.DateTimeFormat("ru-RU", {
-  day: "2-digit",
-  month: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-const TIME_FORMAT = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" });
-
-export function AdminHomeView() {
-  const router = useRouter();
-  const { ready, token, user } = useAuth();
-  const roles = user?.platformRoles ?? [];
-  const roleKey = roles.join("|");
-  const isAdmin = roles.includes("admin");
-  const [dashboard, setDashboard] = useState<AdminDashboardSummary | null>(null);
-  const [dashboardState, setDashboardState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [dashboardError, setDashboardError] = useState<string | null>(null);
-  const [staffSummary, setStaffSummary] = useState<AdminStaffSummary | null>(null);
-
-  useEffect(() => {
-    if (ready && roleKey.length === 0) {
-      router.replace("/news");
-    }
-  }, [ready, roleKey, router]);
-
-  useEffect(() => {
-    let isActive = true;
-    if (!ready || !token || !isAdmin) {
-      setDashboard(null);
-      setDashboardState("idle");
-      setDashboardError(null);
-      return;
-    }
-
-    setDashboardState("loading");
-    setDashboardError(null);
-    api.admin
-      .dashboard({ token })
-      .then((data) => {
-        if (!isActive) return;
-        setDashboard(data);
-        setDashboardState("ready");
-      })
-      .catch((error) => {
-        if (!isActive) return;
-        setDashboard(null);
-        setDashboardState("error");
-        setDashboardError(error instanceof Error ? error.message : "Не удалось загрузить сводку.");
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [isAdmin, ready, token]);
-
-  // Роль-сводка нужна только не-админ-персоналу: у админа есть полный дашборд
-  // (включая модерацию), дублировать незачем.
-  useEffect(() => {
-    let isActive = true;
-    if (!ready || !token || isAdmin || roleKey.length === 0) {
-      setStaffSummary(null);
-      return;
-    }
-
-    api.admin
-      .overview({ token })
-      .then((data) => {
-        if (isActive) setStaffSummary(data);
-      })
-      .catch(() => {
-        if (isActive) setStaffSummary(null);
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [isAdmin, ready, token, roleKey]);
-
-  const groups = visibleAdminHomeGroups(roles);
-  const maxRegistrations = useMemo(() => {
-    if (!dashboard) return 1;
-    return Math.max(1, ...dashboard.registrationSeries.map((point) => point.count));
-  }, [dashboard]);
-
-  return (
-    <AppShell>
-      <section className="page admin-home">
-        <header className="page-header">
-          <h1 className="page-title">Панель управления</h1>
-          <p className="page-subtitle">Сводка по платформе, последним действиям и быстрым административным разделам.</p>
-        </header>
-
-        {isAdmin ? (
-          <AdminDashboard
-            dashboard={dashboard}
-            errorMessage={dashboardError}
-            maxRegistrations={maxRegistrations}
-            state={dashboardState}
-          />
-        ) : null}
-
-        {!isAdmin && staffSummary ? <StaffRoleSummary summary={staffSummary} /> : null}
-
-        {groups.length === 0 ? (
-          <p className="page-subtitle">Открываем основной раздел…</p>
-        ) : (
-          <AdminQuickLinks groups={groups} />
-        )}
-      </section>
-    </AppShell>
-  );
-}
-
-function AdminDashboard({
+export function AdminDashboard({
   dashboard,
   errorMessage,
   maxRegistrations,
@@ -649,141 +475,6 @@ function AdminDashboardSkeleton() {
   );
 }
 
-function AdminQuickLinks({ groups }: { groups: ReturnType<typeof visibleAdminHomeGroups> }) {
-  return (
-    <section className="admin-home-shortcuts" aria-labelledby="admin-home-shortcuts-title">
-      <header className="admin-home-shortcuts-head">
-        <h2 id="admin-home-shortcuts-title">Быстрые переходы</h2>
-      </header>
-      <div className="admin-home-groups">
-        {groups.map((group) => (
-          <section className="admin-home-section" key={group.title}>
-            <header className="admin-home-section-head">
-              <h3>{group.title}</h3>
-            </header>
-            <div className="admin-home-links">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link className="admin-home-link" href={item.href} key={item.href}>
-                    <span className="admin-home-link-icon" aria-hidden>
-                      <Icon size={18} />
-                    </span>
-                    <span className="admin-home-link-text">
-                      <strong className="admin-home-link-title">{item.label}</strong>
-                      <small className="admin-home-link-description">{item.description}</small>
-                    </span>
-                    <ArrowRight className="admin-home-link-arrow" aria-hidden size={17} />
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-const STAFF_CONTENT_METRICS: Array<{
-  key: keyof NonNullable<AdminStaffSummary["content"]>;
-  label: string;
-  href: string;
-  icon: LucideIcon;
-}> = [
-  { key: "newsDrafts", label: "Черновики новостей", href: "/admin/content/news", icon: Newspaper },
-  { key: "lessonDrafts", label: "Уроки без публикации", href: "/admin/content/education", icon: GraduationCap },
-  { key: "knowledgeDrafts", label: "Статьи без публикации", href: "/admin/content/knowledge-base", icon: BookOpen },
-];
-
-function StaffRoleSummary({ summary }: { summary: AdminStaffSummary }) {
-  const { content, moderation } = summary;
-  if (!content && !moderation) return null;
-
-  return (
-    <section className="admin-staff-summary" aria-label="Сводка по вашим задачам">
-      {content ? (
-        <section className="admin-staff-card">
-          <header className="admin-dashboard-panel-head">
-            <div>
-              <h2>Контент в работе</h2>
-              <p>Черновики, ожидающие публикации</p>
-            </div>
-          </header>
-          <div className="admin-staff-metrics">
-            {STAFF_CONTENT_METRICS.map((metric) => {
-              const Icon = metric.icon;
-              return (
-                <Link className="admin-staff-metric" href={metric.href} key={metric.key}>
-                  <span className="admin-staff-metric-icon" aria-hidden>
-                    <Icon size={18} />
-                  </span>
-                  <strong className="admin-staff-metric-value">{formatNumber(content[metric.key])}</strong>
-                  <span className="admin-staff-metric-label">{metric.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      {moderation ? (
-        <section className="admin-staff-card">
-          <header className="admin-dashboard-panel-head">
-            <div>
-              <h2>Модерация</h2>
-              <p>Кейсы, требующие решения</p>
-            </div>
-          </header>
-          <Link
-            className={`admin-staff-queue${moderation.openCases > 0 ? " is-attention" : ""}`}
-            href="/admin/moderation"
-          >
-            <span className="admin-staff-queue-icon" aria-hidden>
-              <ShieldAlert size={22} />
-            </span>
-            <span className="admin-staff-queue-copy">
-              <strong>Очередь модерации</strong>
-              <small>{moderation.openCases > 0 ? "Есть кейсы в работе" : "Очередь пуста"}</small>
-            </span>
-            <span className="admin-staff-queue-value">{formatNumber(moderation.openCases)}</span>
-          </Link>
-        </section>
-      ) : null}
-    </section>
-  );
-}
-
-type AuditTone = "create" | "update" | "publish" | "security" | "danger" | "neutral";
-
-function auditVisual(action: string): { icon: LucideIcon; tone: AuditTone } {
-  if (action.endsWith(".delete")) return { icon: Trash2, tone: "danger" };
-  if (action.includes("unpublish")) return { icon: EyeOff, tone: "neutral" };
-  if (action.includes("publish")) return { icon: Eye, tone: "publish" };
-  if (action.endsWith(".create")) return { icon: Plus, tone: "create" };
-  if (action.includes("user.block")) return { icon: LockKeyhole, tone: "danger" };
-  if (action.includes("user.unblock")) return { icon: Unlock, tone: "publish" };
-  if (action.includes("platform_roles") || action.includes("staff")) return { icon: UserCog, tone: "security" };
-  if (action.includes("subscription")) return { icon: CreditCard, tone: "create" };
-  if (action.includes("moderation")) return { icon: ShieldAlert, tone: "danger" };
-  if (action.includes("setting")) return { icon: Settings2, tone: "security" };
-  if (action.includes("status")) return { icon: RefreshCw, tone: "update" };
-  if (action.includes("update") || action.includes("move")) return { icon: Pencil, tone: "update" };
-  return { icon: Activity, tone: "neutral" };
-}
-
-function formatRelativeTime(date: Date): string {
-  const seconds = Math.round((Date.now() - date.getTime()) / 1000);
-  if (seconds < 45) return "только что";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} мин назад`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} ч назад`;
-  const days = Math.round(hours / 24);
-  if (days < 7) return `${days} дн назад`;
-  return DATE_FORMAT.format(date);
-}
-
 function KpiDelta({ delta, polarity }: { delta: number; polarity: KpiPolarity }) {
   const tone = deltaTone(delta, polarity);
   const Icon = delta > 0 ? ArrowUp : delta < 0 ? ArrowDown : Minus;
@@ -795,34 +486,4 @@ function KpiDelta({ delta, polarity }: { delta: number; polarity: KpiPolarity })
       {formatNumber(delta)}
     </span>
   );
-}
-
-function deltaTone(delta: number, polarity: KpiPolarity): "good" | "bad" | "flat" {
-  if (delta === 0) return "flat";
-  const positiveIsGood = polarity !== "up-bad";
-  const isGood = delta > 0 ? positiveIsGood : !positiveIsGood;
-  return isGood ? "good" : "bad";
-}
-
-function formatNumber(value: number) {
-  return NUMBER_FORMAT.format(value);
-}
-
-function formatAction(action: string) {
-  return ACTION_LABELS[action] ?? "Событие журнала";
-}
-
-function formatActor(actor: AdminJournalActor | null) {
-  if (!actor) return "Системное действие";
-  const name = [actor.firstName, actor.lastName]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(" ");
-  return name || actor.email;
-}
-
-function formatHealthStatus(status: AdminDashboardSummary["systemHealth"][HealthKey]) {
-  if (status === "ok") return "В порядке";
-  if (status === "disabled") return "Не настроено";
-  return "Нужна проверка";
 }
