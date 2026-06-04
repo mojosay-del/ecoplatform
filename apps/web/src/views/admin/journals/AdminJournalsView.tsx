@@ -3,15 +3,15 @@
 import { FormEvent, useMemo, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import type { AdminJournalEntry, AdminJournalPayload, PaginatedResponse } from "@ecoplatform/shared";
-import { AdminSortButton } from "./AdminSortButton";
-import { AppShell } from "./AppShell";
-import { StatusPill } from "./StatusPill";
-import { getJournalEntityDisplay } from "./admin-entity-display";
-import { sortItems, type SortState } from "./admin-table-utils";
-import { apiFetch } from "../lib/api";
-import { useAuth } from "../lib/auth";
-import { formatAuditFieldLabel, formatAuditValue } from "../lib/display-labels";
-import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
+import { AdminSortButton } from "../../../components/AdminSortButton";
+import { AppShell } from "../../../components/AppShell";
+import { StatusPill } from "../../../components/StatusPill";
+import { getJournalEntityDisplay } from "../../../components/admin-entity-display";
+import { sortItems, type SortState } from "../../../components/admin-table-utils";
+import { apiFetch } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
+import { formatAuditFieldLabel, formatAuditValue } from "../../../lib/display-labels";
+import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 
 type JournalList = PaginatedResponse<AdminJournalEntry>;
 type JournalSortKey = "createdAt" | "action" | "entity" | "actor";
