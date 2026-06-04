@@ -7,9 +7,9 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { CompanyRole, CompanyStatus, NotificationCategory } from "@prisma/client";
-import { compare, hash } from "bcryptjs";
+import { hash } from "bcryptjs";
 import { createHmac, randomInt, randomUUID, timingSafeEqual } from "crypto";
-import { MIN_PASSWORD_LENGTH, type LoginDto, type RegisterDto, type RegistrationVerifyDto } from "@ecoplatform/shared";
+import { type LoginDto, type RegisterDto, type RegistrationVerifyDto } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { swallowAndLog } from "../common/silent-catch";
 import { EmailService } from "../email/email.service";
@@ -17,6 +17,7 @@ import { recordUserRegistered } from "../observability/metrics.registry";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
 import { loginAuthUser, type AuthLoginWorkflowDeps } from "./auth-login-workflow.helpers";
+import { changeAuthUserPassword, type AuthPasswordWorkflowDeps } from "./auth-password-workflow.helpers";
 import { accountDeletionScheduledFor, getAuthMeUser, type AuthProfileDeps } from "./auth-profile.helpers";
 import {
   createAuthSession,
@@ -334,37 +335,7 @@ export class AuthService {
     sessionId: string,
     input: { currentPassword: string; newPassword: string },
   ): Promise<{ ok: true }> {
-    if (input.newPassword.length < MIN_PASSWORD_LENGTH) {
-      throw new BadRequestException(`Новый пароль должен содержать не менее ${MIN_PASSWORD_LENGTH} символов.`);
-    }
-    if (input.newPassword === input.currentPassword) {
-      throw new BadRequestException("Новый пароль должен отличаться от текущего.");
-    }
-
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new UnauthorizedException("Пользователь не найден.");
-    }
-
-    const ok = await compare(input.currentPassword, user.passwordHash);
-    if (!ok) {
-      throw new UnauthorizedException("Текущий пароль указан неверно.");
-    }
-
-    await this.passwordPolicy.assertAcceptablePassword(input.newPassword);
-
-    const passwordHash = await hash(input.newPassword, 12);
-    await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: userId }, data: { passwordHash } });
-      // Все остальные сессии отзываются — это стандартное требование безопасности.
-      await tx.session.updateMany({
-        where: { userId, revokedAt: null, NOT: { id: sessionId } },
-        data: { revokedAt: new Date() },
-      });
-    });
-    await this.sessionCache.invalidateUser(userId);
-
-    return { ok: true };
+    return changeAuthUserPassword(this.passwordWorkflowDeps, userId, sessionId, input);
   }
 
   async requestAccountDeletion(userId: string, sessionId: string): Promise<AccountDeletionResponse> {
@@ -517,6 +488,14 @@ export class AuthService {
     return {
       prisma: this.prisma,
       jwt: this.jwt,
+      sessionCache: this.sessionCache,
+    };
+  }
+
+  private get passwordWorkflowDeps(): AuthPasswordWorkflowDeps {
+    return {
+      prisma: this.prisma,
+      passwordPolicy: this.passwordPolicy,
       sessionCache: this.sessionCache,
     };
   }
