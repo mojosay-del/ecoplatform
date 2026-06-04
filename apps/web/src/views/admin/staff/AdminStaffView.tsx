@@ -4,19 +4,19 @@ import Image from "next/image";
 import { FormEvent, useMemo, useState } from "react";
 import { RotateCcw, Search } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, platformRoles } from "@ecoplatform/shared";
-import { AdminSortButton } from "./AdminSortButton";
-import { AppShell } from "./AppShell";
-import { StatusPill } from "./StatusPill";
-import { sortItems, type SortState } from "./admin-table-utils";
-import { apiFetch } from "../lib/api";
-import { useAuth } from "../lib/auth";
+import { AdminSortButton } from "../../../components/AdminSortButton";
+import { AppShell } from "../../../components/AppShell";
+import { StatusPill } from "../../../components/StatusPill";
+import { sortItems, type SortState } from "../../../components/admin-table-utils";
+import { apiFetch } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
 import {
   PLATFORM_ROLE_SHORT_LABELS,
   STAFF_STATUS_LABELS,
   USER_GENDER_LABELS,
   formatPlatformRoles,
-} from "../lib/display-labels";
-import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
+} from "../../../lib/display-labels";
+import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 
 type StaffItem = {
   id: string;

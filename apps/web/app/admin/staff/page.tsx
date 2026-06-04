@@ -1,4 +1,4 @@
-import { AdminStaffView } from "../../../src/components/AdminStaffView";
+import { AdminStaffView } from "../../../src/views/admin/staff";
 
 export default function AdminStaffPage() {
   return <AdminStaffView />;
