@@ -18,7 +18,6 @@ import type {
 } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
 import {
-  assertLearningModulePublishable,
   canAccessPublishedLearningModule,
   canPreviewAuthoredContent,
   type LearningReadOptions,
@@ -28,7 +27,14 @@ import {
   refreshLearningModuleFileReferences,
   resolveLearningAttachmentMeta,
 } from "./learning-file-references.helpers";
-import { repositionChapter, repositionLearningModule, repositionLesson } from "./learning-position.helpers";
+import {
+  createLearningModule as createLearningModuleWorkflow,
+  deleteLearningModule as deleteLearningModuleWorkflow,
+  publishLearningModule as publishLearningModuleWorkflow,
+  unpublishLearningModule as unpublishLearningModuleWorkflow,
+  updateLearningModule as updateLearningModuleWorkflow,
+} from "./learning-module-workflow.helpers";
+import { repositionChapter, repositionLesson } from "./learning-position.helpers";
 
 type LearningModuleInput = z.infer<typeof learningModuleInputSchema>;
 type LearningModuleUpdateInput = z.infer<typeof learningModuleUpdateInputSchema>;
@@ -49,6 +55,10 @@ export class LearningService {
     private readonly common: ContentCommonService,
     private readonly files: FilesService,
   ) {}
+
+  private learningModuleWorkflowDeps() {
+    return { prisma: this.prisma, auditLog: this.auditLog, common: this.common };
+  }
 
   async listLearningModules(user: RequestUser, paginationInput: PaginationInput = {}) {
     this.common.assertFunctionalAccess(user);
@@ -185,322 +195,24 @@ export class LearningService {
     return paginatedResponse(items, total, pagination);
   }
 
-  async createLearningModule(input: LearningModuleInput, user: RequestUser) {
-    for (const chapter of input.chapters) {
-      for (const lesson of chapter.lessons) {
-        const check = validateContentBlocks(lesson.blocks, lessonBlockSchema);
-
-        if (!check.ok) {
-          throw new ForbiddenException(check.message);
-        }
-      }
-    }
-    await this.common.assertCoverImageAllowed(input.coverImageId, user);
-
-    // Позицию считаем внутри транзакции, чтобы новый модуль вставал в конец
-    // по актуальному max(position). Ретрай оставлен только для редкого P2002
-    // от вложенных уникальных позиций глав/уроков.
-    const module = await this.createLearningModuleWithNextPosition(input, user.id);
-
-    // Регистрируем все файлы модуля одной entity-row (cover + все file_id из
-    // блоков уроков + все attachments). Это упрощает lookup в deleteIfUnreferenced.
-    await this.common.recordEntityReferences("learning_module", module.id, [
-      input.coverImageId,
-      ...input.chapters.flatMap((chapter) =>
-        chapter.lessons.flatMap((lesson) => [
-          ...lesson.blocks.flatMap((block) => Array.from(this.common.collectFileIdsFromPayload(block.payload))),
-          ...lesson.attachments.map((attachment) => attachment.fileId),
-        ]),
-      ),
-    ]);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "learning.module.create",
-      entityType: "LearningModule",
-      entityId: module.id,
-    });
-
-    return module;
+  createLearningModule(input: LearningModuleInput, user: RequestUser) {
+    return createLearningModuleWorkflow(this.learningModuleWorkflowDeps(), input, user);
   }
 
-  // Атомарно читает max(position) и вставляет модуль последним.
-  // P2002 не маскируем широко: повторяем только известный конфликт уникальности.
-  private async createLearningModuleWithNextPosition(input: LearningModuleInput, userId: string) {
-    let lastError: unknown = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        return await this.prisma.$transaction(async (tx) => {
-          const lastPosition = await tx.learningModule.aggregate({ _max: { position: true } });
-          return tx.learningModule.create({
-            data: {
-              title: input.title,
-              summary: input.summary,
-              description: input.description,
-              coverImageId: input.coverImageId,
-              accessLevel: input.accessLevel,
-              oneTimePrice: input.oneTimePrice,
-              isInDevelopment: input.isInDevelopment,
-              position: (lastPosition._max.position ?? -1) + 1,
-              createdById: userId,
-              preview: {
-                create: {
-                  promotionalDescription: input.preview.promotionalDescription,
-                  whatYouWillLearn: input.preview.whatYouWillLearn,
-                },
-              },
-              chapters: {
-                create: input.chapters.map((chapter, chapterIndex) => ({
-                  title: chapter.title,
-                  position: chapterIndex,
-                  createdById: userId,
-                  lessons: {
-                    create: chapter.lessons.map((lesson, lessonIndex) => ({
-                      title: lesson.title,
-                      position: lessonIndex,
-                      createdById: userId,
-                      blocks: {
-                        create: lesson.blocks.map((block, blockIndex) => ({
-                          position: blockIndex,
-                          type: block.type,
-                          payload: this.common.payload(block),
-                        })),
-                      },
-                      attachments: {
-                        create: lesson.attachments.map((attachment, position) => ({
-                          fileId: attachment.fileId,
-                          displayName: attachment.displayName,
-                          position,
-                        })),
-                      },
-                    })),
-                  },
-                })),
-              },
-            },
-          });
-        });
-      } catch (err) {
-        // P2002 — unique constraint violation. Только в этом случае ретраим:
-        // означает, что параллельная транзакция заняла наш position, нужен новый max.
-        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-          lastError = err;
-          continue;
-        }
-        throw err;
-      }
-    }
-    throw lastError ?? new Error("Не удалось создать модуль обучения после серии конфликтов позиции.");
+  publishLearningModule(id: string, user: RequestUser) {
+    return publishLearningModuleWorkflow(this.learningModuleWorkflowDeps(), id, user);
   }
 
-  async publishLearningModule(id: string, user: RequestUser) {
-    const existing = await this.prisma.learningModule.findUnique({
-      where: { id },
-      include: { chapters: { include: { lessons: { include: { _count: { select: { blocks: true } } } } } } },
-    });
-    if (!existing) {
-      throw new NotFoundException("Модуль не найден.");
-    }
-    if (!existing.isInDevelopment) {
-      assertLearningModulePublishable(existing);
-    }
-
-    const now = new Date();
-    const result = await this.prisma.$transaction(async (tx) => {
-      const module = await tx.learningModule.update({
-        where: { id },
-        data: {
-          status: ContentStatus.published,
-          firstPublishedAt: existing.firstPublishedAt ?? now,
-        },
-        include: { chapters: { include: { lessons: true } } },
-      });
-
-      const lessonIds = module.isInDevelopment
-        ? []
-        : module.chapters.flatMap((chapter) =>
-            chapter.lessons.filter((lesson) => lesson.status === ContentStatus.draft).map((lesson) => lesson.id),
-          );
-
-      if (lessonIds.length > 0) {
-        await tx.lesson.updateMany({
-          where: { id: { in: lessonIds } },
-          data: { status: ContentStatus.published, firstPublishedAt: now },
-        });
-      }
-
-      return module;
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "learning.module.publish",
-      entityType: "LearningModule",
-      entityId: id,
-    });
-
-    return result;
+  unpublishLearningModule(id: string, user: RequestUser, reason?: string) {
+    return unpublishLearningModuleWorkflow(this.learningModuleWorkflowDeps(), id, user, reason);
   }
 
-  async unpublishLearningModule(id: string, user: RequestUser, reason?: string) {
-    const existing = await this.prisma.learningModule.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException("Модуль не найден.");
-    }
-
-    const module = await this.prisma.learningModule.update({
-      where: { id },
-      data: { status: ContentStatus.draft },
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "learning.module.unpublish",
-      entityType: "LearningModule",
-      entityId: id,
-      comment: reason,
-    });
-
-    return module;
+  updateLearningModule(id: string, input: LearningModuleUpdateInput, user: RequestUser) {
+    return updateLearningModuleWorkflow(this.learningModuleWorkflowDeps(), id, input, user);
   }
 
-  async updateLearningModule(id: string, input: LearningModuleUpdateInput, user: RequestUser) {
-    const existing = await this.prisma.learningModule.findUnique({
-      where: { id },
-      include: { preview: true },
-    });
-    if (!existing) {
-      throw new NotFoundException("Модуль не найден.");
-    }
-    if (input.coverImageId !== undefined) {
-      await this.common.assertCoverImageAllowed(input.coverImageId, user);
-    }
-
-    const data: Prisma.LearningModuleUpdateInput = {};
-    if (input.title !== undefined) data.title = input.title;
-    if (input.summary !== undefined) data.summary = input.summary;
-    if (input.description !== undefined) data.description = input.description;
-    if (input.coverImageId !== undefined) data.coverImageId = input.coverImageId;
-    if (input.accessLevel !== undefined) data.accessLevel = input.accessLevel;
-    if (input.oneTimePrice !== undefined) data.oneTimePrice = input.oneTimePrice;
-    if (input.isInDevelopment !== undefined) data.isInDevelopment = input.isInDevelopment;
-    const positionChanged = input.position !== undefined && input.position !== existing.position;
-
-    let draftLessonIdsToPublish: string[] = [];
-    if (existing.status === ContentStatus.published && input.isInDevelopment === false) {
-      const publishable = await this.prisma.learningModule.findUnique({
-        where: { id },
-        include: { chapters: { include: { lessons: { include: { _count: { select: { blocks: true } } } } } } },
-      });
-      if (!publishable) {
-        throw new NotFoundException("Модуль не найден.");
-      }
-      assertLearningModulePublishable(publishable);
-      draftLessonIdsToPublish = publishable.chapters.flatMap((chapter) =>
-        chapter.lessons.filter((lesson) => lesson.status === ContentStatus.draft).map((lesson) => lesson.id),
-      );
-    }
-
-    if (input.preview) {
-      data.preview = {
-        upsert: {
-          create: {
-            promotionalDescription: input.preview.promotionalDescription,
-            whatYouWillLearn: input.preview.whatYouWillLearn,
-          },
-          update: {
-            promotionalDescription: input.preview.promotionalDescription,
-            whatYouWillLearn: input.preview.whatYouWillLearn,
-          },
-        },
-      };
-    }
-
-    const module = await this.prisma.$transaction(async (tx) => {
-      if (positionChanged) {
-        await repositionLearningModule(tx, id, input.position!);
-      }
-      if (Object.keys(data).length === 0 && !input.preview) {
-        return tx.learningModule.findUniqueOrThrow({ where: { id }, include: { preview: true } });
-      }
-      const updated = await tx.learningModule.update({
-        where: { id },
-        data,
-        include: { preview: true },
-      });
-
-      if (draftLessonIdsToPublish.length > 0) {
-        await tx.lesson.updateMany({
-          where: { id: { in: draftLessonIdsToPublish } },
-          data: { status: ContentStatus.published, firstPublishedAt: new Date() },
-        });
-      }
-
-      return updated;
-    });
-
-    if (input.coverImageId !== undefined && input.coverImageId !== existing.coverImageId) {
-      // Перезапишем references для модуля под текущий cover (lessons/блоки
-      // отдельно меняются — там свои хуки на createChapter/updateLesson/etc).
-      await refreshLearningModuleFileReferences(this.prisma, this.common, id);
-      await this.common.cleanupDetachedFiles([existing.coverImageId]);
-    }
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "learning.module.update",
-      entityType: "LearningModule",
-      entityId: id,
-      payload: input,
-    });
-
-    return module;
-  }
-
-  async deleteLearningModule(id: string, user: RequestUser, reason?: string) {
-    const existing = await this.prisma.learningModule.findUnique({
-      where: { id },
-      include: {
-        chapters: {
-          include: {
-            lessons: {
-              include: {
-                blocks: true,
-                attachments: true,
-              },
-            },
-          },
-        },
-      },
-    });
-    if (!existing) {
-      throw new NotFoundException("Модуль не найден.");
-    }
-
-    const deletedFileIds = this.common.compactFileIds([
-      existing.coverImageId,
-      ...existing.chapters.flatMap((chapter) =>
-        chapter.lessons.flatMap((lesson) => [
-          ...this.common.collectFileIdsFromBlocks(lesson.blocks),
-          ...lesson.attachments.map((attachment) => attachment.fileId),
-        ]),
-      ),
-    ]);
-
-    await this.prisma.learningModule.delete({ where: { id } });
-    await this.common.clearEntityReferences("learning_module", id);
-    await this.common.cleanupDetachedFiles(deletedFileIds);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "learning.module.delete",
-      entityType: "LearningModule",
-      entityId: id,
-      comment: reason,
-      payload: { title: existing.title },
-    });
-
-    return { ok: true };
+  deleteLearningModule(id: string, user: RequestUser, reason?: string) {
+    return deleteLearningModuleWorkflow(this.learningModuleWorkflowDeps(), id, user, reason);
   }
 
   async createChapter(moduleId: string, input: ChapterInput, user: RequestUser) {
