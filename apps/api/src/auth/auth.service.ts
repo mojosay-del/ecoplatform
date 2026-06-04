@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { CompanyRole, CompanyStatus, NotificationCategory } from "@prisma/client";
 import { hash } from "bcryptjs";
@@ -18,7 +12,13 @@ import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
 import { loginAuthUser, type AuthLoginWorkflowDeps } from "./auth-login-workflow.helpers";
 import { changeAuthUserPassword, type AuthPasswordWorkflowDeps } from "./auth-password-workflow.helpers";
-import { accountDeletionScheduledFor, getAuthMeUser, type AuthProfileDeps } from "./auth-profile.helpers";
+import { getAuthMeUser, type AuthProfileDeps } from "./auth-profile.helpers";
+import {
+  cancelAuthAccountDeletion,
+  requestAuthAccountDeletion,
+  type AccountDeletionResponse,
+  type AuthAccountDeletionDeps,
+} from "./auth-account-deletion.helpers";
 import {
   createAuthSession,
   listAuthSessions,
@@ -34,12 +34,6 @@ import { PasswordPolicyService } from "./password-policy.service";
 
 const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
-
-type AccountDeletionResponse = {
-  ok: true;
-  deletionRequestedAt: string | null;
-  deletionScheduledFor: string | null;
-};
 
 type RegistrationVerificationStart = {
   verificationId: string;
@@ -339,109 +333,11 @@ export class AuthService {
   }
 
   async requestAccountDeletion(userId: string, sessionId: string): Promise<AccountDeletionResponse> {
-    const now = new Date();
-    const result = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({
-        where: { id: userId },
-        include: {
-          company: {
-            select: { id: true, status: true, statusBeforeDeletion: true },
-          },
-        },
-      });
-      if (!user) {
-        throw new UnauthorizedException("Пользователь не найден.");
-      }
-
-      const deletionRequestedAt = user.deletionRequestedAt ?? now;
-      if (!user.deletionRequestedAt) {
-        await tx.user.update({
-          where: { id: userId },
-          data: { deletionRequestedAt },
-        });
-      }
-
-      // В pending_deletion переводим ВСЮ компанию только когда удаляется её
-      // владелец: уход владельца = закрытие компании со всеми сотрудниками
-      // (крон-чистка удалит компанию, когда не останется пользователей).
-      // Участник (member) удаляет лишь свой аккаунт — компания и доступ
-      // остальных сотрудников не страдают; крон вычистит только его user-строку
-      // по deletionRequestedAt, оставив компанию работать.
-      //
-      // На вырост: для multi-user компаний удаление владельца стоит заменить на
-      // передачу прав владельца другому сотруднику — иначе уход владельца
-      // закрывает доступ всем. Пока в проде компании 1:1, поэтому сохраняем
-      // прежнее поведение «владелец ушёл → компания закрывается».
-      const isOwner = user.companyRole === CompanyRole.owner;
-      if (user.company && isOwner && user.company.status !== CompanyStatus.pending_deletion) {
-        await tx.company.update({
-          where: { id: user.company.id },
-          data: {
-            status: CompanyStatus.pending_deletion,
-            statusBeforeDeletion: user.company.status,
-          },
-        });
-      }
-
-      await tx.session.updateMany({
-        where: { userId, revokedAt: null, NOT: { id: sessionId } },
-        data: { revokedAt: now },
-      });
-
-      return {
-        companyId: user.companyId,
-        deletionRequestedAt,
-      };
-    });
-
-    await this.sessionCache.invalidateUser(userId);
-
-    return serializeAccountDeletion(result.deletionRequestedAt);
+    return requestAuthAccountDeletion(this.accountDeletionDeps, userId, sessionId);
   }
 
   async cancelAccountDeletion(userId: string): Promise<AccountDeletionResponse> {
-    await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({
-        where: { id: userId },
-        include: {
-          company: {
-            select: { id: true, status: true, statusBeforeDeletion: true },
-          },
-        },
-      });
-      if (!user) {
-        throw new UnauthorizedException("Пользователь не найден.");
-      }
-
-      await tx.user.update({
-        where: { id: userId },
-        data: { deletionRequestedAt: null },
-      });
-
-      if (user.company?.status === CompanyStatus.pending_deletion) {
-        const otherPendingUsers = await tx.user.count({
-          where: {
-            companyId: user.company.id,
-            id: { not: userId },
-            deletionRequestedAt: { not: null },
-          },
-        });
-
-        if (otherPendingUsers === 0) {
-          await tx.company.update({
-            where: { id: user.company.id },
-            data: {
-              status: user.company.statusBeforeDeletion ?? CompanyStatus.demo,
-              statusBeforeDeletion: null,
-            },
-          });
-        }
-      }
-    });
-
-    await this.sessionCache.invalidateUser(userId);
-
-    return serializeAccountDeletion(null);
+    return cancelAuthAccountDeletion(this.accountDeletionDeps, userId);
   }
 
   async refresh(refreshToken: string | undefined): Promise<AuthSessionTokens> {
@@ -500,17 +396,16 @@ export class AuthService {
     };
   }
 
+  private get accountDeletionDeps(): AuthAccountDeletionDeps {
+    return {
+      prisma: this.prisma,
+      sessionCache: this.sessionCache,
+    };
+  }
+
   private get profileDeps(): AuthProfileDeps {
     return {
       prisma: this.prisma,
     };
   }
-}
-
-function serializeAccountDeletion(requestedAt: Date | null): AccountDeletionResponse {
-  return {
-    ok: true,
-    deletionRequestedAt: requestedAt?.toISOString() ?? null,
-    deletionScheduledFor: requestedAt ? accountDeletionScheduledFor(requestedAt).toISOString() : null,
-  };
 }
