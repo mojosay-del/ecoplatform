@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppShell } from "./AppShell";
-import { StatusPill } from "./StatusPill";
-import { ApiError, apiFetch } from "../lib/api";
-import { useAuth } from "../lib/auth";
+import { AppShell } from "../../../components/AppShell";
+import { StatusPill } from "../../../components/StatusPill";
+import { ApiError, apiFetch } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
 
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
