@@ -10,62 +10,15 @@ import type { RequestUser } from "../../common/request-user";
 import type { z } from "zod";
 import type { newsInputSchema } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
+import {
+  decorateNewsComment,
+  loadAllNewsCommentCounts,
+  loadPublishedNewsCommentCounts,
+  newsCommentAuthorSelect,
+} from "./news-comment.helpers";
 
 type NewsInput = z.infer<typeof newsInputSchema>;
 type NewsReadOptions = { preview?: boolean };
-
-const commentAuthorSelect = {
-  id: true,
-  firstName: true,
-  lastName: true,
-  gender: true,
-  company: { select: { type: true } },
-  platformStaff: { select: { roles: true, isActive: true } },
-} satisfies Prisma.UserSelect;
-
-type NewsCommentAuthor = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  gender: string;
-  company: { type: string } | null;
-  platformStaff: { roles: string[]; isActive: boolean } | null;
-};
-
-type NewsCommentPayload = {
-  user: NewsCommentAuthor;
-  likes?: Array<{ id: string }>;
-  replies?: NewsCommentPayload[];
-  [key: string]: unknown;
-};
-
-// Маппинги для генерации public URL аватара. Лежат рядом, потому что нужны
-// только декоратору комментариев новостей.
-const companyAvatarPrefixByType: Record<string, string> = {
-  collector: "z",
-  trader: "t",
-  processor: "p",
-};
-
-const avatarSuffixByGender: Record<string, string> = {
-  male: "man",
-  female: "woman",
-};
-
-function resolveProfileAvatarUrl(platformRoles: string[], companyType: string | null, gender: string): string | null {
-  const platformPrefix = platformRoles.includes("admin")
-    ? "a"
-    : platformRoles.includes("moderator") || platformRoles.includes("content_manager")
-      ? "m"
-      : null;
-  const suffix = avatarSuffixByGender[gender];
-  if (platformPrefix && suffix) {
-    return `/avatars/platform/${platformPrefix}${suffix}.png`;
-  }
-  const companyPrefix = companyType ? companyAvatarPrefixByType[companyType] : null;
-  if (!companyPrefix || !suffix) return null;
-  return `/avatars/company/${companyPrefix}${suffix}.png`;
-}
 
 function normaliseTagFilters(tagNames: string[] = []): string[] {
   return Array.from(new Set(tagNames.map((name) => name.trim()).filter(Boolean)));
@@ -126,7 +79,10 @@ export class NewsService {
     // Комментарии теперь живут в Discussion(targetType=news_post, targetId=NewsPost.id).
     // Считаем их батчем для всех новостей страницы — иначе на каждую карточку
     // отдельный запрос.
-    const commentCounts = await this.loadPublishedCommentCounts(posts.map((post) => post.id));
+    const commentCounts = await loadPublishedNewsCommentCounts(
+      this.prisma,
+      posts.map((post) => post.id),
+    );
 
     const items = posts.map(({ likes, _count, ...post }) => ({
       ...post,
@@ -152,30 +108,6 @@ export class NewsService {
       take: limit,
       select: { id: true, name: true, slug: true, usageCount: true },
     });
-  }
-
-  // Для списочного эндпоинта /news и админ-листинга. На вход — id новостей,
-  // на выход — Map(newsPostId → число опубликованных комментариев).
-  // Один SQL: Discussion ⋈ Comment (group by discussionId).
-  private async loadPublishedCommentCounts(newsPostIds: string[]): Promise<Map<string, number>> {
-    if (newsPostIds.length === 0) return new Map();
-
-    const discussions = await this.prisma.discussion.findMany({
-      where: { targetType: DiscussionTargetType.news_post, targetId: { in: newsPostIds } },
-      select: { id: true, targetId: true },
-    });
-    if (discussions.length === 0) return new Map();
-
-    const counts = await this.prisma.comment.groupBy({
-      by: ["discussionId"],
-      where: {
-        discussionId: { in: discussions.map((d) => d.id) },
-        status: CommentStatus.published,
-      },
-      _count: { _all: true },
-    });
-    const countByDiscussion = new Map(counts.map((row) => [row.discussionId, row._count._all]));
-    return new Map(discussions.map((d) => [d.targetId, countByDiscussion.get(d.id) ?? 0]));
   }
 
   async getNews(slug: string, user: RequestUser, options: NewsReadOptions = {}) {
@@ -215,12 +147,12 @@ export class NewsService {
             where: { status: CommentStatus.published },
             orderBy: { createdAt: "asc" },
             include: {
-              user: { select: commentAuthorSelect },
+              user: { select: newsCommentAuthorSelect },
               likes: { where: { userId: user.id }, select: { id: true } },
               _count: { select: { likes: true } },
             },
           },
-          user: { select: commentAuthorSelect },
+          user: { select: newsCommentAuthorSelect },
           likes: { where: { userId: user.id }, select: { id: true } },
           _count: { select: { likes: true } },
         },
@@ -232,27 +164,8 @@ export class NewsService {
     return {
       ...payload,
       _count: { likes: _count.likes, comments: commentsCount },
-      comments: comments.map((comment) => this.decorateNewsComment(comment)),
+      comments: comments.map((comment) => decorateNewsComment(comment)),
       likedByMe: likes.length > 0,
-    };
-  }
-
-  private decorateNewsComment(comment: NewsCommentPayload): Record<string, unknown> {
-    const { likes = [], replies, ...publicComment } = comment;
-    return {
-      ...publicComment,
-      likedByMe: likes.length > 0,
-      user: this.decorateCommentAuthor(comment.user),
-      replies: replies?.map((reply) => this.decorateNewsComment(reply)),
-    };
-  }
-
-  private decorateCommentAuthor(user: NewsCommentAuthor) {
-    const { company, platformStaff, ...publicUser } = user;
-    const platformRoles = platformStaff?.isActive ? platformStaff.roles : [];
-    return {
-      ...publicUser,
-      avatarUrl: resolveProfileAvatarUrl(platformRoles, company?.type ?? null, user.gender),
     };
   }
 
@@ -479,9 +392,7 @@ export class NewsService {
     const limit = Math.min(Math.max(pagination.limit ?? 20, 1), 100);
     const offset = Math.max(pagination.offset ?? 0, 0);
     const titleQuery = pagination.q?.trim();
-    const where: Prisma.NewsPostWhereInput = titleQuery
-      ? { title: { contains: titleQuery, mode: "insensitive" } }
-      : {};
+    const where: Prisma.NewsPostWhereInput = titleQuery ? { title: { contains: titleQuery, mode: "insensitive" } } : {};
 
     const [total, postsRaw] = await this.prisma.$transaction([
       this.prisma.newsPost.count({ where }),
@@ -500,7 +411,10 @@ export class NewsService {
     // Комментарии — через Discussion (см. listNews). В админ-таблице считаем
     // ВСЕ комментарии без фильтра по статусу: модератор должен видеть, что
     // у новости есть скрытые/удалённые комментарии в очереди модерации.
-    const commentCounts = await this.loadAllCommentCounts(postsRaw.map((post) => post.id));
+    const commentCounts = await loadAllNewsCommentCounts(
+      this.prisma,
+      postsRaw.map((post) => post.id),
+    );
 
     const items = postsRaw.map(({ _count, ...post }) => ({
       ...post,
@@ -512,26 +426,6 @@ export class NewsService {
       total,
       hasMore: offset + items.length < total,
     };
-  }
-
-  // То же, что loadPublishedCommentCounts, но без фильтра по status — для
-  // админ-листинга, где важно видеть общее количество.
-  private async loadAllCommentCounts(newsPostIds: string[]): Promise<Map<string, number>> {
-    if (newsPostIds.length === 0) return new Map();
-
-    const discussions = await this.prisma.discussion.findMany({
-      where: { targetType: DiscussionTargetType.news_post, targetId: { in: newsPostIds } },
-      select: { id: true, targetId: true },
-    });
-    if (discussions.length === 0) return new Map();
-
-    const counts = await this.prisma.comment.groupBy({
-      by: ["discussionId"],
-      where: { discussionId: { in: discussions.map((d) => d.id) } },
-      _count: { _all: true },
-    });
-    const countByDiscussion = new Map(counts.map((row) => [row.discussionId, row._count._all]));
-    return new Map(discussions.map((d) => [d.targetId, countByDiscussion.get(d.id) ?? 0]));
   }
 
   async adminListNewsTags() {
