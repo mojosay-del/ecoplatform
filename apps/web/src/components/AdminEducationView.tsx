@@ -504,12 +504,25 @@ function ModuleCreateForm({
   }
 
   return (
-    <form className="card form" onSubmit={submit}>
-      <h2>Новый модуль</h2>
+    <form className="card form news-form" onSubmit={submit}>
+      <div className="news-form-head">
+        <span className="news-form-mode">Новый модуль</span>
+      </div>
+      <div className="news-form-preview">
+        <FileUploadField
+          accept="image/*"
+          buttonLabel="Загрузить обложку"
+          imagePreset="cover"
+          label="Обложка модуля"
+          value={draft.coverImageId}
+          onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+        />
+      </div>
       <label className="form-field">
         <span>Название</span>
         <input
-          className="input"
+          className="news-form-title"
+          placeholder="Название модуля…"
           onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
           required
           value={draft.title}
@@ -518,7 +531,8 @@ function ModuleCreateForm({
       <label className="form-field">
         <span>Краткое описание</span>
         <input
-          className="input"
+          className="news-form-lead"
+          placeholder="Краткое описание"
           onChange={(event) => setDraft((prev) => ({ ...prev, summary: event.target.value }))}
           required
           value={draft.summary}
@@ -534,14 +548,6 @@ function ModuleCreateForm({
           value={draft.description}
         />
       </label>
-      <FileUploadField
-        accept="image/*"
-        buttonLabel="Загрузить обложку"
-        imagePreset="cover"
-        label="Обложка модуля"
-        value={draft.coverImageId}
-        onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
-      />
       <label className="form-field">
         <span>Уровень доступа</span>
         <select
@@ -743,9 +749,9 @@ function ModuleForm({
   }
 
   return (
-    <form className="form" onSubmit={submit}>
+    <form className="form news-form" onSubmit={submit}>
       <header className="module-form-header">
-        <h2>Модуль</h2>
+        <span className="news-form-mode">Модуль</span>
         <label className="module-development-toggle">
           <input
             checked={draft.isInDevelopment}
@@ -756,10 +762,21 @@ function ModuleForm({
           <span>В разработке</span>
         </label>
       </header>
+      <div className="news-form-preview">
+        <FileUploadField
+          accept="image/*"
+          buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+          imagePreset="cover"
+          label="Обложка модуля"
+          value={draft.coverImageId}
+          onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+        />
+      </div>
       <label className="form-field">
         <span>Название</span>
         <input
-          className="input"
+          className="news-form-title"
+          placeholder="Название модуля…"
           value={draft.title}
           onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
           required
@@ -768,7 +785,8 @@ function ModuleForm({
       <label className="form-field">
         <span>Краткое описание</span>
         <input
-          className="input"
+          className="news-form-lead"
+          placeholder="Краткое описание"
           value={draft.summary}
           onChange={(event) => setDraft((prev) => ({ ...prev, summary: event.target.value }))}
           required
@@ -784,14 +802,6 @@ function ModuleForm({
           required
         />
       </label>
-      <FileUploadField
-        accept="image/*"
-        buttonLabel="Загрузить обложку"
-        imagePreset="cover"
-        label="Обложка модуля"
-        value={draft.coverImageId}
-        onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
-      />
       <label className="form-field">
         <span>Уровень доступа</span>
         <select
@@ -1132,7 +1142,7 @@ function LessonForm({
         </section>
       ) : null}
 
-      <div className="lesson-save-bar">
+      <div className="lesson-save-bar news-save-bar">
         <span className={`lesson-save-bar-status ${saveStatusClass}`}>
           {saving ? "Сохраняется…" : lessonAutosave.autosaveLabel}
         </span>

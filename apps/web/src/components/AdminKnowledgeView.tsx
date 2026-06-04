@@ -525,8 +525,6 @@ export function AdminKnowledgeView() {
                   expanded={expanded.has(UNCATEGORIZED_GROUP_ID)}
                   onToggle={() => toggleExpand(UNCATEGORIZED_GROUP_ID)}
                   onSelect={startEdit}
-                  onPublishToggle={publishToggle}
-                  onRemove={remove}
                 />
               ) : null}
             </ul>
@@ -610,7 +608,7 @@ export function AdminKnowledgeView() {
                   </>
                 )}
 
-                <div className="lesson-save-bar">
+                <div className="lesson-save-bar news-save-bar">
                   <span className={`lesson-save-bar-status ${saveStatusClass}`}>
                     {submitting
                       ? "Сохраняется…"
@@ -626,6 +624,11 @@ export function AdminKnowledgeView() {
                     {!isEditingNew ? (
                       <button className="button secondary" type="button" onClick={() => setDraft(EMPTY_MATERIAL_DRAFT)}>
                         Отмена
+                      </button>
+                    ) : null}
+                    {!isEditingNew && original && draft.kind === "material" ? (
+                      <button className="button secondary danger" type="button" onClick={() => remove(original)}>
+                        Удалить публикацию
                       </button>
                     ) : null}
                     {!isEditingNew && original ? (
@@ -770,8 +773,6 @@ function KnowledgeCategoryNode({
                   material={material}
                   active={draftId === material.id}
                   onSelect={onSelect}
-                  onPublishToggle={onPublishToggle}
-                  onRemove={onRemove}
                 />
               ))}
               <li className="tree-add-row" style={{ paddingLeft: 44 }}>
@@ -791,14 +792,10 @@ function SortableKnowledgeMaterial({
   material,
   active,
   onSelect,
-  onPublishToggle,
-  onRemove,
 }: {
   material: Article;
   active: boolean;
   onSelect: (article: Article) => void;
-  onPublishToggle: (article: Article) => void;
-  onRemove: (article: Article) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: material.id });
 
@@ -819,8 +816,6 @@ function SortableKnowledgeMaterial({
         material={material}
         active={active}
         onSelect={onSelect}
-        onPublishToggle={onPublishToggle}
-        onRemove={onRemove}
         dragHandle={
           <button
             type="button"
@@ -843,16 +838,12 @@ function KnowledgeUncategorizedNode({
   expanded,
   onToggle,
   onSelect,
-  onPublishToggle,
-  onRemove,
 }: {
   materials: Article[];
   draftId: string | null;
   expanded: boolean;
   onToggle: () => void;
   onSelect: (article: Article) => void;
-  onPublishToggle: (article: Article) => void;
-  onRemove: (article: Article) => void;
 }) {
   return (
     <li role="treeitem" aria-expanded={expanded}>
@@ -875,8 +866,6 @@ function KnowledgeUncategorizedNode({
                 material={material}
                 active={draftId === material.id}
                 onSelect={onSelect}
-                onPublishToggle={onPublishToggle}
-                onRemove={onRemove}
               />
             </li>
           ))}
@@ -891,24 +880,12 @@ function KnowledgeMaterialRow({
   active,
   dragHandle,
   onSelect,
-  onPublishToggle,
-  onRemove,
 }: {
   material: Article;
   active: boolean;
   dragHandle?: ReactNode;
   onSelect: (article: Article) => void;
-  onPublishToggle: (article: Article) => void;
-  onRemove: (article: Article) => void;
 }) {
-  const actions: ActionItem[] = [
-    {
-      label: material.status === "published" ? "Снять с публикации" : "Опубликовать",
-      onClick: () => onPublishToggle(material),
-    },
-    { label: "Удалить материал", onClick: () => onRemove(material), danger: true },
-  ];
-
   return (
     <KnowledgeTreeRow
       depth={1}
@@ -917,7 +894,7 @@ function KnowledgeMaterialRow({
       status={material.status}
       title={material.title}
       meta={`${material.blocks.length} ${pluralize(material.blocks.length, "блок", "блока", "блоков")}`}
-      actions={actions}
+      actions={[]}
       dragHandle={dragHandle}
     />
   );
