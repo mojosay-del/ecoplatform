@@ -95,6 +95,8 @@ function normalizeLessonDraft(draft: LessonDraft) {
 // материалов есть отдельная секция вложений.
 const LESSON_ATOMIC_KINDS: AtomicBlockKind[] = ["image", "gallery", "video", "lesson_tasks", "quiz", "matching"];
 
+const MODULE_ACCESS_OPTIONS: LearningModule["accessLevel"][] = ["basic", "extended", "one_time"];
+
 export function AdminEducationView() {
   const { token } = useAuth();
   const [state, setState] = useState<ViewState>("unauthenticated");
@@ -518,7 +520,7 @@ function ModuleCreateForm({
           onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
         />
       </div>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Название</span>
         <input
           className="news-form-title"
@@ -528,7 +530,7 @@ function ModuleCreateForm({
           value={draft.title}
         />
       </label>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Краткое описание</span>
         <input
           className="news-form-lead"
@@ -538,17 +540,17 @@ function ModuleCreateForm({
           value={draft.summary}
         />
       </label>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Полное описание</span>
-        <textarea
-          className="textarea"
+        <input
+          className="news-form-lead"
+          placeholder="Полное описание"
           onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
           required
-          rows={4}
           value={draft.description}
         />
       </label>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Уровень доступа</span>
         <select
           className="select"
@@ -752,15 +754,31 @@ function ModuleForm({
     <form className="form news-form" onSubmit={submit}>
       <header className="module-form-header">
         <span className="news-form-mode">Модуль</span>
-        <label className="module-development-toggle">
-          <input
-            checked={draft.isInDevelopment}
-            onChange={(event) => setDraft((prev) => ({ ...prev, isInDevelopment: event.target.checked }))}
-            type="checkbox"
-          />
-          <span className="module-development-toggle-track" aria-hidden="true" />
-          <span>В разработке</span>
-        </label>
+        <div className="module-form-controls">
+          <div className="module-access-segment" role="radiogroup" aria-label="Уровень доступа">
+            {MODULE_ACCESS_OPTIONS.map((accessLevel) => (
+              <label className="module-access-option" key={accessLevel}>
+                <input
+                  type="radio"
+                  name={`module-access-${module.id}`}
+                  value={accessLevel}
+                  checked={draft.accessLevel === accessLevel}
+                  onChange={() => setDraft((prev) => ({ ...prev, accessLevel }))}
+                />
+                <span>{LEARNING_ACCESS_LEVEL_LABELS[accessLevel]}</span>
+              </label>
+            ))}
+          </div>
+          <label className="module-development-toggle">
+            <input
+              checked={draft.isInDevelopment}
+              onChange={(event) => setDraft((prev) => ({ ...prev, isInDevelopment: event.target.checked }))}
+              type="checkbox"
+            />
+            <span className="module-development-toggle-track" aria-hidden="true" />
+            <span>В разработке</span>
+          </label>
+        </div>
       </header>
       <div className="news-form-preview">
         <FileUploadField
@@ -772,7 +790,7 @@ function ModuleForm({
           onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
         />
       </div>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Название</span>
         <input
           className="news-form-title"
@@ -782,7 +800,7 @@ function ModuleForm({
           required
         />
       </label>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Краткое описание</span>
         <input
           className="news-form-lead"
@@ -792,32 +810,28 @@ function ModuleForm({
           required
         />
       </label>
-      <label className="form-field">
-        <span>Полное описание</span>
-        <textarea
-          className="textarea"
-          value={draft.description}
-          onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
-          rows={4}
+      <label className="form-field news-content-field">
+        <span>Описание для превью (доступно без подписки)</span>
+        <input
+          className="news-form-lead"
+          placeholder="Описание для превью"
+          value={draft.promotionalDescription}
+          onChange={(event) => setDraft((prev) => ({ ...prev, promotionalDescription: event.target.value }))}
           required
         />
       </label>
-      <label className="form-field">
-        <span>Уровень доступа</span>
-        <select
-          className="select"
-          value={draft.accessLevel}
-          onChange={(event) =>
-            setDraft((prev) => ({ ...prev, accessLevel: event.target.value as "basic" | "extended" | "one_time" }))
-          }
-        >
-          <option value="basic">{LEARNING_ACCESS_LEVEL_LABELS.basic}</option>
-          <option value="extended">{LEARNING_ACCESS_LEVEL_LABELS.extended}</option>
-          <option value="one_time">{LEARNING_ACCESS_LEVEL_LABELS.one_time}</option>
-        </select>
+      <label className="form-field news-content-field">
+        <span>Полное описание</span>
+        <input
+          className="news-form-lead"
+          placeholder="Полное описание"
+          value={draft.description}
+          onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
+          required
+        />
       </label>
       {draft.accessLevel === "one_time" ? (
-        <label className="form-field">
+        <label className="form-field news-content-field">
           <span>Цена разовой покупки (рубли)</span>
           <input
             className="input"
@@ -828,17 +842,7 @@ function ModuleForm({
           />
         </label>
       ) : null}
-      <label className="form-field">
-        <span>Описание для превью (доступно без подписки)</span>
-        <textarea
-          className="textarea small"
-          value={draft.promotionalDescription}
-          onChange={(event) => setDraft((prev) => ({ ...prev, promotionalDescription: event.target.value }))}
-          rows={3}
-          required
-        />
-      </label>
-      <div className="form-field">
+      <div className="form-field news-content-field">
         <span>Что узнает пользователь</span>
         <div className="stack-list">
           {draft.whatYouWillLearn.map((bulletItem, index) => (
