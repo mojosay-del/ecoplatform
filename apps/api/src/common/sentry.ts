@@ -39,10 +39,6 @@ export function initializeApiSentry(env: EnvLike = process.env): void {
   initialized = true;
 }
 
-export function isApiSentryEnabled(): boolean {
-  return initialized;
-}
-
 export function captureApiException(exception: unknown, request?: Request, status?: number): void {
   if (!initialized || (status !== undefined && status >= 400 && status < 500)) return;
 

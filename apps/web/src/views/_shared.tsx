@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { type LucideIcon } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { StatusPill } from "../components/StatusPill";
-import { ApiError, apiFetch } from "../lib/api";
+import { ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { isSubscriptionSelectionRequired, subscriptionSelectionHref } from "../lib/subscription-access";
 
@@ -152,13 +152,11 @@ export function getNewsFeedSnapshot<C, L extends boolean>(post: { _count: C; lik
   };
 }
 
-// Версия useApiData, принимающая fetcher-функцию (типизированный
-// `api.news.get`, `api.learning.getModule`, …). Параметр `key` — стабильная
-// строка, в которой кодируются все переменные fetcher'а (id/slug). Когда key
-// меняется — перезапрашиваем; идентичность fetcher НЕ имеет значения.
-//
-// Это вторая версия рядом с useApiData, чтобы можно было мигрировать views
-// постепенно. После полного перехода старый useApiData(path) можно удалить.
+// Хук загрузки данных через типизированный fetcher (`api.news.get`,
+// `api.learning.getModule`, …) с четырьмя состояниями loading/ready/forbidden/
+// error (unauthenticated отдельно — пока токен не прогружен). Параметр `key` —
+// стабильная строка, в которой кодируются все переменные fetcher'а (id/slug):
+// меняется key → перезапрашиваем; идентичность функции fetcher НЕ важна.
 export function useApiQuery<T>(key: string | null, fetcher: () => Promise<T>, initial: T) {
   const { token } = useAuth();
   const initialRef = useRef(initial);
@@ -209,66 +207,6 @@ export function useApiQuery<T>(key: string | null, fetcher: () => Promise<T>, in
       isActive = false;
     };
   }, [key, token]);
-
-  return { data, setData, state, errorMessage };
-}
-
-// Хук одной ручкой берёт данные через apiFetch и держит четыре состояния:
-// loading / ready / forbidden / error. unauthenticated отдельно — для случая
-// когда токен ещё не прогружен.
-export function useApiData<T>(path: string | null, initial: T) {
-  const { token } = useAuth();
-  const initialRef = useRef(initial);
-  const [data, setData] = useState<T>(initial);
-  const [state, setState] = useState<ApiState>("unauthenticated");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isActive = true;
-
-    if (!token) {
-      setData(initialRef.current);
-      setState("unauthenticated");
-      setErrorMessage(null);
-      return;
-    }
-
-    // path=null означает «не дёргать API» (например, у платформенного
-    // сотрудника нет компании, /billing/status вернул бы 500).
-    if (!path) {
-      setData(initialRef.current);
-      setState("ready");
-      setErrorMessage(null);
-      return;
-    }
-
-    setState("loading");
-    setErrorMessage(null);
-    apiFetch<T>(path, { token })
-      .then((result) => {
-        if (!isActive) return;
-        setData(result);
-        setState("ready");
-      })
-      .catch((error) => {
-        if (!isActive) return;
-        if (error instanceof ApiError && error.status === 401) {
-          setState("unauthenticated");
-          return;
-        }
-        if (error instanceof ApiError && error.status === 403) {
-          setState("forbidden");
-          return;
-        }
-        setData(initialRef.current);
-        setState("error");
-        setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить данные");
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [path, token]);
 
   return { data, setData, state, errorMessage };
 }
