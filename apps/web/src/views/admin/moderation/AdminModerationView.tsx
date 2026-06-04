@@ -2,16 +2,16 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
-import { AppShell } from "./AppShell";
-import { StatusPill, moderationStatusPillVariant } from "./StatusPill";
-import { formatModerationCaseTitle, formatModerationEntityPreview } from "./admin-entity-display";
-import { ApiError, apiFetch } from "../lib/api";
-import { useAuth } from "../lib/auth";
+import { AppShell } from "../../../components/AppShell";
+import { StatusPill, moderationStatusPillVariant } from "../../../components/StatusPill";
+import { formatModerationCaseTitle, formatModerationEntityPreview } from "../../../components/admin-entity-display";
+import { ApiError, apiFetch } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
 import {
   MODERATION_CASE_STATUS_LABELS,
   MODERATION_DECISION_LABELS,
   MODERATION_REASON_LABELS,
-} from "../lib/display-labels";
+} from "../../../lib/display-labels";
 
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
