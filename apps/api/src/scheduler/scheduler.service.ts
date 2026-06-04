@@ -9,6 +9,7 @@ const BILLING_HOURLY_LOCK_KEY = "cron:billing-hourly-check";
 const ACCOUNT_DELETION_CLEANUP_LOCK_KEY = "cron:cleanup-deleted-accounts";
 const ORPHAN_FILE_CLEANUP_LOCK_KEY = "cron:cleanup-orphan-files";
 const EMAIL_CHALLENGE_CLEANUP_LOCK_KEY = "cron:cleanup-email-challenges";
+const STALE_RECORD_CLEANUP_LOCK_KEY = "cron:cleanup-stale-records";
 const CRON_LOCK_TRANSACTION_TIMEOUT_MS = 15 * 60 * 1000;
 // Регистрационный challenge хранит хэш пароля + ПДн (телефон, ФИО, тип компании)
 // до подтверждения кода. После истечения (TTL 15 минут) или успешной верификации
@@ -27,6 +28,15 @@ const ORPHAN_FILE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 // (сканирует payload всех блоков), а задача суточная — backlog растворится за
 // несколько дней без риска упереться в таймаут lock-транзакции.
 const ORPHAN_FILE_BATCH_SIZE = 100;
+// Ретеншен «копящихся» таблиц (крон cleanup-stale-records, ночью в 02:00).
+// Эти таблицы росли без ограничений — храним разумное окно и физически удаляем.
+//  - Session: после expiresAt refresh-токен мёртв; держим неделю про запас.
+const SESSION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+//  - IdempotencyKey: окно повторной обработки запроса давно прошло (30 дней).
+const IDEMPOTENCY_KEY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+//  - NotificationDelivery: к 90 дням все доставки терминальные; связанные
+//    InAppNotification не теряются (FK onDelete: SetNull лишь обнулит ссылку).
+const NOTIFICATION_DELIVERY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 type AdvisoryLockRow = {
   ok: boolean;
@@ -48,7 +58,9 @@ type AccountDeletionCleanupResult = {
  *    уведомления о скором/случившемся истечении демо и подписки;
  *  - ночью чистятся аккаунты, прошедшие грейс удаления;
  *  - ночью удаляются осиротевшие загрузки (файлы без единой ссылки);
- *  - ночью удаляются отработавшие регистрационные challenge (хэш пароля + ПДн).
+ *  - ночью удаляются отработавшие регистрационные challenge (хэш пароля + ПДн);
+ *  - ночью чистятся «копящиеся» таблицы: истёкшие сессии, старые ключи
+ *    идемпотентности и журнал доставки нотификаций (cleanup-stale-records).
  *
  * Запуск задач можно полностью отключить переменной SCHEDULER_DISABLED=1
  * (актуально для integration-тестов — для биллинг-логики используется
@@ -170,6 +182,73 @@ export class SchedulerService {
 
     if (count > 0) {
       this.logger.log(`Email challenge cleanup: deleted ${count} expired/verified challenges`);
+    }
+    return { deleted: count };
+  }
+
+  @Cron("0 2 * * *", { name: "cleanup-stale-records" })
+  async handleStaleRecordCleanup() {
+    if (this.disabled) return;
+    try {
+      // Три удаления под одним advisory lock: вторая реплика пропустит tick.
+      await this.runWithPostgresAdvisoryLock(STALE_RECORD_CLEANUP_LOCK_KEY, async () => {
+        await this.cleanupExpiredSessions();
+        await this.cleanupStaleIdempotencyKeys();
+        await this.cleanupStaleNotificationDeliveries();
+      });
+    } catch (error) {
+      this.logger.error("Stale record cleanup failed", error as Error);
+    }
+  }
+
+  /**
+   * Удаляет истёкшие сессии: после `expiresAt` refresh-токен мёртв, строка
+   * нужна лишь как недавний след выхода. Без очистки таблица растёт на каждый
+   * логин. Грейс — неделя (`SESSION_RETENTION_MS`), фильтр опирается на
+   * `@@index([expiresAt])`. Отозванные, но ещё не истёкшие сессии удалятся
+   * этим же кроном после своего `expiresAt`.
+   */
+  async cleanupExpiredSessions(now = new Date()): Promise<{ deleted: number }> {
+    const cutoff = new Date(now.getTime() - SESSION_RETENTION_MS);
+    const { count } = await this.prisma.session.deleteMany({
+      where: { expiresAt: { lt: cutoff } },
+    });
+    if (count > 0) {
+      this.logger.log(`Session cleanup: deleted ${count} expired sessions`);
+    }
+    return { deleted: count };
+  }
+
+  /**
+   * Удаляет отработавшие ключи идемпотентности: окно повторной обработки
+   * запроса давно прошло, через 30 дней (`IDEMPOTENCY_KEY_RETENTION_MS`) ключ
+   * бесполезен. Фильтр опирается на `@@index([createdAt])`.
+   */
+  async cleanupStaleIdempotencyKeys(now = new Date()): Promise<{ deleted: number }> {
+    const cutoff = new Date(now.getTime() - IDEMPOTENCY_KEY_RETENTION_MS);
+    const { count } = await this.prisma.idempotencyKey.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+    if (count > 0) {
+      this.logger.log(`Idempotency key cleanup: deleted ${count} stale keys`);
+    }
+    return { deleted: count };
+  }
+
+  /**
+   * Удаляет старые записи журнала доставки нотификаций: к 90 дням
+   * (`NOTIFICATION_DELIVERY_RETENTION_MS`) все доставки терминальные
+   * (delivered/failed/dead_lettered). Связанные InAppNotification не теряются —
+   * FK `onDelete: SetNull` лишь обнулит ссылку `deliveryId`. Фильтр опирается
+   * на `@@index([createdAt])`.
+   */
+  async cleanupStaleNotificationDeliveries(now = new Date()): Promise<{ deleted: number }> {
+    const cutoff = new Date(now.getTime() - NOTIFICATION_DELIVERY_RETENTION_MS);
+    const { count } = await this.prisma.notificationDelivery.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+    if (count > 0) {
+      this.logger.log(`Notification delivery cleanup: deleted ${count} old deliveries`);
     }
     return { deleted: count };
   }

@@ -15,6 +15,15 @@ function buildService(lockAcquired = true) {
     emailVerificationChallenge: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    session: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    idempotencyKey: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    notificationDelivery: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
   };
   const billing = {
     runHourlyCheck: vi.fn().mockResolvedValue({}),
@@ -242,5 +251,96 @@ describe("SchedulerService", () => {
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.emailVerificationChallenge.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("удаляет истёкшие сессии старше недели по expiresAt", async () => {
+    const now = new Date("2026-06-04T02:00:00.000Z");
+    const prisma = {
+      session: { deleteMany: vi.fn().mockResolvedValue({ count: 3 }) },
+    };
+    const service = new SchedulerService(
+      { runHourlyCheck: vi.fn() } as any,
+      prisma as any,
+      { deleteIfUnreferenced: vi.fn() } as any,
+    );
+
+    const result = await service.cleanupExpiredSessions(now);
+
+    // грейс ровно неделя: cutoff = now - 7d
+    expect(prisma.session.deleteMany).toHaveBeenCalledWith({
+      where: { expiresAt: { lt: new Date("2026-05-28T02:00:00.000Z") } },
+    });
+    expect(result).toEqual({ deleted: 3 });
+  });
+
+  it("удаляет ключи идемпотентности старше 30 дней по createdAt", async () => {
+    const now = new Date("2026-06-04T02:00:00.000Z");
+    const prisma = {
+      idempotencyKey: { deleteMany: vi.fn().mockResolvedValue({ count: 5 }) },
+    };
+    const service = new SchedulerService(
+      { runHourlyCheck: vi.fn() } as any,
+      prisma as any,
+      { deleteIfUnreferenced: vi.fn() } as any,
+    );
+
+    const result = await service.cleanupStaleIdempotencyKeys(now);
+
+    // грейс ровно 30 дней: cutoff = now - 30d
+    expect(prisma.idempotencyKey.deleteMany).toHaveBeenCalledWith({
+      where: { createdAt: { lt: new Date("2026-05-05T02:00:00.000Z") } },
+    });
+    expect(result).toEqual({ deleted: 5 });
+  });
+
+  it("удаляет записи доставки нотификаций старше 90 дней по createdAt", async () => {
+    const now = new Date("2026-06-04T02:00:00.000Z");
+    const prisma = {
+      notificationDelivery: { deleteMany: vi.fn().mockResolvedValue({ count: 11 }) },
+    };
+    const service = new SchedulerService(
+      { runHourlyCheck: vi.fn() } as any,
+      prisma as any,
+      { deleteIfUnreferenced: vi.fn() } as any,
+    );
+
+    const result = await service.cleanupStaleNotificationDeliveries(now);
+
+    // грейс ровно 90 дней: cutoff = now - 90d
+    expect(prisma.notificationDelivery.deleteMany).toHaveBeenCalledWith({
+      where: { createdAt: { lt: new Date("2026-03-06T02:00:00.000Z") } },
+    });
+    expect(result).toEqual({ deleted: 11 });
+  });
+
+  it("чистит копящиеся таблицы только под Postgres advisory lock", async () => {
+    const { prisma, service, tx } = buildService(true);
+
+    await service.handleStaleRecordCleanup();
+
+    expect(tx.$queryRaw.mock.calls[0][1]).toBe("cron:cleanup-stale-records");
+    expect(prisma.session.deleteMany).toHaveBeenCalledTimes(1);
+    expect(prisma.idempotencyKey.deleteMany).toHaveBeenCalledTimes(1);
+    expect(prisma.notificationDelivery.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("пропускает очистку копящихся таблиц, если advisory lock держит другая реплика", async () => {
+    const { prisma, service } = buildService(false);
+
+    await service.handleStaleRecordCleanup();
+
+    expect(prisma.session.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.idempotencyKey.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("не чистит копящиеся таблицы, когда scheduler отключён переменной окружения", async () => {
+    vi.stubEnv("SCHEDULER_DISABLED", "1");
+    const { prisma, service } = buildService(true);
+
+    await service.handleStaleRecordCleanup();
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.session.deleteMany).not.toHaveBeenCalled();
   });
 });

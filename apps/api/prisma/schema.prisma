@@ -280,6 +280,9 @@ model User {
   createdAt                  DateTime                     @default(now())
   updatedAt                  DateTime                     @updatedAt
 
+  // FK на компанию. Postgres не индексирует FK автоматически. Нужен для
+  // списка сотрудников компании (мультиюзер) и ускорения операций по companyId.
+  @@index([companyId])
   @@index([status])
   @@index([lockedUntil])
   @@index([deletionRequestedAt])
@@ -432,6 +435,8 @@ model Payment {
 
   @@index([companyId, createdAt(sort: Desc)])
   @@index([status, createdAt])
+  // FK на способ оплаты (onDelete: SetNull) — ускоряет обнуление при удалении.
+  @@index([paymentMethodId])
 }
 
 // Address — самостоятельная сущность для адресов: и фактических, и юридических,
@@ -538,6 +543,12 @@ model Session {
   revokedAt        DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+
+  // FK на пользователя: список сессий, «выйти со всех устройств»
+  // (updateMany по userId) и каскадное удаление при удалении юзера.
+  @@index([userId])
+  // Ретеншен: крон cleanup-stale-records удаляет истёкшие сессии по expiresAt.
+  @@index([expiresAt])
 }
 
 model PlatformStaff {
@@ -582,6 +593,8 @@ model IdempotencyKey {
   @@index([endpoint, createdAt])
   @@index([actorId, createdAt])
   @@index([referenceType, referenceId])
+  // Ретеншен: крон cleanup-stale-records удаляет старые ключи по createdAt.
+  @@index([createdAt])
 }
 
 model PlatformSetting {
@@ -682,6 +695,9 @@ model NewsPostTag {
   addedAt    DateTime @default(now())
 
   @@id([newsPostId, newsTagId])
+  // FK на тег: «посты по тегу» и каскад при удалении тега. Составной PK
+  // ведёт по newsPostId, поэтому второй FK (newsTagId) нужно индексировать.
+  @@index([newsTagId])
 }
 
 model NewsLike {
@@ -693,6 +709,10 @@ model NewsLike {
   createdAt  DateTime @default(now())
 
   @@unique([userId, newsPostId])
+  // FK на пост: счётчик/выборка лайков поста и каскад при удалении поста.
+  // Уникальный (userId, newsPostId) ведёт по userId и для запроса по
+  // newsPostId не годится.
+  @@index([newsPostId])
 }
 
 model Discussion {
@@ -728,6 +748,8 @@ model Comment {
   // (discussionId, parentCommentId=null, status=published), затем reply'ы.
   @@index([discussionId, parentCommentId, status, createdAt(sort: Desc)])
   @@index([parentCommentId, status, createdAt])
+  // FK на автора: «мои комментарии» и каскадное удаление при удалении юзера.
+  @@index([userId])
 }
 
 model CommentAttachment {
@@ -749,6 +771,8 @@ model CommentLike {
   createdAt DateTime @default(now())
 
   @@unique([userId, commentId])
+  // FK на комментарий: счётчик/выборка лайков и каскад при удалении коммента.
+  @@index([commentId])
 }
 
 model NomenclatureCategory {
@@ -774,6 +798,9 @@ model Nomenclature {
   priceIndex  PriceIndex?
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
+
+  // FK на категорию: список номенклатур категории.
+  @@index([categoryId])
 }
 
 model PriceIndex {
@@ -899,6 +926,8 @@ model LessonProgress {
   completedAt DateTime @default(now())
 
   @@unique([userId, lessonId])
+  // FK на урок: каскадное удаление прогресса при удалении урока.
+  @@index([lessonId])
 }
 
 model KnowledgeBaseArticle {
@@ -990,6 +1019,8 @@ model NotificationDelivery {
   @@unique([domainEventId, recipientUserId, channel])
   @@index([recipientUserId, createdAt])
   @@index([status, createdAt])
+  // Ретеншен: крон cleanup-stale-records удаляет старые доставки по createdAt.
+  @@index([createdAt])
 }
 
 model ModerationCase {
@@ -1064,6 +1095,8 @@ model Sanction {
 
   @@index([targetType, targetId, appliedAt])
   @@index([caseId, type])
+  // FK на решение (onDelete: SetNull) — ускоряет обнуление при удалении.
+  @@index([decisionId])
 }
 
 model UserModuleRestriction {
@@ -1084,6 +1117,8 @@ model UserModuleRestriction {
 
   @@index([userId, moduleCode, liftedAt, expiresAt])
   @@index([companyId, moduleCode])
+  // FK на санкцию (onDelete: SetNull) — ускоряет обнуление при удалении.
+  @@index([sanctionId])
 }
 
 model SupportTicket {
@@ -1103,6 +1138,8 @@ model SupportTicket {
   // для админ-консоли модерации — `where status, orderBy updatedAt`.
   @@index([companyId, updatedAt(sort: Desc)])
   @@index([status, updatedAt(sort: Desc)])
+  // FK на автора: каскадное удаление тикетов при удалении юзера.
+  @@index([authorId])
 }
 
 model SupportTicketMessage {
