@@ -16,6 +16,7 @@ import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../lib/cms-autosave";
 import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
+import { pluralizeRu } from "../lib/ru-plural";
 
 type Article = {
   id: string;
@@ -760,7 +761,7 @@ function KnowledgeCategoryNode({
         active={draftId === category.id}
         status={category.status}
         title={category.title}
-        meta={`${materials.length} ${pluralize(materials.length, "материал", "материала", "материалов")}`}
+        meta={`${materials.length} ${pluralizeRu(materials.length, "материал", "материала", "материалов")}`}
         actions={actions}
       />
       {expanded ? (
@@ -855,7 +856,7 @@ function KnowledgeUncategorizedNode({
         onSelect={onToggle}
         active={false}
         title="Без категории"
-        meta={`${materials.length} ${pluralize(materials.length, "материал", "материала", "материалов")}`}
+        meta={`${materials.length} ${pluralizeRu(materials.length, "материал", "материала", "материалов")}`}
         actions={[]}
       />
       {expanded ? (
@@ -893,7 +894,7 @@ function KnowledgeMaterialRow({
       active={active}
       status={material.status}
       title={material.title}
-      meta={`${material.blocks.length} ${pluralize(material.blocks.length, "блок", "блока", "блоков")}`}
+      meta={`${material.blocks.length} ${pluralizeRu(material.blocks.length, "блок", "блока", "блоков")}`}
       actions={[]}
       dragHandle={dragHandle}
     />
@@ -975,13 +976,4 @@ function isKnowledgeCategory(article: Article) {
 
 function sortByPosition(a: Article, b: Article) {
   return a.position - b.position;
-}
-
-function pluralize(count: number, one: string, few: string, many: string) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod100 >= 11 && mod100 <= 14) return many;
-  if (mod10 === 1) return one;
-  if (mod10 >= 2 && mod10 <= 4) return few;
-  return many;
 }

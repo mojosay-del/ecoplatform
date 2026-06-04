@@ -41,7 +41,7 @@ import {
   pluralizeRu,
   resolveUpgradeCta,
   useApiQuery,
-} from "./_shared";
+} from "./shared";
 import { ContentBlocks } from "./content-blocks";
 
 export function EducationView() {

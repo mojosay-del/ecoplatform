@@ -11,7 +11,7 @@ import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared"
 import { AppShell } from "../components/AppShell";
 import { api, preferredFileAssetImageUrl } from "../lib/api";
 import { useCoverAssets } from "../lib/use-cover-assets";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./_shared";
+import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./shared";
 import { ContentBlocks } from "./content-blocks";
 
 export function KnowledgeBaseView() {

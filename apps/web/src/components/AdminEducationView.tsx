@@ -14,6 +14,7 @@ import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../lib/cms-autosave";
 import { CONTENT_STATUS_LABELS, LEARNING_ACCESS_LEVEL_LABELS } from "../lib/display-labels";
+import { pluralizeRu } from "../lib/ru-plural";
 
 type Attachment = { fileId: string; displayName: string };
 
@@ -373,7 +374,7 @@ function EducationTree({
                 title={module.title}
                 meta={`${module.isInDevelopment ? "В разработке · " : ""}${
                   LEARNING_ACCESS_LEVEL_LABELS[module.accessLevel]
-                } · ${module.chapters.length} ${pluralize(module.chapters.length, "глава", "главы", "глав")}`}
+                } · ${module.chapters.length} ${pluralizeRu(module.chapters.length, "глава", "главы", "глав")}`}
                 actions={moduleActions}
               />
               {isExpanded ? (
@@ -411,7 +412,7 @@ function EducationTree({
                           active={selection.kind === "chapter" && selection.id === chapter.id}
                           icon={<BookOpen size={16} />}
                           title={chapter.title}
-                          meta={`${chapter.lessons.length} ${pluralize(chapter.lessons.length, "урок", "урока", "уроков")}`}
+                          meta={`${chapter.lessons.length} ${pluralizeRu(chapter.lessons.length, "урок", "урока", "уроков")}`}
                           actions={chapterActions}
                         />
                         {chapterExpanded ? (
@@ -443,7 +444,7 @@ function EducationTree({
                                     icon={<FileText size={16} />}
                                     status={lesson.status}
                                     title={lesson.title}
-                                    meta={`${lesson.blocks.length} ${pluralize(lesson.blocks.length, "блок", "блока", "блоков")} · ${lesson.attachments.length} ${pluralize(lesson.attachments.length, "файл", "файла", "файлов")}`}
+                                    meta={`${lesson.blocks.length} ${pluralizeRu(lesson.blocks.length, "блок", "блока", "блоков")} · ${lesson.attachments.length} ${pluralizeRu(lesson.attachments.length, "файл", "файла", "файлов")}`}
                                     actions={lessonActions}
                                   />
                                 </li>
@@ -637,15 +638,6 @@ function TreeRow({
       <RowKebab actions={actions} />
     </div>
   );
-}
-
-function pluralize(count: number, one: string, few: string, many: string) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod100 >= 11 && mod100 <= 14) return many;
-  if (mod10 === 1) return one;
-  if (mod10 >= 2 && mod10 <= 4) return few;
-  return many;
 }
 
 function DetailPanel({

@@ -34,7 +34,7 @@ import {
   type ApiState,
   type LikeResult,
   useApiQuery,
-} from "./_shared";
+} from "./shared";
 import { ContentBlocks } from "./content-blocks";
 import {
   NEWS_ALL_TAG_LIMIT,

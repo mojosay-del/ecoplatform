@@ -14,7 +14,7 @@ import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../lib/cms-autosave";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
-import { formatNewsDate } from "../views/_shared";
+import { formatNewsDate } from "../views/shared";
 
 type NewsTag = {
   id: string;

@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { NomenclatureCategoryListItem, NomenclatureListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { api } from "../lib/api";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./_shared";
+import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./shared";
 import {
   formatIndexWeeklyChange,
   getIndexAnchorId,

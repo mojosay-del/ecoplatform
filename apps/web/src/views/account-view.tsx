@@ -47,7 +47,7 @@ import {
   USER_GENDER_LABELS,
 } from "../lib/display-labels";
 import { SUBSCRIPTION_PLAN_TIERS, type SubscriptionPlanTier } from "../lib/subscription-plans";
-import { useApiQuery } from "./_shared";
+import { useApiQuery } from "./shared";
 import { accountNotificationRowsForRoles } from "./account-notification-rows";
 
 const PROFILE_PHOTO_HINT =
