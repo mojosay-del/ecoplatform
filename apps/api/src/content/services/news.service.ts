@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { CommentStatus, ContentStatus, DiscussionTargetType, Prisma } from "@prisma/client";
-import { newsBlockSchema, slugify, validateContentBlocks } from "@ecoplatform/shared";
+import { newsBlockSchema, validateContentBlocks } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../../admin/settings/platform-settings.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
@@ -16,13 +16,10 @@ import {
   loadPublishedNewsCommentCounts,
   newsCommentAuthorSelect,
 } from "./news-comment.helpers";
+import { normaliseTagFilters, refreshTagUsage, replaceNewsTags } from "./news-tag.helpers";
 
 type NewsInput = z.infer<typeof newsInputSchema>;
 type NewsReadOptions = { preview?: boolean };
-
-function normaliseTagFilters(tagNames: string[] = []): string[] {
-  return Array.from(new Set(tagNames.map((name) => name.trim()).filter(Boolean)));
-}
 
 function canPreviewAuthoredContent(user: RequestUser, createdById: string) {
   return (
@@ -199,7 +196,7 @@ export class NewsService {
       },
     });
 
-    await this.replaceNewsTags(post.id, input.tags, user.id);
+    await replaceNewsTags(this.prisma, post.id, input.tags, user.id);
 
     // Регистрируем «новость → fileIds» в FileReference, чтобы
     // deleteIfUnreferenced работал O(1) вместо сканирования всех блоков.
@@ -258,8 +255,8 @@ export class NewsService {
       await tx.newsPostTag.deleteMany({ where: { newsPostId: id } });
     });
 
-    await this.replaceNewsTags(id, input.tags, user.id);
-    await this.refreshTagUsage(previousTagIds);
+    await replaceNewsTags(this.prisma, id, input.tags, user.id);
+    await refreshTagUsage(this.prisma, previousTagIds);
 
     // Сначала обновляем FileReference для этой новости (новый набор файлов),
     // потом cleanupDetachedFiles — он увидит, что старый fileId больше никем
@@ -366,7 +363,7 @@ export class NewsService {
     });
     await this.prisma.newsPost.delete({ where: { id } });
 
-    await this.refreshTagUsage(affectedTagIds);
+    await refreshTagUsage(this.prisma, affectedTagIds);
     // FileReference для этой новости очищаем ДО cleanupDetachedFiles, иначе
     // ссылки бы блокировали удаление файла.
     await this.common.clearEntityReferences("news_post", id);
@@ -453,62 +450,6 @@ export class NewsService {
       where: { id },
       include: { tags: { include: { newsTag: true } }, blocks: { orderBy: { position: "asc" } } },
     });
-  }
-
-  // Раньше тут был N+1: для каждого тега upsert + create — 20 запросов на
-  // 10 тегов. Теперь — 3 запроса вне зависимости от длины списка:
-  //   1) createMany skipDuplicates — добавляем недостающие теги одним пакетом;
-  //   2) findMany по name — берём все id (включая уже существующие);
-  //   3) createMany skipDuplicates — связываем NewsPost с тегами.
-  private async replaceNewsTags(newsPostId: string, tagNames: string[], actorId: string) {
-    const uniqueNames = Array.from(new Set(tagNames.map((name) => name.trim()).filter(Boolean)));
-    if (uniqueNames.length === 0) {
-      return;
-    }
-
-    await this.prisma.newsTag.createMany({
-      data: uniqueNames.map((name) => ({
-        name,
-        slug: slugify(name),
-        createdById: actorId,
-      })),
-      skipDuplicates: true,
-    });
-
-    const tags = await this.prisma.newsTag.findMany({
-      where: { name: { in: uniqueNames } },
-      select: { id: true },
-    });
-
-    await this.prisma.newsPostTag.createMany({
-      data: tags.map((tag) => ({ newsPostId, newsTagId: tag.id })),
-      skipDuplicates: true,
-    });
-
-    await this.refreshTagUsage(tags.map((tag) => tag.id));
-  }
-
-  private async refreshTagUsage(tagIds: string[]) {
-    const unique = Array.from(new Set(tagIds));
-    if (unique.length === 0) {
-      return;
-    }
-
-    const counts = await this.prisma.newsPostTag.groupBy({
-      by: ["newsTagId"],
-      where: { newsTagId: { in: unique } },
-      _count: { newsTagId: true },
-    });
-    const countMap = new Map(counts.map((row) => [row.newsTagId, row._count.newsTagId]));
-
-    await Promise.all(
-      unique.map((tagId) =>
-        this.prisma.newsTag.update({
-          where: { id: tagId },
-          data: { usageCount: countMap.get(tagId) ?? 0 },
-        }),
-      ),
-    );
   }
 
   async toggleNewsLike(id: string, user: RequestUser) {
