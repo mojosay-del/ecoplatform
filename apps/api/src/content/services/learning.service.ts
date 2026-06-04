@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { ContentStatus, LearningAccessLevel, Prisma } from "@prisma/client";
-import { canAccessLearningLevel, lessonBlockSchema, validateContentBlocks } from "@ecoplatform/shared";
+import { ContentStatus, Prisma } from "@prisma/client";
+import { lessonBlockSchema, validateContentBlocks } from "@ecoplatform/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { ModuleAccessService } from "../../common/module-access.service";
@@ -17,6 +17,18 @@ import type {
   lessonUpdateInputSchema,
 } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
+import {
+  assertLearningModulePublishable,
+  canAccessPublishedLearningModule,
+  canPreviewAuthoredContent,
+  type LearningReadOptions,
+} from "./learning-access.helpers";
+import {
+  mapLessonAttachment,
+  refreshLearningModuleFileReferences,
+  resolveLearningAttachmentMeta,
+} from "./learning-file-references.helpers";
+import { repositionChapter, repositionLearningModule, repositionLesson } from "./learning-position.helpers";
 
 type LearningModuleInput = z.infer<typeof learningModuleInputSchema>;
 type LearningModuleUpdateInput = z.infer<typeof learningModuleUpdateInputSchema>;
@@ -24,17 +36,10 @@ type ChapterInput = z.infer<typeof chapterInputSchema>;
 type ChapterUpdateInput = z.infer<typeof chapterUpdateInputSchema>;
 type LessonInput = z.infer<typeof lessonInputSchema>;
 type LessonUpdateInput = z.infer<typeof lessonUpdateInputSchema>;
-type LearningReadOptions = { preview?: boolean };
-
-function canPreviewAuthoredContent(user: RequestUser, createdById: string | null | undefined) {
-  return (
-    user.id === createdById || user.platformRoles.includes("admin") || user.platformRoles.includes("content_manager")
-  );
-}
 
 // Раздел «Обучение»: модули, главы, уроки, контент-блоки, доступ по подписке.
-// Вынесен из ContentService — содержит весь учебный домен и приватные хелперы
-// (hasLearningAccess, reposition*, createLearningModuleWithNextPosition).
+// Вынесен из ContentService — содержит публичный контракт учебного домена,
+// а узкие helper-группы лежат рядом в learning-*.helpers.ts.
 @Injectable()
 export class LearningService {
   constructor(
@@ -44,95 +49,6 @@ export class LearningService {
     private readonly common: ContentCommonService,
     private readonly files: FilesService,
   ) {}
-
-  // Готовит метаданные вложений (presigned downloadUrl + имя/тип/размер) для
-  // уроков, к которым у пользователя есть доступ. Presign приватных вложений
-  // делается ОДНОЙ пачкой на весь модуль и только здесь — то есть уже за гейтом
-  // hasAccess. Истекла подписка → урок не отдаёт вложения, и ссылка не выдаётся.
-  private async resolveAttachmentMeta(
-    chapters: Array<{ lessons: Array<{ attachments: Array<{ fileId: string }> }> }>,
-  ): Promise<Map<string, { downloadUrl: string | null; originalName: string; mimeType: string; sizeBytes: number }>> {
-    const fileIds = Array.from(
-      new Set(
-        chapters
-          .flatMap((chapter) => chapter.lessons.flatMap((lesson) => lesson.attachments.map((a) => a.fileId)))
-          .filter(Boolean),
-      ),
-    );
-    if (fileIds.length === 0) {
-      return new Map();
-    }
-
-    const assets = await this.prisma.fileAsset.findMany({
-      where: { id: { in: fileIds } },
-      select: { id: true, storageKey: true, accessLevel: true, originalName: true, mimeType: true, sizeBytes: true },
-    });
-    const signed = await this.files.signDownloadUrls(assets);
-
-    return new Map(
-      assets.map((asset) => [
-        asset.id,
-        {
-          downloadUrl: signed.get(asset.id) ?? null,
-          originalName: asset.originalName,
-          mimeType: asset.mimeType,
-          sizeBytes: asset.sizeBytes,
-        },
-      ]),
-    );
-  }
-
-  private mapLessonAttachment(
-    attachment: { id: string; fileId: string; displayName: string; position: number },
-    meta?: { downloadUrl: string | null; originalName: string; mimeType: string; sizeBytes: number },
-  ) {
-    return {
-      id: attachment.id,
-      fileId: attachment.fileId,
-      displayName: attachment.displayName,
-      position: attachment.position,
-      downloadUrl: meta?.downloadUrl ?? null,
-      originalName: meta?.originalName ?? null,
-      mimeType: meta?.mimeType ?? null,
-      sizeBytes: meta?.sizeBytes ?? null,
-    };
-  }
-
-  private hasLearningAccess(user: RequestUser, accessLevel: LearningAccessLevel) {
-    if (user.platformRoles.length > 0) {
-      return true;
-    }
-
-    return user.company ? canAccessLearningLevel(user.company, accessLevel) : false;
-  }
-
-  private canAccessPublishedLearningModule(
-    user: RequestUser,
-    module: { accessLevel: LearningAccessLevel; isInDevelopment: boolean },
-  ) {
-    return !module.isInDevelopment && this.hasLearningAccess(user, module.accessLevel);
-  }
-
-  private assertLearningModulePublishable(module: {
-    chapters: Array<{
-      title: string;
-      lessons: Array<{ title: string; _count: { blocks: number } }>;
-    }>;
-  }) {
-    if (module.chapters.length === 0) {
-      throw new ForbiddenException("Нельзя открыть доступ к модулю без глав.");
-    }
-    for (const chapter of module.chapters) {
-      if (chapter.lessons.length === 0) {
-        throw new ForbiddenException(`В главе «${chapter.title}» нет уроков.`);
-      }
-      for (const lesson of chapter.lessons) {
-        if (lesson._count.blocks === 0) {
-          throw new ForbiddenException(`Урок «${lesson.title}» не содержит блоков.`);
-        }
-      }
-    }
-  }
 
   async listLearningModules(user: RequestUser, paginationInput: PaginationInput = {}) {
     this.common.assertFunctionalAccess(user);
@@ -158,7 +74,7 @@ export class LearningService {
 
     const items = modules.map((module) => ({
       ...module,
-      hasAccess: this.canAccessPublishedLearningModule(user, module),
+      hasAccess: canAccessPublishedLearningModule(user, module),
     }));
 
     return paginatedResponse(items, total, pagination);
@@ -200,9 +116,11 @@ export class LearningService {
         ? chapter.lessons
         : chapter.lessons.filter((lesson) => lesson.status === ContentStatus.published),
     }));
-    const hasAccess = canPreview || this.canAccessPublishedLearningModule(user, module);
+    const hasAccess = canPreview || canAccessPublishedLearningModule(user, module);
     // Presigned-ссылки на вложения считаем только при наличии доступа — за гейтом.
-    const attachmentMeta = hasAccess ? await this.resolveAttachmentMeta(visibleChapters) : new Map();
+    const attachmentMeta = hasAccess
+      ? await resolveLearningAttachmentMeta(this.prisma, this.files, visibleChapters)
+      : new Map();
     let completedLessons = 0;
     const totalLessons = visibleChapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0);
     const chapters = visibleChapters.map((chapter) => ({
@@ -218,7 +136,7 @@ export class LearningService {
           return {
             ...lessonWithoutProgress,
             attachments: lessonWithoutProgress.attachments.map((attachment) =>
-              this.mapLessonAttachment(attachment, attachmentMeta.get(attachment.fileId)),
+              mapLessonAttachment(attachment, attachmentMeta.get(attachment.fileId)),
             ),
             completedAt,
           };
@@ -279,10 +197,9 @@ export class LearningService {
     }
     await this.common.assertCoverImageAllowed(input.coverImageId, user);
 
-    // LearningModule.position уникально на уровне БД, поэтому aggregate+create
-    // без атомарности — это гонка: два админа жмут «создать» одновременно,
-    // оба видят max=N, оба пишут N+1, второй получает P2002. Ретраим до 5 раз
-    // внутри одной транзакции — за это время вторая попытка увидит уже новый max.
+    // Позицию считаем внутри транзакции, чтобы новый модуль вставал в конец
+    // по актуальному max(position). Ретрай оставлен только для редкого P2002
+    // от вложенных уникальных позиций глав/уроков.
     const module = await this.createLearningModuleWithNextPosition(input, user.id);
 
     // Регистрируем все файлы модуля одной entity-row (cover + все file_id из
@@ -307,10 +224,8 @@ export class LearningService {
     return module;
   }
 
-  // Атомарное «прочитать max(position) и вставить max+1» с ретраем на P2002.
-  // Внутри транзакции aggregate видит данные на момент start, поэтому при
-  // параллельной попытке второй вызов получит unique-violation — ретрай-цикл
-  // его проглотит и пересчитает позицию.
+  // Атомарно читает max(position) и вставляет модуль последним.
+  // P2002 не маскируем широко: повторяем только известный конфликт уникальности.
   private async createLearningModuleWithNextPosition(input: LearningModuleInput, userId: string) {
     let lastError: unknown = null;
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -387,7 +302,7 @@ export class LearningService {
       throw new NotFoundException("Модуль не найден.");
     }
     if (!existing.isInDevelopment) {
-      this.assertLearningModulePublishable(existing);
+      assertLearningModulePublishable(existing);
     }
 
     const now = new Date();
@@ -480,7 +395,7 @@ export class LearningService {
       if (!publishable) {
         throw new NotFoundException("Модуль не найден.");
       }
-      this.assertLearningModulePublishable(publishable);
+      assertLearningModulePublishable(publishable);
       draftLessonIdsToPublish = publishable.chapters.flatMap((chapter) =>
         chapter.lessons.filter((lesson) => lesson.status === ContentStatus.draft).map((lesson) => lesson.id),
       );
@@ -503,7 +418,7 @@ export class LearningService {
 
     const module = await this.prisma.$transaction(async (tx) => {
       if (positionChanged) {
-        await this.repositionLearningModule(tx, id, input.position!);
+        await repositionLearningModule(tx, id, input.position!);
       }
       if (Object.keys(data).length === 0 && !input.preview) {
         return tx.learningModule.findUniqueOrThrow({ where: { id }, include: { preview: true } });
@@ -527,7 +442,7 @@ export class LearningService {
     if (input.coverImageId !== undefined && input.coverImageId !== existing.coverImageId) {
       // Перезапишем references для модуля под текущий cover (lessons/блоки
       // отдельно меняются — там свои хуки на createChapter/updateLesson/etc).
-      await this.refreshModuleFileReferences(id);
+      await refreshLearningModuleFileReferences(this.prisma, this.common, id);
       await this.common.cleanupDetachedFiles([existing.coverImageId]);
     }
 
@@ -624,7 +539,7 @@ export class LearningService {
 
     const chapter = await this.prisma.$transaction(async (tx) => {
       if (positionChanged) {
-        await this.repositionChapter(tx, existing.moduleId, id, input.position!);
+        await repositionChapter(tx, existing.moduleId, id, input.position!);
       }
       const data: Prisma.ChapterUpdateInput = {};
       if (input.title !== undefined) data.title = input.title;
@@ -707,7 +622,7 @@ export class LearningService {
       },
     });
 
-    await this.refreshModuleFileReferences(chapter.moduleId);
+    await refreshLearningModuleFileReferences(this.prisma, this.common, chapter.moduleId);
 
     await this.auditLog.record({
       actorId: user.id,
@@ -749,7 +664,7 @@ export class LearningService {
 
     const lesson = await this.prisma.$transaction(async (tx) => {
       if (positionChanged) {
-        await this.repositionLesson(tx, existing.chapterId, id, input.position!);
+        await repositionLesson(tx, existing.chapterId, id, input.position!);
       }
 
       const data: Prisma.LessonUpdateInput = {};
@@ -788,7 +703,7 @@ export class LearningService {
       select: { moduleId: true },
     });
     if (chapter) {
-      await this.refreshModuleFileReferences(chapter.moduleId);
+      await refreshLearningModuleFileReferences(this.prisma, this.common, chapter.moduleId);
     }
 
     await this.auditLog.record({
@@ -823,7 +738,7 @@ export class LearningService {
     });
     await this.prisma.lesson.delete({ where: { id } });
     if (chapter) {
-      await this.refreshModuleFileReferences(chapter.moduleId);
+      await refreshLearningModuleFileReferences(this.prisma, this.common, chapter.moduleId);
     }
     await this.common.cleanupDetachedFiles(deletedFileIds);
 
@@ -904,7 +819,7 @@ export class LearningService {
     ) {
       throw new NotFoundException("Урок не найден.");
     }
-    if (!this.canAccessPublishedLearningModule(user, lesson.chapter.module)) {
+    if (!canAccessPublishedLearningModule(user, lesson.chapter.module)) {
       throw new ForbiddenException("Доступ к модулю закрыт.");
     }
 
@@ -913,96 +828,5 @@ export class LearningService {
       update: {},
       create: { userId: user.id, lessonId },
     });
-  }
-  private async repositionChapter(tx: Prisma.TransactionClient, moduleId: string, itemId: string, newPosition: number) {
-    const siblings = await tx.chapter.findMany({
-      where: { moduleId, id: { not: itemId } },
-      orderBy: { position: "asc" },
-      select: { id: true },
-    });
-
-    await tx.chapter.update({ where: { id: itemId }, data: { position: -1 } });
-    for (let i = 0; i < siblings.length; i++) {
-      await tx.chapter.update({ where: { id: siblings[i]!.id }, data: { position: -(i + 2) } });
-    }
-
-    const ordered = siblings.map((s) => s.id);
-    const clamped = Math.max(0, Math.min(newPosition, ordered.length));
-    ordered.splice(clamped, 0, itemId);
-
-    for (let i = 0; i < ordered.length; i++) {
-      await tx.chapter.update({ where: { id: ordered[i]! }, data: { position: i } });
-    }
-  }
-
-  private async repositionLearningModule(tx: Prisma.TransactionClient, itemId: string, newPosition: number) {
-    const siblings = await tx.learningModule.findMany({
-      where: { id: { not: itemId } },
-      orderBy: [{ position: "asc" }, { createdAt: "desc" }],
-      select: { id: true },
-    });
-
-    const ordered = siblings.map((s) => s.id);
-    const clamped = Math.max(0, Math.min(newPosition, ordered.length));
-    ordered.splice(clamped, 0, itemId);
-
-    for (let i = 0; i < ordered.length; i++) {
-      await tx.learningModule.update({ where: { id: ordered[i]! }, data: { position: i } });
-    }
-  }
-
-  private async repositionLesson(tx: Prisma.TransactionClient, chapterId: string, itemId: string, newPosition: number) {
-    const siblings = await tx.lesson.findMany({
-      where: { chapterId, id: { not: itemId } },
-      orderBy: { position: "asc" },
-      select: { id: true },
-    });
-
-    await tx.lesson.update({ where: { id: itemId }, data: { position: -1 } });
-    for (let i = 0; i < siblings.length; i++) {
-      await tx.lesson.update({ where: { id: siblings[i]!.id }, data: { position: -(i + 2) } });
-    }
-
-    const ordered = siblings.map((s) => s.id);
-    const clamped = Math.max(0, Math.min(newPosition, ordered.length));
-    ordered.splice(clamped, 0, itemId);
-
-    for (let i = 0; i < ordered.length; i++) {
-      await tx.lesson.update({ where: { id: ordered[i]! }, data: { position: i } });
-    }
-  }
-
-  // Для статьи базы знаний: возможно потребовать вставку с уже «выведенным» из
-  // старой группы элементом (skipItemInGroup=true) — в этом случае ищем соседей
-  // без него и вставляем его как новичка. Полезно при смене родителя.
-
-  // Пересобирает FileReference для всего модуля. Зовём после любого изменения
-  // (cover, блок урока, attachment), т.к. на этом уровне хранится единая
-  // entity-row "learning_module" → modulesId. Цена пересборки — один SELECT
-  // с join'ами + replaceMany; держим её только в местах, где состав файлов
-  // действительно поменялся.
-  private async refreshModuleFileReferences(moduleId: string): Promise<void> {
-    const fresh = await this.prisma.learningModule.findUnique({
-      where: { id: moduleId },
-      include: {
-        chapters: {
-          include: {
-            lessons: {
-              include: { blocks: true, attachments: true },
-            },
-          },
-        },
-      },
-    });
-    if (!fresh) return;
-    await this.common.recordEntityReferences("learning_module", moduleId, [
-      fresh.coverImageId,
-      ...fresh.chapters.flatMap((chapter) =>
-        chapter.lessons.flatMap((lesson) => [
-          ...this.common.collectFileIdsFromBlocks(lesson.blocks),
-          ...lesson.attachments.map((attachment) => attachment.fileId),
-        ]),
-      ),
-    ]);
   }
 }
