@@ -1,78 +1,19 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, ImageIcon, Plus, Search, X } from "lucide-react";
-import { AppShell } from "./AppShell";
-import type { Block } from "../lib/editor/block-types";
-import { DocumentEditor } from "./editor/DocumentEditor";
-import type { AtomicBlockKind } from "../lib/editor/block-mapping";
-import { FileUploadField } from "./FileUploadField";
-import { RowKebab, type ActionItem } from "./RowKebab";
-import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../lib/api";
-import { useAuth } from "../lib/auth";
-import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
-import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../lib/cms-autosave";
-import { useCoverAssets } from "../lib/use-cover-assets";
-import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
-import { formatNewsDate } from "../views/shared";
-
-type NewsTag = {
-  id: string;
-  name: string;
-};
-
-type NewsTagOption = NewsTag & {
-  usageCount: number;
-};
-
-type TagSuggestion = {
-  name: string;
-  usageCount?: number;
-};
-
-type NewsItem = {
-  id: string;
-  title: string;
-  lead: string;
-  slug: string;
-  status: "draft" | "published";
-  coverImageId: string | null;
-  tags: Array<{ newsTagId: string; newsTag: NewsTag }>;
-  firstPublishedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  _count?: { blocks: number; comments: number; likes: number };
-};
-
-type NewsDetail = NewsItem & {
-  blocks: Block[];
-};
-
-type ViewState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
-
-type DraftState = {
-  id: string | null;
-  title: string;
-  lead: string;
-  coverImageId: string;
-  tags: string[];
-  blocks: Block[];
-};
-
-const EMPTY_DRAFT: DraftState = {
-  id: null,
-  title: "",
-  lead: "",
-  coverImageId: "",
-  tags: [],
-  blocks: [{ type: "paragraph", payload: { html: "" } }],
-};
-
-const NEWS_LIST_PAGE_SIZE = 20;
-
-// Атомарные блоки для новостей (текстовые блоки всегда доступны через панель
-// и меню «/»). Без чек-листов/файлов/урок-специфичных блоков.
-const NEWS_ATOMIC_KINDS: AtomicBlockKind[] = ["image", "gallery", "video", "audio"];
+import { ExternalLink, Plus, Search, X } from "lucide-react";
+import { AppShell } from "../../../components/AppShell";
+import type { Block } from "../../../lib/editor/block-types";
+import { DocumentEditor } from "../../../components/editor/DocumentEditor";
+import { FileUploadField } from "../../../components/FileUploadField";
+import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
+import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
+import { useCoverAssets } from "../../../lib/use-cover-assets";
+import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
+import type { DraftState, NewsDetail, NewsItem, NewsTagOption, TagSuggestion, ViewState } from "./types";
+import { EMPTY_DRAFT, NEWS_ATOMIC_KINDS, NEWS_LIST_PAGE_SIZE } from "./constants";
+import { NewsRow } from "./NewsRow";
 
 export function AdminNewsView() {
   const { token } = useAuth();
@@ -580,72 +521,18 @@ export function AdminNewsView() {
               </p>
             ) : null}
             <div className="news-list">
-              {items.map((item) => {
-                const coverUrl = preferredFileAssetImageUrl(item.coverImageId ? covers.get(item.coverImageId) : null);
-                const publishedDate = item.firstPublishedAt ? new Date(item.firstPublishedAt) : null;
-                const updatedDate = new Date(item.updatedAt);
-                const actions: ActionItem[] = [
-                  {
-                    label: "Открыть предпросмотр",
-                    onClick: () => openSavedPreview(item),
-                  },
-                  {
-                    label: item.status === "published" ? "Снять с публикации" : "Опубликовать",
-                    onClick: () => publishToggle(item),
-                  },
-                  { label: "Удалить", onClick: () => remove(item), danger: true },
-                ];
-                const isActive = draft.id === item.id;
-                return (
-                  <article key={item.id} className={`news-row${isActive ? " is-active" : ""}`}>
-                    <button type="button" className="news-row-main" onClick={() => void startEdit(item)}>
-                      <div className="news-row-thumb">
-                        {coverUrl ? (
-                          <img alt="" src={coverUrl} />
-                        ) : (
-                          <div className="news-row-thumb-fallback">
-                            <ImageIcon size={18} />
-                          </div>
-                        )}
-                      </div>
-                      <div className="news-row-info">
-                        <div className="news-row-meta">
-                          <span className={`news-row-status${item.status === "published" ? " is-published" : ""}`}>
-                            <span className="news-row-dot" aria-hidden />
-                            {CONTENT_STATUS_LABELS[item.status]}
-                          </span>
-                          {publishedDate ? (
-                            <time className="news-row-date" dateTime={publishedDate.toISOString()}>
-                              Опубликовано {formatNewsDate(publishedDate)}
-                            </time>
-                          ) : (
-                            <time className="news-row-date" dateTime={updatedDate.toISOString()}>
-                              Не опубликована · обновлено {formatNewsDate(updatedDate)}
-                            </time>
-                          )}
-                        </div>
-                        <div className="news-row-line">
-                          <strong className="news-row-title">{item.title}</strong>
-                        </div>
-                        {item.lead ? <p className="news-row-lead">{item.lead}</p> : null}
-                        {item.tags.length > 0 ? (
-                          <div className="news-row-tags">
-                            {item.tags.slice(0, 4).map((t) => (
-                              <span className="tag-chip is-static" key={t.newsTag.id}>
-                                #{t.newsTag.name}
-                              </span>
-                            ))}
-                            {item.tags.length > 4 ? (
-                              <span className="news-row-tags-more">+{item.tags.length - 4}</span>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    </button>
-                    <RowKebab actions={actions} />
-                  </article>
-                );
-              })}
+              {items.map((item) => (
+                <NewsRow
+                  key={item.id}
+                  item={item}
+                  isActive={draft.id === item.id}
+                  coverUrl={preferredFileAssetImageUrl(item.coverImageId ? covers.get(item.coverImageId) : null)}
+                  onEdit={() => void startEdit(item)}
+                  onPreview={() => openSavedPreview(item)}
+                  onPublishToggle={() => publishToggle(item)}
+                  onRemove={() => remove(item)}
+                />
+              ))}
             </div>
             <div ref={newsQuery.sentinelRef} aria-hidden="true" />
             {newsQuery.isLoadingMore ? <p className="page-subtitle news-list-more">Загружаем ещё…</p> : null}
