@@ -22,15 +22,17 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { BillingStatus, BillingSubscription, CompanyProfileUpdateDto } from "@ecoplatform/shared";
 import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import {
   ACCOUNT_SECTION_CHANGE_EVENT,
   ACCOUNT_SECTION_NAVIGATE_EVENT,
+  type AccountProfileModalId,
   accountSectionHref,
   isAccountBusinessSection,
+  normalizeAccountProfileModal,
   type AccountSectionId,
 } from "../components/app-shell-nav";
 import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "../components/StatusPill";
@@ -228,6 +230,9 @@ function AccountPasswordValue({ onEdit }: { onEdit: () => void }) {
 
 export function AccountView({ section }: { section: AccountSectionId }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawProfileModal = searchParams.get("modal");
+  const profileModal = normalizeAccountProfileModal(rawProfileModal);
   const { user, token, refreshMe } = useAuth();
   const isPlatformStaff = (user?.platformRoles?.length ?? 0) > 0;
   const {
@@ -367,6 +372,26 @@ export function AccountView({ section }: { section: AccountSectionId }) {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [notificationsDialogOpen]);
+
+  useEffect(() => {
+    if (!rawProfileModal) {
+      setSubscriptionDialogOpen(false);
+      setSessionsDialogOpen(false);
+      setNotificationsDialogOpen(false);
+      return;
+    }
+
+    if (!user) return;
+
+    if (!profileModal || isPlatformStaff) {
+      router.replace(accountSectionHref("profile"), { scroll: false });
+      return;
+    }
+
+    setSubscriptionDialogOpen(profileModal === "subscription");
+    setSessionsDialogOpen(profileModal === "sessions");
+    setNotificationsDialogOpen(profileModal === "notifications");
+  }, [isPlatformStaff, profileModal, rawProfileModal, router, user]);
 
   useEffect(() => {
     if (isPlatformStaff && isAccountBusinessSection(section)) {
@@ -773,6 +798,12 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     );
   }
 
+  function clearProfileModalParam(modal: AccountProfileModalId) {
+    if (profileModal === modal) {
+      router.replace(accountSectionHref("profile"), { scroll: false });
+    }
+  }
+
   function openSupport() {
     window.dispatchEvent(new Event("support:open"));
   }
@@ -783,6 +814,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
 
   function closeSubscriptionDialog() {
     setSubscriptionDialogOpen(false);
+    clearProfileModalParam("subscription");
   }
 
   function openPaymentDialog() {
@@ -799,6 +831,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
 
   function closeSessionsDialog() {
     setSessionsDialogOpen(false);
+    clearProfileModalParam("sessions");
   }
 
   function openNotificationsDialog() {
@@ -807,6 +840,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
 
   function closeNotificationsDialog() {
     setNotificationsDialogOpen(false);
+    clearProfileModalParam("notifications");
   }
 
   function openPasswordDialog() {

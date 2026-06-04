@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronsLeft, ChevronsRight, HelpCircle, LogOut, Menu, Settings, X } from "lucide-react";
 import { useAuth, type User } from "../lib/auth";
@@ -10,12 +10,15 @@ import { SUPPORT_EMAIL } from "../lib/platform-contact";
 import {
   ACCOUNT_SECTION_CHANGE_EVENT,
   ACCOUNT_SECTION_NAVIGATE_EVENT,
+  accountProfileModalFromHref,
   accountSectionFromHref,
   appNavSections,
   getAccountMenuSections,
   getBreadcrumbTrail,
   isAccountPath,
   isNavItemActive,
+  normalizeAccountProfileModal,
+  type AccountProfileModalId,
   type BreadcrumbItem,
   type AccountSectionId,
   type NavItem,
@@ -37,6 +40,7 @@ type AppShellChrome = {
 export function AppShell({ children, chrome = {} }: { children: React.ReactNode; chrome?: AppShellChrome }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, token, ready, logout } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -46,6 +50,7 @@ export function AppShell({ children, chrome = {} }: { children: React.ReactNode;
   // показывать не нужно, иначе двойная сущность.
   const isAdminUser = (user?.platformRoles?.length ?? 0) > 0;
   const inAccountSettings = isAccountPath(pathname);
+  const activeAccountModal = inAccountSettings ? normalizeAccountProfileModal(searchParams.get("modal")) : null;
   const showSidebar = chrome.sidebar !== false;
   const showBreadcrumbs = chrome.breadcrumbs !== false;
   const showNotifications = chrome.notifications !== false;
@@ -218,9 +223,11 @@ export function AppShell({ children, chrome = {} }: { children: React.ReactNode;
           )}
           <AccountMenu
             activeAccountSection={activeAccountSection}
+            activeAccountModal={activeAccountModal}
             includeBusiness={!isAdminUser}
             onLogout={logout}
             pathname={pathname}
+            searchKey={searchParams.toString()}
             user={user}
           />
         </header>
@@ -243,15 +250,19 @@ export function AppShell({ children, chrome = {} }: { children: React.ReactNode;
 
 function AccountMenu({
   activeAccountSection,
+  activeAccountModal,
   includeBusiness,
   onLogout,
   pathname,
+  searchKey,
   user,
 }: {
   activeAccountSection: AccountSectionId | null;
+  activeAccountModal: AccountProfileModalId | null;
   includeBusiness: boolean;
   onLogout: () => Promise<void>;
   pathname: string;
+  searchKey: string;
   user: User | null;
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -262,7 +273,7 @@ function AccountMenu({
 
   useEffect(() => {
     setOpen(false);
-  }, [pathname]);
+  }, [pathname, searchKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -313,15 +324,19 @@ function AccountMenu({
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const accountSection = activeAccountSection ? accountSectionFromHref(item.href) : null;
-                const active = accountSection
-                  ? accountSection === activeAccountSection
-                  : isNavItemActive(item, pathname);
+                const accountModal = accountProfileModalFromHref(item.href);
+                const active = accountModal
+                  ? accountModal === activeAccountModal
+                  : accountSection
+                    ? accountSection === activeAccountSection && !activeAccountModal
+                    : isNavItemActive(item, pathname);
                 return item.href ? (
                   <Link
                     className={`account-menu-link ${active ? "active" : ""}`}
                     href={item.href}
                     key={item.href}
                     onClick={() => {
+                      setOpen(false);
                       if (accountSection) {
                         window.dispatchEvent(
                           new CustomEvent(ACCOUNT_SECTION_NAVIGATE_EVENT, { detail: { section: accountSection } }),

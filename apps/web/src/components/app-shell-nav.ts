@@ -1,8 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
+  Bell,
   BookOpen,
   Calculator,
+  CreditCard,
   Database,
   FileText,
   GraduationCap,
@@ -10,6 +12,7 @@ import {
   LineChart,
   Map as MapIcon,
   MessageCircle,
+  Smartphone,
   Newspaper,
   UserRound,
 } from "lucide-react";
@@ -39,6 +42,7 @@ export type BreadcrumbItem = {
 };
 
 export type AccountSectionId = "profile" | "data-privacy";
+export type AccountProfileModalId = "subscription" | "sessions" | "notifications";
 
 export const ACCOUNT_SECTION_CHANGE_EVENT = "account:section-change";
 export const ACCOUNT_SECTION_NAVIGATE_EVENT = "account:section-navigate";
@@ -105,6 +109,15 @@ const accountSettingsItems: NavItem[] = [
   { href: "/account/data-privacy", label: "Данные и приватность", icon: Database },
 ];
 
+const accountProfileMenuItems: NavItem[] = [
+  { href: "/account/profile", label: "Профиль", icon: UserRound },
+  { href: accountProfileModalHref("subscription"), label: "Подписка", icon: CreditCard },
+  { href: accountProfileModalHref("sessions"), label: "Сессии", icon: Smartphone },
+  { href: accountProfileModalHref("notifications"), label: "Уведомления", icon: Bell },
+];
+
+const accountStaffMenuItems: NavItem[] = [{ href: "/account/profile", label: "Профиль", icon: UserRound }];
+
 export const accountBusinessSections: AccountSectionId[] = [];
 
 export function getAccountNavSections(includeBusiness: boolean): NavSection[] {
@@ -122,7 +135,12 @@ export function getAccountNavSections(includeBusiness: boolean): NavSection[] {
 }
 
 export function getAccountMenuSections(includeBusiness: boolean): NavSection[] {
-  return getAccountNavSections(includeBusiness).filter((section) => section.title !== "Переход");
+  return [
+    {
+      title: "Настройки",
+      items: includeBusiness ? accountProfileMenuItems : accountStaffMenuItems,
+    },
+  ];
 }
 
 export function isAccountPath(pathname: string): boolean {
@@ -141,6 +159,21 @@ export function accountSectionHref(section: AccountSectionId): string {
   return `/account/${section}`;
 }
 
+export function accountProfileModalHref(modal: AccountProfileModalId): string {
+  return `${accountSectionHref("profile")}?modal=${modal}`;
+}
+
+export function normalizeAccountProfileModal(value: string | null | undefined): AccountProfileModalId | null {
+  return accountProfileModalIds.has(value as AccountProfileModalId) ? (value as AccountProfileModalId) : null;
+}
+
+export function accountProfileModalFromHref(href: string | undefined): AccountProfileModalId | null {
+  if (!href) return null;
+  const [, query = ""] = href.split("?");
+  const modal = new URLSearchParams(query).get("modal");
+  return normalizeAccountProfileModal(modal);
+}
+
 export function accountSectionFromHref(href: string | undefined): AccountSectionId | null {
   if (!href) return null;
   if (href === "/account") return "profile";
@@ -152,8 +185,7 @@ export function accountSectionFromHref(href: string | undefined): AccountSection
 
 export function getLegacyAccountTabHref(tab: string | null | undefined): string | null {
   if (!tab) return null;
-  const section = legacyAccountTabToSection.get(tab);
-  return section ? accountSectionHref(section) : null;
+  return legacyAccountTabToHref.get(tab) ?? null;
 }
 
 export function futureNavItems(sections: NavSection[] = appNavSections): NavItem[] {
@@ -244,15 +276,16 @@ const accountBreadcrumbs: { prefix: string; section: AccountSectionId; label: st
 ];
 
 const accountSectionIds = new Set<AccountSectionId>(accountBreadcrumbs.map((item) => item.section));
+const accountProfileModalIds = new Set<AccountProfileModalId>(["subscription", "sessions", "notifications"]);
 
-const legacyAccountTabToSection = new Map<string, AccountSectionId>([
-  ["profile", "profile"],
-  ["security", "profile"],
-  ["notifications", "profile"],
-  ["company", "profile"],
-  ["billing", "profile"],
-  ["sessions", "profile"],
-  ["support", "profile"],
+const legacyAccountTabToHref = new Map<string, string>([
+  ["profile", accountSectionHref("profile")],
+  ["security", accountSectionHref("profile")],
+  ["notifications", accountProfileModalHref("notifications")],
+  ["company", accountSectionHref("profile")],
+  ["billing", accountProfileModalHref("subscription")],
+  ["sessions", accountProfileModalHref("sessions")],
+  ["support", accountSectionHref("profile")],
 ]);
 
 function getAccountBreadcrumbTrail(pathname: string): BreadcrumbItem[] | null {

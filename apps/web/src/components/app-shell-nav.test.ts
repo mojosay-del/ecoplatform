@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  accountProfileModalFromHref,
   accountSectionFromHref,
   appNavSections,
   futureNavItems,
+  getAccountMenuSections,
   getAccountNavSections,
   getBreadcrumbTrail,
   getLegacyAccountTabHref,
@@ -46,11 +48,37 @@ describe("AppShell future navigation teasers", () => {
     expect(sections[1]?.items.map((item) => item.label)).toEqual(["Профиль", "Данные и приватность"]);
   });
 
+  it("builds the account topbar menu with profile modal links for regular users", () => {
+    const sections = getAccountMenuSections(true);
+
+    expect(sections.map((section) => section.title)).toEqual(["Настройки"]);
+    expect(sections[0]?.items.map((item) => item.label)).toEqual([
+      "Профиль",
+      "Подписка",
+      "Сессии",
+      "Уведомления",
+    ]);
+    expect(sections[0]?.items.map((item) => item.href)).toEqual([
+      "/account/profile",
+      "/account/profile?modal=subscription",
+      "/account/profile?modal=sessions",
+      "/account/profile?modal=notifications",
+    ]);
+  });
+
   it("hides business account links for platform staff", () => {
     const sections = getAccountNavSections(false);
 
     expect(sections.map((section) => section.title)).toEqual(["Переход", "Настройки"]);
     expect(sections.flatMap((section) => section.items.map((item) => item.href))).not.toContain("/account/support");
+  });
+
+  it("keeps the account topbar menu minimal for platform staff", () => {
+    const sections = getAccountMenuSections(false);
+
+    expect(sections.map((section) => section.title)).toEqual(["Настройки"]);
+    expect(sections[0]?.items.map((item) => item.label)).toEqual(["Профиль"]);
+    expect(sections[0]?.items.map((item) => item.href)).toEqual(["/account/profile"]);
   });
 
   it("builds regular breadcrumbs from the visible sidebar section", () => {
@@ -93,11 +121,18 @@ describe("AppShell future navigation teasers", () => {
   it("maps legacy account tab query values to direct routes", () => {
     expect(getLegacyAccountTabHref("security")).toBe("/account/profile");
     expect(getLegacyAccountTabHref("company")).toBe("/account/profile");
-    expect(getLegacyAccountTabHref("billing")).toBe("/account/profile");
-    expect(getLegacyAccountTabHref("sessions")).toBe("/account/profile");
-    expect(getLegacyAccountTabHref("notifications")).toBe("/account/profile");
+    expect(getLegacyAccountTabHref("billing")).toBe("/account/profile?modal=subscription");
+    expect(getLegacyAccountTabHref("sessions")).toBe("/account/profile?modal=sessions");
+    expect(getLegacyAccountTabHref("notifications")).toBe("/account/profile?modal=notifications");
     expect(getLegacyAccountTabHref("support")).toBe("/account/profile");
     expect(getLegacyAccountTabHref("unknown")).toBeNull();
+  });
+
+  it("parses profile modal links from account menu hrefs", () => {
+    expect(accountProfileModalFromHref("/account/profile?modal=subscription")).toBe("subscription");
+    expect(accountProfileModalFromHref("/account/profile?modal=sessions")).toBe("sessions");
+    expect(accountProfileModalFromHref("/account/profile?modal=notifications")).toBe("notifications");
+    expect(accountProfileModalFromHref("/account/profile?modal=unknown")).toBeNull();
   });
 
   it("parses account section links for scroll navigation", () => {
