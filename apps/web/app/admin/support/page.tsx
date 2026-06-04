@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AdminSupportView } from "../../../src/components/AdminSupportView";
+import { AdminSupportView } from "../../../src/views/admin/support";
 
 export default function AdminSupportPage() {
   return (

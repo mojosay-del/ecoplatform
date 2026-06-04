@@ -3,14 +3,14 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw, Search } from "lucide-react";
-import { AdminSortButton } from "./AdminSortButton";
-import { AppShell } from "./AppShell";
-import { StatusPill, supportStatusPillVariant } from "./StatusPill";
-import { sortItems, type SortState } from "./admin-table-utils";
-import { apiFetch } from "../lib/api";
-import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../lib/display-labels";
-import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
-import { useAuth } from "../lib/auth";
+import { AdminSortButton } from "../../../components/AdminSortButton";
+import { AppShell } from "../../../components/AppShell";
+import { StatusPill, supportStatusPillVariant } from "../../../components/StatusPill";
+import { sortItems, type SortState } from "../../../components/admin-table-utils";
+import { apiFetch } from "../../../lib/api";
+import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../../../lib/display-labels";
+import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
+import { useAuth } from "../../../lib/auth";
 
 // Inbox-режим админской поддержки: слева — список тикетов с фильтрами,
 // справа — выбранный тикет с тредом и формой ответа. Раньше всё валилось
