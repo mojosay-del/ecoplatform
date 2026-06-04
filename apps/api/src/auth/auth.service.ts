@@ -9,13 +9,7 @@ import { JwtService } from "@nestjs/jwt";
 import { CompanyRole, CompanyStatus, NotificationCategory } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { createHmac, randomInt, randomUUID, timingSafeEqual } from "crypto";
-import {
-  MIN_PASSWORD_LENGTH,
-  type AuthMeUser,
-  type LoginDto,
-  type RegisterDto,
-  type RegistrationVerifyDto,
-} from "@ecoplatform/shared";
+import { MIN_PASSWORD_LENGTH, type LoginDto, type RegisterDto, type RegistrationVerifyDto } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { swallowAndLog } from "../common/silent-catch";
 import { EmailService } from "../email/email.service";
@@ -23,6 +17,7 @@ import { recordUserRegistered } from "../observability/metrics.registry";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
 import { loginAuthUser, type AuthLoginWorkflowDeps } from "./auth-login-workflow.helpers";
+import { accountDeletionScheduledFor, getAuthMeUser, type AuthProfileDeps } from "./auth-profile.helpers";
 import {
   createAuthSession,
   listAuthSessions,
@@ -36,7 +31,6 @@ import {
 } from "./auth-session-workflow.helpers";
 import { PasswordPolicyService } from "./password-policy.service";
 
-const ACCOUNT_DELETION_GRACE_DAYS = 30;
 const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
 
@@ -503,73 +497,8 @@ export class AuthService {
     return logoutAllAuthSessions(this.sessionWorkflowDeps, userId);
   }
 
-  async me(userId: string): Promise<AuthMeUser> {
-    const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      include: {
-        company: {
-          select: {
-            id: true,
-            organizationName: true,
-            type: true,
-            status: true,
-            demoEndsAt: true,
-            subscriptionPlan: true,
-            subscriptionEndsAt: true,
-          },
-        },
-        platformStaff: true,
-      },
-    });
-
-    const platformRoles = user.platformStaff?.isActive ? user.platformStaff.roles : [];
-
-    return {
-      id: user.id,
-      email: user.email,
-      phone: user.phone,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      gender: user.gender,
-      status: user.status,
-      avatarUrl: resolveProfileAvatarUrl(platformRoles, user.company?.type ?? null, user.gender),
-      companyId: user.companyId,
-      company: user.company
-        ? {
-            id: user.company.id,
-            organizationName: user.company.organizationName,
-            type: user.company.type,
-            status: user.company.status,
-            demoEndsAt: user.company.demoEndsAt?.toISOString() ?? null,
-            subscriptionPlan: user.company.subscriptionPlan,
-            subscriptionEndsAt: user.company.subscriptionEndsAt?.toISOString() ?? null,
-          }
-        : null,
-      platformRoles,
-      requiresReConsent: await this.hasPendingRequiredConsent(userId),
-      deletionRequestedAt: user.deletionRequestedAt?.toISOString() ?? null,
-      deletionScheduledFor: user.deletionRequestedAt
-        ? accountDeletionScheduledFor(user.deletionRequestedAt).toISOString()
-        : null,
-    };
-  }
-
-  // requiresReConsent=true означает, что после последнего входа была
-  // опубликована новая версия обязательного документа, и пользователь её
-  // ещё не подтвердил. UI показывает модалку «Условия использования
-  // обновлены» при следующем визите. ConsentRecord имеет уникальный
-  // (userId, documentId) — каждая новая версия = новая строка LegalDocument,
-  // поэтому отсутствие записи на конкретную активную версию = pending.
-  private async hasPendingRequiredConsent(userId: string): Promise<boolean> {
-    const requiredActive = await this.prisma.legalDocument.findMany({
-      where: { isActive: true, isRequired: true },
-      select: { id: true },
-    });
-    if (requiredActive.length === 0) return false;
-    const acceptedCount = await this.prisma.consentRecord.count({
-      where: { userId, documentId: { in: requiredActive.map((d) => d.id) } },
-    });
-    return acceptedCount < requiredActive.length;
+  async me(userId: string) {
+    return getAuthMeUser(this.profileDeps, userId);
   }
 
   private async createSession(userId: string, meta: AuthSessionMeta, rememberMe: boolean): Promise<AuthSessionTokens> {
@@ -591,39 +520,12 @@ export class AuthService {
       sessionCache: this.sessionCache,
     };
   }
-}
 
-function resolveProfileAvatarUrl(platformRoles: string[], companyType: string | null, gender: string): string | null {
-  const platformPrefix = platformRoles.includes("admin")
-    ? "a"
-    : platformRoles.includes("moderator") || platformRoles.includes("content_manager")
-      ? "m"
-      : null;
-  const suffix = avatarSuffixByGender[gender];
-
-  if (platformPrefix && suffix) {
-    return `/avatars/platform/${platformPrefix}${suffix}.png`;
+  private get profileDeps(): AuthProfileDeps {
+    return {
+      prisma: this.prisma,
+    };
   }
-
-  const companyPrefix = companyType ? companyAvatarPrefixByType[companyType] : null;
-  if (!companyPrefix || !suffix) return null;
-
-  return `/avatars/company/${companyPrefix}${suffix}.png`;
-}
-
-const companyAvatarPrefixByType: Record<string, string> = {
-  collector: "z",
-  trader: "t",
-  processor: "p",
-};
-
-const avatarSuffixByGender: Record<string, string> = {
-  male: "man",
-  female: "woman",
-};
-
-function accountDeletionScheduledFor(requestedAt: Date): Date {
-  return new Date(requestedAt.getTime() + ACCOUNT_DELETION_GRACE_DAYS * 24 * 60 * 60 * 1000);
 }
 
 function serializeAccountDeletion(requestedAt: Date | null): AccountDeletionResponse {
