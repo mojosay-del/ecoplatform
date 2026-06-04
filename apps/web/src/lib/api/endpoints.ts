@@ -33,6 +33,7 @@ import { apiDownload, apiFetch, type FileAsset } from "./core";
 
 type PaginationInput = { limit?: number; offset?: number };
 type NewsListInput = PaginationInput & { tags?: string[] };
+type AdminNewsListInput = PaginationInput & { q?: string };
 type ApiRequestOptions = { token?: string | null };
 type PreviewRequestOptions = ApiRequestOptions & { preview?: boolean };
 
@@ -67,6 +68,14 @@ function newsListSuffix(input: NewsListInput = {}) {
   if (input.limit !== undefined) query.set("limit", String(input.limit));
   if (input.offset !== undefined) query.set("offset", String(input.offset));
   input.tags?.forEach((tag) => query.append("tags[]", tag));
+  return query.toString() ? `?${query.toString()}` : "";
+}
+
+function adminNewsListSuffix(input: AdminNewsListInput = {}) {
+  const query = new URLSearchParams();
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  if (input.offset !== undefined) query.set("offset", String(input.offset));
+  if (input.q?.trim()) query.set("q", input.q.trim());
   return query.toString() ? `?${query.toString()}` : "";
 }
 
@@ -221,7 +230,7 @@ export const api = {
     news: {
       // Возвращает paginated envelope БЕЗ blocks (для таблицы).
       // Получение detail для редактора — `admin.news.get(id)`.
-      list: (pagination: PaginationInput = {}) =>
+      list: (pagination: AdminNewsListInput = {}) =>
         apiFetch<
           PaginatedResponse<{
             id: string;
@@ -236,7 +245,7 @@ export const api = {
             tags: Array<{ newsTagId: string; newsTag: { id: string; name: string; slug: string } }>;
             _count: { blocks: number; comments: number; likes: number };
           }>
-        >(`/admin/content/news${paginationSuffix(pagination)}`),
+        >(`/admin/content/news${adminNewsListSuffix(pagination)}`),
       get: (id: string) =>
         apiFetch<{
           id: string;

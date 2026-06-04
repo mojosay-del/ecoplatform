@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, ImageIcon, Plus, X } from "lucide-react";
+import { ExternalLink, ImageIcon, Plus, Search, X } from "lucide-react";
 import { AppShell } from "./AppShell";
 import type { Block } from "../lib/editor/block-types";
 import { DocumentEditor } from "./editor/DocumentEditor";
@@ -23,6 +23,11 @@ type NewsTag = {
 
 type NewsTagOption = NewsTag & {
   usageCount: number;
+};
+
+type TagSuggestion = {
+  name: string;
+  usageCount?: number;
 };
 
 type NewsItem = {
@@ -77,12 +82,19 @@ export function AdminNewsView() {
   const [editingOriginal, setEditingOriginal] = useState<NewsDetail | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState("");
+  const [newsSearch, setNewsSearch] = useState("");
+  const [appliedNewsSearch, setAppliedNewsSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const newsSearchQuery = appliedNewsSearch.trim();
   const newsQuery = useInfiniteApiQuery<NewsItem>(
-    token ? "admin-news" : null,
+    token ? `admin-news:${newsSearchQuery}` : null,
     NEWS_LIST_PAGE_SIZE,
     ({ limit, offset }) =>
-      api.admin.news.list({ limit, offset }) as Promise<{ items: NewsItem[]; total: number; hasMore: boolean }>,
+      api.admin.news.list({ limit, offset, q: newsSearchQuery || undefined }) as Promise<{
+        items: NewsItem[];
+        total: number;
+        hasMore: boolean;
+      }>,
   );
   const items = newsQuery.items;
 
@@ -98,11 +110,30 @@ export function AdminNewsView() {
     return [...set].sort((a, b) => a.localeCompare(b, "ru"));
   }, [items, tagOptions]);
 
-  const filteredSuggestions = useMemo(() => {
-    if (!tagDraft.trim()) return [];
+  const tagSuggestions = useMemo<TagSuggestion[]>(() => {
+    const selectedTags = new Set(draft.tags.map((tag) => tag.toLowerCase()));
     const query = tagDraft.trim().toLowerCase();
-    return knownTags.filter((tag) => tag.toLowerCase().includes(query) && !draft.tags.includes(tag)).slice(0, 8);
-  }, [tagDraft, knownTags, draft.tags]);
+    const byName = new Map<string, TagSuggestion>();
+
+    for (const tag of tagOptions) {
+      const key = tag.name.toLowerCase();
+      if (!selectedTags.has(key)) byName.set(key, { name: tag.name, usageCount: tag.usageCount });
+    }
+    for (const tag of knownTags) {
+      const key = tag.toLowerCase();
+      if (!selectedTags.has(key) && !byName.has(key)) byName.set(key, { name: tag });
+    }
+
+    return [...byName.values()]
+      .filter((tag) => (query ? tag.name.toLowerCase().includes(query) : true))
+      .sort((a, b) => {
+        const usageDiff = (b.usageCount ?? 0) - (a.usageCount ?? 0);
+        return usageDiff || a.name.localeCompare(b.name, "ru");
+      })
+      .slice(0, 10);
+  }, [draft.tags, knownTags, tagDraft, tagOptions]);
+
+  const tagSuggestionLabel = tagDraft.trim() ? "Подходящие теги" : "Популярные теги";
 
   // Запоминаем «оригинал» текущей открытой новости — нужен для индикатора
   // «есть несохранённые изменения» внизу формы.
@@ -188,6 +219,16 @@ export function AdminNewsView() {
 
   function removeTag(value: string) {
     setDraft((prev) => ({ ...prev, tags: prev.tags.filter((tag) => tag !== value) }));
+  }
+
+  function submitNewsSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAppliedNewsSearch(newsSearch.trim());
+  }
+
+  function resetNewsSearch() {
+    setNewsSearch("");
+    setAppliedNewsSearch("");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -329,21 +370,214 @@ export function AdminNewsView() {
         {message || newsQuery.errorMessage ? <p className="cms-flash">{message ?? newsQuery.errorMessage}</p> : null}
 
         <div className="moderation-layout cms-vertical-layout">
+          <div className="moderation-detail">
+            <form className="form news-form" onSubmit={submit} onBlur={newsAutosave.handleAutosaveBlur}>
+              <div className="news-form-head">
+                <span className="news-form-mode">{isEditingNew ? "Новая новость" : "Редактирование"}</span>
+              </div>
+
+              <div className="news-form-preview">
+                <FileUploadField
+                  accept="image/*"
+                  buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+                  imagePreset="cover"
+                  label="Обложка новости"
+                  value={draft.coverImageId}
+                  onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+                />
+                <div className="news-form-copy">
+                  <span className="news-tile-category">Новости</span>
+                  <input
+                    className="news-form-title"
+                    placeholder="Заголовок новости…"
+                    value={draft.title}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <label className="news-lead-field">
+                <input
+                  className="news-form-lead"
+                  aria-label="Описание новости"
+                  placeholder="Краткое содержание, 1–2 предложения"
+                  value={draft.lead}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, lead: event.target.value }))}
+                  required
+                />
+              </label>
+
+              <div className="form-field news-content-field">
+                <span>Содержание новости</span>
+                <DocumentEditor
+                  blocks={draft.blocks}
+                  onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks: blocks as Block[] }))}
+                  allowedAtomicKinds={NEWS_ATOMIC_KINDS}
+                  placeholder="Текст новости — пишите или нажмите «/» для вставки блока…"
+                />
+              </div>
+
+              <div className="form-field tag-field">
+                <span>Теги</span>
+                <div className="tag-input">
+                  {draft.tags.map((tag) => (
+                    <span className="tag-chip" key={tag}>
+                      #{tag}
+                      <button
+                        type="button"
+                        className="tag-chip-remove"
+                        onClick={() => removeTag(tag)}
+                        aria-label={`Убрать тег ${tag}`}
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    className="tag-input-field"
+                    placeholder={draft.tags.length === 0 ? "Новый тег" : "Ещё тег"}
+                    value={tagDraft}
+                    onChange={(event) => setTagDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " " || event.key === ",") {
+                        event.preventDefault();
+                        addTag(tagDraft);
+                        return;
+                      }
+                      if (event.key === "Backspace" && tagDraft.length === 0 && draft.tags.length > 0) {
+                        event.preventDefault();
+                        removeTag(draft.tags[draft.tags.length - 1]!);
+                      }
+                    }}
+                  />
+                </div>
+                {tagSuggestions.length > 0 ? (
+                  <div className="tag-suggestions">
+                    <span className="tag-suggestions-label">{tagSuggestionLabel}</span>
+                    {tagSuggestions.map((suggestion) => (
+                      <button
+                        className="tag-suggestion"
+                        key={suggestion.name}
+                        type="button"
+                        onClick={() => addTag(suggestion.name)}
+                      >
+                        <Plus size={11} /> #{suggestion.name}
+                        {suggestion.usageCount ? (
+                          <span className="tag-suggestion-count">{suggestion.usageCount}</span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="lesson-save-bar news-save-bar">
+                <span className={`lesson-save-bar-status ${saveStatusClass}`}>
+                  {submitting
+                    ? "Сохраняется…"
+                    : autosaveEnabled
+                      ? newsAutosave.autosaveLabel
+                      : hasChanges
+                        ? isEditingNew
+                          ? "Новый черновик"
+                          : "Есть несохранённые изменения"
+                        : "Сохранено"}
+                </span>
+                <div className="lesson-save-bar-actions">
+                  {!isEditingNew ? (
+                    <button className="button secondary" type="button" onClick={startNew}>
+                      Отмена
+                    </button>
+                  ) : null}
+                  {!isEditingNew && original ? (
+                    <button className="button secondary" type="button" onClick={() => publishToggle(original)}>
+                      {original.status === "published" ? "Снять с публикации" : "Опубликовать"}
+                    </button>
+                  ) : null}
+                  {!isEditingNew && original ? (
+                    <button className="button secondary danger" type="button" onClick={() => remove(original)}>
+                      Удалить полностью
+                    </button>
+                  ) : null}
+                  {canOpenSavedPreview && original ? (
+                    <a
+                      className="button secondary"
+                      href={previewHref(original)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Открыть публичный предпросмотр"
+                    >
+                      <ExternalLink size={14} />
+                      Предпросмотр
+                    </a>
+                  ) : (
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled
+                      title="Сначала сохраните новость, чтобы открыть публичный предпросмотр"
+                    >
+                      <ExternalLink size={14} />
+                      Предпросмотр
+                    </button>
+                  )}
+                  <button
+                    className="button"
+                    type="submit"
+                    disabled={submitting || newsAutosave.isAutosaving || !hasChanges}
+                  >
+                    {submitting || newsAutosave.isAutosaving
+                      ? "Сохраняется…"
+                      : isEditingNew
+                        ? "Создать черновик"
+                        : "Сохранить"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
           <div className="education-tree">
             <div className="education-tree-header">
               <h2 className="education-tree-title">Все новости</h2>
-              <button
-                className="education-tree-add"
-                type="button"
-                onClick={startNew}
-                title="Новая новость"
-                aria-label="Новая новость"
-              >
-                <Plus size={14} />
-              </button>
+              <div className="news-list-tools">
+                <form className="news-list-search" onSubmit={submitNewsSearch} role="search">
+                  <input
+                    type="search"
+                    value={newsSearch}
+                    onChange={(event) => setNewsSearch(event.target.value)}
+                    placeholder="Поиск по заголовку"
+                    aria-label="Поиск по заголовкам новостей"
+                  />
+                  <button className="news-list-search-submit" type="submit" aria-label="Искать новости">
+                    <Search size={14} aria-hidden="true" />
+                  </button>
+                  <button
+                    className="news-list-search-reset"
+                    type="button"
+                    onClick={resetNewsSearch}
+                    disabled={!newsSearch && !newsSearchQuery}
+                    aria-label="Сбросить поиск"
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                </form>
+                <button
+                  className="education-tree-add"
+                  type="button"
+                  onClick={startNew}
+                  title="Новая новость"
+                  aria-label="Новая новость"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
             </div>
             {items.length === 0 && !newsQuery.isInitialLoading ? (
-              <p className="education-tree-empty">Новостей пока нет.</p>
+              <p className="education-tree-empty">
+                {newsSearchQuery ? "Новостей с таким заголовком нет." : "Новостей пока нет."}
+              </p>
             ) : null}
             <div className="news-list">
               {items.map((item) => {
@@ -418,167 +652,6 @@ export function AdminNewsView() {
             {!newsQuery.hasMore && items.length > 0 ? (
               <p className="page-subtitle news-list-more">Это все новости.</p>
             ) : null}
-          </div>
-
-          <div className="moderation-detail">
-            <form className="form news-form" onSubmit={submit} onBlur={newsAutosave.handleAutosaveBlur}>
-              <div className="news-form-head">
-                <span className="news-form-mode">{isEditingNew ? "Новая новость" : "Редактирование"}</span>
-              </div>
-
-              <FileUploadField
-                accept="image/*"
-                buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
-                imagePreset="cover"
-                label="Обложка новости"
-                value={draft.coverImageId}
-                onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
-              />
-
-              <input
-                className="news-form-title"
-                placeholder="Заголовок новости…"
-                value={draft.title}
-                onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-                required
-              />
-
-              <label className="form-field">
-                <span>Описание новости</span>
-                <textarea
-                  className="textarea small"
-                  placeholder="Краткое содержание, 1–2 предложения"
-                  value={draft.lead}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, lead: event.target.value }))}
-                  required
-                  rows={2}
-                />
-              </label>
-
-              <div className="form-field">
-                <span>Содержание новости</span>
-                <DocumentEditor
-                  blocks={draft.blocks}
-                  onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks: blocks as Block[] }))}
-                  allowedAtomicKinds={NEWS_ATOMIC_KINDS}
-                  placeholder="Текст новости — пишите или нажмите «/» для вставки блока…"
-                />
-              </div>
-
-              <div className="form-field">
-                <span>Теги</span>
-                <div className="tag-input">
-                  {draft.tags.map((tag) => (
-                    <span className="tag-chip" key={tag}>
-                      #{tag}
-                      <button
-                        type="button"
-                        className="tag-chip-remove"
-                        onClick={() => removeTag(tag)}
-                        aria-label={`Убрать тег ${tag}`}
-                      >
-                        <X size={12} />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    className="tag-input-field"
-                    placeholder={draft.tags.length === 0 ? "Добавьте теги — Enter или пробел" : "Ещё тег…"}
-                    value={tagDraft}
-                    onChange={(event) => setTagDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " " || event.key === ",") {
-                        event.preventDefault();
-                        addTag(tagDraft);
-                        return;
-                      }
-                      if (event.key === "Backspace" && tagDraft.length === 0 && draft.tags.length > 0) {
-                        event.preventDefault();
-                        removeTag(draft.tags[draft.tags.length - 1]!);
-                      }
-                    }}
-                  />
-                </div>
-                {filteredSuggestions.length > 0 ? (
-                  <div className="tag-suggestions">
-                    {filteredSuggestions.map((suggestion) => (
-                      <button
-                        className="tag-suggestion"
-                        key={suggestion}
-                        type="button"
-                        onClick={() => addTag(suggestion)}
-                      >
-                        <Plus size={11} /> {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="lesson-save-bar">
-                <span className={`lesson-save-bar-status ${saveStatusClass}`}>
-                  {submitting
-                    ? "Сохраняется…"
-                    : autosaveEnabled
-                      ? newsAutosave.autosaveLabel
-                      : hasChanges
-                        ? isEditingNew
-                          ? "Новый черновик"
-                          : "Есть несохранённые изменения"
-                        : "Сохранено"}
-                </span>
-                <div className="lesson-save-bar-actions">
-                  {!isEditingNew ? (
-                    <button className="button secondary" type="button" onClick={startNew}>
-                      Отмена
-                    </button>
-                  ) : null}
-                  {!isEditingNew && original ? (
-                    <button className="button secondary" type="button" onClick={() => publishToggle(original)}>
-                      {original.status === "published" ? "Снять с публикации" : "Опубликовать"}
-                    </button>
-                  ) : null}
-                  {!isEditingNew && original ? (
-                    <button className="button secondary danger" type="button" onClick={() => remove(original)}>
-                      Удалить полностью
-                    </button>
-                  ) : null}
-                  {canOpenSavedPreview && original ? (
-                    <a
-                      className="button secondary"
-                      href={previewHref(original)}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Открыть публичный предпросмотр"
-                    >
-                      <ExternalLink size={14} />
-                      Предпросмотр
-                    </a>
-                  ) : (
-                    <button
-                      className="button secondary"
-                      type="button"
-                      disabled
-                      title="Сначала сохраните новость, чтобы открыть публичный предпросмотр"
-                    >
-                      <ExternalLink size={14} />
-                      Предпросмотр
-                    </button>
-                  )}
-                  <button
-                    className="button"
-                    type="submit"
-                    disabled={submitting || newsAutosave.isAutosaving || !hasChanges}
-                  >
-                    {submitting || newsAutosave.isAutosaving
-                      ? "Сохраняется…"
-                      : isEditingNew
-                        ? "Создать черновик"
-                        : "Сохранить"}
-                  </button>
-                </div>
-              </div>
-            </form>
           </div>
         </div>
       </section>

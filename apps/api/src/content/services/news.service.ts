@@ -475,13 +475,18 @@ export class NewsService {
   // листинг тянул весь контент новостей (~400КБ JSON на 100 новостях),
   // хотя для таблицы нужны только заголовок/lead/обложка/статус/_count.
   // При клике на «Редактировать» фронт отдельно дёргает `getAdminNews(id)`.
-  async adminListNews(pagination: { limit?: number; offset?: number } = {}) {
+  async adminListNews(pagination: { limit?: number; offset?: number; q?: string } = {}) {
     const limit = Math.min(Math.max(pagination.limit ?? 20, 1), 100);
     const offset = Math.max(pagination.offset ?? 0, 0);
+    const titleQuery = pagination.q?.trim();
+    const where: Prisma.NewsPostWhereInput = titleQuery
+      ? { title: { contains: titleQuery, mode: "insensitive" } }
+      : {};
 
     const [total, postsRaw] = await this.prisma.$transaction([
-      this.prisma.newsPost.count(),
+      this.prisma.newsPost.count({ where }),
       this.prisma.newsPost.findMany({
+        where,
         orderBy: { updatedAt: "desc" },
         take: limit,
         skip: offset,

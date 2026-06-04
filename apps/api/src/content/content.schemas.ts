@@ -22,7 +22,9 @@ export const newsTagsQuerySchema = z.object({
 });
 
 export const publicContentListQuerySchema = paginationQuerySchema(100);
-export const adminNewsListQuerySchema = paginationQuerySchema(100);
+export const adminNewsListQuerySchema = paginationQuerySchema(100).extend({
+  q: z.string().trim().max(120).optional(),
+});
 export const adminContentListQuerySchema = paginationQuerySchema(200);
 
 export const knowledgeTreeQuerySchema = z.object({
