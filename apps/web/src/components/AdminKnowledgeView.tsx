@@ -14,7 +14,7 @@ import { FileUploadField } from "./FileUploadField";
 import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { canAutosaveDraft, useCmsAutosave } from "../lib/cms-autosave";
+import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../lib/cms-autosave";
 import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
 
 type Article = {
@@ -354,6 +354,16 @@ export function AdminKnowledgeView() {
 
   async function publishToggle(article: Article) {
     if (!token) return;
+    // Публикуем открытый в редакторе материал с несохранёнными правками —
+    // сначала сохраняем черновик, чтобы не опубликовать устаревшую версию.
+    if (draft.id === article.id && hasChanges) {
+      try {
+        await persistKnowledgeDraft();
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Не удалось сохранить перед публикацией.");
+        return;
+      }
+    }
     const path =
       article.status === "published"
         ? `/admin/content/knowledge-base/${article.id}/unpublish`
@@ -426,6 +436,8 @@ export function AdminKnowledgeView() {
     hasChanges,
     onSave: persistKnowledgeDraft,
   });
+
+  useUnsavedChangesWarning(Boolean(draft.id) && hasChanges);
 
   if (state === "unauthenticated") {
     return (

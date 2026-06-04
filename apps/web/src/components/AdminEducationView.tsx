@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, ChevronRight, ExternalLink, FileText, FolderOpen, Paperclip, Plus, Trash2 } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "./AppShell";
@@ -12,10 +12,16 @@ import { RowKebab, type ActionItem } from "./RowKebab";
 import { StatusPill } from "./StatusPill";
 import { ApiError, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { canAutosaveDraft, useCmsAutosave } from "../lib/cms-autosave";
+import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../lib/cms-autosave";
 import { CONTENT_STATUS_LABELS, LEARNING_ACCESS_LEVEL_LABELS } from "../lib/display-labels";
 
 type Attachment = { fileId: string; displayName: string };
+
+type LessonDraft = {
+  title: string;
+  blocks: Block[];
+  attachments: Attachment[];
+};
 
 type Lesson = {
   id: string;
@@ -66,6 +72,22 @@ function normalizeAttachments(attachments: Attachment[]) {
       displayName: attachment.displayName.trim(),
     }))
     .filter((attachment) => attachment.fileId && attachment.displayName);
+}
+
+function lessonToDraft(lesson: Lesson): LessonDraft {
+  return {
+    title: lesson.title,
+    blocks: lesson.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
+    attachments: lesson.attachments.map((attachment) => ({ ...attachment })),
+  };
+}
+
+function normalizeLessonDraft(draft: LessonDraft) {
+  return {
+    title: draft.title,
+    blocks: draft.blocks.map((block) => ({ type: block.type, payload: block.payload })),
+    attachments: normalizeAttachments(draft.attachments),
+  };
 }
 
 // Атомарные блоки, доступные в уроках (текстовые блоки всегда доступны через
@@ -917,32 +939,45 @@ function LessonForm({
   onMutate: (path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) => Promise<boolean>;
   onSelect: (s: Selection) => void;
 }) {
-  const [draft, setDraft] = useState({
-    title: lesson.title,
-    blocks: lesson.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
-    attachments: lesson.attachments.map((a) => ({ ...a })),
-  });
+  const [draft, setDraft] = useState<LessonDraft>(() => lessonToDraft(lesson));
+  const [savedDraft, setSavedDraft] = useState(() => normalizeLessonDraft(lessonToDraft(lesson)));
   const [attachmentsBlockVisible, setAttachmentsBlockVisible] = useState(lesson.attachments.length > 0);
   const [saving, setSaving] = useState(false);
   const normalizedDraftAttachments = useMemo(() => normalizeAttachments(draft.attachments), [draft.attachments]);
+  const normalizedDraft = useMemo(
+    () => ({
+      title: draft.title,
+      blocks: draft.blocks.map((block) => ({ type: block.type, payload: block.payload })),
+      attachments: normalizedDraftAttachments,
+    }),
+    [draft.blocks, draft.title, normalizedDraftAttachments],
+  );
 
+  // Черновик пересинхронизируем только при переключении на другой урок, а
+  // "последнюю сохранённую версию" обновляем на каждый refetch. Так refetch
+  // после автосейва не затирает текст, набранный во время сохранения, но
+  // индикатор "Не сохранено" честно гаснет, когда сервер вернул ровно текущий
+  // черновик.
+  const loadedLessonIdRef = useRef(lesson.id);
   useEffect(() => {
-    setDraft({
-      title: lesson.title,
-      blocks: lesson.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
-      attachments: lesson.attachments.map((a) => ({ ...a })),
-    });
+    const nextSavedDraft = normalizeLessonDraft(lessonToDraft(lesson));
+    setSavedDraft(nextSavedDraft);
+    if (loadedLessonIdRef.current === lesson.id) return;
+    loadedLessonIdRef.current = lesson.id;
+    setDraft(lessonToDraft(lesson));
     setAttachmentsBlockVisible(lesson.attachments.length > 0);
-  }, [lesson.id, lesson.title, lesson.blocks, lesson.attachments]);
+  }, [lesson]);
 
   const persistLessonDraft = useCallback(async () => {
+    const savedSnapshot = normalizedDraft;
     const ok = await onMutate(`/admin/content/education/lessons/${lesson.id}`, "PATCH", {
-      title: draft.title,
-      blocks: draft.blocks,
-      attachments: normalizedDraftAttachments,
+      title: savedSnapshot.title,
+      blocks: savedSnapshot.blocks,
+      attachments: savedSnapshot.attachments,
     });
     if (!ok) throw new Error("Не удалось сохранить урок.");
-  }, [draft.blocks, draft.title, lesson.id, normalizedDraftAttachments, onMutate]);
+    setSavedDraft(savedSnapshot);
+  }, [lesson.id, normalizedDraft, onMutate]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -980,6 +1015,17 @@ function LessonForm({
   }
 
   async function publishToggle() {
+    // Сначала сохраняем текущий черновик: иначе на сайт уйдёт последняя
+    // автосохранённая версия, а свежие правки (которые ещё не успел подхватить
+    // автосейв) потеряются. Именно из-за этого «публикую — теряю 5 минут».
+    if (hasChanges) {
+      setSaving(true);
+      const saved = await persistLessonDraft()
+        .then(() => true)
+        .catch(() => false);
+      setSaving(false);
+      if (!saved) return;
+    }
     const path =
       lesson.status === "published"
         ? `/admin/content/education/lessons/${lesson.id}/unpublish`
@@ -987,16 +1033,14 @@ function LessonForm({
     await onMutate(path, "POST");
   }
 
-  // Сравниваем draft с lesson, чтобы показать индикатор «есть изменения».
+  // Сравниваем draft с последней сохранённой версией, чтобы refetch после
+  // сохранения не залипал в состоянии "Не сохранено".
   const hasChanges = useMemo(() => {
-    if (draft.title !== lesson.title) return true;
-    if (
-      JSON.stringify(draft.blocks) !== JSON.stringify(lesson.blocks.map((b) => ({ type: b.type, payload: b.payload })))
-    )
-      return true;
-    if (JSON.stringify(normalizedDraftAttachments) !== JSON.stringify(lesson.attachments)) return true;
+    if (normalizedDraft.title !== savedDraft.title) return true;
+    if (JSON.stringify(normalizedDraft.blocks) !== JSON.stringify(savedDraft.blocks)) return true;
+    if (JSON.stringify(normalizedDraft.attachments) !== JSON.stringify(savedDraft.attachments)) return true;
     return false;
-  }, [draft, lesson, normalizedDraftAttachments]);
+  }, [normalizedDraft, savedDraft]);
 
   const lessonAutosave = useCmsAutosave({
     enabled: canAutosaveDraft(lesson.status, lesson.id) && !saving,
@@ -1005,6 +1049,8 @@ function LessonForm({
   });
   const saveStatusClass =
     lessonAutosave.autosaveState === "dirty" ? "has-changes" : `is-${lessonAutosave.autosaveState}`;
+
+  useUnsavedChangesWarning(hasChanges);
 
   return (
     <form className="form lesson-form" onSubmit={submit} onBlur={lessonAutosave.handleAutosaveBlur}>

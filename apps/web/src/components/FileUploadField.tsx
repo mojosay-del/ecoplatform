@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Upload, X } from "lucide-react";
-import { apiDeleteFile, apiFetch, apiUploadFile, preferredFileAssetImageUrl, type FileAsset } from "../lib/api";
+import { useEffect, useRef, useState, type DragEvent } from "react";
+import { FileText, RefreshCcw, Upload, X } from "lucide-react";
+import {
+  apiDeleteFile,
+  apiFetch,
+  apiUploadFileWithProgress,
+  preferredFileAssetImageUrl,
+  type FileAsset,
+} from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 // Показываем миниатюру для image-MIME и для любого file, у которого
@@ -38,8 +44,14 @@ export function FileUploadField({
 }) {
   const { token } = useAuth();
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const uploadAbortRef = useRef<AbortController | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState<FileAsset | null>(null);
+  // progress: null — не грузим; 0..1 — доля отправленных байт.
+  const [progress, setProgress] = useState<number | null>(null);
+  const [uploadingName, setUploadingName] = useState("");
+  const [dragActive, setDragActive] = useState(false);
 
   // При открытии формы редактирования у нас уже есть value (id файла), но
   // нет asset. Подтягиваем мету по id, чтобы сразу нарисовать миниатюру —
@@ -66,22 +78,53 @@ export function FileUploadField({
     };
   }, [value, token, uploaded?.id]);
 
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      uploadAbortRef.current?.abort();
+    };
+  }, []);
+
   async function upload(file: File | undefined) {
     if (!file || !token) {
       return;
     }
 
-    setStatus("Загружаю…");
+    uploadAbortRef.current?.abort();
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    setError(null);
+    setUploadingName(file.name);
+    setProgress(0);
     try {
-      const asset = await apiUploadFile(file, { token, accessLevel, imagePreset });
+      const asset = await apiUploadFileWithProgress(file, {
+        token,
+        accessLevel,
+        imagePreset,
+        signal: controller.signal,
+        onProgress: (fraction) => {
+          if (mountedRef.current && uploadAbortRef.current === controller) {
+            setProgress(fraction);
+          }
+        },
+      });
+      if (!mountedRef.current || uploadAbortRef.current !== controller) return;
       setUploaded(asset);
       onChange(asset.id, asset);
-      setStatus(null);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Не удалось загрузить файл.");
+    } catch (uploadError) {
+      if (!controller.signal.aborted) {
+        setError(uploadError instanceof Error ? uploadError.message : "Не удалось загрузить файл.");
+      }
     } finally {
-      if (inputRef.current) {
-        inputRef.current.value = "";
+      if (uploadAbortRef.current === controller) {
+        uploadAbortRef.current = null;
+        if (mountedRef.current) {
+          setProgress(null);
+          setUploadingName("");
+          if (inputRef.current) {
+            inputRef.current.value = "";
+          }
+        }
       }
     }
   }
@@ -89,7 +132,7 @@ export function FileUploadField({
   async function clear() {
     const fileId = uploaded?.id;
     setUploaded(null);
-    setStatus(null);
+    setError(null);
     onChange("");
 
     if (!fileId || !token) {
@@ -99,79 +142,117 @@ export function FileUploadField({
     try {
       await apiDeleteFile(fileId, { token });
     } catch {
-      setStatus("Файл отвязан, но удалить его из хранилища не удалось.");
+      setError("Файл отвязан, но удалить его из хранилища не удалось.");
     }
+  }
+
+  function pick() {
+    inputRef.current?.click();
+  }
+
+  function onDrop(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setDragActive(false);
+    if (progress !== null) return;
+    void upload(event.dataTransfer.files?.[0]);
+  }
+  function onDragOver(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    if (progress === null) setDragActive(true);
+  }
+  function onDragLeave(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setDragActive(false);
   }
 
   const imageMode = isImageAsset(uploaded);
   const uploadedImageUrl = preferredFileAssetImageUrl(uploaded);
   const hasFile = Boolean(uploaded);
+  const uploading = progress !== null;
+  const percent = Math.round((progress ?? 0) * 100);
+
+  const hiddenInput = (
+    <input accept={accept} hidden onChange={(event) => void upload(event.target.files?.[0])} ref={inputRef} type="file" />
+  );
+
+  const progressView = (
+    <div className="file-upload-progress" role="status" aria-live="polite">
+      <div className="file-upload-progress-head">
+        <Upload size={tile ? 16 : 18} className="file-upload-progress-spin" />
+        <span className="file-upload-progress-name">{uploadingName || "Загрузка…"}</span>
+        <span className="file-upload-progress-percent">{percent >= 100 ? "Обработка…" : `${percent}%`}</span>
+      </div>
+      <div className="file-upload-progress-track">
+        <div className={`file-upload-progress-fill${percent >= 100 ? " is-indeterminate" : ""}`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
 
   if (tile) {
     return (
-      <div className="file-upload-field is-tile">
+      <div className={`file-upload-field is-tile${dragActive ? " is-drag" : ""}`}>
         {hideLabel ? null : <span className="file-upload-label">{label}</span>}
-        <input
-          accept={accept}
-          hidden
-          onChange={(event) => void upload(event.target.files?.[0])}
-          ref={inputRef}
-          type="file"
-        />
-        {hasFile ? (
+        {hiddenInput}
+        {uploading ? (
+          <div className="file-upload-tile-uploading">{progressView}</div>
+        ) : hasFile ? (
           imageMode && uploadedImageUrl ? (
             <div className="file-upload-tile-preview">
               <img alt={uploaded?.originalName ?? "Файл"} src={uploadedImageUrl} />
               <div className="file-upload-tile-actions">
-                <button onClick={() => inputRef.current?.click()} type="button" aria-label="Заменить файл">
-                  <Upload size={15} />
+                <button onClick={pick} type="button" aria-label="Заменить файл" title="Заменить">
+                  <RefreshCcw size={15} />
                 </button>
-                <button onClick={() => void clear()} type="button" aria-label="Убрать файл">
+                <button onClick={() => void clear()} type="button" aria-label="Убрать файл" title="Убрать">
                   <X size={15} />
                 </button>
               </div>
             </div>
           ) : (
             <div className="file-upload-tile-file">
+              <FileText size={18} />
               <strong>{uploaded?.originalName ?? "Файл прикреплён"}</strong>
               <div className="file-upload-tile-actions">
-                <button onClick={() => inputRef.current?.click()} type="button" aria-label="Заменить файл">
-                  <Upload size={15} />
+                <button onClick={pick} type="button" aria-label="Заменить файл" title="Заменить">
+                  <RefreshCcw size={15} />
                 </button>
-                <button onClick={() => void clear()} type="button" aria-label="Убрать файл">
+                <button onClick={() => void clear()} type="button" aria-label="Убрать файл" title="Убрать">
                   <X size={15} />
                 </button>
               </div>
             </div>
           )
         ) : (
-          <button className="file-upload-tile-empty" onClick={() => inputRef.current?.click()} type="button">
+          <button
+            className={`file-upload-tile-empty${dragActive ? " is-drag" : ""}`}
+            onClick={pick}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            type="button"
+          >
             <Upload size={18} />
             <span>{buttonLabel}</span>
           </button>
         )}
-        {status ? <p className="page-subtitle">{status}</p> : null}
+        {error ? <p className="file-upload-error">{error}</p> : null}
       </div>
     );
   }
 
   return (
-    <div className={`file-upload-field${compact ? " is-compact" : ""}`}>
+    <div className={`file-upload-field${compact ? " is-compact" : ""}${dragActive ? " is-drag" : ""}`}>
       {hideLabel ? null : <span className="file-upload-label">{label}</span>}
-      <input
-        accept={accept}
-        hidden
-        onChange={(event) => void upload(event.target.files?.[0])}
-        ref={inputRef}
-        type="file"
-      />
-      {hasFile ? (
+      {hiddenInput}
+      {uploading ? (
+        <div className="file-upload-card">{progressView}</div>
+      ) : hasFile ? (
         imageMode && uploadedImageUrl ? (
           <div className="file-upload-preview">
             <img alt={uploaded?.originalName ?? "Файл"} src={uploadedImageUrl} />
             <div className="file-upload-preview-actions">
-              <button className="button secondary" onClick={() => inputRef.current?.click()} type="button">
-                <Upload size={16} />
+              <button className="button secondary" onClick={pick} type="button">
+                <RefreshCcw size={16} />
                 Заменить
               </button>
               <button className="button secondary" onClick={() => void clear()} type="button">
@@ -182,7 +263,10 @@ export function FileUploadField({
           </div>
         ) : (
           <div className="file-upload-chip">
-            <strong>{uploaded?.originalName ?? "Файл прикреплён"}</strong>
+            <span className="file-upload-chip-icon">
+              <FileText size={18} />
+            </span>
+            <strong className="file-upload-chip-name">{uploaded?.originalName ?? "Файл прикреплён"}</strong>
             {(uploaded?.publicUrl ?? uploaded?.downloadUrl) ? (
               <a
                 className="file-upload-chip-link"
@@ -193,9 +277,9 @@ export function FileUploadField({
                 Открыть
               </a>
             ) : null}
-            <div className="auth-actions">
-              <button className="button secondary" onClick={() => inputRef.current?.click()} type="button">
-                <Upload size={16} />
+            <div className="file-upload-chip-actions">
+              <button className="button secondary" onClick={pick} type="button">
+                <RefreshCcw size={16} />
                 Заменить
               </button>
               <button className="button secondary" onClick={() => void clear()} type="button">
@@ -206,12 +290,24 @@ export function FileUploadField({
           </div>
         )
       ) : (
-        <button className="button secondary file-upload-empty" onClick={() => inputRef.current?.click()} type="button">
-          <Upload size={16} />
-          {buttonLabel}
+        <button
+          className={`file-upload-dropzone${dragActive ? " is-drag" : ""}${compact ? " is-compact" : ""}`}
+          onClick={pick}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          type="button"
+        >
+          <span className="file-upload-dropzone-icon">
+            <Upload size={compact ? 18 : 22} />
+          </span>
+          <span className="file-upload-dropzone-text">
+            <strong>{buttonLabel}</strong>
+            {compact ? null : <small>или перетащите файл сюда</small>}
+          </span>
         </button>
       )}
-      {status ? <p className="page-subtitle">{status}</p> : null}
+      {error ? <p className="file-upload-error">{error}</p> : null}
     </div>
   );
 }

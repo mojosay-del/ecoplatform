@@ -11,7 +11,7 @@ import { RowKebab, type ActionItem } from "./RowKebab";
 import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { CONTENT_STATUS_LABELS } from "../lib/display-labels";
-import { canAutosaveDraft, useCmsAutosave } from "../lib/cms-autosave";
+import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../lib/cms-autosave";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 import { formatNewsDate } from "../views/_shared";
@@ -209,6 +209,16 @@ export function AdminNewsView() {
 
   async function publishToggle(item: NewsItem) {
     if (!token) return;
+    // Если публикуем открытую в редакторе новость с несохранёнными правками —
+    // сперва сохраняем черновик, иначе опубликуется устаревшая версия.
+    if (draft.id === item.id && hasChanges) {
+      try {
+        await persistNewsDraft();
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Не удалось сохранить перед публикацией.");
+        return;
+      }
+    }
     const path =
       item.status === "published"
         ? `/admin/content/news/${item.id}/unpublish`
@@ -270,6 +280,8 @@ export function AdminNewsView() {
     hasChanges,
     onSave: persistNewsDraft,
   });
+
+  useUnsavedChangesWarning(Boolean(draft.id) && hasChanges);
 
   useEffect(() => {
     void loadList();

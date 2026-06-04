@@ -30,6 +30,21 @@ export function shouldRunCmsAutosave(input: { enabled: boolean; hasChanges: bool
   return input.enabled && input.hasChanges && !input.isSaving;
 }
 
+// Предупреждаем перед закрытием вкладки/переходом, если есть несохранённые
+// правки — браузер покажет нативный диалог «Покинуть страницу?». Это последняя
+// страховка от потери работы (автосейв срабатывает не мгновенно).
+export function useUnsavedChangesWarning(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [active]);
+}
+
 export function useCmsAutosave({
   enabled,
   hasChanges,

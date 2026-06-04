@@ -414,6 +414,93 @@ export async function apiUploadFile(
   return response.json() as Promise<FileAsset>;
 }
 
+// Загрузка с прогрессом. fetch() не умеет отдавать upload-progress, поэтому
+// здесь XMLHttpRequest. Воспроизводим ту же авторизацию, что и fetchWithAuthRetry:
+// Bearer-токен, CSRF-заголовок, cookie (withCredentials) и один ретрай на 401.
+export async function apiUploadFileWithProgress(
+  file: File,
+  options: {
+    token?: string | null;
+    accessLevel?: FileAsset["accessLevel"];
+    imagePreset?: "cover";
+    onProgress?: (fraction: number) => void;
+    signal?: AbortSignal;
+  } = {},
+): Promise<FileAsset> {
+  const prepared = await prepareUploadFile(file, options.imagePreset);
+
+  const send = async (authToken: string | null): Promise<{ status: number; body: string }> => {
+    const csrfToken = await ensureCsrfToken();
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      let abortHandler: (() => void) | null = null;
+      const cleanup = () => {
+        if (abortHandler) {
+          options.signal?.removeEventListener("abort", abortHandler);
+          abortHandler = null;
+        }
+      };
+      xhr.open("POST", `${API_URL}/files/upload`);
+      xhr.withCredentials = true;
+      if (authToken) xhr.setRequestHeader("Authorization", `Bearer ${authToken}`);
+      xhr.setRequestHeader(CSRF_HEADER_NAME, csrfToken);
+
+      if (xhr.upload && options.onProgress) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) options.onProgress?.(event.loaded / event.total);
+        };
+      }
+      xhr.onload = () => {
+        cleanup();
+        resolve({ status: xhr.status, body: xhr.responseText });
+      };
+      xhr.onerror = () => {
+        cleanup();
+        reject(new ApiError("Не удалось загрузить файл. Проверьте соединение.", 0));
+      };
+      xhr.onabort = () => {
+        cleanup();
+        reject(new ApiError("Загрузка отменена.", 0));
+      };
+
+      if (options.signal) {
+        if (options.signal.aborted) {
+          xhr.abort();
+          return;
+        }
+        abortHandler = () => xhr.abort();
+        options.signal.addEventListener("abort", abortHandler, { once: true });
+      }
+
+      const formData = new FormData();
+      formData.append("file", prepared);
+      formData.append("accessLevel", options.accessLevel ?? "public");
+      if (options.imagePreset) formData.append("imagePreset", options.imagePreset);
+      xhr.send(formData);
+    });
+  };
+
+  const currentToken = options.token ?? getAccessToken();
+  let result = await send(currentToken);
+
+  if (result.status === 401 && currentToken) {
+    try {
+      const refreshed = await refreshAccessToken();
+      result = await send(refreshed);
+    } catch {
+      handleUnauthorized();
+    }
+  }
+
+  if (result.status < 200 || result.status >= 300) {
+    if (result.status === 401) handleUnauthorized();
+    throw new ApiError(extractApiErrorMessage(result.body) || "File upload failed", result.status);
+  }
+
+  options.onProgress?.(1);
+  return JSON.parse(result.body) as FileAsset;
+}
+
 export async function apiDeleteFile(fileId: string, options: { token?: string | null } = {}): Promise<{ ok: boolean }> {
   const response = await fetchWithAuthRetry(
     `/files/${encodeURIComponent(fileId)}`,
