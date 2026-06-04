@@ -1,0 +1,1 @@
+export { AdminKnowledgeView } from "./AdminKnowledgeView";

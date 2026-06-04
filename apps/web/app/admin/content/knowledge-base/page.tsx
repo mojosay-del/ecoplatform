@@ -1,4 +1,4 @@
-import { AdminKnowledgeView } from "../../../../src/components/AdminKnowledgeView";
+import { AdminKnowledgeView } from "../../../../src/views/admin/knowledge";
 
 export default function AdminKnowledgePage() {
   return <AdminKnowledgeView />;
