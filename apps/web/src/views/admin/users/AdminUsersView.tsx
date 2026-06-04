@@ -1,73 +1,25 @@
 "use client";
 
-import { FormEvent, useEffect, useId, useMemo, useState } from "react";
-import { RotateCcw, Search, Smartphone, X } from "lucide-react";
-import { createPortal } from "react-dom";
-import { platformRoles, type PaginatedResponse } from "@ecoplatform/shared";
-import { AdminSortButton } from "./AdminSortButton";
-import { AppShell } from "./AppShell";
-import { StatusPill, companyStatusPillVariant, userStatusPillVariant } from "./StatusPill";
-import { sortItems, type SortState } from "./admin-table-utils";
-import { apiFetch } from "../lib/api";
+import { FormEvent, useMemo, useState } from "react";
+import { RotateCcw, Search, Smartphone } from "lucide-react";
+import { AdminSortButton } from "../../../components/AdminSortButton";
+import { AppShell } from "../../../components/AppShell";
+import { StatusPill, companyStatusPillVariant, userStatusPillVariant } from "../../../components/StatusPill";
+import { sortItems, type SortState } from "../../../components/admin-table-utils";
+import { apiFetch } from "../../../lib/api";
 import {
   COMPANY_STATUS_LABELS,
   MODERATION_REASON_LABELS,
   PLATFORM_ROLE_SHORT_LABELS,
   USER_STATUS_LABELS,
   formatPlatformRoles,
-} from "../lib/display-labels";
-import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
-import { useAuth } from "../lib/auth";
-
-type AdminUserListItem = {
-  id: string;
-  email: string;
-  phone: string;
-  firstName: string;
-  lastName: string;
-  status: "active" | "blocked";
-  createdAt: string;
-  company: { id: string; organizationName: string; status: string } | null;
-  platformStaff: { roles: string[]; isActive: boolean } | null;
-};
-
-type AdminUserList = PaginatedResponse<AdminUserListItem>;
-type UserSortKey = "name" | "status" | "company" | "role" | "phone" | "createdAt";
-
-type AdminUserDetail = AdminUserListItem & {
-  updatedAt: string;
-  activeRestrictions: Array<{
-    id: string;
-    moduleCode: string;
-    expiresAt: string;
-    reasonCode: string;
-    comment: string | null;
-  }>;
-  recentSessions: Array<{
-    id: string;
-    userAgent: string | null;
-    ipAddress: string | null;
-    createdAt: string;
-    expiresAt: string;
-    revokedAt: string | null;
-  }>;
-};
-
-type AdminUserSession = AdminUserDetail["recentSessions"][number];
-
-const blockReasonCodes = ["policy_violation", "fraud", "suspicious_activity", "support_request", "other"] as const;
-
-const allRoles = platformRoles;
-type PlatformRole = (typeof allRoles)[number];
-
-const userSortSelectors: Record<UserSortKey, (item: AdminUserListItem) => string | number> = {
-  name: (item) => `${item.lastName} ${item.firstName}`,
-  status: (item) => USER_STATUS_LABELS[item.status] ?? item.status,
-  company: (item) => item.company?.organizationName ?? "",
-  role: (item) => formatPlatformRoles(item.platformStaff?.roles ?? []),
-  phone: (item) => item.phone,
-  createdAt: (item) => Date.parse(item.createdAt),
-};
+} from "../../../lib/display-labels";
+import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
+import { useAuth } from "../../../lib/auth";
+import type { AdminUserDetail, AdminUserList, AdminUserListItem, UserSortKey } from "./types";
+import { allRoles, blockReasonCodes, userSortSelectors, type PlatformRole } from "./constants";
+import { formatLatestSession, formatSessionsCount } from "./format";
+import { AdminUserSessionsModal } from "./sessions-modal";
 
 type AdminUsersViewProps = {
   embedded?: boolean;
@@ -504,98 +456,4 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       <section className="page">{content}</section>
     </AppShell>
   );
-}
-
-function AdminUserSessionsModal({
-  user,
-  sessions,
-  onClose,
-}: {
-  user: AdminUserDetail;
-  sessions: AdminUserSession[];
-  onClose: () => void;
-}) {
-  const titleId = useId();
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.body.classList.add("news-modal-open");
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-      document.body.classList.remove("news-modal-open");
-    };
-  }, [onClose]);
-
-  if (typeof document === "undefined") {
-    return null;
-  }
-
-  return createPortal(
-    <div
-      className="news-modal-backdrop admin-sessions-modal-backdrop"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      role="dialog"
-      aria-labelledby={titleId}
-      aria-modal="true"
-    >
-      <div className="news-modal admin-sessions-modal">
-        <button className="news-modal-close" onClick={onClose} type="button" aria-label="Закрыть">
-          <X aria-hidden size={20} />
-        </button>
-        <header className="admin-sessions-modal-header">
-          <p className="admin-sessions-modal-kicker">Пользователь</p>
-          <h2 id={titleId}>
-            {user.firstName} {user.lastName}
-          </h2>
-          <p className="page-subtitle">{user.email}</p>
-        </header>
-        <div className="admin-sessions-list">
-          {sessions.map((session) => (
-            <article className="admin-session-card" key={session.id}>
-              <div>
-                <strong>{session.userAgent ?? "Без UA"}</strong>
-                <p>
-                  IP {session.ipAddress ?? "—"} · вход {formatSessionDateTime(session.createdAt)}
-                </p>
-              </div>
-              <StatusPill variant={session.revokedAt ? "neutral" : "success"}>
-                {session.revokedAt ? "Отозвана" : "Активна"}
-              </StatusPill>
-              <small>
-                {session.revokedAt
-                  ? `Отозвана ${formatSessionDateTime(session.revokedAt)}`
-                  : `До ${formatSessionDateTime(session.expiresAt)}`}
-              </small>
-            </article>
-          ))}
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-function formatSessionDateTime(value: string) {
-  return new Date(value).toLocaleString("ru-RU");
-}
-
-function formatSessionsCount(count: number) {
-  const lastDigit = count % 10;
-  const lastTwoDigits = count % 100;
-  if (lastDigit === 1 && lastTwoDigits !== 11) return `${count} вход`;
-  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)) return `${count} входа`;
-  return `${count} входов`;
-}
-
-function formatLatestSession(session: AdminUserSession) {
-  const device = session.userAgent ?? "Без UA";
-  return `${device} · ${formatSessionDateTime(session.createdAt)}`;
 }
