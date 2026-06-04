@@ -6,13 +6,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronsLeft, ChevronsRight, HelpCircle, LogOut, Menu, Settings, X } from "lucide-react";
 import { useAuth, type User } from "../lib/auth";
+import { SUPPORT_EMAIL } from "../lib/platform-contact";
 import {
   ACCOUNT_SECTION_CHANGE_EVENT,
   ACCOUNT_SECTION_NAVIGATE_EVENT,
   accountSectionFromHref,
   appNavSections,
   getAccountMenuSections,
-  getAccountNavSections,
   getBreadcrumbTrail,
   isAccountPath,
   isNavItemActive,
@@ -127,7 +127,7 @@ export function AppShell({ children, chrome = {} }: { children: React.ReactNode;
     // Если в секции не осталось ни одного пункта (например, «Служебное»
     // для обычного пользователя без админских ролей) — секцию не показываем.
     .filter((section) => section.items.length > 0);
-  const visibleNav = inAccountSettings ? getAccountNavSections(!isAdminUser) : visibleAppNav;
+  const visibleNav = visibleAppNav;
 
   return (
     <div
@@ -138,7 +138,7 @@ export function AppShell({ children, chrome = {} }: { children: React.ReactNode;
         <aside
           className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}
           role="navigation"
-          aria-label={inAccountSettings ? "Навигация личного кабинета" : "Основная навигация"}
+          aria-label="Основная навигация"
         >
           <div className="sidebar-head">
             <Link className="brand" href="/news">
@@ -501,7 +501,7 @@ function AppShellFooter() {
         <Link href="/legal/offer">Оферта</Link>
       </nav>
       <span className="app-shell-footer-separator" aria-hidden="true" />
-      <a href="mailto:support@ecoplatform.local">support@ecoplatform.local</a>
+      <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
       <span className="app-shell-footer-copyright">© 2026</span>
     </footer>
   );

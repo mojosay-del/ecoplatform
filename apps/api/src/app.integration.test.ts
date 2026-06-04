@@ -758,7 +758,7 @@ describe("Auth", () => {
     const note = await ctx.prisma.inAppNotification.findFirst({
       where: { userId, eventType: "auth.data_export.ready" },
     });
-    expect(note?.category).toBe("security");
+    expect(note).toBeNull();
   });
 
   it("POST /auth/me/request-deletion планирует удаление и cancel возвращает компанию в прежний статус", async () => {
@@ -794,7 +794,7 @@ describe("Auth", () => {
     const note = await ctx.prisma.inAppNotification.findFirst({
       where: { userId, eventType: "auth.data_deletion.requested" },
     });
-    expect(note?.category).toBe("security");
+    expect(note).toBeNull();
 
     const cancelDeletion = await ctx.http.post("/api/auth/me/cancel-deletion").set("Authorization", `Bearer ${token}`);
     expect(cancelDeletion.status).toBe(201);
@@ -2171,7 +2171,7 @@ describe("Email channel queue (задел)", () => {
         userId: company.userId,
         domainEventId: "audit.notification.payload:1",
         eventType: "audit.notification.payload",
-        category: "security",
+        category: "moderation",
         title: "Проверка уведомления",
         body: "Внутренние детали не должны попадать в публичный ответ.",
         link: "/account",
@@ -2211,16 +2211,19 @@ describe("Email channel queue (задел)", () => {
     expect(archive.body).not.toHaveProperty("payload");
   });
 
-  it("preferences API сохраняет security/billing и отбрасывает неизвестные категории", async () => {
+  it("preferences API сохраняет только управляемые категории", async () => {
     const company = await registerCompany("0699902");
 
     const saved = await ctx.http
       .patch("/api/notifications/preferences")
       .set("Authorization", `Bearer ${company.token}`)
-      .send({ inAppMutedCategories: ["moderation", "security"], emailMutedCategories: ["support", "billing"] });
+      .send({
+        inAppMutedCategories: ["moderation", "security", "marketplace", "system"],
+        emailMutedCategories: ["support", "billing", "security", "system"],
+      });
     expect(saved.status).toBe(200);
     expect(saved.body).toEqual({
-      inAppMutedCategories: ["moderation", "security"],
+      inAppMutedCategories: ["moderation"],
       emailMutedCategories: ["support", "billing"],
     });
     expect(saved.body).not.toHaveProperty("id");
@@ -2231,7 +2234,7 @@ describe("Email channel queue (задел)", () => {
     expect(loaded.body).toEqual(saved.body);
   });
 
-  it("при логине создаётся не только in_app, но и email-доставка в статусе queued", async () => {
+  it("при логине security-доставка не создаётся", async () => {
     const company = await registerCompany("0700001");
     const login = await ctx.http
       .post("/api/auth/login")
@@ -2244,12 +2247,7 @@ describe("Email channel queue (задел)", () => {
         eventType: { in: ["auth.login", "auth.login.new_device"] },
       },
     });
-    // Должно быть две записи: in_app=delivered и email=queued.
-    const inApp = deliveries.find((d) => d.channel === "in_app");
-    const email = deliveries.find((d) => d.channel === "email");
-    expect(inApp?.status).toBe("delivered");
-    expect(email?.status).toBe("queued");
-    expect(email?.address).toBe("user0700001@test.local");
+    expect(deliveries).toHaveLength(0);
   });
 
   it("email-доставка не создаётся, если категория замьючена в email", async () => {
@@ -2395,7 +2393,7 @@ describe("Billing notifications (cron)", () => {
 });
 
 describe("Auth security notifications", () => {
-  it("создаёт уведомление о входе после успешного логина", async () => {
+  it("не создаёт уведомление о входе после успешного логина", async () => {
     const company = await registerCompany("0500001");
     // Регистрация уже создала сессию — уведомления при register не шлются,
     // но повторный логин должен создать notification.
@@ -2408,11 +2406,10 @@ describe("Auth security notifications", () => {
       where: { userId: company.userId, eventType: { in: ["auth.login", "auth.login.new_device"] } },
       orderBy: { createdAt: "desc" },
     });
-    expect(note).toBeTruthy();
-    expect(note?.category).toBe("security");
+    expect(note).toBeNull();
   });
 
-  it("второй логин с другим User-Agent помечается как новое устройство", async () => {
+  it("не создаёт уведомление о входе с нового устройства", async () => {
     const company = await registerCompany("0500002");
 
     const login = await ctx.http
@@ -2425,12 +2422,10 @@ describe("Auth security notifications", () => {
       where: { userId: company.userId, eventType: "auth.login.new_device" },
       orderBy: { createdAt: "desc" },
     });
-    expect(note).toBeTruthy();
-    expect(note?.title).toBe("Новый вход в аккаунт");
-    expect(note?.body).toBe("Вход выполнен.");
+    expect(note).toBeNull();
   });
 
-  it("смена пароля: отзывает другие сессии, создаёт уведомление, новый пароль работает", async () => {
+  it("смена пароля: отзывает другие сессии без security-уведомления, новый пароль работает", async () => {
     const company = await registerCompany("0500003");
 
     // Открываем вторую сессию параллельно.
@@ -2469,8 +2464,7 @@ describe("Auth security notifications", () => {
     const note = await ctx.prisma.inAppNotification.findFirst({
       where: { userId: company.userId, eventType: "auth.password_changed" },
     });
-    expect(note).toBeTruthy();
-    expect(note?.category).toBe("security");
+    expect(note).toBeNull();
   });
 
   it("смена пароля с неверным текущим паролем возвращает 401", async () => {

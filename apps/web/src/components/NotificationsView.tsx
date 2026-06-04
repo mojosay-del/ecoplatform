@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { CreditCard, HelpCircle, type LucideIcon, MessageSquare, Settings, Shield, ShoppingBag } from "lucide-react";
+import { CreditCard, HelpCircle, type LucideIcon, MessageSquare, Settings } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { StatusPill } from "./StatusPill";
 import { api, apiFetch } from "../lib/api";
@@ -28,16 +28,13 @@ type NotificationPreferences = {
 };
 
 const categoryIcons: Record<string, LucideIcon> = {
-  security: Shield,
   billing: CreditCard,
-  marketplace: ShoppingBag,
   moderation: MessageSquare,
   support: HelpCircle,
   system: Settings,
 };
 
-const preferenceCategories = ["marketplace", "moderation", "support", "system"];
-const lockedCategories = ["security", "billing"];
+const preferenceCategories = ["billing", "moderation", "support"];
 const defaultPreferences: NotificationPreferences = { inAppMutedCategories: [], emailMutedCategories: [] };
 const NOTIFICATIONS_PAGE_SIZE = 30;
 
@@ -272,18 +269,6 @@ export function NotificationsView() {
                         />{" "}
                         Email
                       </label>
-                    </div>
-                  );
-                })}
-                {lockedCategories.map((category) => {
-                  const Icon = categoryIcons[category] ?? Settings;
-                  return (
-                    <div className="preference-row locked" key={category}>
-                      <span>
-                        <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                        {NOTIFICATION_CATEGORY_LABELS[category] ?? category}
-                      </span>
-                      <StatusPill variant="success">Всегда включено</StatusPill>
                     </div>
                   );
                 })}

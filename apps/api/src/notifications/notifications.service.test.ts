@@ -52,7 +52,7 @@ describe("NotificationsService", () => {
       userId: "user-1",
       eventType: "auth.login",
       sourceId: "device-1",
-      category: NotificationCategory.security,
+      category: NotificationCategory.billing,
       title: "Вход",
       body: "—",
     });
@@ -60,7 +60,7 @@ describe("NotificationsService", () => {
       userId: "user-1",
       eventType: "auth.login",
       sourceId: "device-1",
-      category: NotificationCategory.security,
+      category: NotificationCategory.billing,
       title: "Вход",
       body: "—",
     });
@@ -71,8 +71,8 @@ describe("NotificationsService", () => {
     expect(notificationUpsert).toHaveBeenCalledTimes(2);
   });
 
-  it("security можно отключить через mute — in-app уведомление подавляется", async () => {
-    const { prisma, notificationUpsert } = buildPrismaMock({
+  it("security-уведомления выключены для всех каналов", async () => {
+    const { prisma, deliveryUpsert, notificationUpsert } = buildPrismaMock({
       preferences: {
         inAppMutedCategories: [NotificationCategory.security, NotificationCategory.billing],
         emailMutedCategories: [],
@@ -90,6 +90,7 @@ describe("NotificationsService", () => {
     });
 
     expect(result).toBeNull();
+    expect(deliveryUpsert).not.toHaveBeenCalled();
     expect(notificationUpsert).not.toHaveBeenCalled();
   });
 
@@ -141,16 +142,16 @@ describe("NotificationsService", () => {
 
     deliveryUpsert.mockClear();
 
-    // security НЕ замьючен → email-доставка создаётся параллельно.
+    // billing НЕ замьючен → email-доставка создаётся параллельно.
     await service.createInApp({
       userId: "user-1",
-      eventType: "auth.login",
-      category: NotificationCategory.security,
-      title: "Вход",
+      eventType: "billing.invoice.created",
+      category: NotificationCategory.billing,
+      title: "Счёт",
       body: "—",
     });
-    const securityChannels = deliveryUpsert.mock.calls.map((args) => args[0].create.channel);
-    expect(securityChannels).toEqual(expect.arrayContaining([NotificationChannel.in_app, NotificationChannel.email]));
+    const billingChannels = deliveryUpsert.mock.calls.map((args) => args[0].create.channel);
+    expect(billingChannels).toEqual(expect.arrayContaining([NotificationChannel.in_app, NotificationChannel.email]));
   });
 
   it("createInAppForAdmins зовёт createInApp для каждого активного админа и не для других", async () => {
@@ -176,7 +177,7 @@ describe("NotificationsService", () => {
     expect(recipientIds).toEqual(["admin-1", "admin-2"]);
   });
 
-  it("updatePreferences сохраняет security/billing в inAppMutedCategories", async () => {
+  it("updatePreferences сохраняет только управляемые категории", async () => {
     const { prisma } = buildPrismaMock({});
     const service = new NotificationsService(prisma);
 
@@ -186,17 +187,20 @@ describe("NotificationsService", () => {
         inAppMutedCategories: [
           NotificationCategory.security,
           NotificationCategory.billing,
+          NotificationCategory.marketplace,
           NotificationCategory.moderation,
+          NotificationCategory.system,
         ],
-        emailMutedCategories: [NotificationCategory.billing, NotificationCategory.support],
+        emailMutedCategories: [
+          NotificationCategory.billing,
+          NotificationCategory.support,
+          NotificationCategory.security,
+          NotificationCategory.system,
+        ],
       },
     );
 
-    const expectedInApp = [
-      NotificationCategory.security,
-      NotificationCategory.billing,
-      NotificationCategory.moderation,
-    ];
+    const expectedInApp = [NotificationCategory.billing, NotificationCategory.moderation];
     const expectedEmail = [NotificationCategory.billing, NotificationCategory.support];
 
     const args = prisma.userNotificationPreferences.upsert.mock.calls[0]?.[0];

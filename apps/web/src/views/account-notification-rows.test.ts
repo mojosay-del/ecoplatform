@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PlatformRole } from "@ecoplatform/shared";
 import { accountNotificationRowsForRoles } from "./account-notification-rows";
 
-const expectedCategories = ["security", "billing", "marketplace", "moderation", "support", "system"];
+const expectedCategories = ["billing", "moderation", "support"];
 
 describe("account notification rows", () => {
   it.each<[string, PlatformRole[]]>([

@@ -8,19 +8,9 @@ export type AccountNotificationRow = {
 
 export const ACCOUNT_NOTIFICATION_ROWS: AccountNotificationRow[] = [
   {
-    category: "security",
-    label: "Безопасность",
-    description: "Входы, смена пароля и отзыв сессий.",
-  },
-  {
     category: "billing",
     label: "Биллинг",
     description: "Счета, платежи, документы и статусы подписки.",
-  },
-  {
-    category: "marketplace",
-    label: "Торговая площадка",
-    description: "Объявления, предложения и статусы сделок.",
   },
   {
     category: "moderation",
@@ -31,11 +21,6 @@ export const ACCOUNT_NOTIFICATION_ROWS: AccountNotificationRow[] = [
     category: "support",
     label: "Поддержка",
     description: "Ответы администратора и статусы обращений.",
-  },
-  {
-    category: "system",
-    label: "Системные",
-    description: "Правила, обновления и технические работы.",
   },
 ];
 

@@ -30,13 +30,12 @@ export type NotificationPreferencesInput = {
 type NotificationPreferencesOutput = NotificationPreferencesInput;
 
 const MUTABLE_CATEGORIES = new Set<NotificationCategory>([
-  NotificationCategory.security,
   NotificationCategory.billing,
-  NotificationCategory.marketplace,
   NotificationCategory.moderation,
   NotificationCategory.support,
-  NotificationCategory.system,
 ]);
+
+const DISABLED_CATEGORIES = new Set<NotificationCategory>([NotificationCategory.security]);
 
 const publicNotificationSelect = {
   id: true,
@@ -55,6 +54,10 @@ export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createInApp(input: CreateInAppNotificationInput) {
+    if (DISABLED_CATEGORIES.has(input.category)) {
+      return null;
+    }
+
     const prefs = await this.prisma.userNotificationPreferences.findUnique({
       where: { userId: input.userId },
     });
@@ -166,6 +169,7 @@ export class NotificationsService {
     const offset = Math.max(options.offset ?? 0, 0);
     const where: Prisma.InAppNotificationWhereInput = {
       userId: user.id,
+      category: { notIn: [...DISABLED_CATEGORIES] },
       ...(options.includeArchived ? {} : { archivedAt: null }),
     };
 
@@ -185,7 +189,7 @@ export class NotificationsService {
 
   async unreadCount(user: RequestUser) {
     const count = await this.prisma.inAppNotification.count({
-      where: { userId: user.id, readAt: null, archivedAt: null },
+      where: { userId: user.id, category: { notIn: [...DISABLED_CATEGORIES] }, readAt: null, archivedAt: null },
     });
     return { count };
   }
@@ -201,7 +205,7 @@ export class NotificationsService {
 
   async markAllRead(user: RequestUser) {
     const result = await this.prisma.inAppNotification.updateMany({
-      where: { userId: user.id, readAt: null, archivedAt: null },
+      where: { userId: user.id, category: { notIn: [...DISABLED_CATEGORIES] }, readAt: null, archivedAt: null },
       data: { readAt: new Date() },
     });
     return { updated: result.count };
@@ -260,8 +264,8 @@ export class NotificationsService {
     prefs: { inAppMutedCategories: NotificationCategory[]; emailMutedCategories: NotificationCategory[] } | null,
   ): NotificationPreferencesOutput {
     return {
-      inAppMutedCategories: prefs?.inAppMutedCategories ?? [],
-      emailMutedCategories: prefs?.emailMutedCategories ?? [],
+      inAppMutedCategories: this.keepMutableCategories(prefs?.inAppMutedCategories ?? []),
+      emailMutedCategories: this.keepMutableCategories(prefs?.emailMutedCategories ?? []),
     };
   }
 }

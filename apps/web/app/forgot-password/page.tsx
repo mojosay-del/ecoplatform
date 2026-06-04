@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { MarketingShell } from "../../src/components/MarketingShell";
-
-const SUPPORT_EMAIL = "support@ecoplatform.local";
+import { SUPPORT_EMAIL } from "../../src/lib/platform-contact";
 
 function copyTextFallback(value: string) {
   const input = document.createElement("textarea");

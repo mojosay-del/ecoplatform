@@ -2,8 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  forwardRef,
-  Inject,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -21,7 +19,6 @@ import {
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { swallowAndLog } from "../common/silent-catch";
 import { EmailService } from "../email/email.service";
-import { NotificationsService } from "../notifications/notifications.service";
 import { recordUserRegistered } from "../observability/metrics.registry";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
@@ -64,8 +61,6 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly settings: PlatformSettingsService,
-    @Inject(forwardRef(() => NotificationsService))
-    private readonly notifications: NotificationsService,
     private readonly sessionCache: SessionCacheService,
     private readonly passwordPolicy: PasswordPolicyService,
     private readonly email: EmailService,
@@ -370,11 +365,7 @@ export class AuthService {
 
     await this.resetFailedLoginState(user);
 
-    const newDevice = await this.detectNewDevice(user.id, meta);
-    const tokens = await this.createSession(user.id, meta, Boolean(input.rememberMe));
-    await this.notifyLogin(user.id, meta, newDevice).catch(swallowAndLog("auth.login.notify", { userId: user.id }));
-
-    return tokens;
+    return this.createSession(user.id, meta, Boolean(input.rememberMe));
   }
 
   private isLoginLocked(user: LoginLockoutState): boolean {
@@ -464,18 +455,6 @@ export class AuthService {
     });
     await this.sessionCache.invalidateUser(userId);
 
-    await this.notifications
-      .createInApp({
-        userId,
-        eventType: "auth.password_changed",
-        sourceId: `${userId}:${Date.now()}`,
-        category: NotificationCategory.security,
-        title: "Пароль изменён",
-        body: "Пароль вашей учётной записи был изменён. Все остальные сессии отозваны.",
-        link: "/account",
-      })
-      .catch(swallowAndLog("auth.password.changed.notify", { userId }));
-
     return { ok: true };
   }
 
@@ -536,30 +515,12 @@ export class AuthService {
     });
 
     await this.sessionCache.invalidateUser(userId);
-    await this.notifications
-      .createInApp({
-        userId,
-        eventType: "auth.data_deletion.requested",
-        sourceId: `${userId}:${result.deletionRequestedAt.toISOString()}`,
-        category: NotificationCategory.security,
-        title: "Удаление аккаунта запланировано",
-        body: `Аккаунт будет удалён ${accountDeletionScheduledFor(result.deletionRequestedAt).toLocaleDateString(
-          "ru-RU",
-        )}. Если передумаете, отмените запрос в личном кабинете.`,
-        link: "/account",
-        payload: {
-          companyId: result.companyId,
-          deletionRequestedAt: result.deletionRequestedAt.toISOString(),
-          deletionScheduledFor: accountDeletionScheduledFor(result.deletionRequestedAt).toISOString(),
-        },
-      })
-      .catch(swallowAndLog("auth.data_deletion.requested.notify", { userId }));
 
     return serializeAccountDeletion(result.deletionRequestedAt);
   }
 
   async cancelAccountDeletion(userId: string): Promise<AccountDeletionResponse> {
-    const result = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
         where: { id: userId },
         include: {
@@ -596,104 +557,11 @@ export class AuthService {
           });
         }
       }
-
-      return { hadDeletionRequest: Boolean(user.deletionRequestedAt), companyId: user.companyId };
     });
 
     await this.sessionCache.invalidateUser(userId);
-    if (result.hadDeletionRequest) {
-      await this.notifications
-        .createInApp({
-          userId,
-          eventType: "auth.data_deletion.cancelled",
-          sourceId: `${userId}:${Date.now()}`,
-          category: NotificationCategory.security,
-          title: "Удаление аккаунта отменено",
-          body: "Запрос на удаление аккаунта отменён. Доступ к кабинету восстановлен.",
-          link: "/account",
-          payload: { companyId: result.companyId },
-        })
-        .catch(swallowAndLog("auth.data_deletion.cancelled.notify", { userId }));
-    }
 
     return serializeAccountDeletion(null);
-  }
-
-  // Сворачиваем User-Agent к стабильной паре «браузер/ОС». Нужно, чтобы
-  // обновление версии Chrome или смена IP (Wi-Fi → мобильная сеть) НЕ
-  // считались «новым устройством» — пользователь не хочет десятки уведомлений
-  // об одном и том же ноутбуке.
-  private fingerprintUserAgent(ua: string | undefined | null): string {
-    if (!ua) return "unknown/unknown";
-    const browser = /Edg\//i.test(ua)
-      ? "Edge"
-      : /OPR\/|Opera/i.test(ua)
-        ? "Opera"
-        : /Firefox\//i.test(ua)
-          ? "Firefox"
-          : /Chrome\//i.test(ua)
-            ? "Chrome"
-            : /Safari\//i.test(ua)
-              ? "Safari"
-              : "Other";
-    const os = /Windows NT/i.test(ua)
-      ? "Windows"
-      : /iPhone|iPad|iOS/i.test(ua)
-        ? "iOS"
-        : /Mac OS X|Macintosh/i.test(ua)
-          ? "macOS"
-          : /Android/i.test(ua)
-            ? "Android"
-            : /Linux/i.test(ua)
-              ? "Linux"
-              : "Unknown";
-    return `${browser}/${os}`;
-  }
-
-  private async detectNewDevice(userId: string, meta: { userAgent?: string; ipAddress?: string }): Promise<boolean> {
-    const currentFp = this.fingerprintUserAgent(meta.userAgent);
-    // Сравниваем с сессиями за последние 30 дней. IP сознательно не учитываем —
-    // мобильные операторы и Wi-Fi-роуминг постоянно меняют IP при том же
-    // физическом устройстве.
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const sessions = await this.prisma.session.findMany({
-      where: { userId, createdAt: { gte: thirtyDaysAgo } },
-      select: { userAgent: true },
-      take: 50,
-      orderBy: { createdAt: "desc" },
-    });
-    // Самая первая сессия в жизни аккаунта — не считаем «новым устройством»,
-    // иначе после регистрации пользователю прилетает странное уведомление.
-    if (sessions.length === 0) return false;
-    return !sessions.some((s) => this.fingerprintUserAgent(s.userAgent) === currentFp);
-  }
-
-  private async notifyLogin(
-    userId: string,
-    meta: { userAgent?: string; ipAddress?: string },
-    newDevice: boolean,
-  ): Promise<void> {
-    // Дедуп: одно уведомление о входе с конкретного fingerprint в сутки.
-    // `createInApp` делает upsert по (domainEventId, userId) — стабильный
-    // sourceId сам подавит повторы без доп. запросов.
-    const fp = this.fingerprintUserAgent(meta.userAgent);
-    const dayBucket = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
-
-    await this.notifications.createInApp({
-      userId,
-      eventType: newDevice ? "auth.login.new_device" : "auth.login",
-      sourceId: `${newDevice ? "new_device" : "login"}:${fp}:${dayBucket}`,
-      category: NotificationCategory.security,
-      title: "Новый вход в аккаунт",
-      body: "Вход выполнен.",
-      link: "/account",
-      payload: {
-        ipAddress: meta.ipAddress ?? null,
-        userAgent: meta.userAgent ?? null,
-        fingerprint: fp,
-        newDevice,
-      },
-    });
   }
 
   async refresh(refreshToken: string | undefined): Promise<SessionTokens> {

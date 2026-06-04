@@ -41,23 +41,16 @@ describe("AppShell future navigation teasers", () => {
   it("builds the account settings sidebar with business links for regular users", () => {
     const sections = getAccountNavSections(true);
 
-    expect(sections.map((section) => section.title)).toEqual(["Переход", "Настройки", "Компания"]);
+    expect(sections.map((section) => section.title)).toEqual(["Переход", "Настройки"]);
     expect(sections[0]?.items.map((item) => item.label)).toEqual(["К платформе"]);
-    expect(sections[1]?.items.map((item) => item.label)).toEqual([
-      "Профиль",
-      "Безопасность",
-      "Уведомления",
-      "Данные и приватность",
-      "Сессии",
-    ]);
-    expect(sections[2]?.items.map((item) => item.label)).toEqual(["Компания", "Подписка", "Поддержка"]);
+    expect(sections[1]?.items.map((item) => item.label)).toEqual(["Профиль", "Данные и приватность"]);
   });
 
   it("hides business account links for platform staff", () => {
     const sections = getAccountNavSections(false);
 
     expect(sections.map((section) => section.title)).toEqual(["Переход", "Настройки"]);
-    expect(sections.flatMap((section) => section.items.map((item) => item.href))).not.toContain("/account/billing");
+    expect(sections.flatMap((section) => section.items.map((item) => item.href))).not.toContain("/account/support");
   });
 
   it("builds regular breadcrumbs from the visible sidebar section", () => {
@@ -93,23 +86,26 @@ describe("AppShell future navigation teasers", () => {
 
     expect(isAccountPath("/account/security")).toBe(true);
     expect(isAccountPath("/news")).toBe(false);
-    expect(trail?.map((item) => item.label)).toEqual(["Настройки аккаунта", "Данные и приватность"]);
+    expect(trail?.map((item) => item.label)).toEqual(["Настройки аккаунта"]);
     expect(trail?.[0]?.href).toBe("/account/profile");
-    expect(trail?.[1]?.href).toBe("/account/data-privacy");
   });
 
   it("maps legacy account tab query values to direct routes", () => {
-    expect(getLegacyAccountTabHref("security")).toBe("/account/security");
-    expect(getLegacyAccountTabHref("billing")).toBe("/account/billing");
-    expect(getLegacyAccountTabHref("support")).toBe("/account/support");
+    expect(getLegacyAccountTabHref("security")).toBe("/account/profile");
+    expect(getLegacyAccountTabHref("company")).toBe("/account/profile");
+    expect(getLegacyAccountTabHref("billing")).toBe("/account/profile");
+    expect(getLegacyAccountTabHref("sessions")).toBe("/account/profile");
+    expect(getLegacyAccountTabHref("notifications")).toBe("/account/profile");
+    expect(getLegacyAccountTabHref("support")).toBe("/account/profile");
     expect(getLegacyAccountTabHref("unknown")).toBeNull();
   });
 
   it("parses account section links for scroll navigation", () => {
     expect(accountSectionFromHref("/account")).toBe("profile");
-    expect(accountSectionFromHref("/account/billing")).toBe("billing");
-    expect(accountSectionFromHref("/account/sessions?from=menu")).toBe("sessions");
-    expect(accountSectionFromHref("/account/support/thread")).toBe("support");
+    expect(accountSectionFromHref("/account/billing")).toBeNull();
+    expect(accountSectionFromHref("/account/sessions?from=menu")).toBeNull();
+    expect(accountSectionFromHref("/account/notifications")).toBeNull();
+    expect(accountSectionFromHref("/account/support/thread")).toBeNull();
     expect(accountSectionFromHref("/news")).toBeNull();
   });
 });

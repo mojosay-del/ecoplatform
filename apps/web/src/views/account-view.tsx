@@ -1,7 +1,7 @@
 "use client";
 
-// Личный кабинет: профиль, безопасность (сессии, смена пароля), уведомления,
-// биллинг и список тикетов поддержки. Самый крупный view в проекте — раньше
+// Личный кабинет: профиль, безопасность (сессии, смена пароля) и приватность.
+// Самый крупный view в проекте — раньше
 // жил в DataViews.tsx, теперь изолирован.
 
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
@@ -14,24 +14,16 @@ import {
   Download,
   FileText,
   KeyRound,
-  LifeBuoy,
-  LogOut,
   Monitor,
   Pencil,
   RotateCcw,
   Smartphone,
   Trash2,
-  UserRound,
   X,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type {
-  BillingStatus,
-  BillingSubscription,
-  CompanyProfileUpdateDto,
-  PaginatedResponse,
-} from "@ecoplatform/shared";
+import type { BillingStatus, BillingSubscription, CompanyProfileUpdateDto } from "@ecoplatform/shared";
 import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import {
@@ -41,12 +33,7 @@ import {
   isAccountBusinessSection,
   type AccountSectionId,
 } from "../components/app-shell-nav";
-import {
-  StatusPill,
-  companyStatusPillVariant,
-  subscriptionStatusPillVariant,
-  supportStatusPillVariant,
-} from "../components/StatusPill";
+import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "../components/StatusPill";
 import { api, clearAccessToken } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import {
@@ -55,8 +42,6 @@ import {
   PLATFORM_ROLE_LABELS,
   SUBSCRIPTION_PLAN_TITLE_LABELS,
   SUBSCRIPTION_STATUS_LABELS,
-  SUPPORT_CATEGORY_LABELS,
-  SUPPORT_STATUS_LABELS,
   USER_GENDER_LABELS,
 } from "../lib/display-labels";
 import { SUBSCRIPTION_PLAN_TIERS, type SubscriptionPlanTier } from "../lib/subscription-plans";
@@ -66,14 +51,8 @@ import { accountNotificationRowsForRoles } from "./account-notification-rows";
 const PROFILE_PHOTO_HINT =
   "Фото профиля подбирается автоматически по типу компании. Загрузка своего фото появится в следующих обновлениях.";
 
-const ACCOUNT_SETTINGS_SECTIONS: AccountSectionId[] = [
-  "profile",
-  "security",
-  "notifications",
-  "data-privacy",
-  "sessions",
-];
-const ACCOUNT_BUSINESS_VIEW_SECTIONS: AccountSectionId[] = ["company", "billing", "support"];
+const ACCOUNT_SETTINGS_SECTIONS: AccountSectionId[] = ["profile", "data-privacy"];
+const ACCOUNT_BUSINESS_VIEW_SECTIONS: AccountSectionId[] = [];
 const ACCOUNT_SCROLL_OFFSET = 124;
 
 function accountSectionDomId(section: AccountSectionId) {
@@ -160,14 +139,6 @@ type NotificationPreferences = {
   emailMutedCategories: string[];
 };
 
-type AccountSupportTicket = {
-  id: string;
-  category: string;
-  subject: string;
-  status: string;
-  updatedAt: string;
-};
-
 function accountDash(value: ReactNode) {
   return value || <span className="account-muted">Не заполнено</span>;
 }
@@ -218,15 +189,35 @@ function AccountDetailList({ rows }: { rows: Array<{ label: string; value: React
   );
 }
 
-function AccountEditableValue({ value, label }: { value?: string | null; label: string }) {
+function AccountEditableValue({ value, label, onEdit }: { value?: string | null; label: string; onEdit?: () => void }) {
   return (
     <span className="account-editable-value">
       <span>{accountDash(value)}</span>
       <button
-        aria-label={`Редактирование поля ${label} появится позже`}
+        aria-label={onEdit ? `Редактировать поле ${label}` : `Редактирование поля ${label} появится позже`}
         className="account-inline-edit"
-        disabled
-        title={`Редактирование поля ${label} появится позже`}
+        disabled={!onEdit}
+        onClick={onEdit}
+        title={onEdit ? `Редактировать ${label}` : `Редактирование поля ${label} появится позже`}
+        type="button"
+      >
+        <Pencil aria-hidden="true" size={14} />
+      </button>
+    </span>
+  );
+}
+
+function AccountPasswordValue({ onEdit }: { onEdit: () => void }) {
+  return (
+    <span className="account-editable-value">
+      <span className="account-secret-value" aria-label="Пароль скрыт">
+        ••••••••
+      </span>
+      <button
+        aria-label="Открыть смену пароля"
+        className="account-inline-edit"
+        onClick={onEdit}
+        title="Сменить пароль"
         type="button"
       >
         <Pencil aria-hidden="true" size={14} />
@@ -237,7 +228,7 @@ function AccountEditableValue({ value, label }: { value?: string | null; label: 
 
 export function AccountView({ section }: { section: AccountSectionId }) {
   const router = useRouter();
-  const { user, token, logout, refreshMe } = useAuth();
+  const { user, token, refreshMe } = useAuth();
   const isPlatformStaff = (user?.platformRoles?.length ?? 0) > 0;
   const {
     data: billing,
@@ -258,13 +249,13 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     () => api.notifications.preferences.get(),
     null,
   );
-  const { data: supportTickets, state: supportState } = useApiQuery(
-    isPlatformStaff ? null : "support-tickets",
-    () => api.support.listMyTickets(),
-    { items: [], total: 0, hasMore: false } as PaginatedResponse<AccountSupportTicket>,
-  );
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false);
+  const [notificationsDialogOpen, setNotificationsDialogOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [deletionBusy, setDeletionBusy] = useState(false);
@@ -284,7 +275,98 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   // Высота секций зависит от асинхронно подгружаемых данных; включаем все
   // релевантные состояния, чтобы при их догрузке заново «доводить» прокрутку
   // к нужной секции (иначе на прямом заходе по ссылке позиция уезжала).
-  const targetLayoutKey = `${billingState}|${sessionsState}|${notificationPreferencesState}|${supportState}`;
+  const targetLayoutKey = `${billingState}|${sessionsState}|${notificationPreferencesState}`;
+
+  useEffect(() => {
+    if (!passwordDialogOpen) return;
+
+    document.body.classList.add("account-password-modal-open");
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !passwordSaving) {
+        setPasswordMessage(null);
+        setPasswordDialogOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.classList.remove("account-password-modal-open");
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [passwordDialogOpen, passwordSaving]);
+
+  useEffect(() => {
+    if (!subscriptionDialogOpen) return;
+
+    document.body.classList.add("account-password-modal-open");
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSubscriptionDialogOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.classList.remove("account-password-modal-open");
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [subscriptionDialogOpen]);
+
+  useEffect(() => {
+    if (!paymentDialogOpen) return;
+
+    document.body.classList.add("account-password-modal-open");
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPaymentDialogOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.classList.remove("account-password-modal-open");
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [paymentDialogOpen]);
+
+  useEffect(() => {
+    if (!sessionsDialogOpen) return;
+
+    document.body.classList.add("account-password-modal-open");
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSessionsDialogOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.classList.remove("account-password-modal-open");
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [sessionsDialogOpen]);
+
+  useEffect(() => {
+    if (!notificationsDialogOpen) return;
+
+    document.body.classList.add("account-password-modal-open");
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setNotificationsDialogOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.classList.remove("account-password-modal-open");
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [notificationsDialogOpen]);
 
   useEffect(() => {
     if (isPlatformStaff && isAccountBusinessSection(section)) {
@@ -399,7 +481,6 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   // лежит only-name shape — нет реквизитов и подписок. Тип BillingStatus
   // полнее и приходит сразу после refresh, так что фолбэк был вестигиальным.
   const company = billing;
-  const supportPreview = supportTickets.items.slice(0, 4);
   // Демо больше не показываем баннером — его роль выполняет плашка «Текущий
   // план» в секции «Подписка». Баннер оставляем только для проблемных статусов.
   const showBillingStateBanner =
@@ -431,8 +512,312 @@ export function AccountView({ section }: { section: AccountSectionId }) {
         : "demo";
   const notificationRows = accountNotificationRowsForRoles(user?.platformRoles ?? []);
 
+  function renderBillingStateBanner() {
+    if (!showBillingStateBanner || !company) return null;
+
+    return (
+      <div className={`account-state-banner status-${company.status}`}>
+        <strong>{subscription.tariff}</strong>
+        <span>{subscription.note}</span>
+      </div>
+    );
+  }
+
+  function renderCurrentPlanSummary() {
+    return (
+      <div className="account-plan-current">
+        <div className="account-plan-current-main">
+          <span className="account-plan-current-icon">
+            <CreditCard size={26} />
+          </span>
+          <div>
+            <span className="account-plan-current-label">Текущий план</span>
+            <strong className="account-plan-current-name">{subscription.tariff}</strong>
+          </div>
+        </div>
+        <div className="account-plan-current-side">
+          {companyStatusLabel ? (
+            <StatusPill variant={companyStatusPillVariant(billing?.status)}>{companyStatusLabel}</StatusPill>
+          ) : null}
+          <span className="account-plan-current-note">{subscription.note}</span>
+        </div>
+      </div>
+    );
+  }
+
+  function renderSubscriptionPlans() {
+    return (
+      <div className="account-plans">
+        {SUBSCRIPTION_PLAN_TIERS.map((tier) => {
+          const isCurrent = tier.key === currentPlanKey;
+          const popular = tier.key === "basic";
+          return (
+            <article
+              className={`account-plan${isCurrent ? " is-current" : ""}${popular ? " is-popular" : ""}`}
+              key={tier.key}
+            >
+              {popular ? <span className="account-plan-badge">Рекомендуем</span> : null}
+              <h3 className="account-plan-name">{tier.name}</h3>
+              <p className="account-plan-desc">{tier.description}</p>
+              <div className="account-plan-price">
+                {tier.price ? (
+                  <>
+                    <span className="account-plan-amount">{tier.price}</span>
+                    {tier.pricePeriod ? <span className="account-plan-period">{tier.pricePeriod}</span> : null}
+                  </>
+                ) : (
+                  <span className="account-plan-tbd">Цена скоро</span>
+                )}
+              </div>
+              <ul className="account-plan-features">
+                {tier.features.map((feature) => (
+                  <li className={feature.included ? undefined : "is-off"} key={feature.label}>
+                    <span className={`account-plan-check${feature.included ? "" : " is-off"}`}>
+                      {feature.included ? <Check size={12} /> : <X size={12} />}
+                    </span>
+                    {feature.label}
+                  </li>
+                ))}
+              </ul>
+              {isCurrent ? (
+                <button className="button secondary" type="button" disabled>
+                  Текущий план
+                </button>
+              ) : (
+                <button className={popular ? "button" : "button secondary"} type="button" onClick={openSupport}>
+                  Оставить заявку
+                </button>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderSubscriptionHistory() {
+    return (
+      <article className="card account-card">
+        <h2>История подписок</h2>
+        {billing?.subscriptions?.length ? (
+          <div className="account-history-list">
+            {billing.subscriptions.map((item: BillingSubscription) => (
+              <div className="account-history-row" key={item.id}>
+                <div>
+                  <strong>{SUBSCRIPTION_PLAN_TITLE_LABELS[item.plan] ?? item.plan}</strong>
+                  <span>
+                    {formatAccountDate(item.startsAt)} — {formatAccountDate(item.endsAt)}
+                  </span>
+                </div>
+                <StatusPill variant={subscriptionStatusPillVariant(item.status)}>
+                  {SUBSCRIPTION_STATUS_LABELS[item.status] ?? item.status}
+                </StatusPill>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="page-subtitle">История появится после активации подписки.</p>
+        )}
+      </article>
+    );
+  }
+
+  function renderPaymentDataCards() {
+    return (
+      <div className="account-section-grid">
+        <article className="card account-card">
+          <h2>Способы оплаты</h2>
+          <p className="page-subtitle">Сохранённые карты и расчётные счета для безналичной оплаты.</p>
+          <div className="account-empty">
+            <span className="account-empty-icon">
+              <CreditCard size={22} />
+            </span>
+            <div>
+              <strong>
+                Пока нет способов оплаты <span className="account-soon">Скоро</span>
+              </strong>
+              <p>Подписки активируются вручную поддержкой.</p>
+            </div>
+          </div>
+        </article>
+        <article className="card account-card">
+          <h2>Документы и платежи</h2>
+          <p className="page-subtitle">Счета, чеки и акты появятся рядом с каждым платежом.</p>
+          <div className="account-empty">
+            <span className="account-empty-icon">
+              <FileText size={22} />
+            </span>
+            <div>
+              <strong>Документов пока нет</strong>
+              <p>Появятся после первой оплаты подписки.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    );
+  }
+
+  function renderActiveSessionsCard() {
+    return (
+      <article className="card account-card">
+        <div className="account-card-head">
+          <div>
+            <h2>Активные сессии</h2>
+            <p className="page-subtitle">Всего устройств: {sessions.length}</p>
+          </div>
+          <button
+            className="button secondary danger"
+            onClick={logoutEverywhere}
+            type="button"
+            disabled={sessionBusyId === "all"}
+          >
+            Выйти со всех устройств
+          </button>
+        </div>
+        {sessionsState === "loading" ? <p className="page-subtitle">Загружаем сессии...</p> : null}
+        <div className="account-session-list">
+          {sessions.slice(0, sessionsShown).map((session) => {
+            const mobile = /iPhone|iPad|Android/i.test(session.userAgent ?? "");
+            const DeviceIcon = mobile ? Smartphone : Monitor;
+            return (
+              <div className="account-session-card" key={session.id}>
+                <div className="account-session-left">
+                  <span className="account-session-ic">
+                    <DeviceIcon size={20} />
+                  </span>
+                  <div className="account-session-meta">
+                    <strong>
+                      {describeSessionDevice(session.userAgent)}
+                      {session.current ? (
+                        <>
+                          {" "}
+                          <StatusPill variant="brand">Текущая</StatusPill>
+                        </>
+                      ) : null}
+                    </strong>
+                    <span>
+                      IP {session.ipAddress ?? "—"} · {formatAccountDateTime(session.updatedAt)} · до{" "}
+                      {formatAccountDateTime(session.expiresAt)}
+                    </span>
+                  </div>
+                </div>
+                {!session.current ? (
+                  <button
+                    className="button secondary"
+                    onClick={() => void revokeSession(session.id)}
+                    type="button"
+                    disabled={sessionBusyId === session.id}
+                  >
+                    Отозвать
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+          {sessionsState !== "loading" && sessions.length === 0 ? (
+            <p className="page-subtitle">Активных сессий не найдено.</p>
+          ) : null}
+        </div>
+        {sessions.length > sessionsShown ? (
+          <button
+            className="button secondary account-block-button"
+            type="button"
+            onClick={() => setSessionsShown((shown) => shown + 5)}
+          >
+            <ChevronDown size={16} />
+            Показать ещё ({sessions.length - sessionsShown})
+          </button>
+        ) : null}
+      </article>
+    );
+  }
+
+  function renderNotificationPreferencesCard() {
+    return (
+      <article className="card account-card">
+        <div className="account-notification-table">
+          <div className="account-notification-head">
+            <span>Категория</span>
+            <span>В кабинете</span>
+          </div>
+          {notificationRows.map((row) => {
+            const busyKey = `${row.category}:in_app`;
+            return (
+              <div className="account-notification-row" key={row.category}>
+                <div>
+                  <strong>{row.label}</strong>
+                  <p>{row.description}</p>
+                </div>
+                <label className="account-switch">
+                  <input
+                    checked={notificationEnabled(row.category, "in_app")}
+                    disabled={notificationPreferencesState === "loading" || notificationBusyKey === busyKey}
+                    onChange={(event) =>
+                      void updateNotificationPreference(row.category, "in_app", event.currentTarget.checked)
+                    }
+                    type="checkbox"
+                  />
+                  <span className="account-switch-track" aria-hidden="true" />
+                </label>
+              </div>
+            );
+          })}
+        </div>
+        {notificationPreferencesState === "loading" ? (
+          <p className="page-subtitle">Загружаем настройки уведомлений...</p>
+        ) : null}
+        {notificationPreferencesState === "error" ? (
+          <p className="account-form-message">Не удалось загрузить настройки уведомлений.</p>
+        ) : null}
+      </article>
+    );
+  }
+
   function openSupport() {
     window.dispatchEvent(new Event("support:open"));
+  }
+
+  function openSubscriptionDialog() {
+    setSubscriptionDialogOpen(true);
+  }
+
+  function closeSubscriptionDialog() {
+    setSubscriptionDialogOpen(false);
+  }
+
+  function openPaymentDialog() {
+    setPaymentDialogOpen(true);
+  }
+
+  function closePaymentDialog() {
+    setPaymentDialogOpen(false);
+  }
+
+  function openSessionsDialog() {
+    setSessionsDialogOpen(true);
+  }
+
+  function closeSessionsDialog() {
+    setSessionsDialogOpen(false);
+  }
+
+  function openNotificationsDialog() {
+    setNotificationsDialogOpen(true);
+  }
+
+  function closeNotificationsDialog() {
+    setNotificationsDialogOpen(false);
+  }
+
+  function openPasswordDialog() {
+    setPasswordMessage(null);
+    setPasswordDialogOpen(true);
+  }
+
+  function closePasswordDialog() {
+    if (passwordSaving) return;
+    setPasswordMessage(null);
+    setPasswordDialogOpen(false);
   }
 
   async function onChangePassword(event: FormEvent<HTMLFormElement>) {
@@ -679,7 +1064,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
 
           {!isPlatformStaff ? (
             <div className="account-stats">
-              <button className="account-stat" type="button" onClick={() => scrollAccountSectionIntoView("billing")}>
+              <button className="account-stat" type="button" onClick={openSubscriptionDialog}>
                 <span className="account-stat-icon account-stat-warn">
                   <CreditCard size={20} />
                 </span>
@@ -687,15 +1072,15 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                 <span className="account-stat-label">Подписка</span>
                 <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
               </button>
-              <button className="account-stat" type="button" onClick={() => scrollAccountSectionIntoView("profile")}>
+              <button className="account-stat" type="button" onClick={openPaymentDialog}>
                 <span className="account-stat-icon account-stat-brand">
-                  <UserRound size={20} />
+                  <FileText size={20} />
                 </span>
-                <span className="account-stat-value">{profileCompletion}%</span>
-                <span className="account-stat-label">Профиль заполнен</span>
+                <span className="account-stat-value">Платежные данные</span>
+                <span className="account-stat-label">Оплата и документы</span>
                 <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
               </button>
-              <button className="account-stat" type="button" onClick={() => scrollAccountSectionIntoView("sessions")}>
+              <button className="account-stat" type="button" onClick={openSessionsDialog}>
                 <span className="account-stat-icon account-stat-info">
                   <Smartphone size={20} />
                 </span>
@@ -703,11 +1088,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                 <span className="account-stat-label">Активные сессии</span>
                 <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
               </button>
-              <button
-                className="account-stat"
-                type="button"
-                onClick={() => scrollAccountSectionIntoView("notifications")}
-              >
+              <button className="account-stat" type="button" onClick={openNotificationsDialog}>
                 <span className="account-stat-icon account-stat-green">
                   <Bell size={20} />
                 </span>
@@ -726,11 +1107,25 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                   { label: "Имя", value: fullName },
                   { label: "Пол", value: user?.gender ? (USER_GENDER_LABELS[user.gender] ?? user.gender) : null },
                   { label: "Email", value: <AccountEditableValue value={user?.email} label="Email" /> },
+                  { label: "Пароль", value: <AccountPasswordValue onEdit={openPasswordDialog} /> },
                   { label: "Телефон", value: <AccountEditableValue value={user?.phone} label="Телефон" /> },
                 ]}
               />
             </article>
-            {isPlatformStaff ? (
+            {!isPlatformStaff ? (
+              billing ? (
+                <CompanyProfileForm billing={billing} onSaved={(updated) => setBilling(updated)} />
+              ) : (
+                <article className="card account-card">
+                  <h2>Компания</h2>
+                  <p className="page-subtitle">
+                    {billingState === "loading"
+                      ? "Загружаем реквизиты компании..."
+                      : "Данные компании пока недоступны."}
+                  </p>
+                </article>
+              )
+            ) : (
               <article className="card account-card">
                 <h2>Сотрудник платформы</h2>
                 <p className="page-subtitle">Этот аккаунт не привязан к клиентской компании.</p>
@@ -742,123 +1137,8 @@ export function AccountView({ section }: { section: AccountSectionId }) {
                   ))}
                 </div>
               </article>
-            ) : null}
+            )}
           </div>
-        </AccountScrollSection>
-
-        <AccountScrollSection
-          accountSection="security"
-          description="Пароль, дополнительная защита и быстрый выход из текущей сессии."
-          title="Безопасность"
-        >
-          <div className="account-panel-stack">
-            <div className="account-section-grid">
-              <article className="card account-card">
-                <h2>Смена пароля</h2>
-                <form className="account-form" onSubmit={onChangePassword}>
-                  <label>
-                    <span>Текущий пароль</span>
-                    <input
-                      className="input"
-                      name="currentPassword"
-                      type="password"
-                      autoComplete="current-password"
-                      required
-                    />
-                  </label>
-                  <label>
-                    <span>Новый пароль</span>
-                    <input
-                      className="input"
-                      name="newPassword"
-                      type="password"
-                      autoComplete="new-password"
-                      minLength={MIN_PASSWORD_LENGTH}
-                      required
-                    />
-                  </label>
-                  <label>
-                    <span>Повтор нового пароля</span>
-                    <input
-                      className="input"
-                      name="repeatPassword"
-                      type="password"
-                      autoComplete="new-password"
-                      minLength={MIN_PASSWORD_LENGTH}
-                      required
-                    />
-                  </label>
-                  {passwordMessage ? <p className="account-form-message">{passwordMessage}</p> : null}
-                  <button className="button" type="submit" disabled={passwordSaving}>
-                    <KeyRound size={16} />
-                    {passwordSaving ? "Сохраняем..." : "Сменить пароль"}
-                  </button>
-                </form>
-              </article>
-              <article className="card account-card">
-                <h2>Дополнительная защита</h2>
-                <p className="page-subtitle">Второй фактор и быстрый выход из текущей сессии.</p>
-                <div className="account-empty">
-                  <span className="account-empty-icon">
-                    <Smartphone size={22} />
-                  </span>
-                  <div>
-                    <strong>
-                      Двухфакторная аутентификация <span className="account-soon">Скоро</span>
-                    </strong>
-                    <p>SMS-код при входе с нового устройства.</p>
-                  </div>
-                  <button className="button secondary" type="button" disabled>
-                    Включить
-                  </button>
-                </div>
-                <button className="button secondary account-block-button" type="button" onClick={logout}>
-                  <LogOut size={16} />
-                  Завершить эту сессию
-                </button>
-              </article>
-            </div>
-          </div>
-        </AccountScrollSection>
-
-        <AccountScrollSection
-          accountSection="notifications"
-          description="Какие уведомления показывать в личном кабинете."
-          title="Уведомления"
-        >
-          <article className="card account-card">
-            <div className="account-notification-table">
-              <div className="account-notification-head">
-                <span>Категория</span>
-                <span>В кабинете</span>
-              </div>
-              {notificationRows.map((row) => {
-                const busyKey = `${row.category}:in_app`;
-                return (
-                  <div className="account-notification-row" key={row.category}>
-                    <div>
-                      <strong>{row.label}</strong>
-                      <p>{row.description}</p>
-                    </div>
-                    <label className="account-switch">
-                      <input
-                        checked={notificationEnabled(row.category, "in_app")}
-                        disabled={notificationPreferencesState === "loading" || notificationBusyKey === busyKey}
-                        onChange={(event) =>
-                          void updateNotificationPreference(row.category, "in_app", event.currentTarget.checked)
-                        }
-                        type="checkbox"
-                      />
-                      <span className="account-switch-track" aria-hidden="true" />
-                    </label>
-                  </div>
-                );
-              })}
-            </div>
-            {notificationPreferencesState === "error" ? (
-              <p className="account-form-message">Не удалось загрузить настройки уведомлений.</p>
-            ) : null}
-          </article>
         </AccountScrollSection>
 
         <AccountScrollSection
@@ -910,280 +1190,202 @@ export function AccountView({ section }: { section: AccountSectionId }) {
             </article>
           </div>
         </AccountScrollSection>
-
-        <AccountScrollSection
-          accountSection="sessions"
-          description="Устройства, с которых сейчас открыт кабинет."
-          title="Сессии"
-        >
-          <article className="card account-card">
-            <div className="account-card-head">
-              <div>
-                <h2>Активные сессии</h2>
-                <p className="page-subtitle">Всего устройств: {sessions.length}</p>
-              </div>
-              <button
-                className="button secondary danger"
-                onClick={logoutEverywhere}
-                type="button"
-                disabled={sessionBusyId === "all"}
-              >
-                Выйти со всех устройств
-              </button>
-            </div>
-            {sessionsState === "loading" ? <p className="page-subtitle">Загружаем сессии...</p> : null}
-            <div className="account-session-list">
-              {sessions.slice(0, sessionsShown).map((session) => {
-                const mobile = /iPhone|iPad|Android/i.test(session.userAgent ?? "");
-                const DeviceIcon = mobile ? Smartphone : Monitor;
-                return (
-                  <div className="account-session-card" key={session.id}>
-                    <div className="account-session-left">
-                      <span className="account-session-ic">
-                        <DeviceIcon size={20} />
-                      </span>
-                      <div className="account-session-meta">
-                        <strong>
-                          {describeSessionDevice(session.userAgent)}
-                          {session.current ? (
-                            <>
-                              {" "}
-                              <StatusPill variant="brand">Текущая</StatusPill>
-                            </>
-                          ) : null}
-                        </strong>
-                        <span>
-                          IP {session.ipAddress ?? "—"} · {formatAccountDateTime(session.updatedAt)} · до{" "}
-                          {formatAccountDateTime(session.expiresAt)}
-                        </span>
-                      </div>
-                    </div>
-                    {!session.current ? (
-                      <button
-                        className="button secondary"
-                        onClick={() => void revokeSession(session.id)}
-                        type="button"
-                        disabled={sessionBusyId === session.id}
-                      >
-                        Отозвать
-                      </button>
-                    ) : null}
-                  </div>
-                );
-              })}
-              {sessionsState !== "loading" && sessions.length === 0 ? (
-                <p className="page-subtitle">Активных сессий не найдено.</p>
-              ) : null}
-            </div>
-            {sessions.length > sessionsShown ? (
-              <button
-                className="button secondary account-block-button"
-                type="button"
-                onClick={() => setSessionsShown((shown) => shown + 5)}
-              >
-                <ChevronDown size={16} />
-                Показать ещё ({sessions.length - sessionsShown})
-              </button>
-            ) : null}
-          </article>
-        </AccountScrollSection>
-
-        {!isPlatformStaff ? (
-          <AccountScrollSection accountSection="company" description="Основные данные вашей компании." title="Компания">
-            {billing ? (
-              <CompanyProfileForm billing={billing} onSaved={(updated) => setBilling(updated)} />
-            ) : (
-              <article className="card account-card">
-                <h2>Компания</h2>
-                <p className="page-subtitle">
-                  {billingState === "loading" ? "Загружаем реквизиты компании..." : "Данные компании пока недоступны."}
-                </p>
-              </article>
-            )}
-          </AccountScrollSection>
-        ) : null}
-
-        {!isPlatformStaff ? (
-          <AccountScrollSection
-            accountSection="billing"
-            description="Тариф, документы, способы оплаты и история подписок."
-            title="Подписка"
-          >
-            <div className="account-panel-stack">
-              {showBillingStateBanner ? (
-                <div className={`account-state-banner status-${company.status}`}>
-                  <strong>{subscription.tariff}</strong>
-                  <span>{subscription.note}</span>
-                </div>
-              ) : null}
-              <div className="account-plan-current">
-                <div className="account-plan-current-main">
-                  <span className="account-plan-current-icon">
-                    <CreditCard size={26} />
-                  </span>
-                  <div>
-                    <span className="account-plan-current-label">Текущий план</span>
-                    <strong className="account-plan-current-name">{subscription.tariff}</strong>
-                  </div>
-                </div>
-                <div className="account-plan-current-side">
-                  {companyStatusLabel ? (
-                    <StatusPill variant={companyStatusPillVariant(billing?.status)}>{companyStatusLabel}</StatusPill>
-                  ) : null}
-                  <span className="account-plan-current-note">{subscription.note}</span>
-                </div>
-              </div>
-
-              <div className="account-plans">
-                {SUBSCRIPTION_PLAN_TIERS.map((tier) => {
-                  const isCurrent = tier.key === currentPlanKey;
-                  const popular = tier.key === "basic";
-                  return (
-                    <article
-                      className={`account-plan${isCurrent ? " is-current" : ""}${popular ? " is-popular" : ""}`}
-                      key={tier.key}
-                    >
-                      {popular ? <span className="account-plan-badge">Рекомендуем</span> : null}
-                      <h3 className="account-plan-name">{tier.name}</h3>
-                      <p className="account-plan-desc">{tier.description}</p>
-                      <div className="account-plan-price">
-                        {tier.price ? (
-                          <>
-                            <span className="account-plan-amount">{tier.price}</span>
-                            {tier.pricePeriod ? <span className="account-plan-period">{tier.pricePeriod}</span> : null}
-                          </>
-                        ) : (
-                          <span className="account-plan-tbd">Цена скоро</span>
-                        )}
-                      </div>
-                      <ul className="account-plan-features">
-                        {tier.features.map((feature) => (
-                          <li className={feature.included ? undefined : "is-off"} key={feature.label}>
-                            <span className={`account-plan-check${feature.included ? "" : " is-off"}`}>
-                              {feature.included ? <Check size={12} /> : <X size={12} />}
-                            </span>
-                            {feature.label}
-                          </li>
-                        ))}
-                      </ul>
-                      {isCurrent ? (
-                        <button className="button secondary" type="button" disabled>
-                          Текущий план
-                        </button>
-                      ) : (
-                        <button className={popular ? "button" : "button secondary"} type="button" onClick={openSupport}>
-                          Оставить заявку
-                        </button>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-
-              <div className="account-section-grid">
-                <article className="card account-card">
-                  <h2>Способы оплаты</h2>
-                  <p className="page-subtitle">Сохранённые карты и расчётные счета для безналичной оплаты.</p>
-                  <div className="account-empty">
-                    <span className="account-empty-icon">
-                      <CreditCard size={22} />
-                    </span>
-                    <div>
-                      <strong>
-                        Пока нет способов оплаты <span className="account-soon">Скоро</span>
-                      </strong>
-                      <p>Подписки активируются вручную поддержкой.</p>
-                    </div>
-                  </div>
-                </article>
-                <article className="card account-card">
-                  <h2>Документы и платежи</h2>
-                  <p className="page-subtitle">Счета, чеки и акты появятся рядом с каждым платежом.</p>
-                  <div className="account-empty">
-                    <span className="account-empty-icon">
-                      <FileText size={22} />
-                    </span>
-                    <div>
-                      <strong>Документов пока нет</strong>
-                      <p>Появятся после первой оплаты подписки.</p>
-                    </div>
-                  </div>
-                </article>
-              </div>
-
-              <article className="card account-card">
-                <h2>История подписок</h2>
-                {billing?.subscriptions?.length ? (
-                  <div className="account-history-list">
-                    {billing.subscriptions.map((item: BillingSubscription) => (
-                      <div className="account-history-row" key={item.id}>
-                        <div>
-                          <strong>{SUBSCRIPTION_PLAN_TITLE_LABELS[item.plan] ?? item.plan}</strong>
-                          <span>
-                            {formatAccountDate(item.startsAt)} — {formatAccountDate(item.endsAt)}
-                          </span>
-                        </div>
-                        <StatusPill variant={subscriptionStatusPillVariant(item.status)}>
-                          {SUBSCRIPTION_STATUS_LABELS[item.status] ?? item.status}
-                        </StatusPill>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="page-subtitle">История появится после активации подписки.</p>
-                )}
-              </article>
-            </div>
-          </AccountScrollSection>
-        ) : null}
-
-        {!isPlatformStaff ? (
-          <AccountScrollSection
-            accountSection="support"
-            description="Создайте обращение или продолжите переписку с администратором платформы."
-            title="Поддержка"
-          >
-            <div className="account-section-grid">
-              <article className="card account-card">
-                <h2>Поддержка</h2>
-                <p className="page-subtitle">
-                  Создайте обращение или продолжите переписку с администратором платформы.
-                </p>
-                <div className="account-action-list">
-                  <button className="button" type="button" onClick={openSupport}>
-                    <LifeBuoy size={16} />
-                    Открыть поддержку
-                  </button>
-                </div>
-              </article>
-              <article className="card account-card">
-                <h2>Последние обращения</h2>
-                {supportState === "loading" ? <p className="page-subtitle">Загружаем обращения...</p> : null}
-                {supportPreview.length > 0 ? (
-                  <div className="account-history-list">
-                    {supportPreview.map((ticket) => (
-                      <button className="account-ticket-row" key={ticket.id} type="button" onClick={openSupport}>
-                        <div>
-                          <strong>{ticket.subject}</strong>
-                          <span>
-                            {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
-                            {formatAccountDateTime(ticket.updatedAt)}
-                          </span>
-                        </div>
-                        <StatusPill variant={supportStatusPillVariant(ticket.status)}>
-                          {SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status}
-                        </StatusPill>
-                      </button>
-                    ))}
-                  </div>
-                ) : supportState !== "loading" ? (
-                  <p className="page-subtitle">Обращений пока нет.</p>
-                ) : null}
-              </article>
-            </div>
-          </AccountScrollSection>
-        ) : null}
       </section>
+      {subscriptionDialogOpen ? (
+        <div
+          aria-labelledby="account-subscription-dialog-title"
+          aria-modal="true"
+          className="account-password-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeSubscriptionDialog();
+          }}
+          role="dialog"
+        >
+          <section className="account-password-modal account-subscription-modal">
+            <header className="account-password-modal-head">
+              <div>
+                <span className="account-password-modal-kicker">Подписка</span>
+                <h2 id="account-subscription-dialog-title">Тариф и история</h2>
+                <p>Текущий план, доступные тарифы и история подписок.</p>
+              </div>
+              <button
+                aria-label="Закрыть подписку"
+                className="account-password-modal-close"
+                onClick={closeSubscriptionDialog}
+                type="button"
+              >
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <div className="account-subscription-modal-body account-panel-stack">
+              {renderBillingStateBanner()}
+              {renderCurrentPlanSummary()}
+              {renderSubscriptionPlans()}
+              {renderSubscriptionHistory()}
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {paymentDialogOpen ? (
+        <div
+          aria-labelledby="account-payment-dialog-title"
+          aria-modal="true"
+          className="account-password-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closePaymentDialog();
+          }}
+          role="dialog"
+        >
+          <section className="account-password-modal account-payment-modal">
+            <header className="account-password-modal-head">
+              <div>
+                <span className="account-password-modal-kicker">Оплата</span>
+                <h2 id="account-payment-dialog-title">Платежные данные</h2>
+                <p>Способы оплаты и платежные документы компании.</p>
+              </div>
+              <button
+                aria-label="Закрыть платежные данные"
+                className="account-password-modal-close"
+                onClick={closePaymentDialog}
+                type="button"
+              >
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <div className="account-payment-modal-body">{renderPaymentDataCards()}</div>
+          </section>
+        </div>
+      ) : null}
+      {sessionsDialogOpen ? (
+        <div
+          aria-labelledby="account-sessions-dialog-title"
+          aria-modal="true"
+          className="account-password-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeSessionsDialog();
+          }}
+          role="dialog"
+        >
+          <section className="account-password-modal account-sessions-modal">
+            <header className="account-password-modal-head">
+              <div>
+                <span className="account-password-modal-kicker">Доступ</span>
+                <h2 id="account-sessions-dialog-title">Сессии</h2>
+                <p>Устройства, с которых сейчас открыт кабинет.</p>
+              </div>
+              <button
+                aria-label="Закрыть сессии"
+                className="account-password-modal-close"
+                onClick={closeSessionsDialog}
+                type="button"
+              >
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <div className="account-sessions-modal-body">{renderActiveSessionsCard()}</div>
+          </section>
+        </div>
+      ) : null}
+      {notificationsDialogOpen ? (
+        <div
+          aria-labelledby="account-notifications-dialog-title"
+          aria-modal="true"
+          className="account-password-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeNotificationsDialog();
+          }}
+          role="dialog"
+        >
+          <section className="account-password-modal account-notifications-modal">
+            <header className="account-password-modal-head">
+              <div>
+                <span className="account-password-modal-kicker">Настройки</span>
+                <h2 id="account-notifications-dialog-title">Уведомления</h2>
+                <p>Какие уведомления показывать в личном кабинете.</p>
+              </div>
+              <button
+                aria-label="Закрыть уведомления"
+                className="account-password-modal-close"
+                onClick={closeNotificationsDialog}
+                type="button"
+              >
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <div className="account-notifications-modal-body">{renderNotificationPreferencesCard()}</div>
+          </section>
+        </div>
+      ) : null}
+      {passwordDialogOpen ? (
+        <div
+          aria-labelledby="account-password-dialog-title"
+          aria-modal="true"
+          className="account-password-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closePasswordDialog();
+          }}
+          role="dialog"
+        >
+          <section className="account-password-modal">
+            <header className="account-password-modal-head">
+              <div>
+                <span className="account-password-modal-kicker">Безопасность</span>
+                <h2 id="account-password-dialog-title">Смена пароля</h2>
+                <p>Введите текущий пароль и новый пароль дважды.</p>
+              </div>
+              <button
+                aria-label="Закрыть смену пароля"
+                className="account-password-modal-close"
+                disabled={passwordSaving}
+                onClick={closePasswordDialog}
+                type="button"
+              >
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <form className="account-form account-password-modal-form" onSubmit={onChangePassword}>
+              <label>
+                <span>Текущий пароль</span>
+                <input
+                  autoComplete="current-password"
+                  autoFocus
+                  className="input"
+                  name="currentPassword"
+                  required
+                  type="password"
+                />
+              </label>
+              <label>
+                <span>Новый пароль</span>
+                <input
+                  autoComplete="new-password"
+                  className="input"
+                  minLength={MIN_PASSWORD_LENGTH}
+                  name="newPassword"
+                  required
+                  type="password"
+                />
+              </label>
+              <label>
+                <span>Повтор нового пароля</span>
+                <input
+                  autoComplete="new-password"
+                  className="input"
+                  minLength={MIN_PASSWORD_LENGTH}
+                  name="repeatPassword"
+                  required
+                  type="password"
+                />
+              </label>
+              {passwordMessage ? <p className="account-form-message">{passwordMessage}</p> : null}
+              <button className="button" type="submit" disabled={passwordSaving}>
+                <KeyRound size={16} />
+                {passwordSaving ? "Сохраняем..." : "Сменить пароль"}
+              </button>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </AppShell>
   );
 }
@@ -1221,13 +1423,56 @@ function AccountScrollSection({
 
 // ── /account → Компания ─────────────────────────────────────────────────────
 // Упрощённый профиль компании (MVP): только базовые поля «Основное» — название,
-// сайт, корпоративные телефон и email. Один PATCH собирает изменённые поля.
+// сайт, корпоративные телефон и email. PATCH меняет только выбранное поле.
 // Тип/статус компании здесь не показываем — ими управляет бэкенд.
 type CompanyFormState = {
   organizationName: string;
   websiteUrl: string;
   corporatePhone: string;
   corporateEmail: string;
+};
+
+type CompanyEditableField = keyof CompanyFormState;
+
+const COMPANY_FIELD_CONFIG: Record<
+  CompanyEditableField,
+  {
+    detailLabel: string;
+    inputLabel: string;
+    modalTitle: string;
+    placeholder?: string;
+    required?: boolean;
+    type: "email" | "tel" | "text" | "url";
+  }
+> = {
+  organizationName: {
+    detailLabel: "Название",
+    inputLabel: "Название организации",
+    modalTitle: "Название компании",
+    required: true,
+    type: "text",
+  },
+  websiteUrl: {
+    detailLabel: "Сайт",
+    inputLabel: "Сайт",
+    modalTitle: "Сайт компании",
+    placeholder: "https://example.ru",
+    type: "url",
+  },
+  corporatePhone: {
+    detailLabel: "Телефон",
+    inputLabel: "Корпоративный телефон",
+    modalTitle: "Корпоративный телефон",
+    placeholder: "+74951234567",
+    type: "tel",
+  },
+  corporateEmail: {
+    detailLabel: "Email",
+    inputLabel: "Корпоративный email",
+    modalTitle: "Корпоративный email",
+    placeholder: "info@example.ru",
+    type: "email",
+  },
 };
 
 function billingToFormState(billing: BillingStatus): CompanyFormState {
@@ -1247,8 +1492,10 @@ function CompanyProfileForm({
   onSaved: (updated: BillingStatus) => void;
 }) {
   const [form, setForm] = useState<CompanyFormState>(() => billingToFormState(billing));
+  const [editingField, setEditingField] = useState<CompanyEditableField | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const activeFieldConfig = editingField ? COMPANY_FIELD_CONFIG[editingField] : null;
 
   // Если внешние данные billing изменились (например, после успешного сейва) —
   // подтянуть форму, чтобы не редактировать «исторические» значения.
@@ -1260,20 +1507,51 @@ function CompanyProfileForm({
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  useEffect(() => {
+    if (!editingField) return;
+
+    document.body.classList.add("account-password-modal-open");
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !saving) {
+        setEditingField(null);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.classList.remove("account-password-modal-open");
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [editingField, saving]);
+
+  function openEditDialog(field: CompanyEditableField) {
+    setForm(billingToFormState(billing));
+    setMessage(null);
+    setEditingField(field);
+  }
+
+  function closeEditDialog() {
+    if (saving) return;
+    setEditingField(null);
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!editingField) return;
+
     setMessage(null);
     setSaving(true);
-    const dto: CompanyProfileUpdateDto = {
-      organizationName: form.organizationName.trim() || undefined,
-      websiteUrl: form.websiteUrl.trim() || null,
-      corporatePhone: form.corporatePhone.trim() || null,
-      corporateEmail: form.corporateEmail.trim() || null,
-    };
+    const trimmedValue = form[editingField].trim();
+    const dto: CompanyProfileUpdateDto =
+      editingField === "organizationName"
+        ? { organizationName: trimmedValue }
+        : { [editingField]: trimmedValue || null };
     try {
       const updated = await api.billing.updateCompanyProfile(dto);
       onSaved(updated);
       setMessage({ type: "ok", text: "Сохранено." });
+      setEditingField(null);
     } catch (error) {
       setMessage({
         type: "error",
@@ -1285,61 +1563,103 @@ function CompanyProfileForm({
   }
 
   return (
-    <form className="card account-card" onSubmit={onSubmit}>
-      <div className="account-card-head">
-        <div>
-          <h2>{billing.organizationName}</h2>
-          <p className="page-subtitle" style={{ margin: 0 }}>
-            Основные данные компании
-          </p>
-        </div>
-        <button className="button" type="submit" disabled={saving}>
-          {saving ? "Сохраняем..." : "Сохранить"}
-        </button>
-      </div>
-      <div className="account-form-grid-2">
-        <label className="account-form-field">
-          <span>Название организации</span>
-          <input
-            className="input"
-            type="text"
-            value={form.organizationName}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setField("organizationName", event.target.value)}
-            required
-          />
-        </label>
-        <label className="account-form-field">
-          <span>Сайт</span>
-          <input
-            className="input"
-            type="url"
-            value={form.websiteUrl}
-            onChange={(event) => setField("websiteUrl", event.target.value)}
-            placeholder="https://example.ru"
-          />
-        </label>
-        <label className="account-form-field">
-          <span>Корпоративный телефон</span>
-          <input
-            className="input"
-            type="tel"
-            value={form.corporatePhone}
-            onChange={(event) => setField("corporatePhone", event.target.value)}
-            placeholder="+74951234567"
-          />
-        </label>
-        <label className="account-form-field">
-          <span>Корпоративный email</span>
-          <input
-            className="input"
-            type="email"
-            value={form.corporateEmail}
-            onChange={(event) => setField("corporateEmail", event.target.value)}
-            placeholder="info@example.ru"
-          />
-        </label>
-      </div>
+    <article className="card account-card">
+      <h2>Данные компании</h2>
+      <AccountDetailList
+        rows={[
+          {
+            label: COMPANY_FIELD_CONFIG.organizationName.detailLabel,
+            value: (
+              <AccountEditableValue
+                value={billing.organizationName}
+                label="Название компании"
+                onEdit={() => openEditDialog("organizationName")}
+              />
+            ),
+          },
+          {
+            label: COMPANY_FIELD_CONFIG.websiteUrl.detailLabel,
+            value: (
+              <AccountEditableValue
+                value={billing.websiteUrl}
+                label="Сайт компании"
+                onEdit={() => openEditDialog("websiteUrl")}
+              />
+            ),
+          },
+          {
+            label: COMPANY_FIELD_CONFIG.corporatePhone.detailLabel,
+            value: (
+              <AccountEditableValue
+                value={billing.corporatePhone}
+                label="Корпоративный телефон"
+                onEdit={() => openEditDialog("corporatePhone")}
+              />
+            ),
+          },
+          {
+            label: COMPANY_FIELD_CONFIG.corporateEmail.detailLabel,
+            value: (
+              <AccountEditableValue
+                value={billing.corporateEmail}
+                label="Корпоративный email"
+                onEdit={() => openEditDialog("corporateEmail")}
+              />
+            ),
+          },
+        ]}
+      />
       {message ? <p className={`account-form-message account-form-message-${message.type}`}>{message.text}</p> : null}
-    </form>
+      {editingField && activeFieldConfig ? (
+        <div
+          aria-labelledby="account-company-dialog-title"
+          aria-modal="true"
+          className="account-password-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeEditDialog();
+          }}
+          role="dialog"
+        >
+          <section className="account-password-modal">
+            <header className="account-password-modal-head">
+              <div>
+                <span className="account-password-modal-kicker">Компания</span>
+                <h2 id="account-company-dialog-title">{activeFieldConfig.modalTitle}</h2>
+                <p>Измените только выбранный пункт.</p>
+              </div>
+              <button
+                aria-label={`Закрыть редактирование: ${activeFieldConfig.modalTitle}`}
+                className="account-password-modal-close"
+                disabled={saving}
+                onClick={closeEditDialog}
+                type="button"
+              >
+                <X aria-hidden="true" size={18} />
+              </button>
+            </header>
+            <form className="account-form account-password-modal-form" onSubmit={onSubmit}>
+              <label>
+                <span>{activeFieldConfig.inputLabel}</span>
+                <input
+                  autoFocus
+                  className="input"
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setField(editingField, event.target.value)}
+                  placeholder={activeFieldConfig.placeholder}
+                  required={activeFieldConfig.required}
+                  type={activeFieldConfig.type}
+                  value={form[editingField]}
+                />
+              </label>
+              {message?.type === "error" ? (
+                <p className="account-form-message account-form-message-error">{message.text}</p>
+              ) : null}
+              <button className="button" type="submit" disabled={saving}>
+                {saving ? "Сохраняем..." : "Сохранить"}
+              </button>
+            </form>
+          </section>
+        </div>
+      ) : null}
+    </article>
   );
 }

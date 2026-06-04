@@ -10537,9 +10537,34 @@ li.tree-add-row + li.tree-add-row,
   color: var(--text-secondary);
 }
 
+.account-inline-edit:not(:disabled) {
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.account-inline-edit:not(:disabled):hover {
+  border-color: var(--primary);
+  background: rgb(var(--brand-rgb) / 0.1);
+  color: var(--primary);
+}
+
+.account-inline-edit:not(:disabled):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .account-inline-edit:disabled {
   cursor: not-allowed;
   opacity: 0.68;
+}
+
+.account-secret-value {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  color: var(--text);
 }
 
 .account-muted {
@@ -10782,6 +10807,136 @@ li.tree-add-row + li.tree-add-row,
   color: var(--danger-text-strong);
 }
 
+body.account-password-modal-open {
+  overflow: hidden;
+}
+
+.account-password-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(var(--shadow-rgb) / 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: news-modal-fade-in 160ms ease-out;
+}
+
+.account-password-modal {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--panel);
+  box-shadow: 0 28px 80px rgb(var(--shadow-rgb) / 0.26);
+  animation: news-modal-rise 180ms ease-out;
+}
+
+.account-password-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-password-modal-head h2,
+.account-password-modal-head p {
+  margin: 0;
+}
+
+.account-password-modal-head h2 {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.account-password-modal-head p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.account-password-modal-kicker {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.account-password-modal-close {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.account-password-modal-close:hover {
+  border-color: var(--primary);
+  background: rgb(var(--brand-rgb) / 0.1);
+  color: var(--primary);
+}
+
+.account-password-modal-close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.account-password-modal-close:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.account-password-modal-form {
+  padding: 20px 24px 24px;
+}
+
+.account-subscription-modal {
+  width: min(980px, 100%);
+}
+
+.account-payment-modal {
+  width: min(760px, 100%);
+}
+
+.account-sessions-modal {
+  width: min(880px, 100%);
+}
+
+.account-notifications-modal {
+  width: min(860px, 100%);
+}
+
+.account-subscription-modal-body {
+  padding: 20px 24px 24px;
+}
+
+.account-payment-modal-body,
+.account-sessions-modal-body,
+.account-notifications-modal-body {
+  padding: 20px 24px 24px;
+}
+
+.account-subscription-modal .account-plans {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 @media (max-width: 720px) {
   .account-section-grid,
   .account-form-grid-2 {
@@ -10812,6 +10967,33 @@ li.tree-add-row + li.tree-add-row,
 
   .account-notification-row {
     gap: 8px;
+  }
+
+  .account-password-modal-backdrop {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .account-password-modal {
+    max-height: calc(100dvh - 24px);
+  }
+
+  .account-password-modal-head {
+    padding: 20px 20px 14px;
+  }
+
+  .account-password-modal-form {
+    padding: 18px 20px 20px;
+  }
+
+  .account-subscription-modal-body {
+    padding: 18px 20px 20px;
+  }
+
+  .account-payment-modal-body,
+  .account-sessions-modal-body,
+  .account-notifications-modal-body {
+    padding: 18px 20px 20px;
   }
 }
 

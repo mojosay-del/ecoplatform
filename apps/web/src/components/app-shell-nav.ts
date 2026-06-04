@@ -1,22 +1,16 @@
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
-  Bell,
   BookOpen,
-  Building2,
   Calculator,
-  CreditCard,
   Database,
   FileText,
   GraduationCap,
-  KeyRound,
   LayoutDashboard,
   LineChart,
-  LifeBuoy,
   Map as MapIcon,
   MessageCircle,
   Newspaper,
-  Smartphone,
   UserRound,
 } from "lucide-react";
 
@@ -44,15 +38,7 @@ export type BreadcrumbItem = {
   icon?: LucideIcon;
 };
 
-export type AccountSectionId =
-  | "profile"
-  | "security"
-  | "notifications"
-  | "data-privacy"
-  | "sessions"
-  | "company"
-  | "billing"
-  | "support";
+export type AccountSectionId = "profile" | "data-privacy";
 
 export const ACCOUNT_SECTION_CHANGE_EVENT = "account:section-change";
 export const ACCOUNT_SECTION_NAVIGATE_EVENT = "account:section-navigate";
@@ -116,21 +102,13 @@ export const appNavSections: NavSection[] = [
 
 const accountSettingsItems: NavItem[] = [
   { href: "/account/profile", label: "Профиль", icon: UserRound },
-  { href: "/account/security", label: "Безопасность", icon: KeyRound },
-  { href: "/account/notifications", label: "Уведомления", icon: Bell },
   { href: "/account/data-privacy", label: "Данные и приватность", icon: Database },
-  { href: "/account/sessions", label: "Сессии", icon: Smartphone },
 ];
 
-const accountBusinessItems: NavItem[] = [
-  { href: "/account/company", label: "Компания", icon: Building2 },
-  { href: "/account/billing", label: "Подписка", icon: CreditCard },
-  { href: "/account/support", label: "Поддержка", icon: LifeBuoy },
-];
-
-export const accountBusinessSections: AccountSectionId[] = ["company", "billing", "support"];
+export const accountBusinessSections: AccountSectionId[] = [];
 
 export function getAccountNavSections(includeBusiness: boolean): NavSection[] {
+  void includeBusiness;
   return [
     {
       title: "Переход",
@@ -140,14 +118,6 @@ export function getAccountNavSections(includeBusiness: boolean): NavSection[] {
       title: "Настройки",
       items: accountSettingsItems,
     },
-    ...(includeBusiness
-      ? [
-          {
-            title: "Компания",
-            items: accountBusinessItems,
-          },
-        ]
-      : []),
   ];
 }
 
@@ -270,33 +240,23 @@ const accountRoot: BreadcrumbItem = {
 
 const accountBreadcrumbs: { prefix: string; section: AccountSectionId; label: string }[] = [
   { prefix: "/account/profile", section: "profile", label: "Профиль" },
-  { prefix: "/account/security", section: "security", label: "Безопасность" },
-  { prefix: "/account/notifications", section: "notifications", label: "Уведомления" },
   { prefix: "/account/data-privacy", section: "data-privacy", label: "Данные и приватность" },
-  { prefix: "/account/sessions", section: "sessions", label: "Сессии" },
-  { prefix: "/account/company", section: "company", label: "Компания" },
-  { prefix: "/account/billing", section: "billing", label: "Подписка" },
-  { prefix: "/account/support", section: "support", label: "Поддержка" },
 ];
 
 const accountSectionIds = new Set<AccountSectionId>(accountBreadcrumbs.map((item) => item.section));
 
 const legacyAccountTabToSection = new Map<string, AccountSectionId>([
   ["profile", "profile"],
-  ["security", "security"],
-  ["notifications", "notifications"],
-  ["company", "company"],
-  ["billing", "billing"],
-  ["support", "support"],
+  ["security", "profile"],
+  ["notifications", "profile"],
+  ["company", "profile"],
+  ["billing", "profile"],
+  ["sessions", "profile"],
+  ["support", "profile"],
 ]);
 
 function getAccountBreadcrumbTrail(pathname: string): BreadcrumbItem[] | null {
-  const matched = accountBreadcrumbs.find(({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-  if (matched) {
-    return [accountRoot, { href: matched.prefix, label: matched.label }];
-  }
-
-  if (pathname === "/account") {
+  if (pathname === "/account" || pathname.startsWith("/account/")) {
     return [accountRoot];
   }
 

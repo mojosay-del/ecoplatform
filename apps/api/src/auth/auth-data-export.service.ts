@@ -1,8 +1,5 @@
-import { forwardRef, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { NotificationCategory } from "@prisma/client";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { createZip, type ZipFile } from "../common/simple-zip";
-import { swallowAndLog } from "../common/silent-catch";
-import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 type ExportResult = {
@@ -12,11 +9,7 @@ type ExportResult = {
 
 @Injectable()
 export class AuthDataExportService {
-  constructor(
-    private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => NotificationsService))
-    private readonly notifications: NotificationsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async exportUserData(userId: string): Promise<ExportResult> {
     const generatedAt = new Date();
@@ -124,7 +117,6 @@ export class AuthDataExportService {
     ];
 
     const buffer = createZip(zipFiles, generatedAt);
-    await this.notifyExportReady(userId, generatedAt).catch(swallowAndLog("auth.data_export.notify", { userId }));
 
     return {
       buffer,
@@ -419,18 +411,6 @@ export class AuthDataExportService {
         OR: [{ actorId: userId }, { entityId: userId }, ...(companyId ? [{ entityId: companyId }] : [])],
       },
       orderBy: { createdAt: "desc" },
-    });
-  }
-
-  private async notifyExportReady(userId: string, generatedAt: Date): Promise<void> {
-    await this.notifications.createInApp({
-      userId,
-      eventType: "auth.data_export.ready",
-      sourceId: `data-export:${generatedAt.getTime()}`,
-      category: NotificationCategory.security,
-      title: "Экспорт данных подготовлен",
-      body: "Архив с вашими данными сформирован и скачан в браузере.",
-      link: "/account",
     });
   }
 }

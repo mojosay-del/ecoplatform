@@ -23,7 +23,6 @@ function createService(
     prisma as any,
     {} as any,
     { getValue: vi.fn(async (key: string) => SETTING_DEFAULTS[key]) } as any,
-    { createInApp: vi.fn() } as any,
     { invalidateUser: vi.fn(), invalidateSession: vi.fn() } as any,
     { assertAcceptablePassword: vi.fn() } as any,
     email as any,
