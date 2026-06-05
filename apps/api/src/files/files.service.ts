@@ -1,12 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  NotFoundException,
-  Optional,
-} from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -45,6 +37,7 @@ import {
   replaceEntityFileReferences,
   type FilesReferenceDeps,
 } from "./files-reference.helpers";
+import { assertDailyUploadQuota, type FilesQuotaDeps } from "./files-quota.helpers";
 
 export type UploadedMemoryFile = {
   originalname: string;
@@ -430,47 +423,8 @@ export class FilesService {
     return Array.from(new Set([asset.storageKey, ...variants]));
   }
 
-  private async dailyUploadScopeUserIds(userId: string): Promise<string[]> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { companyId: true },
-    });
-    if (!user?.companyId) {
-      return [userId];
-    }
-
-    const companyUsers = await this.prisma.user.findMany({
-      where: { companyId: user.companyId },
-      select: { id: true },
-    });
-    return companyUsers.length > 0 ? companyUsers.map((companyUser) => companyUser.id) : [userId];
-  }
-
-  private quotaResetHours(windowStart: Date): number {
-    const resetAt = windowStart.getTime() + 24 * 60 * 60 * 1000;
-    return Math.max(1, Math.ceil((resetAt - Date.now()) / (60 * 60 * 1000)));
-  }
-
-  private async assertDailyUploadQuota(userId: string, nextFileBytes: number): Promise<void> {
-    const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const userIds = await this.dailyUploadScopeUserIds(userId);
-    const aggregate = await this.prisma.fileAsset.aggregate({
-      where: {
-        uploadedById: { in: userIds },
-        createdAt: { gte: windowStart },
-      },
-      _sum: { sizeBytes: true },
-    });
-    const usedBytes = aggregate._sum.sizeBytes ?? 0;
-    const dailyQuotaBytes = (await this.dailyQuotaMb()) * MB_IN_BYTES;
-    if (usedBytes + nextFileBytes <= dailyQuotaBytes) {
-      return;
-    }
-
-    throw new HttpException(
-      `Дневной лимит загрузок исчерпан. Будет сброшен через ${this.quotaResetHours(windowStart)} ч.`,
-      HttpStatus.TOO_MANY_REQUESTS,
-    );
+  private get quotaDeps(): FilesQuotaDeps {
+    return { prisma: this.prisma, dailyQuotaMb: () => this.dailyQuotaMb() };
   }
 
   async assertCoverImageAllowed(fileId: string | null | undefined, user: RequestUser): Promise<void> {
@@ -502,7 +456,7 @@ export class FilesService {
     if (metadata.sizeBytes > maxUploadMb * MB_IN_BYTES) {
       throw new BadRequestException(`Файл больше ${maxUploadMb} МБ.`);
     }
-    await this.assertDailyUploadQuota(userId, metadata.sizeBytes);
+    await assertDailyUploadQuota(this.quotaDeps, userId, metadata.sizeBytes);
 
     const asset = await this.prisma.fileAsset.create({
       data: {
@@ -540,7 +494,7 @@ export class FilesService {
       }
     }
 
-    await this.assertDailyUploadQuota(userId, file.size);
+    await assertDailyUploadQuota(this.quotaDeps, userId, file.size);
 
     const upload = await this.validateUpload(file, input);
     const { client, bucket } = this.getClient();
