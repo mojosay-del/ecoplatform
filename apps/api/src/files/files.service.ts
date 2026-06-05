@@ -1,12 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from "@nestjs/common";
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  HeadBucketCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 // file-type ≥17 поставляется только как ESM. apps/api собирается в CommonJS:
@@ -38,6 +31,15 @@ import {
   type FilesReferenceDeps,
 } from "./files-reference.helpers";
 import { assertDailyUploadQuota, type FilesQuotaDeps } from "./files-quota.helpers";
+import {
+  bucketForAccessLevel,
+  getS3Client,
+  getS3Config,
+  publicUrl,
+  readS3HealthConfig,
+  s3PingBucket,
+  signS3DownloadUrls,
+} from "./files-storage.helpers";
 
 export type UploadedMemoryFile = {
   originalname: string;
@@ -87,10 +89,6 @@ const S3_HEALTH_TIMEOUT_MS = 1_000;
 // и доступ перепроверяется заново (истёкшая подписка ссылку уже не получит).
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
-function isPlaceholderS3Value(value: string) {
-  return value.startsWith("replace-with-");
-}
-
 @Injectable()
 export class FilesService {
   constructor(
@@ -110,178 +108,27 @@ export class FilesService {
     return (await this.settings?.getValue("files.daily_quota_mb")) ?? DEFAULT_DAILY_QUOTA_MB;
   }
 
-  private getS3Config() {
-    const endpoint = process.env.S3_ENDPOINT;
-    const region = process.env.S3_REGION ?? "ru-1";
-    const bucket = process.env.S3_BUCKET;
-    const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-
-    if (
-      !endpoint ||
-      !bucket ||
-      !accessKeyId ||
-      !secretAccessKey ||
-      isPlaceholderS3Value(bucket) ||
-      isPlaceholderS3Value(accessKeyId) ||
-      isPlaceholderS3Value(secretAccessKey)
-    ) {
-      return null;
-    }
-
-    return {
-      client: new S3Client({
-        endpoint,
-        region,
-        forcePathStyle: true,
-        credentials: {
-          accessKeyId,
-          secretAccessKey,
-        },
-      }),
-      bucket,
-      publicBaseUrl: process.env.S3_PUBLIC_BASE_URL ?? endpoint,
-    };
-  }
-
-  private getClient() {
-    const config = this.getS3Config();
-    if (!config) {
-      throw new BadRequestException("S3-хранилище не настроено.");
-    }
-
-    return config;
-  }
-
   getS3HealthConfig() {
-    const config = this.getS3Config();
-    if (!config) {
-      return { configured: false };
-    }
-    config.client.destroy();
-
-    return {
-      configured: true,
-      endpoint: process.env.S3_ENDPOINT,
-      bucket: config.bucket,
-    };
+    return readS3HealthConfig();
   }
 
   async pingS3(timeoutMs = S3_HEALTH_TIMEOUT_MS): Promise<void> {
-    const config = this.getS3Config();
-    if (!config) {
-      throw new BadRequestException("S3-хранилище не настроено.");
-    }
-
-    const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(), timeoutMs);
-
-    try {
-      await config.client.send(new HeadBucketCommand({ Bucket: config.bucket }), {
-        abortSignal: abortController.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-      config.client.destroy();
-    }
+    return s3PingBucket(timeoutMs);
   }
 
-  private directObjectUrl(baseUrl: string, bucket: string, storageKey: string): string {
-    return `${baseUrl.replace(/\/$/, "")}/${bucket}/${storageKey}`;
-  }
-
-  private publicUrl(storageKey: string, accessLevel: FileAccessLevel): string | null {
-    if (accessLevel !== FileAccessLevel.public) {
-      return null;
-    }
-
-    const baseUrl = process.env.S3_PUBLIC_BASE_URL ?? process.env.S3_ENDPOINT;
-    const bucket = process.env.S3_BUCKET;
-    if (!baseUrl || !bucket) {
-      return null;
-    }
-
-    return this.directObjectUrl(baseUrl, bucket, storageKey);
-  }
-
-  // Отдельный приватный бакет для непубличных файлов (вложения платных уроков).
-  // Если не настроен — возвращаем null, и всё работает по-старому (мягкая
-  // деградация: до настройки инфраструктуры файлы остаются в публичном бакете).
-  private privateBucket(): string | null {
-    const bucket = process.env.S3_PRIVATE_BUCKET;
-    if (!bucket || isPlaceholderS3Value(bucket)) {
-      return null;
-    }
-    return bucket;
-  }
-
-  // Бакет, в котором ФИЗИЧЕСКИ лежит объект данного уровня доступа: public — в
-  // обычном public-read бакете, остальное — в приватном (если он настроен).
-  // Единая точка истины для upload / delete / presign — они обязаны совпадать.
-  private bucketForAccessLevel(accessLevel: FileAccessLevel, publicBucket: string): string {
-    if (accessLevel === FileAccessLevel.public) {
-      return publicBucket;
-    }
-    return this.privateBucket() ?? publicBucket;
-  }
-
-  /**
-   * Считает ссылку для скачивания пачки файлов с учётом уровня доступа:
-   *  - public → прямая публичная ссылка (как раньше, кешируется CDN);
-   *  - не public + настроен приватный бакет → presigned GET на SIGNED_URL_TTL_SECONDS;
-   *  - не public + приватный бакет НЕ настроен → fallback на прямую ссылку
-   *    (объект ещё в публичном бакете, не мигрирован) — без регрессии выдачи;
-   *  - S3 не настроен → null.
-   * Принимает пачку, чтобы на странице урока создавать S3-клиент один раз.
-   */
+  // Фасад над signS3DownloadUrls — вся S3-логика в files-storage.helpers.
   async signDownloadUrls(
     assets: Array<Pick<FileAsset, "id" | "storageKey" | "accessLevel" | "originalName">>,
     ttlSeconds = SIGNED_URL_TTL_SECONDS,
   ): Promise<Map<string, string | null>> {
-    const urls = new Map<string, string | null>();
-    if (assets.length === 0) {
-      return urls;
-    }
-
-    const needsPrivate = assets.some((asset) => asset.accessLevel !== FileAccessLevel.public);
-    const config = needsPrivate ? this.getS3Config() : null;
-    const privateBucket = needsPrivate ? this.privateBucket() : null;
-
-    try {
-      for (const asset of assets) {
-        if (asset.accessLevel === FileAccessLevel.public) {
-          urls.set(asset.id, this.publicUrl(asset.storageKey, asset.accessLevel));
-          continue;
-        }
-        if (!config) {
-          urls.set(asset.id, null);
-          continue;
-        }
-        if (!privateBucket) {
-          urls.set(asset.id, this.directObjectUrl(config.publicBaseUrl, config.bucket, asset.storageKey));
-          continue;
-        }
-        const command = new GetObjectCommand({
-          Bucket: privateBucket,
-          Key: asset.storageKey,
-          ResponseContentDisposition: downloadContentDisposition(asset.originalName),
-        });
-        urls.set(asset.id, await getSignedUrl(config.client, command, { expiresIn: ttlSeconds }));
-      }
-    } finally {
-      // getS3Config() создаёт клиента заново на каждый вызов — закрываем его,
-      // чтобы не накапливать дескрипторы пула соединений.
-      config?.client.destroy();
-    }
-
-    return urls;
+    return signS3DownloadUrls(assets, ttlSeconds);
   }
 
   async createSignedDownloadUrl(
     asset: Pick<FileAsset, "id" | "storageKey" | "accessLevel" | "originalName">,
     ttlSeconds = SIGNED_URL_TTL_SECONDS,
   ): Promise<string | null> {
-    return (await this.signDownloadUrls([asset], ttlSeconds)).get(asset.id) ?? null;
+    return (await signS3DownloadUrls([asset], ttlSeconds)).get(asset.id) ?? null;
   }
 
   private parseImageVariants(raw: Prisma.JsonValue | null | undefined): Record<string, StoredImageVariant> {
@@ -317,21 +164,21 @@ export class FilesService {
       format,
       {
         ...variant,
-        publicUrl: this.publicUrl(variant.storageKey, asset.accessLevel),
+        publicUrl: publicUrl(variant.storageKey, asset.accessLevel),
       },
     ]);
     return entries.length > 0 ? (Object.fromEntries(entries) as FileAssetImageVariants) : null;
   }
 
   private toResponse(asset: FileAsset): FileAssetResponse {
-    const publicUrl = this.publicUrl(asset.storageKey, asset.accessLevel);
+    const resolvedPublicUrl = publicUrl(asset.storageKey, asset.accessLevel);
     return {
       ...asset,
-      publicUrl,
+      publicUrl: resolvedPublicUrl,
       // Базовое значение: для public — публичная ссылка, для приватных — null.
       // Вызовы, которым нужна presigned-ссылка для приватного файла, перезаписывают
       // это поле через signDownloadUrls (см. upload / findManyByIds).
-      downloadUrl: publicUrl,
+      downloadUrl: resolvedPublicUrl,
       variants: this.variantResponse(asset),
     };
   }
@@ -497,12 +344,12 @@ export class FilesService {
     await assertDailyUploadQuota(this.quotaDeps, userId, file.size);
 
     const upload = await this.validateUpload(file, input);
-    const { client, bucket } = this.getClient();
+    const { client, bucket } = getS3Client();
     const accessLevel = input.accessLevel ?? FileAccessLevel.public;
     // Приватные файлы кладём в приватный бакет (см. bucketForAccessLevel) —
     // публичные остаются в public-read бакете. Удаление и presign используют ту
     // же функцию выбора бакета, поэтому объект всегда ищется там, где лежит.
-    const targetBucket = this.bucketForAccessLevel(accessLevel, bucket);
+    const targetBucket = bucketForAccessLevel(accessLevel, bucket);
     const storageKey = buildStorageKey(file.originalname, upload.extension);
     const variantUploads = (upload.variants ?? []).map((variant) => ({
       ...variant,
@@ -645,10 +492,10 @@ export class FilesService {
         throw new ForbiddenException("Можно удалить только файл, загруженный вами.");
       }
 
-      const config = this.getS3Config();
+      const config = getS3Config();
       if (config) {
         // Удаляем из того же бакета, куда объект был загружен по его уровню доступа.
-        const objectBucket = this.bucketForAccessLevel(asset.accessLevel, config.bucket);
+        const objectBucket = bucketForAccessLevel(asset.accessLevel, config.bucket);
         await Promise.all(
           this.fileStorageKeys(asset).map((key) =>
             config.client.send(
