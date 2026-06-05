@@ -3,6 +3,7 @@ import {
   BookOpen,
   Building2,
   CreditCard,
+  Gauge,
   GraduationCap,
   Headphones,
   Newspaper,
@@ -31,6 +32,13 @@ export type AdminHomeItem = AdminPanelTab & {
 export type AdminHomeGroup = {
   title: string;
   items: AdminHomeItem[];
+};
+
+const analyticsTab: AdminPanelTab = {
+  href: "/admin/analytics",
+  label: "Аналитика",
+  pathname: "/admin/analytics",
+  roles: ["admin"],
 };
 
 const newsTab: AdminPanelTab = {
@@ -65,6 +73,11 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
   {
     title: "CMS",
     items: [
+      {
+        ...analyticsTab,
+        description: "Состояние платформы, метрики и операционные сигналы.",
+        icon: Gauge,
+      },
       {
         ...newsTab,
         description: "Новостные публикации и редактор материалов.",

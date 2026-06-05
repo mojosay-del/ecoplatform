@@ -4,6 +4,7 @@ import type { KeyboardEvent, MutableRefObject } from "react";
 import { Building2, Check, Mail, Tag, User, Users, X } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
 import { companyTypeOptions, genderOptions, VERIFICATION_CODE_LENGTH } from "./constants";
+import { AuthSelect } from "./auth-select";
 import { ConsentRow } from "./consent-row";
 import {
   AuthField,
@@ -30,23 +31,17 @@ export function CompanyStepFields({ values, setField }: { values: RegisterFormVa
           />
         </FieldAffix>
       </AuthField>
-      <AuthField label="Тип компании">
-        <FieldAffix icon={Tag}>
-          <select
-            className="select auth-input-leading"
-            name="companyType"
-            value={values.companyType}
-            onChange={(event) => setField("companyType", event.currentTarget.value)}
-            required
-          >
-            {companyTypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </FieldAffix>
-      </AuthField>
+      <div className="auth-field">
+        <span className="auth-field-label">Тип компании</span>
+        <AuthSelect
+          icon={Tag}
+          label="Тип компании"
+          name="companyType"
+          value={values.companyType}
+          options={companyTypeOptions}
+          onChange={(value) => setField("companyType", value)}
+        />
+      </div>
     </div>
   );
 }
@@ -97,23 +92,17 @@ export function PersonStepFields({
           </AuthField>
         </div>
         <div className="auth-grid-2">
-          <AuthField label="Пол">
-            <FieldAffix icon={Users}>
-              <select
-                className="select auth-input-leading"
-                name="gender"
-                value={values.gender}
-                onChange={(event) => setField("gender", event.currentTarget.value)}
-                required
-              >
-                {genderOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </FieldAffix>
-          </AuthField>
+          <div className="auth-field">
+            <span className="auth-field-label">Пол</span>
+            <AuthSelect
+              icon={Users}
+              label="Пол"
+              name="gender"
+              value={values.gender}
+              options={genderOptions}
+              onChange={(value) => setField("gender", value)}
+            />
+          </div>
           <AuthField label="Телефон">
             <PhoneInput
               name="phone"

@@ -234,6 +234,10 @@ const adminContentRoot: BreadcrumbItem = {
 
 const adminBreadcrumbs: { prefix: string; trail: BreadcrumbItem[] }[] = [
   {
+    prefix: "/admin/analytics",
+    trail: [adminPanelRoot, adminContentRoot, { href: "/admin/analytics", label: "Аналитика" }],
+  },
+  {
     prefix: "/admin/content/knowledge-base",
     trail: [adminPanelRoot, adminContentRoot, { href: "/admin/content/knowledge-base", label: "База знаний" }],
   },

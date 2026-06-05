@@ -6,6 +6,7 @@ describe("admin panel home groups", () => {
     const labels = visibleAdminHomeGroups(["admin"]).flatMap((group) => group.items.map((item) => item.label));
 
     expect(labels).toEqual([
+      "Аналитика",
       "Новости",
       "Индексы цен",
       "Обучение",

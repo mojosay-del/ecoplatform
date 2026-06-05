@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { CreditCard, HelpCircle, type LucideIcon, MessageSquare, Settings } from "lucide-react";
+import { BellOff, CheckCheck, CreditCard, HelpCircle, type LucideIcon, MessageSquare, Settings } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { StatusPill } from "./StatusPill";
 import { api, apiFetch } from "../lib/api";
@@ -191,40 +191,55 @@ export function NotificationsView() {
           <>
             <div className="notifications-toolbar">
               <button className="button secondary" onClick={markAllRead} disabled={items.every((item) => item.readAt)}>
+                <CheckCheck aria-hidden size={16} />
                 Отметить все прочитанными
               </button>
             </div>
             {items.length === 0 ? (
-              <p className="page-subtitle">Новых уведомлений нет.</p>
+              <div className="notification-empty">
+                <span className="notification-empty-icon" aria-hidden>
+                  <BellOff size={26} />
+                </span>
+                <p className="notification-empty-title">Уведомлений нет</p>
+                <p className="page-subtitle">Здесь появятся системные сообщения по вашему аккаунту.</p>
+              </div>
             ) : (
               <div className="notification-list">
                 {items.map((item) => {
                   const Icon = categoryIcons[item.category] ?? Settings;
                   return (
-                    <article className={`notification-card ${item.readAt ? "" : "unread"}`} key={item.id}>
-                      <div className="notification-head">
-                        <StatusPill>
-                          <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                          {NOTIFICATION_CATEGORY_LABELS[item.category] ?? item.category}
-                        </StatusPill>
-                        <time>{new Date(item.createdAt).toLocaleString("ru-RU")}</time>
+                    <article
+                      className={`notification-card ${item.readAt ? "is-read" : "is-unread"}`}
+                      data-category={item.category}
+                      key={item.id}
+                    >
+                      <div className="notification-icon" aria-hidden>
+                        <Icon size={18} />
                       </div>
-                      <h2>{item.title}</h2>
-                      <p>{item.body}</p>
-                      <div className="notification-actions">
-                        {item.link ? (
-                          <Link className="button" href={item.link} onClick={() => markRead(item.id)}>
-                            Перейти
-                          </Link>
-                        ) : null}
-                        {!item.readAt ? (
-                          <button className="button secondary" onClick={() => markRead(item.id)}>
-                            Прочитано
+                      <div className="notification-body">
+                        <div className="notification-head">
+                          <span className="notification-cat">
+                            {NOTIFICATION_CATEGORY_LABELS[item.category] ?? item.category}
+                          </span>
+                          <time className="notification-time">{new Date(item.createdAt).toLocaleString("ru-RU")}</time>
+                        </div>
+                        <h2 className="notification-title">{item.title}</h2>
+                        <p className="notification-text">{item.body}</p>
+                        <div className="notification-actions">
+                          {item.link ? (
+                            <Link className="button" href={item.link} onClick={() => markRead(item.id)}>
+                              Перейти
+                            </Link>
+                          ) : null}
+                          {!item.readAt ? (
+                            <button className="button ghost" onClick={() => markRead(item.id)}>
+                              Прочитано
+                            </button>
+                          ) : null}
+                          <button className="button ghost" onClick={() => archive(item.id)}>
+                            В архив
                           </button>
-                        ) : null}
-                        <button className="button secondary" onClick={() => archive(item.id)}>
-                          В архив
-                        </button>
+                        </div>
                       </div>
                     </article>
                   );

@@ -1,7 +1,19 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { RotateCcw, Search, Smartphone } from "lucide-react";
+import {
+  Ban,
+  Building2,
+  Check,
+  FileText,
+  Gavel,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  Smartphone,
+  type LucideIcon,
+} from "lucide-react";
 import { AdminSortButton } from "../../../components/AdminSortButton";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, companyStatusPillVariant, userStatusPillVariant } from "../../../components/StatusPill";
@@ -23,6 +35,18 @@ import { AdminUserSessionsModal } from "./sessions-modal";
 
 type AdminUsersViewProps = {
   embedded?: boolean;
+};
+
+const ROLE_ICONS: Record<string, LucideIcon> = {
+  admin: ShieldCheck,
+  moderator: Gavel,
+  content_manager: FileText,
+};
+
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  admin: "Полный доступ к панели",
+  moderator: "Жалобы и санкции",
+  content_manager: "Контент и публикации",
 };
 
 export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
@@ -311,77 +335,101 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
             ) : null}
           </div>
 
-          <div className="moderation-detail">
+          <div className="moderation-detail admin-user-detail">
             {!selected ? (
-              <p className="page-subtitle">Выберите пользователя.</p>
+              <p className="page-subtitle auser-empty">Выберите пользователя.</p>
             ) : (
               <>
-                <div className="list-row">
-                  <div>
-                    <StatusPill as="p" variant={userStatusPillVariant(selected.status)}>
+                <header className="auser-head">
+                  <div className="auser-avatar" aria-hidden="true">
+                    {(selected.firstName?.[0] ?? "") + (selected.lastName?.[0] ?? "") || "?"}
+                  </div>
+                  <div className="auser-id">
+                    <StatusPill variant={userStatusPillVariant(selected.status)}>
                       {USER_STATUS_LABELS[selected.status]}
                     </StatusPill>
-                    <h2>
+                    <h2 className="auser-name">
                       {selected.firstName} {selected.lastName}
                     </h2>
-                    <p className="page-subtitle">
+                    <p className="auser-contacts">
                       {selected.email} · {selected.phone}
                     </p>
                   </div>
-                  <div className="auth-actions">
-                    {selected.status === "blocked" ? (
-                      <button className="button secondary" onClick={unblockUser} type="button">
-                        Разблокировать
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
+                  {selected.status === "blocked" ? (
+                    <button className="button secondary auser-unblock" onClick={unblockUser} type="button">
+                      Разблокировать
+                    </button>
+                  ) : null}
+                </header>
 
-                <section>
-                  <h3>Компания</h3>
+                <section className="auser-section">
+                  <div className="auser-section-head">
+                    <Building2 aria-hidden size={15} />
+                    <span>Компания</span>
+                  </div>
                   {selected.company ? (
-                    <p>
-                      {selected.company.organizationName} ·{" "}
+                    <p className="auser-company">
+                      {selected.company.organizationName}{" "}
                       <StatusPill variant={companyStatusPillVariant(selected.company.status)}>
                         {COMPANY_STATUS_LABELS[selected.company.status] ?? selected.company.status}
                       </StatusPill>
                     </p>
                   ) : (
-                    <p className="page-subtitle">Не привязан к компании.</p>
+                    <p className="auser-muted">Не привязан к компании.</p>
                   )}
                 </section>
 
-                <section>
-                  <h3>Платформенные роли</h3>
-                  <div className="auth-actions">
-                    {allRoles.map((role) => (
-                      <label className="checklist-item" key={role}>
-                        <input
-                          checked={rolesDraft.includes(role)}
-                          onChange={(event) => {
-                            setRolesDraft((prev) =>
-                              event.target.checked ? [...prev, role] : prev.filter((item) => item !== role),
-                            );
-                          }}
-                          type="checkbox"
-                        />
-                        {PLATFORM_ROLE_SHORT_LABELS[role]}
-                      </label>
-                    ))}
+                <section className="auser-section">
+                  <div className="auser-section-head">
+                    <ShieldCheck aria-hidden size={15} />
+                    <span>Платформенные роли</span>
                   </div>
-                  <button className="button" onClick={saveRoles} type="button">
+                  <div className="auser-roles">
+                    {allRoles.map((role) => {
+                      const RoleIcon = ROLE_ICONS[role] ?? ShieldCheck;
+                      const checked = rolesDraft.includes(role);
+                      return (
+                        <label className={`auser-role${checked ? " is-on" : ""}`} key={role}>
+                          <input
+                            className="auser-role-input"
+                            checked={checked}
+                            onChange={(event) => {
+                              setRolesDraft((prev) =>
+                                event.target.checked ? [...prev, role] : prev.filter((item) => item !== role),
+                              );
+                            }}
+                            type="checkbox"
+                          />
+                          <span className="auser-role-icon">
+                            <RoleIcon aria-hidden size={18} />
+                          </span>
+                          <span className="auser-role-text">
+                            <strong>{PLATFORM_ROLE_SHORT_LABELS[role]}</strong>
+                            <small>{ROLE_DESCRIPTIONS[role]}</small>
+                          </span>
+                          <span className="auser-role-check" aria-hidden="true">
+                            <Check size={14} strokeWidth={3} />
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <button className="button auser-save" onClick={saveRoles} type="button">
                     Сохранить роли
                   </button>
                 </section>
 
-                <section>
-                  <h3>Активные ограничения по модулям</h3>
+                <section className="auser-section">
+                  <div className="auser-section-head">
+                    <Ban aria-hidden size={15} />
+                    <span>Активные ограничения по модулям</span>
+                  </div>
                   {selected.activeRestrictions.length === 0 ? (
-                    <p className="page-subtitle">Нет.</p>
+                    <p className="auser-muted">Нет.</p>
                   ) : (
                     <div className="stack-list">
                       {selected.activeRestrictions.map((restriction) => (
-                        <article className="checklist-block" key={restriction.id}>
+                        <article className="auser-restriction" key={restriction.id}>
                           <strong>{restriction.moduleCode}</strong>
                           <p>
                             До {new Date(restriction.expiresAt).toLocaleString("ru-RU")} ·{" "}
@@ -393,10 +441,13 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                   )}
                 </section>
 
-                <section>
-                  <h3>Последние сессии</h3>
+                <section className="auser-section">
+                  <div className="auser-section-head">
+                    <Smartphone aria-hidden size={15} />
+                    <span>Последние сессии</span>
+                  </div>
                   {selected.recentSessions.length === 0 ? (
-                    <p className="page-subtitle">Нет данных о входах.</p>
+                    <p className="auser-muted">Нет данных о входах.</p>
                   ) : (
                     <button className="admin-sessions-trigger" onClick={() => setSessionsOpen(true)} type="button">
                       <Smartphone aria-hidden size={18} />
@@ -409,8 +460,11 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                 </section>
 
                 {selected.status === "active" ? (
-                  <form className="form" onSubmit={blockUser}>
-                    <h3>Заблокировать</h3>
+                  <form className="form auser-danger" onSubmit={blockUser}>
+                    <div className="auser-section-head auser-danger-head">
+                      <ShieldAlert aria-hidden size={15} />
+                      <span>Заблокировать</span>
+                    </div>
                     <select
                       className="select"
                       onChange={(event) => setBlockReason(event.target.value)}
@@ -428,7 +482,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
                       placeholder="Комментарий (обязателен для «Иное»)"
                       value={blockComment}
                     />
-                    <button className="button" type="submit">
+                    <button className="button danger" type="submit">
                       Заблокировать пользователя
                     </button>
                   </form>
