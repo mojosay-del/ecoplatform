@@ -2,9 +2,10 @@
 
 Репозиторий содержит рабочую кодовую базу MVP на Turborepo + pnpm.
 
-Текущее состояние MVP и следующий этап — в [PROJECT_STATUS.md](PROJECT_STATUS.md).
-**MVP задеплоен в прод (2026-05-30): https://ecoplatform.pro.** Как развёрнуто и
-как выкатывать обновления — в [deploy/PRODUCTION.md](deploy/PRODUCTION.md).
+**MVP задеплоен в прод (2026-05-30): https://ecoplatform.pro.** Текущий этап —
+ручная приёмка владельцем продукта и точечные bugfix-задачи по найденным
+проблемам. Как развёрнуто и как выкатывать обновления — в
+[deploy/PRODUCTION.md](deploy/PRODUCTION.md).
 
 ## Карта проекта
 
@@ -13,7 +14,7 @@ apps/
   api/               NestJS-сервер, Prisma, миграции, integration-тесты
     prisma/
       schema.prisma  модель PostgreSQL (актуальная)
-      migrations/    25 SQL-миграций от 2026-05-20 до 2026-05-26
+      migrations/    30 SQL-миграций от 2026-05-20 до 2026-06-04
       seed.ts        сидер для admin/demo и юр-документов
     src/
       auth/          регистрация, вход, JWT, refresh-cookie, lockout, экспорт данных
@@ -28,7 +29,7 @@ apps/
       redis/         session cache, throttler storage
       scheduler/     hourly billing-check + nightly cleanup-deleted-accounts (advisory-lock)
       common/        CSRF guard, JwtAuthGuard, pagination, sanitize, simple-zip
-      app.integration.test.ts  133 сквозных теста
+      app.integration.test.ts  сквозные integration-тесты
   web/               Next.js App Router, Tiptap-редактор, dnd-kit
     app/             публичные и админ-маршруты
       (login,register,forgot-password,news,indices,education,
@@ -36,9 +37,9 @@ apps/
     src/
       components/    AppShell + app-shell-nav, AuthForms, BlocksEditor,
                      RichTextEditor, CookieConsent, NotificationBell,
-                     UserSupportDrawer, Admin*View, FileUploadField
+                     UserSupportDrawer, FileUploadField
       views/         публичные view-страницы (news/indices/learning/knowledge-base/account)
-                     + content-blocks для рендеринга блоков
+                     + admin view-страницы и content-blocks для рендеринга блоков
       lib/api/       типизированный namespace `api.news.list()` / `api.billing.updateCompanyProfile()`
                      + auto-refresh + CSRF + apiDownload
       lib/auth.tsx   AuthProvider с восстановлением через HttpOnly refresh-cookie
@@ -107,8 +108,8 @@ docker-compose.yml     прод для Timeweb App Platform (proxy + web + api)
 
 ```bash
 pnpm lint                  # tsc --noEmit во всех пакетах
-pnpm test                  # 144 unit-теста (shared 10, web 50, api 84)
-pnpm test:integration      # 133 integration-теста против ecoplatform_test
+pnpm test                  # unit-тесты shared/web/api
+pnpm test:integration      # integration-тесты против ecoplatform_test
 pnpm build                 # tsc + next build
 pnpm format:check          # prettier
 ```
@@ -160,3 +161,10 @@ cd /root/ecoplatform && git pull && \
 
 - Русские комментарии стоят рядом с неочевидной бизнес-логикой: demo-доступ, закрытие функциональных разделов после истечения demo и в статусе `pending_deletion`, права поддержки, публикация контента, расчёт индексов и структура блоков, lockout, идемпотентность ручной активации.
 - Pre-MVP-модули (форум, торговая площадка, магазин решений) уже отмечены в enum'ах и сайдбаре, но без UI — это сделано осознанно как «фундамент на вырост», чтобы не двигать миграции с реальными платежами на проде позже.
+
+## Осознанно отложено
+
+- Декомпозиция большого `apps/api/src/app.integration.test.ts` на доменные файлы.
+- OpenAPI/Swagger для внешней документации API.
+- Реальный визуальный блочный редактор CMS вместо текущего пошагового композитора блоков.
+- Реальный файловый upload-adapter для прода: S3 уже настроен, но dev может работать metadata-only.
