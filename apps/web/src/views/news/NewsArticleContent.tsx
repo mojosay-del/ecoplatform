@@ -13,7 +13,6 @@ type NewsArticleProps = {
   commentText: string;
   onCommentTextChange: (value: string) => void;
   onSubmitComment: (event: FormEvent<HTMLFormElement>) => void;
-  resultMessage: string | null;
   reportingCommentId: string | null;
   setReportingCommentId: (id: string | null) => void;
   reportReason: string;
@@ -32,7 +31,6 @@ export function NewsArticleContent({
   commentText,
   onCommentTextChange,
   onSubmitComment,
-  resultMessage,
   reportingCommentId,
   setReportingCommentId,
   reportReason,
@@ -91,11 +89,9 @@ export function NewsArticleContent({
 
           <CommentsSection
             comments={post.comments ?? []}
-            commentsCount={post._count?.comments ?? 0}
             commentText={commentText}
             onCommentTextChange={onCommentTextChange}
             onSubmitComment={onSubmitComment}
-            resultMessage={resultMessage}
             reportingCommentId={reportingCommentId}
             setReportingCommentId={setReportingCommentId}
             reportReason={reportReason}
@@ -129,10 +125,10 @@ export function NewsLikeButton({
       disabled={pending}
       onClick={onToggle}
       type="button"
+      aria-label={post.likedByMe ? `Убрать лайк, сейчас ${likesCount}` : `Поставить лайк, сейчас ${likesCount}`}
       aria-pressed={Boolean(post.likedByMe)}
     >
       <ThumbsUp aria-hidden="true" size={16} strokeWidth={2.2} />
-      <span>{post.likedByMe ? "Нравится" : "Поставить лайк"}</span>
       <strong>{likesCount}</strong>
     </button>
   );

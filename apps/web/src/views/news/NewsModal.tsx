@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import type { NewsPostDetail } from "@ecoplatform/shared";
@@ -21,19 +21,21 @@ export function NewsModal({
   const [state, setState] = useState<"loading" | "ready" | "error" | "forbidden">("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("offensive_content");
   const [reportComment, setReportComment] = useState("");
   const [likePending, setLikePending] = useState(false);
   const [commentLikePendingId, setCommentLikePendingId] = useState<string | null>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
 
-  async function load() {
+  async function load(options: { silent?: boolean } = {}) {
     if (!token) {
       setState("forbidden");
       return;
     }
-    setState("loading");
+    if (!options.silent) {
+      setState("loading");
+    }
     setErrorMessage(null);
     try {
       const data = await api.news.get(slug);
@@ -74,10 +76,15 @@ export function NewsModal({
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !post || !commentText.trim()) return;
+    const scrollTop = backdropRef.current?.scrollTop ?? 0;
     await api.news.addComment(post.id, { text: commentText.trim() });
     setCommentText("");
-    setResultMessage("Комментарий опубликован.");
-    await load();
+    await load({ silent: true });
+    window.requestAnimationFrame(() => {
+      if (backdropRef.current) {
+        backdropRef.current.scrollTop = scrollTop;
+      }
+    });
   }
 
   async function togglePostLike() {
@@ -118,7 +125,6 @@ export function NewsModal({
     setReportingCommentId(null);
     setReportReason("offensive_content");
     setReportComment("");
-    setResultMessage("Жалоба отправлена модератору.");
   }
 
   if (typeof document === "undefined") {
@@ -128,6 +134,7 @@ export function NewsModal({
   return createPortal(
     <div
       className="news-modal-backdrop"
+      ref={backdropRef}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -151,7 +158,6 @@ export function NewsModal({
             commentText={commentText}
             onCommentTextChange={setCommentText}
             onSubmitComment={submitComment}
-            resultMessage={resultMessage}
             reportingCommentId={reportingCommentId}
             setReportingCommentId={setReportingCommentId}
             reportReason={reportReason}

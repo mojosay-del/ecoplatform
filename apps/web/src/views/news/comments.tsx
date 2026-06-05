@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useRef, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, type FormEvent } from "react";
 import { Flag, MessageCircleOff, Send, ThumbsUp } from "lucide-react";
 import type { NewsCommentDecorated } from "@ecoplatform/shared";
-import { StatusPill } from "../../components/StatusPill";
 import { useAuth } from "../../lib/auth";
 import { CommentAvatar, formatCommentDate, getCommentAuthor } from "../shared";
 
+const COMMENT_TEXTAREA_MAX_HEIGHT = 168;
+
 type CommentsSectionProps = {
   comments: NewsCommentDecorated[];
-  commentsCount: number;
   commentText: string;
   onCommentTextChange: (value: string) => void;
   onSubmitComment: (event: FormEvent<HTMLFormElement>) => void;
-  resultMessage: string | null;
   reportingCommentId: string | null;
   setReportingCommentId: (id: string | null) => void;
   reportReason: string;
@@ -25,11 +24,9 @@ type CommentsSectionProps = {
 
 export function CommentsSection({
   comments,
-  commentsCount,
   commentText,
   onCommentTextChange,
   onSubmitComment,
-  resultMessage,
   reportingCommentId,
   setReportingCommentId,
   reportReason,
@@ -46,6 +43,7 @@ export function CommentsSection({
   const currentUserAvatarUrl = user?.avatarUrl ?? null;
   const orderedComments = useMemo(() => sortCommentsChronologically(comments), [comments]);
   const listRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const list = listRef.current;
@@ -53,21 +51,23 @@ export function CommentsSection({
     list.scrollTop = list.scrollHeight;
   }, [orderedComments]);
 
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(textarea.scrollHeight, COMMENT_TEXTAREA_MAX_HEIGHT);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > COMMENT_TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
+  }, [commentText]);
+
   return (
     <section className="comments-section" aria-labelledby="comments-title">
       <div className="comments-section-head">
-        <div>
-          <span className="comments-kicker">Обсуждение</span>
-          <h2 id="comments-title">Комментарии</h2>
-        </div>
-        <span className="comments-counter">{formatCommentCount(commentsCount)}</span>
+        <h2 className="comments-kicker" id="comments-title">
+          Обсуждение
+        </h2>
       </div>
-
-      {resultMessage ? (
-        <StatusPill as="p" className="comments-status" variant="success">
-          {resultMessage}
-        </StatusPill>
-      ) : null}
 
       <div className="comments-chat-surface">
         <div
@@ -117,6 +117,7 @@ export function CommentsSection({
               name="comment"
               onChange={(event) => onCommentTextChange(event.target.value)}
               placeholder="Сообщение"
+              ref={textareaRef}
               rows={1}
               value={commentText}
             />
@@ -176,6 +177,7 @@ function CommentCard({
   const isSameVisibleUser =
     currentUserName.length > 0 && currentUserName === author && currentUserAvatarUrl === comment.user.avatarUrl;
   const isOwn = currentUserId === comment.user.id || isSameVisibleUser;
+  const canUseCommentActions = !isOwn;
 
   function closeReportForm() {
     setReportingCommentId(null);
@@ -189,31 +191,35 @@ function CommentCard({
         <header className="comment-card-head">
           <div className="comment-author-meta">
             <strong>{isOwn ? "Вы" : author}</strong>
+            {canUseCommentActions ? (
+              <button
+                className="comment-report-button"
+                onClick={() => setReportingCommentId(isReporting ? null : comment.id)}
+                type="button"
+                aria-expanded={isReporting}
+                aria-label="Пожаловаться"
+                title="Пожаловаться"
+              >
+                <Flag aria-hidden="true" size={14} />
+              </button>
+            ) : null}
           </div>
           <div className="comment-message-meta" aria-label={`Действия с комментарием, лайков: ${likesCount}`}>
-            <button
-              className="comment-report-button"
-              onClick={() => setReportingCommentId(isReporting ? null : comment.id)}
-              type="button"
-              aria-expanded={isReporting}
-              aria-label="Пожаловаться"
-              title="Пожаловаться"
-            >
-              <Flag aria-hidden="true" size={14} />
-            </button>
-            <button
-              className={`comment-like-button ${comment.likedByMe ? "active" : ""}`}
-              disabled={commentLikePendingId === comment.id}
-              onClick={() => onToggleCommentLike(comment.id)}
-              type="button"
-              aria-label={
-                comment.likedByMe ? `Убрать лайк, сейчас ${likesCount}` : `Поставить лайк, сейчас ${likesCount}`
-              }
-              aria-pressed={Boolean(comment.likedByMe)}
-            >
-              <ThumbsUp aria-hidden="true" size={14} />
-              <span>{likesCount}</span>
-            </button>
+            {canUseCommentActions ? (
+              <button
+                className={`comment-like-button ${comment.likedByMe ? "active" : ""}`}
+                disabled={commentLikePendingId === comment.id}
+                onClick={() => onToggleCommentLike(comment.id)}
+                type="button"
+                aria-label={
+                  comment.likedByMe ? `Убрать лайк, сейчас ${likesCount}` : `Поставить лайк, сейчас ${likesCount}`
+                }
+                aria-pressed={Boolean(comment.likedByMe)}
+              >
+                <ThumbsUp aria-hidden="true" size={14} />
+                <span>{likesCount}</span>
+              </button>
+            ) : null}
             {commentDate ? (
               <time className="comment-message-time" dateTime={commentDate.toISOString()}>
                 {formatCommentDate(commentDate)}
@@ -223,7 +229,7 @@ function CommentCard({
         </header>
         <p className="comment-text">{comment.text}</p>
 
-        {isReporting ? (
+        {canUseCommentActions && isReporting ? (
           <form className="comment-report-form" onSubmit={onSubmitComplaint}>
             <label className="comment-report-label" htmlFor={`comment-report-reason-${comment.id}`}>
               Причина жалобы
@@ -287,14 +293,6 @@ function CommentCard({
       </div>
     </article>
   );
-}
-
-function formatCommentCount(count: number) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${count} комментарий`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} комментария`;
-  return `${count} комментариев`;
 }
 
 const complaintReasons = [

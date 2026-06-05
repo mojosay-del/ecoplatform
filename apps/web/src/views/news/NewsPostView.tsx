@@ -31,18 +31,19 @@ export function NewsPostView({ slug, preview = false }: { slug: string; preview?
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("offensive_content");
   const [reportComment, setReportComment] = useState("");
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [likePending, setLikePending] = useState(false);
   const [commentLikePendingId, setCommentLikePendingId] = useState<string | null>(null);
 
-  async function load() {
+  async function load(options: { silent?: boolean } = {}) {
     if (!token) {
       setState("unauthenticated");
       setPost(null);
       return;
     }
 
-    setState("loading");
+    if (!options.silent) {
+      setState("loading");
+    }
     setErrorMessage(null);
     try {
       const data = await api.news.get(slug, { preview });
@@ -67,10 +68,11 @@ export function NewsPostView({ slug, preview = false }: { slug: string; preview?
     event.preventDefault();
     if (!token || !post || !commentText.trim()) return;
 
+    const scrollTop = window.scrollY;
     await api.news.addComment(post.id, { text: commentText.trim() });
     setCommentText("");
-    setResultMessage("Комментарий опубликован.");
-    await load();
+    await load({ silent: true });
+    window.requestAnimationFrame(() => window.scrollTo({ top: scrollTop, behavior: "auto" }));
   }
 
   async function submitComplaint(event: FormEvent<HTMLFormElement>) {
@@ -86,7 +88,6 @@ export function NewsPostView({ slug, preview = false }: { slug: string; preview?
     setReportingCommentId(null);
     setReportReason("offensive_content");
     setReportComment("");
-    setResultMessage("Жалоба отправлена модератору.");
   }
 
   async function togglePostLike() {
@@ -165,11 +166,9 @@ export function NewsPostView({ slug, preview = false }: { slug: string; preview?
             {!preview ? (
               <CommentsSection
                 comments={post.comments ?? []}
-                commentsCount={post._count?.comments ?? 0}
                 commentText={commentText}
                 onCommentTextChange={setCommentText}
                 onSubmitComment={submitComment}
-                resultMessage={resultMessage}
                 reportingCommentId={reportingCommentId}
                 setReportingCommentId={setReportingCommentId}
                 reportReason={reportReason}

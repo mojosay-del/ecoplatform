@@ -21,12 +21,16 @@ export function formatNewsDate(value: string | Date) {
 }
 
 export function formatCommentDate(value: string | Date) {
-  return new Date(value).toLocaleString("ru-RU", {
+  const date = new Date(value);
+  const datePart = date.toLocaleDateString("ru-RU", {
     day: "numeric",
-    month: "short",
+    month: "long",
+  });
+  const timePart = date.toLocaleTimeString("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
   });
+  return `${datePart} ${timePart}`;
 }
 
 export function getCommentAuthor(user: { firstName?: string; lastName?: string } | null | undefined) {

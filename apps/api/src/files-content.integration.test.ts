@@ -301,6 +301,24 @@ describe("Content publish", () => {
     expect(unlike.body).toEqual({ liked: false, likesCount: 0 });
   });
 
+  it("не позволяет пользователю поставить лайк своему комментарию", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0000024");
+    const news = await createPublishedNews(adminToken, "own-comment-like");
+
+    const comment = await ctx.http
+      .post(`/api/news/${news.id}/comments`)
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ text: "Свой комментарий без лайка" });
+    expect(comment.status).toBe(201);
+
+    const like = await ctx.http
+      .post(`/api/news/comments/${comment.body.id}/like`)
+      .set("Authorization", `Bearer ${author.token}`);
+    expect(like.status).toBe(403);
+    expect(await ctx.prisma.commentLike.count({ where: { commentId: comment.body.id } })).toBe(0);
+  });
+
   it("content-листинги валидируют числовые query-параметры", async () => {
     const adminToken = await loginAdmin();
     const reader = await registerCompany("0000023");

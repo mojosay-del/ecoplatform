@@ -78,6 +78,23 @@ describe("Moderation", () => {
     expect(await ctx.prisma.complaint.count({ where: { entityType: "news_comment", entityId: comment.id } })).toBe(2);
   });
 
+  it("не позволяет пользователю пожаловаться на свой комментарий", async () => {
+    const adminToken = await loginAdmin();
+    const author = await registerCompany("0000057");
+    const { comment } = await createPublishedNewsWithComment(adminToken, author.token);
+
+    const ownComplaint = await ctx.http
+      .post("/api/moderation/complaints")
+      .set("Authorization", `Bearer ${author.token}`)
+      .send({ entityType: "news_comment", entityId: comment.id, reasonCode: "spam" });
+
+    expect(ownComplaint.status).toBe(403);
+    expect(await ctx.prisma.complaint.count({ where: { entityType: "news_comment", entityId: comment.id } })).toBe(0);
+    expect(await ctx.prisma.moderationCase.count({ where: { entityType: "news_comment", entityId: comment.id } })).toBe(
+      0,
+    );
+  });
+
   it("не пускает обычного пользователя в очередь и позволяет модератору взять и освободить lock", async () => {
     const adminToken = await loginAdmin();
     const moderatorToken = await loginModerator();

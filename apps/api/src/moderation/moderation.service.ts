@@ -61,6 +61,11 @@ export class ModerationService {
   async createComplaint(input: ComplaintInput, user: RequestUser) {
     this.assertFunctionalAccess(user);
 
+    const entity = await this.loadPublishedEntity(input.entityType, input.entityId);
+    if (entity.authorUserId === user.id) {
+      throw new ForbiddenException("Нельзя пожаловаться на свой материал.");
+    }
+
     const existing = await this.prisma.complaint.findUnique({
       where: {
         entityType_entityId_authorId_reasonCode: {
@@ -75,8 +80,6 @@ export class ModerationService {
     if (existing) {
       return { complaint: existing, duplicate: true };
     }
-
-    const entity = await this.loadPublishedEntity(input.entityType, input.entityId);
 
     const complaint = await this.prisma.$transaction(async (tx) => {
       const activeCase =

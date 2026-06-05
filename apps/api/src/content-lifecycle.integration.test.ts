@@ -47,8 +47,9 @@ describe("Content lifecycle: news", () => {
   it("delete новости полностью удаляет её и связанные данные", async () => {
     const adminToken = await loginAdmin();
     const contentManagerToken = await loginContentManager();
-    const reader = await registerCompany("0800001");
-    const { news, comment } = await createPublishedNewsWithComment(adminToken, reader.token);
+    const author = await registerCompany("0800001");
+    const reader = await registerCompany("0800091");
+    const { news, comment } = await createPublishedNewsWithComment(adminToken, author.token);
 
     const likePost = await ctx.http.post(`/api/news/${news.id}/like`).set("Authorization", `Bearer ${reader.token}`);
     expect(likePost.status).toBe(201);

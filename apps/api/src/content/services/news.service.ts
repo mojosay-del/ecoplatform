@@ -287,6 +287,7 @@ export class NewsService {
       where: { id },
       select: {
         id: true,
+        userId: true,
         status: true,
         discussion: { select: { targetType: true, targetId: true } },
       },
@@ -305,6 +306,9 @@ export class NewsService {
     });
     if (!newsPost || newsPost.status !== ContentStatus.published) {
       throw new NotFoundException("Комментарий не найден.");
+    }
+    if (comment.userId === user.id) {
+      throw new ForbiddenException("Нельзя поставить лайк своему комментарию.");
     }
 
     const existing = await this.prisma.commentLike.findUnique({

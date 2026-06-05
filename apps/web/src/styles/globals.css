@@ -3754,7 +3754,7 @@ body.news-modal-open .app-shell {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
   padding: 14px 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -3770,12 +3770,12 @@ body.news-modal-open .app-shell {
 .news-like-button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-left: auto;
   min-height: 36px;
   border: 1px solid var(--line);
   border-radius: var(--radius-chip);
-  padding: 8px 12px;
+  padding: 8px 10px;
   background: var(--panel);
   color: var(--text);
   font-size: 13px;
@@ -6915,17 +6915,16 @@ body.news-modal-open .app-shell {
 }
 
 .comments-section {
-  margin-top: 36px;
+  margin-top: 18px;
   display: grid;
   gap: 16px;
-  padding: 26px 0 0;
-  border-top: 1px solid var(--line);
+  padding: 0;
 }
 
 .comments-section-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
 }
 
@@ -6934,6 +6933,12 @@ body.news-modal-open .app-shell {
   font-size: 22px;
   line-height: 1.2;
   letter-spacing: 0;
+}
+
+.comments-section .comments-kicker {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .comments-kicker {
@@ -6945,33 +6950,13 @@ body.news-modal-open .app-shell {
   text-transform: uppercase;
 }
 
-.comments-counter {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-chip);
-  padding: 5px 10px;
-  background: var(--panel);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.comments-status {
-  justify-self: start;
-}
-
 .comments-chat-surface {
   display: grid;
   gap: 16px;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgb(var(--brand-rgb) / 0.04), rgb(var(--brand-rgb) / 0)),
-    var(--panel-soft);
+  background: linear-gradient(180deg, rgb(var(--brand-rgb) / 0.04), rgb(var(--brand-rgb) / 0)), var(--panel-soft);
   box-shadow: inset 0 1px 0 rgb(var(--white-rgb) / 0.65);
 }
 
@@ -7069,13 +7054,14 @@ body.news-modal-open .app-shell {
 .comment-textarea {
   width: 100%;
   min-height: 44px;
-  max-height: 132px;
+  max-height: 168px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--panel);
   color: var(--text);
   padding: 12px 14px;
-  resize: vertical;
+  resize: none;
+  overflow-y: hidden;
   font-size: 14px;
   line-height: 1.5;
   transition:
@@ -7209,9 +7195,9 @@ body.news-modal-open .app-shell {
 
 .comment-author-meta {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 6px 10px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -7285,7 +7271,9 @@ body.news-modal-open .app-shell {
 }
 
 .comment-report-button {
-  padding-inline: 0;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 4px;
 }
 
 .comment-like-button:hover,
@@ -8134,8 +8122,8 @@ body.news-modal-open .app-shell {
 
 @media (max-width: 640px) {
   .comments-section {
-    margin-top: 28px;
-    padding: 22px 0 0;
+    margin-top: 16px;
+    padding: 0;
   }
 
   .comments-section-head {
