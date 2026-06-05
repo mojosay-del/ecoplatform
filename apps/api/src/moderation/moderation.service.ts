@@ -27,6 +27,7 @@ import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
+import { notifyAdminSanction, notifySanctionLift, type ModerationNotifyDeps } from "./moderation-notify.helpers";
 import type {
   adminSanctionInputSchema,
   complaintInputSchema,
@@ -520,7 +521,7 @@ export class ModerationService {
       },
     });
 
-    await this.notifyAdminSanction(found, result.sanction, input).catch(
+    await notifyAdminSanction(this.moderationNotifyDeps(), found, result.sanction, input).catch(
       swallowAndLog("moderation.sanction.notify", { sanctionId: result.sanction.id }),
     );
 
@@ -580,7 +581,7 @@ export class ModerationService {
       payload: { reasonCode: input.reasonCode },
     });
 
-    await this.notifySanctionLift(sanction).catch(
+    await notifySanctionLift(this.moderationNotifyDeps(), sanction).catch(
       swallowAndLog("moderation.sanction.lift.notify", { sanctionId: sanction.id }),
     );
 
@@ -658,119 +659,10 @@ export class ModerationService {
     }
   }
 
-  private async notifyAdminSanction(
-    found: ModerationCaseWithRelations,
-    sanction: { id: string },
-    input: AdminSanctionInput,
-  ) {
-    const recipients =
-      input.type === "company_block"
-        ? await this.prisma.user.findMany({
-            where: { companyId: found.entityCompanyId ?? undefined },
-            select: { id: true },
-          })
-        : found.entityAuthorId
-          ? [{ id: found.entityAuthorId }]
-          : [];
-
-    if (recipients.length === 0) return;
-
-    const category =
-      input.type === "module_restriction" ? NotificationCategory.moderation : NotificationCategory.security;
-
-    const titles = this.adminSanctionCopy(input);
-
-    await Promise.all(
-      recipients.map((recipient) =>
-        this.notifications.createInApp({
-          userId: recipient.id,
-          eventType: titles.eventType,
-          sourceId: `${sanction.id}:${recipient.id}`,
-          category,
-          title: titles.title,
-          body: titles.body,
-          link: "/notifications",
-          payload: { caseId: found.id, sanctionId: sanction.id, reasonCode: input.reasonCode },
-        }),
-      ),
-    );
-  }
-
-  private async notifySanctionLift(sanction: { id: string; type: SanctionType; targetType: string; targetId: string }) {
-    const recipients =
-      sanction.type === SanctionType.company_block
-        ? await this.prisma.user.findMany({
-            where: { companyId: sanction.targetId },
-            select: { id: true },
-          })
-        : [{ id: sanction.targetId }];
-
-    if (recipients.length === 0) return;
-
-    const category =
-      sanction.type === SanctionType.module_restriction
-        ? NotificationCategory.moderation
-        : NotificationCategory.security;
-
-    const titles = this.sanctionLiftCopy(sanction.type);
-
-    await Promise.all(
-      recipients.map((recipient) =>
-        this.notifications.createInApp({
-          userId: recipient.id,
-          eventType: titles.eventType,
-          sourceId: `${sanction.id}:lift:${recipient.id}`,
-          category,
-          title: titles.title,
-          body: titles.body,
-          link: "/notifications",
-          payload: { sanctionId: sanction.id },
-        }),
-      ),
-    );
-  }
-
-  private adminSanctionCopy(input: AdminSanctionInput) {
-    if (input.type === "user_block") {
-      return {
-        eventType: "moderation.user.blocked",
-        title: "Учётная запись заблокирована",
-        body: "Ваша учётная запись заблокирована администратором платформы.",
-      };
-    }
-    if (input.type === "company_block") {
-      return {
-        eventType: "moderation.company.blocked",
-        title: "Компания заблокирована",
-        body: "Компания заблокирована администратором платформы.",
-      };
-    }
+  private moderationNotifyDeps(): ModerationNotifyDeps {
     return {
-      eventType: "moderation.module_restriction.applied",
-      title: "Ограничение доступа к модулю",
-      body: `Доступ к модулю «${input.moduleCode}» ограничен на ${input.durationDays} дн.`,
-    };
-  }
-
-  private sanctionLiftCopy(type: SanctionType) {
-    if (type === SanctionType.user_block) {
-      return {
-        eventType: "moderation.user.unblocked",
-        title: "Учётная запись разблокирована",
-        body: "Доступ к учётной записи восстановлен.",
-      };
-    }
-    if (type === SanctionType.company_block) {
-      return {
-        eventType: "moderation.company.unblocked",
-        title: "Компания разблокирована",
-        body: "Доступ компании восстановлен.",
-      };
-    }
-    return {
-      eventType: "moderation.module_restriction.lifted",
-      title: "Ограничение доступа к модулю снято",
-      body: "Доступ к модулю восстановлен досрочно.",
+      prisma: this.prisma,
+      notifications: this.notifications,
     };
   }
 
