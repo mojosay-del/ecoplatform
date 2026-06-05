@@ -36,11 +36,7 @@ export function KnowledgeDetailForm({
   onRemove: (article: Article) => void;
   onPublishToggle: (article: Article) => void;
 }) {
-  const saveStatusClass = autosaveEnabled
-    ? `is-${autosave.autosaveState}`
-    : hasChanges
-      ? "has-changes"
-      : "is-saved";
+  const saveStatusClass = autosaveEnabled ? `is-${autosave.autosaveState}` : hasChanges ? "has-changes" : "is-saved";
   const draftLabel = draft.kind === "category" ? "Категория" : "Материал";
 
   return (

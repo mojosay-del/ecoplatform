@@ -52,12 +52,7 @@ describe("AppShell future navigation teasers", () => {
     const sections = getAccountMenuSections(true);
 
     expect(sections.map((section) => section.title)).toEqual(["Настройки"]);
-    expect(sections[0]?.items.map((item) => item.label)).toEqual([
-      "Профиль",
-      "Подписка",
-      "Сессии",
-      "Уведомления",
-    ]);
+    expect(sections[0]?.items.map((item) => item.label)).toEqual(["Профиль", "Подписка", "Сессии", "Уведомления"]);
     expect(sections[0]?.items.map((item) => item.href)).toEqual([
       "/account/profile",
       "/account/profile?modal=subscription",
