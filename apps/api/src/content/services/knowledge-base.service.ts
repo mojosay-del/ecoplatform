@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { ContentStatus, Prisma } from "@prisma/client";
+import { ContentStatus } from "@prisma/client";
 import { validateContentBlocks } from "@ecoplatform/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
@@ -8,12 +8,15 @@ import type { RequestUser } from "../../common/request-user";
 import type { z } from "zod";
 import type { knowledgeArticleInputSchema } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
+import { buildKnowledgeTreeInclude } from "./knowledge-base-tree.helpers";
+import { assertKnowledgeDepth, isKnowledgeCategory } from "./knowledge-base-depth.helpers";
+import { compactKnowledgeAfterRemoval, repositionKnowledgeInGroup } from "./knowledge-base-position.helpers";
 
 type KnowledgeArticleInput = z.infer<typeof knowledgeArticleInputSchema>;
 
-// База знаний: дерево статей до 2 уровней (категория → подкатегория → статья).
-// Сложная часть — позиции внутри одной группы (для drag-and-drop) и проверка
-// глубины (assertKnowledgeDepth). Вынесена из ContentService последней.
+// База знаний: дерево статей до 3 уровней (категория → вид → подвид). Сложная
+// часть — позиции внутри одной группы (drag-and-drop) и проверка глубины —
+// вынесена в knowledge-base-{position,depth,tree}.helpers. Здесь — оркестрация.
 @Injectable()
 export class KnowledgeBaseService {
   constructor(
@@ -28,55 +31,11 @@ export class KnowledgeBaseService {
     const rawDepth = Number.isFinite(options.depth) ? Math.trunc(options.depth!) : 3;
     const depth = Math.min(Math.max(rawDepth, 1), 3);
 
-    if (depth === 1) {
-      return this.prisma.knowledgeBaseArticle.findMany({
-        where: { parentId: null, status: ContentStatus.published },
-        orderBy: { position: "asc" },
-        take: width,
-        include: {
-          blocks: { orderBy: { position: "asc" } },
-        },
-      });
-    }
-
-    if (depth === 2) {
-      return this.prisma.knowledgeBaseArticle.findMany({
-        where: { parentId: null, status: ContentStatus.published },
-        orderBy: { position: "asc" },
-        take: width,
-        include: {
-          blocks: { orderBy: { position: "asc" } },
-          children: {
-            where: { status: ContentStatus.published },
-            orderBy: { position: "asc" },
-            take: width,
-            include: { blocks: { orderBy: { position: "asc" } } },
-          },
-        },
-      });
-    }
-
     return this.prisma.knowledgeBaseArticle.findMany({
       where: { parentId: null, status: ContentStatus.published },
       orderBy: { position: "asc" },
       take: width,
-      include: {
-        blocks: { orderBy: { position: "asc" } },
-        children: {
-          where: { status: ContentStatus.published },
-          orderBy: { position: "asc" },
-          take: width,
-          include: {
-            blocks: { orderBy: { position: "asc" } },
-            children: {
-              where: { status: ContentStatus.published },
-              orderBy: { position: "asc" },
-              take: width,
-              include: { blocks: { orderBy: { position: "asc" } } },
-            },
-          },
-        },
-      },
+      include: buildKnowledgeTreeInclude(depth, width),
     });
   }
 
@@ -130,7 +89,7 @@ export class KnowledgeBaseService {
   }
 
   async createKnowledgeArticle(input: KnowledgeArticleInput, user: RequestUser) {
-    const isCategory = this.isKnowledgeCategory(input.iconType);
+    const isCategory = isKnowledgeCategory(input.iconType);
     const blocks = isCategory ? [] : input.blocks;
     const check = this.validateDraftableKnowledgeBlocks(blocks);
 
@@ -142,7 +101,7 @@ export class KnowledgeBaseService {
     }
     await this.common.assertCoverImageAllowed(input.coverImageId, user);
 
-    await this.assertKnowledgeDepth(input.parentId ?? null);
+    await assertKnowledgeDepth(this.prisma, input.parentId ?? null);
 
     const slug =
       input.slug ??
@@ -194,7 +153,7 @@ export class KnowledgeBaseService {
       throw new NotFoundException("Статья не найдена.");
     }
 
-    const isCategory = this.isKnowledgeCategory(input.iconType);
+    const isCategory = isKnowledgeCategory(input.iconType);
     const blocks = isCategory ? [] : input.blocks;
     const check = this.validateDraftableKnowledgeBlocks(blocks);
 
@@ -263,7 +222,7 @@ export class KnowledgeBaseService {
     if (!existing) {
       throw new NotFoundException("Статья не найдена.");
     }
-    if (!this.isKnowledgeCategory(existing.iconType) && existing._count.blocks === 0) {
+    if (!isKnowledgeCategory(existing.iconType) && existing._count.blocks === 0) {
       throw new ForbiddenException("Нельзя опубликовать статью без блоков.");
     }
 
@@ -316,11 +275,11 @@ export class KnowledgeBaseService {
     if (input.parentId === id) {
       throw new ForbiddenException("Статья не может быть собственным родителем.");
     }
-    if (this.isKnowledgeCategory(existing.iconType) && input.parentId !== null) {
+    if (isKnowledgeCategory(existing.iconType) && input.parentId !== null) {
       throw new ForbiddenException("Категория базы знаний должна оставаться верхним узлом.");
     }
 
-    await this.assertKnowledgeDepth(input.parentId, id);
+    await assertKnowledgeDepth(this.prisma, input.parentId, id);
 
     const parentChanged = existing.parentId !== input.parentId;
     const positionChanged = existing.position !== input.position;
@@ -333,10 +292,10 @@ export class KnowledgeBaseService {
           where: { id },
           data: { position: -1_000_000 - existing.position },
         });
-        await this.compactKnowledgeAfterRemoval(tx, existing.parentId, existing.position);
-        await this.repositionKnowledgeInGroup(tx, input.parentId, id, input.position, true);
+        await compactKnowledgeAfterRemoval(tx, existing.parentId, existing.position);
+        await repositionKnowledgeInGroup(tx, input.parentId, id, input.position, true);
       } else if (positionChanged) {
-        await this.repositionKnowledgeInGroup(tx, input.parentId, id, input.position, false);
+        await repositionKnowledgeInGroup(tx, input.parentId, id, input.position, false);
       }
 
       if (parentChanged) {
@@ -394,129 +353,10 @@ export class KnowledgeBaseService {
     return { ok: true };
   }
 
-  private async assertKnowledgeDepth(parentId: string | null, movingId?: string) {
-    if (!parentId) {
-      return;
-    }
-
-    const depth = await this.knowledgeDepth(parentId);
-    // Допустимы уровни 0, 1, 2 (категория → вид → подвид). Новый ребёнок добавит уровень depth+1.
-    if (depth + 1 > 2) {
-      throw new ForbiddenException("Дерево базы знаний ограничено тремя уровнями.");
-    }
-
-    if (movingId) {
-      const subtreeDepth = await this.subtreeDepth(movingId);
-      if (depth + 1 + subtreeDepth > 2) {
-        throw new ForbiddenException("Перемещение нарушит ограничение в три уровня.");
-      }
-    }
-  }
-
-  private isKnowledgeCategory(iconType?: string | null) {
-    return iconType === "category";
-  }
-
   private validateDraftableKnowledgeBlocks(blocks: KnowledgeArticleInput["blocks"]) {
     if (blocks.length === 0) {
       return { ok: true as const };
     }
     return validateContentBlocks(blocks);
-  }
-
-  private async knowledgeDepth(nodeId: string): Promise<number> {
-    let current: string | null = nodeId;
-    let depth = 0;
-    const visited = new Set<string>();
-
-    while (current) {
-      if (visited.has(current)) {
-        throw new ForbiddenException("Циклическая структура в дереве базы знаний.");
-      }
-      visited.add(current);
-      const node: { parentId: string | null } | null = await this.prisma.knowledgeBaseArticle.findUnique({
-        where: { id: current },
-        select: { parentId: true },
-      });
-      if (!node) {
-        break;
-      }
-      if (node.parentId === null) {
-        return depth;
-      }
-      depth += 1;
-      current = node.parentId;
-    }
-
-    return depth;
-  }
-
-  private async subtreeDepth(nodeId: string): Promise<number> {
-    const children = await this.prisma.knowledgeBaseArticle.findMany({
-      where: { parentId: nodeId },
-      select: { id: true },
-    });
-    if (children.length === 0) {
-      return 0;
-    }
-    const depths = await Promise.all(children.map((child) => this.subtreeDepth(child.id)));
-    return 1 + Math.max(...depths);
-  }
-
-  // Перепаковка позиций внутри группы (главы модуля).
-  // Уникальный индекс @@unique([moduleId, position]) не позволяет двум главам
-  // занимать одну позицию — даже временно. Поэтому сначала уводим всех соседей
-  // в заведомо свободную зону отрицательных значений, а потом раздаём финальные
-  // номера 0..N-1 уже в нужном порядке.
-  private async repositionKnowledgeInGroup(
-    tx: Prisma.TransactionClient,
-    parentId: string | null,
-    itemId: string,
-    newPosition: number,
-    isNewcomer: boolean,
-  ) {
-    const siblings = await tx.knowledgeBaseArticle.findMany({
-      where: { parentId, id: { not: itemId } },
-      orderBy: { position: "asc" },
-      select: { id: true },
-    });
-
-    if (!isNewcomer) {
-      await tx.knowledgeBaseArticle.update({ where: { id: itemId }, data: { position: -1 } });
-    }
-    for (let i = 0; i < siblings.length; i++) {
-      await tx.knowledgeBaseArticle.update({
-        where: { id: siblings[i]!.id },
-        data: { position: -(i + 2) },
-      });
-    }
-
-    const ordered = siblings.map((s) => s.id);
-    const clamped = Math.max(0, Math.min(newPosition, ordered.length));
-    ordered.splice(clamped, 0, itemId);
-
-    for (let i = 0; i < ordered.length; i++) {
-      await tx.knowledgeBaseArticle.update({ where: { id: ordered[i]! }, data: { position: i } });
-    }
-  }
-
-  // При переходе статьи в другую родительскую группу — нужно «закрыть дыру»,
-  // которую она оставила: оставшиеся соседи перенумеровываются без неё.
-  private async compactKnowledgeAfterRemoval(
-    tx: Prisma.TransactionClient,
-    parentId: string | null,
-    removedPosition: number,
-  ) {
-    const remaining = await tx.knowledgeBaseArticle.findMany({
-      where: { parentId, position: { gt: removedPosition } },
-      orderBy: { position: "asc" },
-      select: { id: true, position: true },
-    });
-    for (const node of remaining) {
-      await tx.knowledgeBaseArticle.update({
-        where: { id: node.id },
-        data: { position: node.position - 1 },
-      });
-    }
   }
 }
