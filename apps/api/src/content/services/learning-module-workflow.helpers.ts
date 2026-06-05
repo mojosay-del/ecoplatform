@@ -27,6 +27,7 @@ export async function createLearningModule(
 ) {
   for (const chapter of input.chapters) {
     for (const lesson of chapter.lessons) {
+      await common.assertCoverImageAllowed(lesson.coverImageId, user);
       const check = validateContentBlocks(lesson.blocks, lessonBlockSchema);
 
       if (!check.ok) {
@@ -47,6 +48,7 @@ export async function createLearningModule(
     input.coverImageId,
     ...input.chapters.flatMap((chapter) =>
       chapter.lessons.flatMap((lesson) => [
+        lesson.coverImageId,
         ...lesson.blocks.flatMap((block) => Array.from(common.collectFileIdsFromPayload(block.payload))),
         ...lesson.attachments.map((attachment) => attachment.fileId),
       ]),
@@ -270,6 +272,7 @@ export async function deleteLearningModule(
     existing.coverImageId,
     ...existing.chapters.flatMap((chapter) =>
       chapter.lessons.flatMap((lesson) => [
+        lesson.coverImageId,
         ...common.collectFileIdsFromBlocks(lesson.blocks),
         ...lesson.attachments.map((attachment) => attachment.fileId),
       ]),
@@ -329,6 +332,8 @@ async function createLearningModuleWithNextPosition(
                 lessons: {
                   create: chapter.lessons.map((lesson, lessonIndex) => ({
                     title: lesson.title,
+                    coverImageId: lesson.coverImageId,
+                    coverSubtitle: lesson.coverSubtitle,
                     position: lessonIndex,
                     createdById: userId,
                     blocks: {

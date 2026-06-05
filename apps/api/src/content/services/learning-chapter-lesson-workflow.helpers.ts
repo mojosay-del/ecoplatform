@@ -144,11 +144,14 @@ export async function createLesson(
       throw new ForbiddenException(check.message);
     }
   }
+  await common.assertCoverImageAllowed(input.coverImageId, user);
 
   const lesson = await prisma.lesson.create({
     data: {
       chapterId,
       title: input.title,
+      coverImageId: input.coverImageId,
+      coverSubtitle: input.coverSubtitle,
       position: input.position,
       createdById: user.id,
       blocks: {
@@ -206,9 +209,13 @@ export async function updateLesson(
       }
     }
   }
+  if (input.coverImageId !== undefined) {
+    await common.assertCoverImageAllowed(input.coverImageId, user);
+  }
 
   const positionChanged = input.position !== undefined && input.position !== existing.position;
   const previousFileIds = common.compactFileIds([
+    ...(input.coverImageId !== undefined ? [existing.coverImageId] : []),
     ...(input.blocks ? common.collectFileIdsFromBlocks(existing.blocks) : []),
     ...(input.attachments ? existing.attachments.map((attachment) => attachment.fileId) : []),
   ]);
@@ -220,6 +227,8 @@ export async function updateLesson(
 
     const data: Prisma.LessonUpdateInput = {};
     if (input.title !== undefined) data.title = input.title;
+    if (input.coverImageId !== undefined) data.coverImageId = input.coverImageId;
+    if (input.coverSubtitle !== undefined) data.coverSubtitle = input.coverSubtitle;
 
     if (input.blocks) {
       await tx.lessonContentBlock.deleteMany({ where: { lessonId: id } });
@@ -284,6 +293,7 @@ export async function deleteLesson(
   }
 
   const deletedFileIds = common.compactFileIds([
+    existing.coverImageId,
     ...common.collectFileIdsFromBlocks(existing.blocks),
     ...existing.attachments.map((attachment) => attachment.fileId),
   ]);

@@ -100,12 +100,13 @@ async function main() {
       const keys = Array.from(new Set([asset.storageKey, ...variantStorageKeys(asset.variants)]));
 
       // Защита: файл, который ещё и обложка где-либо, должен оставаться публичным.
-      const [newsCover, learningCover, knowledgeCover] = await Promise.all([
+      const [newsCover, learningCover, lessonCover, knowledgeCover] = await Promise.all([
         prisma.newsPost.count({ where: { coverImageId: asset.id } }),
         prisma.learningModule.count({ where: { coverImageId: asset.id } }),
+        prisma.lesson.count({ where: { coverImageId: asset.id } }),
         prisma.knowledgeBaseArticle.count({ where: { coverImageId: asset.id } }),
       ]);
-      if (newsCover + learningCover + knowledgeCover > 0) {
+      if (newsCover + learningCover + lessonCover + knowledgeCover > 0) {
         console.warn(`SKIP ${asset.id} (${asset.originalName}): файл используется как обложка — оставляем публичным.`);
         skippedCover += 1;
         continue;

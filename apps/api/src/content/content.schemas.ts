@@ -11,6 +11,7 @@ function paginationQuerySchema(maxLimit: number) {
 }
 
 const stringArrayQueryValueSchema = z.union([z.string(), z.array(z.string())]);
+const lessonCoverSubtitleSchema = z.string().trim().max(120).nullable().optional();
 
 export const newsListQuerySchema = paginationQuerySchema(100).extend({
   tags: stringArrayQueryValueSchema.optional(),
@@ -104,6 +105,8 @@ export const learningModuleInputSchema = z.object({
       lessons: z.array(
         z.object({
           title: z.string().min(1),
+          coverImageId: z.string().nullable().optional(),
+          coverSubtitle: lessonCoverSubtitleSchema,
           blocks: z.array(lessonBlockSchema).default([]),
           attachments: z
             .array(
@@ -169,6 +172,8 @@ export const chapterUpdateInputSchema = z.object({
 
 export const lessonInputSchema = z.object({
   title: z.string().min(1),
+  coverImageId: z.string().nullable().optional(),
+  coverSubtitle: lessonCoverSubtitleSchema,
   position: z.number().int().nonnegative(),
   blocks: z.array(lessonBlockSchema).default([]),
   attachments: z
@@ -183,6 +188,8 @@ export const lessonInputSchema = z.object({
 
 export const lessonUpdateInputSchema = z.object({
   title: z.string().min(1).optional(),
+  coverImageId: z.string().nullable().optional(),
+  coverSubtitle: lessonCoverSubtitleSchema,
   position: z.number().int().nonnegative().optional(),
   blocks: z.array(lessonBlockSchema).optional(),
   attachments: z

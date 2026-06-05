@@ -131,6 +131,7 @@ export async function backfillFileReferences(deps: FilesReferenceDeps): Promise<
       module.coverImageId,
       ...module.chapters.flatMap((chapter) =>
         chapter.lessons.flatMap((lesson) => [
+          lesson.coverImageId,
           ...Array.from(
             lesson.blocks.reduce((ids, block) => collectFileIdsFromPayload(block.payload, ids), new Set<string>()),
           ),

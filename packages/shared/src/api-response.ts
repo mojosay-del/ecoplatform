@@ -142,6 +142,8 @@ export type NomenclatureCategoryListItem = {
 export type LearningLessonSummary = {
   id: string;
   title: string;
+  coverImageId: string | null;
+  coverSubtitle: string | null;
   position: number;
   status: string;
 };

@@ -12,6 +12,8 @@ export function normalizeAttachments(attachments: Attachment[]) {
 export function lessonToDraft(lesson: Lesson): LessonDraft {
   return {
     title: lesson.title,
+    coverImageId: lesson.coverImageId ?? "",
+    coverSubtitle: lesson.coverSubtitle ?? "",
     blocks: lesson.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
     attachments: lesson.attachments.map((attachment) => ({ ...attachment })),
   };
@@ -20,6 +22,8 @@ export function lessonToDraft(lesson: Lesson): LessonDraft {
 export function normalizeLessonDraft(draft: LessonDraft) {
   return {
     title: draft.title,
+    coverImageId: draft.coverImageId.trim() || null,
+    coverSubtitle: draft.coverSubtitle.trim() || null,
     blocks: draft.blocks.map((block) => ({ type: block.type, payload: block.payload })),
     attachments: normalizeAttachments(draft.attachments),
   };

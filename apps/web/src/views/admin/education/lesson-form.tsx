@@ -30,10 +30,12 @@ export function LessonForm({
   const normalizedDraft = useMemo(
     () => ({
       title: draft.title,
+      coverImageId: draft.coverImageId.trim() || null,
+      coverSubtitle: draft.coverSubtitle.trim() || null,
       blocks: draft.blocks.map((block) => ({ type: block.type, payload: block.payload })),
       attachments: normalizedDraftAttachments,
     }),
-    [draft.blocks, draft.title, normalizedDraftAttachments],
+    [draft.blocks, draft.coverImageId, draft.coverSubtitle, draft.title, normalizedDraftAttachments],
   );
 
   // Черновик пересинхронизируем только при переключении на другой урок, а
@@ -55,6 +57,8 @@ export function LessonForm({
     const savedSnapshot = normalizedDraft;
     const ok = await onMutate(`/admin/content/education/lessons/${lesson.id}`, "PATCH", {
       title: savedSnapshot.title,
+      coverImageId: savedSnapshot.coverImageId || null,
+      coverSubtitle: savedSnapshot.coverSubtitle || null,
       blocks: savedSnapshot.blocks,
       attachments: savedSnapshot.attachments,
     });
@@ -125,6 +129,8 @@ export function LessonForm({
   // сохранения не залипал в состоянии "Не сохранено".
   const hasChanges = useMemo(() => {
     if (normalizedDraft.title !== savedDraft.title) return true;
+    if (normalizedDraft.coverImageId !== savedDraft.coverImageId) return true;
+    if (normalizedDraft.coverSubtitle !== savedDraft.coverSubtitle) return true;
     if (JSON.stringify(normalizedDraft.blocks) !== JSON.stringify(savedDraft.blocks)) return true;
     if (JSON.stringify(normalizedDraft.attachments) !== JSON.stringify(savedDraft.attachments)) return true;
     return false;
@@ -154,6 +160,28 @@ export function LessonForm({
           required
         />
       </header>
+
+      <section className="lesson-section lesson-cover-section">
+        <h3 className="lesson-section-title">Обложка урока</h3>
+        <FileUploadField
+          accept="image/*"
+          buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+          imagePreset="cover"
+          label="Обложка урока"
+          value={draft.coverImageId}
+          onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+        />
+        <label className="news-lead-field lesson-cover-subtitle-field">
+          <input
+            className="news-form-lead"
+            aria-label="Подзаголовок на обложке"
+            value={draft.coverSubtitle}
+            placeholder="Подзаголовок на обложке"
+            maxLength={120}
+            onChange={(event) => setDraft((prev) => ({ ...prev, coverSubtitle: event.target.value }))}
+          />
+        </label>
+      </section>
 
       <section className="lesson-section">
         <h3 className="lesson-section-title">Содержание</h3>

@@ -4,6 +4,8 @@ export type Attachment = { fileId: string; displayName: string };
 
 export type LessonDraft = {
   title: string;
+  coverImageId: string;
+  coverSubtitle: string;
   blocks: Block[];
   attachments: Attachment[];
 };
@@ -12,6 +14,8 @@ export type Lesson = {
   id: string;
   chapterId: string;
   title: string;
+  coverImageId: string | null;
+  coverSubtitle: string | null;
   position: number;
   status: "draft" | "published";
   blocks: Block[];

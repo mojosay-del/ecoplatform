@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -7,8 +8,9 @@ import { GraduationCap } from "lucide-react";
 import type { LearningChapterDetail, LearningModuleDetail, LessonDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { StatusPill } from "../../components/StatusPill";
-import { ApiError, api } from "../../lib/api";
+import { ApiError, api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { useCoverAssets } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, resolveUpgradeCta, useApiQuery } from "../shared";
 import { ContentBlocks } from "../content-blocks";
 import { extractLessonTasks } from "./lesson-tasks";
@@ -47,15 +49,22 @@ export function LessonView({
     })),
   );
   const currentLessonIndex = lessonSequence.findIndex((item) => item.lesson.id === lessonId);
+  const previousLessonEntry = currentLessonIndex > 0 ? (lessonSequence[currentLessonIndex - 1] ?? null) : null;
   const nextLessonEntry = currentLessonIndex >= 0 ? (lessonSequence[currentLessonIndex + 1] ?? null) : null;
   const previewSuffix = preview ? "?preview=1" : "";
   const moduleHref = `/education/${moduleId}${previewSuffix}`;
+  const previousLessonHref = previousLessonEntry
+    ? `/education/${moduleId}/${previousLessonEntry.lesson.id}${previewSuffix}`
+    : null;
   const nextLessonHref = nextLessonEntry ? `/education/${moduleId}/${nextLessonEntry.lesson.id}${previewSuffix}` : null;
   const nextLessonLabel = nextLessonEntry
     ? nextLessonEntry.chapter.id !== chapter?.id
       ? `Следующая глава: урок ${nextLessonEntry.lessonIndex + 1}`
       : "Следующий урок"
     : null;
+  const covers = useCoverAssets(lesson ? [lesson] : []);
+  const lessonCover = lesson?.coverImageId ? (covers.get(lesson.coverImageId) ?? null) : null;
+  const lessonCoverUrl = preferredFileAssetImageUrl(lessonCover);
   useEffect(() => {
     setCompleted(Boolean(lesson?.completedAt));
     setCompleting(false);
@@ -68,7 +77,9 @@ export function LessonView({
     if (!container) return;
 
     const revealItems = Array.from(
-      container.querySelectorAll<HTMLElement>(".lesson-title, .lesson-blocks > .content-blocks > *, .lesson-actions"),
+      container.querySelectorAll<HTMLElement>(
+        ".lesson-cover, .lesson-title:not(.lesson-title-on-cover), .lesson-blocks > .content-blocks > *, .lesson-actions",
+      ),
     );
 
     revealItems.forEach((item, index) => {
@@ -103,7 +114,7 @@ export function LessonView({
         item.style.removeProperty("--lesson-reveal-index");
       });
     };
-  }, [lesson?.blocks?.length, lessonId, nextLessonHref, preview]);
+  }, [lesson?.blocks?.length, lessonCoverUrl, lessonId, nextLessonHref, preview]);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Урок" />;
@@ -218,40 +229,79 @@ export function LessonView({
 
         <div className="lesson-layout">
           <article className="lesson-main lesson-scroll-reveal" ref={lessonMainRef}>
-            <h1 className="lesson-title">{lesson.title}</h1>
+            {lessonCoverUrl ? (
+              <figure className="lesson-cover">
+                <Image
+                  alt={lessonCover?.originalName ?? lesson.title}
+                  src={lessonCoverUrl}
+                  fill
+                  loading="eager"
+                  sizes="(max-width: 1100px) 100vw, 760px"
+                  style={{ objectFit: "cover" }}
+                />
+                <div className="lesson-cover-title-wrap">
+                  <div className="lesson-cover-caption">
+                    <h1 className="lesson-title lesson-title-on-cover">{lesson.title}</h1>
+                    {lesson.coverSubtitle ? <p className="lesson-cover-subtitle">{lesson.coverSubtitle}</p> : null}
+                  </div>
+                </div>
+              </figure>
+            ) : (
+              <h1 className="lesson-title">{lesson.title}</h1>
+            )}
             <div className="content-blocks lesson-blocks">
               <ContentBlocks blocks={lessonContentBlocks} />
             </div>
             {!preview ? (
               <div className="auth-actions lesson-actions" style={{ marginTop: 24 }}>
-                {nextLessonHref && nextLessonLabel ? (
-                  <button
-                    className="button lesson-next-button"
-                    type="button"
-                    onClick={goToNextLesson}
-                    disabled={advancing || completing}
-                  >
-                    {advancing ? "Сохраняю…" : nextLessonLabel}
-                  </button>
-                ) : (
-                  <button
-                    className="button"
-                    type="button"
-                    onClick={markCompleted}
-                    disabled={lessonAlreadyCompleted || completing}
-                  >
-                    {lessonAlreadyCompleted ? "Отмечено пройденным" : completing ? "Сохраняю…" : "Отметить пройденным"}
-                  </button>
-                )}
-                <Link className="button secondary" href={moduleHref}>
-                  ← К модулю
-                </Link>
+                <div className="lesson-actions-left">
+                  <Link className="button secondary" href={moduleHref}>
+                    ← К модулю
+                  </Link>
+                  {previousLessonHref ? (
+                    <Link className="button secondary" href={previousLessonHref}>
+                      Предыдущий урок
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="lesson-actions-right">
+                  {nextLessonHref && nextLessonLabel ? (
+                    <button
+                      className="button lesson-next-button"
+                      type="button"
+                      onClick={goToNextLesson}
+                      disabled={advancing || completing}
+                    >
+                      {advancing ? "Сохраняю…" : nextLessonLabel}
+                    </button>
+                  ) : (
+                    <button
+                      className="button"
+                      type="button"
+                      onClick={markCompleted}
+                      disabled={lessonAlreadyCompleted || completing}
+                    >
+                      {lessonAlreadyCompleted
+                        ? "Отмечено пройденным"
+                        : completing
+                          ? "Сохраняю…"
+                          : "Отметить пройденным"}
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="auth-actions lesson-actions" style={{ marginTop: 24 }}>
-                <Link className="button secondary" href={moduleHref}>
-                  ← К модулю
-                </Link>
+                <div className="lesson-actions-left">
+                  <Link className="button secondary" href={moduleHref}>
+                    ← К модулю
+                  </Link>
+                  {previousLessonHref ? (
+                    <Link className="button secondary" href={previousLessonHref}>
+                      Предыдущий урок
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             )}
             {completionError && !preview ? <p className="lesson-action-error">{completionError}</p> : null}

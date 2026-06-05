@@ -3193,6 +3193,67 @@ input[type="checkbox"]:focus-visible {
   padding: 28px 32px 32px;
 }
 
+.lesson-cover {
+  position: relative;
+  margin: -28px -32px 24px;
+  height: clamp(190px, 28vw, 340px);
+  overflow: hidden;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--panel-soft);
+}
+
+.lesson-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgb(15 23 42 / 0.68),
+      rgb(15 23 42 / 0.36) 34%,
+      rgb(15 23 42 / 0.14) 62%,
+      rgb(15 23 42 / 0.22)
+    ),
+    linear-gradient(90deg, rgb(15 23 42 / 0.3), transparent 26%, transparent 74%, rgb(15 23 42 / 0.2));
+}
+
+.lesson-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lesson-cover-title-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding: clamp(30px, 6vw, 60px) 32px 24px;
+  pointer-events: none;
+}
+
+.lesson-cover-caption {
+  width: min(760px, calc(100% - 48px));
+  margin: 0;
+  padding: 0;
+  color: var(--white);
+  text-align: center;
+}
+
+.lesson-cover-caption::before {
+  content: none;
+}
+
+.lesson-cover-caption > * {
+  position: relative;
+  z-index: 1;
+}
+
 .lesson-title {
   margin: -28px -32px 24px;
   padding: 18px 28px;
@@ -3206,8 +3267,97 @@ input[type="checkbox"]:focus-visible {
   color: var(--white);
 }
 
+.lesson-title-on-cover {
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--white);
+  font-size: 58px;
+  line-height: 1.05;
+  text-shadow: 0 3px 18px rgb(0 0 0 / 0.44);
+  overflow-wrap: anywhere;
+}
+
+.lesson-cover-subtitle {
+  margin: 10px 0 0;
+  color: rgb(var(--white-rgb) / 0.92);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  text-shadow: 0 2px 14px rgb(0 0 0 / 0.42);
+}
+
 .lesson-blocks {
   margin-top: 0;
+}
+
+.lesson-blocks .rendered-html p {
+  text-indent: 1.35em;
+}
+
+.lesson-blocks .content-block-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 0;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.lesson-blocks .content-block-heading > span {
+  min-width: 0;
+}
+
+.lesson-blocks .content-block-heading-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  color: var(--primary);
+  fill: var(--primary-soft);
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lesson-blocks .content-block-heading-icon.is-subheading {
+  width: 24px;
+  height: 24px;
+  color: var(--blue);
+  fill: rgb(var(--info-rgb) / 0.12);
+}
+
+.lesson-blocks h2.content-block-heading {
+  font-size: 23px;
+  font-weight: 800;
+}
+
+.lesson-blocks h3.content-block-heading {
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.lesson-actions {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lesson-actions-left,
+.lesson-actions-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.lesson-actions-right {
+  margin-left: auto;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -3439,6 +3589,40 @@ input[type="checkbox"]:focus-visible {
   }
   .lesson-sidebar {
     position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .lesson-cover-title-wrap {
+    padding: 24px 18px 18px;
+  }
+
+  .lesson-cover-caption {
+    width: 100%;
+  }
+
+  .lesson-title-on-cover {
+    font-size: 38px;
+  }
+
+  .lesson-cover-subtitle {
+    margin-top: 8px;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+  }
+
+  .lesson-actions,
+  .lesson-actions-left,
+  .lesson-actions-right {
+    width: 100%;
+  }
+
+  .lesson-actions-right {
+    margin-left: 0;
+  }
+
+  .lesson-actions .button {
+    flex: 1 1 180px;
   }
 }
 
@@ -6392,6 +6576,10 @@ body.news-modal-open .app-shell {
   display: grid;
   gap: 18px;
   margin-top: 4px;
+}
+
+.content-block-heading-icon {
+  display: none;
 }
 
 .page-back {
@@ -9887,6 +10075,10 @@ li.tree-add-row + li.tree-add-row,
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.lesson-cover-subtitle-field {
+  margin-top: 2px;
 }
 
 .lesson-section-title {

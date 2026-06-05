@@ -39,10 +39,20 @@ export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
     <div className="content-blocks">
       {blocks.map((block, index) => {
         if (block.type === "heading") {
-          return <h2 key={index}>{(block.payload as { text: string }).text}</h2>;
+          return (
+            <h2 className="content-block-heading" key={index}>
+              <HeadingIcon kind="heading" />
+              <span>{(block.payload as { text: string }).text}</span>
+            </h2>
+          );
         }
         if (block.type === "subheading") {
-          return <h3 key={index}>{(block.payload as { text: string }).text}</h3>;
+          return (
+            <h3 className="content-block-heading is-subheading" key={index}>
+              <HeadingIcon kind="subheading" />
+              <span>{(block.payload as { text: string }).text}</span>
+            </h3>
+          );
         }
         if (block.type === "paragraph") {
           const html = (block.payload as { html: string }).html;
@@ -162,6 +172,24 @@ export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
         return null;
       })}
     </div>
+  );
+}
+
+function HeadingIcon({ kind }: { kind: "heading" | "subheading" }) {
+  if (kind === "subheading") {
+    return (
+      <svg className="content-block-heading-icon is-subheading" viewBox="0 0 26 26" aria-hidden="true">
+        <path d="M6.5 5.5h9.4l4.6 4.6v10.4H8.5c-1.1 0-2-.9-2-2z" />
+        <path d="M15.9 5.7v4.5h4.4M10.3 13.6h7M10.3 17h5.2" fill="none" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className="content-block-heading-icon" viewBox="0 0 28 28" aria-hidden="true">
+      <path d="M7 6.5h11.4c2.2 0 4 1.8 4 4v11H11c-2.2 0-4-1.8-4-4z" />
+      <path d="M11 12h7.2M11 16.4h5.2" fill="none" />
+    </svg>
   );
 }
 

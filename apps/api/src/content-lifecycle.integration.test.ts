@@ -529,6 +529,8 @@ describe("Content updates (PATCH)", () => {
 
   it("PATCH урока заменяет блоки и пишет audit log", async () => {
     const adminToken = await loginAdmin();
+    const admin = await ctx.prisma.user.findUniqueOrThrow({ where: { email: "admin@test.local" } });
+    const cover = await createCoverAsset(admin.id, "lesson-cover");
     const moduleRes = await ctx.http
       .post("/api/admin/content/education/modules")
       .set("Authorization", `Bearer ${adminToken}`)
@@ -560,6 +562,8 @@ describe("Content updates (PATCH)", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({
         title: "Урок v2",
+        coverImageId: cover.id,
+        coverSubtitle: "Организация склада",
         blocks: [
           { type: "heading", payload: { text: "Глава" } },
           { type: "paragraph", payload: { html: "<p>Версия 2</p>" } },
@@ -567,6 +571,8 @@ describe("Content updates (PATCH)", () => {
       });
     expect(patched.status).toBe(200);
     expect(patched.body.title).toBe("Урок v2");
+    expect(patched.body.coverImageId).toBe(cover.id);
+    expect(patched.body.coverSubtitle).toBe("Организация склада");
 
     // Сервис updateLesson возвращает только сам урок без вложенных блоков —
     // проверяем подмену блоков через прямой запрос.
@@ -581,6 +587,23 @@ describe("Content updates (PATCH)", () => {
       where: { entityId: lesson.body.id, action: { contains: "lesson" } },
     });
     expect(log).toBeTruthy();
+
+    const reference = await ctx.prisma.fileReference.findFirst({
+      where: { entityType: "learning_module", entityId: moduleRes.body.id, fileId: cover.id },
+    });
+    expect(reference).toBeTruthy();
+
+    const reader = await registerCompany("0800012");
+    const publish = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleRes.body.id}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publish.status).toBe(201);
+
+    const publicDetail = await ctx.http
+      .get(`/api/education/modules/${moduleRes.body.id}`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(publicDetail.body.chapters[0].lessons[0].coverImageId).toBe(cover.id);
+    expect(publicDetail.body.chapters[0].lessons[0].coverSubtitle).toBe("Организация склада");
   });
 });
 

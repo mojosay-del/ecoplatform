@@ -884,6 +884,8 @@ model Lesson {
   chapterId        String
   chapter          Chapter              @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   title            String
+  coverImageId     String?
+  coverSubtitle    String?
   position         Int
   status           ContentStatus        @default(draft)
   firstPublishedAt DateTime?

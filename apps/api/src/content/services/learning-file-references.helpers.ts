@@ -90,6 +90,7 @@ export async function refreshLearningModuleFileReferences(
     fresh.coverImageId,
     ...fresh.chapters.flatMap((chapter) =>
       chapter.lessons.flatMap((lesson) => [
+        lesson.coverImageId,
         ...common.collectFileIdsFromBlocks(lesson.blocks),
         ...lesson.attachments.map((attachment) => attachment.fileId),
       ]),
