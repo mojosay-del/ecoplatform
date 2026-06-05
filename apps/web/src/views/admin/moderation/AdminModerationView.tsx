@@ -1,7 +1,12 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import type { PaginatedResponse } from "@ecoplatform/shared";
+import type {
+  ModerationCaseDetail,
+  ModerationCaseListItem,
+  ModerationDecisionType,
+  PaginatedResponse,
+} from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, moderationStatusPillVariant } from "../../../components/StatusPill";
 import { formatModerationCaseTitle, formatModerationEntityPreview } from "../../../components/admin-entity-display";
@@ -25,14 +30,16 @@ const reasonCodes = [
   "other",
 ] as const;
 
+type ModerationReasonCode = (typeof reasonCodes)[number];
+
 export function AdminModerationView() {
   const { token } = useAuth();
-  const [cases, setCases] = useState<any[]>([]);
-  const [selectedCase, setSelectedCase] = useState<any | null>(null);
+  const [cases, setCases] = useState<ModerationCaseListItem[]>([]);
+  const [selectedCase, setSelectedCase] = useState<ModerationCaseDetail | null>(null);
   const [state, setState] = useState<ApiState>("unauthenticated");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [decisionType, setDecisionType] = useState("leave_as_is");
-  const [reasonCode, setReasonCode] = useState("valid_complaint");
+  const [decisionType, setDecisionType] = useState<ModerationDecisionType>("leave_as_is");
+  const [reasonCode, setReasonCode] = useState<ModerationReasonCode>("valid_complaint");
   const [comment, setComment] = useState("");
 
   async function loadCases(nextSelectedId?: string) {
@@ -46,7 +53,9 @@ export function AdminModerationView() {
     setState("loading");
     setErrorMessage(null);
     try {
-      const data = await apiFetch<PaginatedResponse<any>>("/admin/moderation/cases?limit=100", { token });
+      const data = await apiFetch<PaginatedResponse<ModerationCaseListItem>>("/admin/moderation/cases?limit=100", {
+        token,
+      });
       setCases(data.items);
       const selected = data.items.find((item) => item.id === nextSelectedId) ?? data.items[0] ?? null;
       setSelectedCase(selected);
@@ -63,13 +72,13 @@ export function AdminModerationView() {
 
   async function openCase(id: string) {
     if (!token) return;
-    const data = await apiFetch<any>(`/admin/moderation/cases/${id}`, { token });
+    const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${id}`, { token });
     setSelectedCase(data);
   }
 
   async function mutateCase(path: string) {
     if (!token || !selectedCase) return;
-    const data = await apiFetch<any>(path, { method: "POST", token });
+    const data = await apiFetch<ModerationCaseDetail>(path, { method: "POST", token });
     setSelectedCase(data);
     await loadCases(data.id);
   }
@@ -78,7 +87,7 @@ export function AdminModerationView() {
     event.preventDefault();
     if (!token || !selectedCase) return;
 
-    const data = await apiFetch<any>(`/admin/moderation/cases/${selectedCase.id}/decisions`, {
+    const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${selectedCase.id}/decisions`, {
       method: "POST",
       token,
       body: {
@@ -187,19 +196,20 @@ export function AdminModerationView() {
                   {selectedCase.lockedBy ? (
                     <p className="page-subtitle">
                       В работе у {selectedCase.lockedBy.firstName} {selectedCase.lockedBy.lastName} до{" "}
-                      {new Date(selectedCase.lockedUntil).toLocaleTimeString("ru-RU")}
+                      {selectedCase.lockedUntil ? new Date(selectedCase.lockedUntil).toLocaleTimeString("ru-RU") : ""}
                     </p>
                   ) : null}
                   <article className="moderated-content">
                     <strong>
-                      {selectedCase.entity?.author?.firstName} {selectedCase.entity?.author?.lastName}
+                      {selectedCase.entity?.type === "news_comment" ? selectedCase.entity.author?.firstName : ""}{" "}
+                      {selectedCase.entity?.type === "news_comment" ? selectedCase.entity.author?.lastName : ""}
                     </strong>
-                    <p>{selectedCase.entity?.text}</p>
+                    <p>{selectedCase.entity?.type === "news_comment" ? selectedCase.entity.text : undefined}</p>
                   </article>
                   <section>
                     <h3>Жалобы</h3>
                     <div className="stack-list">
-                      {selectedCase.complaints.map((complaint: any) => (
+                      {selectedCase.complaints.map((complaint) => (
                         <article className="checklist-block" key={complaint.id}>
                           <strong>{MODERATION_REASON_LABELS[complaint.reasonCode] ?? complaint.reasonCode}</strong>
                           <p>{complaint.comment || "Без комментария"}</p>
@@ -214,7 +224,7 @@ export function AdminModerationView() {
                     <h3>Решения</h3>
                     <div className="stack-list">
                       {selectedCase.decisions.length === 0 ? <p className="page-subtitle">Решений пока нет.</p> : null}
-                      {selectedCase.decisions.map((decision: any) => (
+                      {selectedCase.decisions.map((decision) => (
                         <article className="checklist-block" key={decision.id}>
                           <strong>{MODERATION_DECISION_LABELS[decision.type] ?? decision.type}</strong>
                           <p>{MODERATION_REASON_LABELS[decision.reasonCode] ?? decision.reasonCode}</p>
@@ -229,7 +239,7 @@ export function AdminModerationView() {
                     <form className="form moderation-decision-form" onSubmit={submitDecision}>
                       <select
                         className="select"
-                        onChange={(event) => setDecisionType(event.target.value)}
+                        onChange={(event) => setDecisionType(event.target.value as ModerationDecisionType)}
                         value={decisionType}
                       >
                         {decisionCodes.map((value) => (
@@ -240,7 +250,7 @@ export function AdminModerationView() {
                       </select>
                       <select
                         className="select"
-                        onChange={(event) => setReasonCode(event.target.value)}
+                        onChange={(event) => setReasonCode(event.target.value as ModerationReasonCode)}
                         value={reasonCode}
                       >
                         {reasonCodes.map((value) => (

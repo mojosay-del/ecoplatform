@@ -11,6 +11,7 @@ import type {
   CompanyStatus,
   CompanyType,
   ConsentSource,
+  ContentStatus,
   LegalDocumentType,
   PlatformRole,
   SubscriptionPlan,
@@ -522,3 +523,101 @@ export type AdminStaffSummary = {
     openCases: number;
   } | null;
 };
+
+// ── Moderation ────────────────────────────────────────────────────────────
+export type ModerationCaseType = "complaint" | "suspicious_activity";
+
+export type ModerationCaseStatus = "open" | "in_review" | "resolved" | "escalated" | "closed_by_admin";
+
+export type ComplaintStatus = "pending" | "resolved" | "auto_closed";
+
+export type ModerationDecisionType = "leave_as_is" | "remove_content" | "warn_company" | "escalate_to_admin";
+
+export type SanctionType = "warning" | "content_removal" | "module_restriction" | "user_block" | "company_block";
+
+export type ModeratedEntityType = "news_comment" | "news_post" | "knowledge_article";
+
+export type ModerationCommentStatus = "published" | "hidden_by_moderator" | "removed_by_admin" | "removed_with_news";
+
+export type ModerationUserSummary = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  company: { id: string; organizationName: string } | null;
+};
+
+export type ModerationEntitySummary =
+  | {
+      type: "news_comment";
+      id: string;
+      text: string;
+      status: ModerationCommentStatus;
+      createdAt: IsoDateString;
+      newsPost: { id: string; title: string; slug: string };
+      author: ModerationUserSummary | null;
+    }
+  | { type: "news_post"; id: string; title: string; slug: string; status: ContentStatus }
+  | { type: "knowledge_article"; id: string; title: string; slug: string; status: ContentStatus };
+
+export type ModerationComplaint = {
+  id: string;
+  caseId: string;
+  entityType: ModeratedEntityType;
+  entityId: string;
+  authorId: string;
+  authorCompanyId: string | null;
+  reasonCode: string;
+  comment: string | null;
+  status: ComplaintStatus;
+  createdAt: IsoDateString;
+  author: ModerationUserSummary | null;
+};
+
+export type ModerationDecision = {
+  id: string;
+  caseId: string;
+  actorId: string;
+  actorRole: string;
+  type: ModerationDecisionType;
+  reasonCode: string;
+  comment: string | null;
+  createdAt: IsoDateString;
+  actor: ModerationUserSummary | null;
+};
+
+export type ModerationSanction = {
+  id: string;
+  caseId: string;
+  decisionId: string | null;
+  type: SanctionType;
+  targetType: string;
+  targetId: string;
+  parameters: unknown;
+  appliedById: string;
+  appliedAt: IsoDateString;
+  liftedAt: IsoDateString | null;
+  liftedById: string | null;
+};
+
+export type ModerationCaseListItem = {
+  id: string;
+  type: ModerationCaseType;
+  entityType: ModeratedEntityType;
+  entityId: string;
+  entityAuthorId: string | null;
+  entityCompanyId: string | null;
+  status: ModerationCaseStatus;
+  lockedById: string | null;
+  lockedUntil: IsoDateString | null;
+  createdAt: IsoDateString;
+  updatedAt: IsoDateString;
+  closedAt: IsoDateString | null;
+  complaints: ModerationComplaint[];
+  decisions: ModerationDecision[];
+  sanctions: ModerationSanction[];
+  lockedBy: ModerationUserSummary | null;
+  entity: ModerationEntitySummary | null;
+};
+
+export type ModerationCaseDetail = ModerationCaseListItem;
