@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { ContentStatus, Prisma } from "@prisma/client";
-import { filterPriceIndexPoints, slugify, summarizePriceIndex } from "@ecoplatform/shared";
+import { slugify, summarizePriceIndex } from "@ecoplatform/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { PlatformSettingsService } from "../../admin/settings/platform-settings.service";
@@ -17,6 +17,8 @@ import type {
   priceIndexValueInputSchema,
 } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
+import { buildPriceIndexChart } from "./indices-chart.helpers";
+import { nextNomenclaturePosition, reorderNomenclature } from "./indices-position.helpers";
 
 type CategoryInput = z.infer<typeof categoryInputSchema>;
 type CategoryUpdateInput = z.infer<typeof categoryUpdateInputSchema>;
@@ -73,15 +75,7 @@ export class IndicesService {
                 ...item,
                 priceIndex: item.priceIndex,
                 summary,
-                chart: {
-                  "2W": filterPriceIndexPoints(values, 14),
-                  "1M": filterPriceIndexPoints(values, 30),
-                  "3M": filterPriceIndexPoints(values, 90),
-                  "6M": filterPriceIndexPoints(values, 180),
-                  "1Y": filterPriceIndexPoints(values, 365),
-                  "2Y": filterPriceIndexPoints(values, 730),
-                  "3Y": filterPriceIndexPoints(values, 1095),
-                },
+                chart: buildPriceIndexChart(values),
               }
             : null;
         })
@@ -184,7 +178,7 @@ export class IndicesService {
     const nomenclature = await this.prisma.nomenclature.create({
       data: {
         ...rest,
-        position: position ?? (await this.nextNomenclaturePosition(rest.categoryId)),
+        position: position ?? (await nextNomenclaturePosition(this.prisma, rest.categoryId)),
       },
     });
 
@@ -208,22 +202,7 @@ export class IndicesService {
     }
 
     const nomenclature = await this.prisma.$transaction(async (tx) => {
-      const siblings = await tx.nomenclature.findMany({
-        where: { categoryId: existing.categoryId },
-        orderBy: [{ position: "asc" }, { name: "asc" }, { id: "asc" }],
-        select: { id: true },
-      });
-      const ordered = siblings.map((item) => item.id).filter((itemId) => itemId !== id);
-      const clamped = Math.max(0, Math.min(input.position, ordered.length));
-      ordered.splice(clamped, 0, id);
-
-      for (let position = 0; position < ordered.length; position++) {
-        await tx.nomenclature.update({
-          where: { id: ordered[position]! },
-          data: { position },
-        });
-      }
-
+      await reorderNomenclature(tx, existing.categoryId, id, input.position);
       return tx.nomenclature.findUniqueOrThrow({ where: { id } });
     });
 
@@ -424,14 +403,5 @@ export class IndicesService {
     });
 
     return { ok: true };
-  }
-
-  private async nextNomenclaturePosition(categoryId: string) {
-    const last = await this.prisma.nomenclature.findFirst({
-      where: { categoryId },
-      orderBy: { position: "desc" },
-      select: { position: true },
-    });
-    return (last?.position ?? -1) + 1;
   }
 }
