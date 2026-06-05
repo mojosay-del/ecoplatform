@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useEffect, useMemo, useRef, type FormEvent } from "react";
 import { Flag, MessageCircleOff, Send, ThumbsUp } from "lucide-react";
 import type { NewsCommentDecorated } from "@ecoplatform/shared";
 import { StatusPill } from "../../components/StatusPill";
@@ -41,6 +41,17 @@ export function CommentsSection({
   commentLikePendingId,
 }: CommentsSectionProps) {
   const { user } = useAuth();
+  const currentUserId = user?.id ?? null;
+  const currentUserName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
+  const currentUserAvatarUrl = user?.avatarUrl ?? null;
+  const orderedComments = useMemo(() => sortCommentsChronologically(comments), [comments]);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    list.scrollTop = list.scrollHeight;
+  }, [orderedComments]);
 
   return (
     <section className="comments-section" aria-labelledby="comments-title">
@@ -58,55 +69,70 @@ export function CommentsSection({
         </StatusPill>
       ) : null}
 
-      <form className="comment-composer" onSubmit={onSubmitComment}>
-        <CommentAvatar current user={user} />
-        <div className="comment-composer-body">
-          <label className="comment-textarea-label" htmlFor="news-comment-text">
-            Ваш комментарий
-          </label>
-          <textarea
-            aria-describedby="comment-composer-help"
-            className="comment-textarea"
-            id="news-comment-text"
-            name="comment"
-            onChange={(event) => onCommentTextChange(event.target.value)}
-            placeholder="Напишите, что думаете по теме"
-            rows={3}
-            value={commentText}
-          />
-          <div className="comment-composer-footer">
-            <span id="comment-composer-help">Публикуем сразу после отправки</span>
-            <button className="button comment-submit" disabled={!commentText.trim()} type="submit">
-              <Send aria-hidden="true" size={16} />
-              Опубликовать
+      <div className="comments-chat-surface">
+        <div
+          aria-label="История комментариев"
+          aria-live="polite"
+          className="comment-list"
+          ref={listRef}
+          tabIndex={orderedComments.length > 0 ? 0 : undefined}
+        >
+          {orderedComments.length === 0 ? (
+            <div className="comments-empty">
+              <MessageCircleOff aria-hidden="true" size={20} />
+              <span>Пока никто не написал комментарий.</span>
+            </div>
+          ) : (
+            orderedComments.map((comment) => (
+              <CommentCard
+                comment={comment}
+                currentUserAvatarUrl={currentUserAvatarUrl}
+                currentUserId={currentUserId}
+                currentUserName={currentUserName}
+                key={comment.id}
+                reportingCommentId={reportingCommentId}
+                setReportingCommentId={setReportingCommentId}
+                reportReason={reportReason}
+                setReportReason={setReportReason}
+                reportComment={reportComment}
+                setReportComment={setReportComment}
+                onSubmitComplaint={onSubmitComplaint}
+                onToggleCommentLike={onToggleCommentLike}
+                commentLikePendingId={commentLikePendingId}
+              />
+            ))
+          )}
+        </div>
+
+        <form className="comment-composer" onSubmit={onSubmitComment}>
+          <CommentAvatar current user={user} />
+          <div className="comment-composer-body">
+            <label className="comment-sr-only" htmlFor="news-comment-text">
+              Ваш комментарий
+            </label>
+            <textarea
+              aria-describedby="comment-composer-help"
+              className="comment-textarea"
+              id="news-comment-text"
+              name="comment"
+              onChange={(event) => onCommentTextChange(event.target.value)}
+              placeholder="Сообщение"
+              rows={1}
+              value={commentText}
+            />
+            <span className="comment-sr-only" id="comment-composer-help">
+              Публикуем комментарий сразу после отправки.
+            </span>
+            <button
+              aria-label="Опубликовать комментарий"
+              className="button comment-submit"
+              disabled={!commentText.trim()}
+              type="submit"
+            >
+              <Send aria-hidden="true" size={17} />
             </button>
           </div>
-        </div>
-      </form>
-
-      <div className="comment-list">
-        {comments.length === 0 ? (
-          <div className="comments-empty">
-            <MessageCircleOff aria-hidden="true" size={20} />
-            <span>Пока никто не написал комментарий.</span>
-          </div>
-        ) : (
-          comments.map((comment) => (
-            <CommentCard
-              comment={comment}
-              key={comment.id}
-              reportingCommentId={reportingCommentId}
-              setReportingCommentId={setReportingCommentId}
-              reportReason={reportReason}
-              setReportReason={setReportReason}
-              reportComment={reportComment}
-              setReportComment={setReportComment}
-              onSubmitComplaint={onSubmitComplaint}
-              onToggleCommentLike={onToggleCommentLike}
-              commentLikePendingId={commentLikePendingId}
-            />
-          ))
-        )}
+        </form>
       </div>
     </section>
   );
@@ -115,6 +141,9 @@ export function CommentsSection({
 function CommentCard({
   comment,
   isReply = false,
+  currentUserAvatarUrl,
+  currentUserId,
+  currentUserName,
   reportingCommentId,
   setReportingCommentId,
   reportReason,
@@ -127,6 +156,9 @@ function CommentCard({
 }: {
   comment: NewsCommentDecorated;
   isReply?: boolean;
+  currentUserAvatarUrl: string | null;
+  currentUserId: string | null;
+  currentUserName: string;
   reportingCommentId: string | null;
   setReportingCommentId: (id: string | null) => void;
   reportReason: string;
@@ -141,6 +173,9 @@ function CommentCard({
   const author = getCommentAuthor(comment.user);
   const likesCount = comment._count?.likes ?? 0;
   const commentDate = comment.createdAt ? new Date(comment.createdAt) : null;
+  const isSameVisibleUser =
+    currentUserName.length > 0 && currentUserName === author && currentUserAvatarUrl === comment.user.avatarUrl;
+  const isOwn = currentUserId === comment.user.id || isSameVisibleUser;
 
   function closeReportForm() {
     setReportingCommentId(null);
@@ -148,18 +183,24 @@ function CommentCard({
   }
 
   return (
-    <article className={`comment-card ${isReply ? "is-reply" : ""}`}>
+    <article className={`comment-card ${isReply ? "is-reply" : ""} ${isOwn ? "is-own" : ""}`}>
       <CommentAvatar user={comment.user} />
       <div className="comment-bubble">
         <header className="comment-card-head">
           <div className="comment-author-meta">
-            <strong>{author}</strong>
-            {commentDate ? <time dateTime={commentDate.toISOString()}>{formatCommentDate(commentDate)}</time> : null}
+            <strong>{isOwn ? "Вы" : author}</strong>
           </div>
-        </header>
-        <p className="comment-text">{comment.text}</p>
-        <footer className="comment-card-footer">
-          <div className="comment-card-actions" aria-label={`Действия с комментарием, лайков: ${likesCount}`}>
+          <div className="comment-message-meta" aria-label={`Действия с комментарием, лайков: ${likesCount}`}>
+            <button
+              className="comment-report-button"
+              onClick={() => setReportingCommentId(isReporting ? null : comment.id)}
+              type="button"
+              aria-expanded={isReporting}
+              aria-label="Пожаловаться"
+              title="Пожаловаться"
+            >
+              <Flag aria-hidden="true" size={14} />
+            </button>
             <button
               className={`comment-like-button ${comment.likedByMe ? "active" : ""}`}
               disabled={commentLikePendingId === comment.id}
@@ -173,18 +214,14 @@ function CommentCard({
               <ThumbsUp aria-hidden="true" size={14} />
               <span>{likesCount}</span>
             </button>
-            <button
-              className="comment-report-button"
-              onClick={() => setReportingCommentId(isReporting ? null : comment.id)}
-              type="button"
-              aria-expanded={isReporting}
-              aria-label="Пожаловаться"
-              title="Пожаловаться"
-            >
-              <Flag aria-hidden="true" size={14} />
-            </button>
+            {commentDate ? (
+              <time className="comment-message-time" dateTime={commentDate.toISOString()}>
+                {formatCommentDate(commentDate)}
+              </time>
+            ) : null}
           </div>
-        </footer>
+        </header>
+        <p className="comment-text">{comment.text}</p>
 
         {isReporting ? (
           <form className="comment-report-form" onSubmit={onSubmitComplaint}>
@@ -229,6 +266,9 @@ function CommentCard({
             {comment.replies.map((reply) => (
               <CommentCard
                 comment={reply}
+                currentUserAvatarUrl={currentUserAvatarUrl}
+                currentUserId={currentUserId}
+                currentUserName={currentUserName}
                 isReply
                 key={reply.id}
                 reportingCommentId={reportingCommentId}
@@ -265,3 +305,19 @@ const complaintReasons = [
   ["illegal_content", "Нарушает закон"],
   ["other", "Иное"],
 ] as const;
+
+function sortCommentsChronologically(comments: NewsCommentDecorated[]): NewsCommentDecorated[] {
+  return [...comments].sort(compareCommentsByDate).map((comment) => ({
+    ...comment,
+    replies: comment.replies?.length ? sortCommentsChronologically(comment.replies) : comment.replies,
+  }));
+}
+
+function compareCommentsByDate(left: NewsCommentDecorated, right: NewsCommentDecorated) {
+  const leftTime = Date.parse(left.createdAt);
+  const rightTime = Date.parse(right.createdAt);
+  if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+    return leftTime - rightTime;
+  }
+  return left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id);
+}

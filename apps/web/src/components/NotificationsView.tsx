@@ -22,11 +22,6 @@ type Notification = {
   createdAt: string;
 };
 
-type NotificationPreferences = {
-  inAppMutedCategories: string[];
-  emailMutedCategories: string[];
-};
-
 const categoryIcons: Record<string, LucideIcon> = {
   billing: CreditCard,
   moderation: MessageSquare,
@@ -34,18 +29,14 @@ const categoryIcons: Record<string, LucideIcon> = {
   system: Settings,
 };
 
-const preferenceCategories = ["billing", "moderation", "support"];
-const defaultPreferences: NotificationPreferences = { inAppMutedCategories: [], emailMutedCategories: [] };
 const NOTIFICATIONS_PAGE_SIZE = 30;
 
 type ViewState = "unauthenticated" | "loading" | "ready" | "error";
 
 export function NotificationsView() {
   const { token } = useAuth();
-  const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
   const [state, setState] = useState<ViewState>("unauthenticated");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [savingCategory, setSavingCategory] = useState<string | null>(null);
   const notifications = useInfiniteApiQuery<Notification>(
     token ? "notifications" : null,
     NOTIFICATIONS_PAGE_SIZE,
@@ -57,20 +48,11 @@ export function NotificationsView() {
   const load = useCallback(() => {
     if (!token) {
       setState("unauthenticated");
-      setPreferences(defaultPreferences);
+      setErrorMessage(null);
       return;
     }
-    setState("loading");
-    apiFetch<NotificationPreferences>("/notifications/preferences", { token })
-      .then((nextPreferences) => {
-        setPreferences(nextPreferences);
-        setState("ready");
-        setErrorMessage(null);
-      })
-      .catch((error) => {
-        setState("error");
-        setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить уведомления");
-      });
+    setState("ready");
+    setErrorMessage(null);
   }, [token]);
 
   useEffect(() => {
@@ -120,39 +102,6 @@ export function NotificationsView() {
       window.dispatchEvent(new Event("notifications:changed"));
     } catch {
       /* тихо */
-    }
-  }
-
-  async function toggleCategoryChannel(category: string, channel: "in_app" | "email") {
-    if (!token) return;
-
-    const field = channel === "in_app" ? "inAppMutedCategories" : "emailMutedCategories";
-    const muted = new Set(preferences[field]);
-    if (muted.has(category)) {
-      muted.delete(category);
-    } else {
-      muted.add(category);
-    }
-
-    const nextPreferences = {
-      ...preferences,
-      [field]: [...muted],
-    };
-
-    setPreferences(nextPreferences);
-    setSavingCategory(`${category}:${channel}`);
-    try {
-      const saved = await apiFetch<NotificationPreferences>("/notifications/preferences", {
-        method: "PATCH",
-        token,
-        body: nextPreferences,
-      });
-      setPreferences(saved);
-    } catch (error) {
-      setPreferences(preferences);
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить настройки");
-    } finally {
-      setSavingCategory(null);
     }
   }
 
@@ -249,46 +198,6 @@ export function NotificationsView() {
             <div ref={notifications.sentinelRef} aria-hidden="true" />
             {notifications.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
             {!notifications.hasMore && items.length > 0 ? <p className="page-subtitle">Это все записи.</p> : null}
-            <section className="notification-preferences">
-              <h2>Настройки</h2>
-              <p className="page-subtitle">
-                Управляйте каналами доставки. Email-канал пока в режиме задела: уведомления ставятся в очередь и
-                отправятся, когда подключим почту.
-              </p>
-              <div className="preference-list">
-                {preferenceCategories.map((category) => {
-                  const Icon = categoryIcons[category] ?? Settings;
-                  const inAppOn = !preferences.inAppMutedCategories.includes(category);
-                  const emailOn = !preferences.emailMutedCategories.includes(category);
-                  return (
-                    <div className="preference-row" key={category}>
-                      <span>
-                        <Icon size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                        {NOTIFICATION_CATEGORY_LABELS[category] ?? category}
-                      </span>
-                      <label style={{ marginRight: 12 }}>
-                        <input
-                          checked={inAppOn}
-                          disabled={savingCategory === `${category}:in_app`}
-                          onChange={() => toggleCategoryChannel(category, "in_app")}
-                          type="checkbox"
-                        />{" "}
-                        В приложении
-                      </label>
-                      <label>
-                        <input
-                          checked={emailOn}
-                          disabled={savingCategory === `${category}:email`}
-                          onChange={() => toggleCategoryChannel(category, "email")}
-                          type="checkbox"
-                        />{" "}
-                        Email
-                      </label>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
           </>
         ) : null}
       </section>
