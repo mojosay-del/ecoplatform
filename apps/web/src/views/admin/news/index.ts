@@ -1,0 +1,1 @@
+export { AdminNewsView } from "./AdminNewsView";

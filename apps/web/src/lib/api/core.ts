@@ -382,38 +382,6 @@ async function prepareUploadFile(file: File, imagePreset?: "cover"): Promise<Fil
   return file;
 }
 
-export async function apiUploadFile(
-  file: File,
-  options: { token?: string | null; accessLevel?: FileAsset["accessLevel"]; imagePreset?: "cover" } = {},
-): Promise<FileAsset> {
-  const prepared = await prepareUploadFile(file, options.imagePreset);
-  const formData = new FormData();
-  formData.append("file", prepared);
-  formData.append("accessLevel", options.accessLevel ?? "public");
-  if (options.imagePreset) {
-    formData.append("imagePreset", options.imagePreset);
-  }
-
-  const response = await fetchWithAuthRetry(
-    "/files/upload",
-    {
-      method: "POST",
-      body: formData,
-    },
-    options.token,
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      handleUnauthorized();
-    }
-    const message = extractApiErrorMessage(await response.text());
-    throw new ApiError(message || "File upload failed", response.status);
-  }
-
-  return response.json() as Promise<FileAsset>;
-}
-
 // Загрузка с прогрессом. fetch() не умеет отдавать upload-progress, поэтому
 // здесь XMLHttpRequest. Воспроизводим ту же авторизацию, что и fetchWithAuthRetry:
 // Bearer-токен, CSRF-заголовок, cookie (withCredentials) и один ретрай на 401.

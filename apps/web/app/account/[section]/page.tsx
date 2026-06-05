@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getLegacyAccountTabHref, normalizeAccountSection } from "../../../src/components/app-shell-nav";
-import { AccountView } from "../../../src/views/account-view";
+import { AccountView } from "../../../src/views/account";
 
 export default async function AccountSectionPage({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;

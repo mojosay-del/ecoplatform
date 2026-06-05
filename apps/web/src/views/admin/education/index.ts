@@ -1,0 +1,1 @@
+export { AdminEducationView } from "./AdminEducationView";

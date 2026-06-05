@@ -1,0 +1,222 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  buildSmoothChartPath,
+  formatIndexDateLabel,
+  formatIndexPrice,
+  formatIndexTooltipDate,
+  smoothPricesForScale,
+} from "./format";
+import type { IndexPeriod, IndexPoint } from "./types";
+
+export function IndexChart({ points, period }: { points: IndexPoint[]; period: IndexPeriod }) {
+  // Хук всегда вызывается, до раннего return — иначе сломается порядок hooks.
+  const uid = useMemo(() => Math.random().toString(36).slice(2, 9), []);
+  const lineGradId = `index-line-${uid}`;
+  const areaGradId = `index-area-${uid}`;
+  const fadeMaskId = `index-fade-${uid}`;
+  const fadeGradId = `index-fadegrad-${uid}`;
+
+  // Индекс точки под курсором (null = курсор не над графиком, тогда плашка
+  // показывает последнее значение, как раньше).
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  useEffect(() => {
+    setHoverIndex(null);
+  }, [period]);
+
+  useEffect(() => {
+    if (hoverIndex === null) return;
+
+    function handleDocumentMouseMove(event: MouseEvent) {
+      const svg = svgRef.current;
+      const target = event.target;
+      if (svg && target instanceof Node && svg.contains(target)) return;
+      setHoverIndex(null);
+    }
+
+    document.addEventListener("mousemove", handleDocumentMouseMove);
+    return () => {
+      document.removeEventListener("mousemove", handleDocumentMouseMove);
+    };
+  }, [hoverIndex]);
+
+  if (points.length === 0) {
+    return <div className="index-chart-empty">Нет данных для графика</div>;
+  }
+
+  const width = 720;
+  const height = 260;
+  const padding = { top: 40, right: 36, bottom: 42, left: 36 };
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+
+  const prices = points.map((p) => p.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || max || 1;
+  const domainPadding = range * (period === "1M" ? 0.22 : 0.14);
+  const domainMin = min - domainPadding;
+  const domainMax = max + domainPadding;
+  const domainRange = domainMax - domainMin || 1;
+  const displayPrices = smoothPricesForScale(prices, period, innerWidth);
+
+  const xs = points.map((_, i) =>
+    points.length === 1 ? padding.left + innerWidth / 2 : padding.left + (i / (points.length - 1)) * innerWidth,
+  );
+  const ys = displayPrices.map(
+    (price) => padding.top + innerHeight - ((price - domainMin) / domainRange) * innerHeight,
+  );
+
+  const linePath = buildSmoothChartPath(xs, ys);
+  const lastIndex = points.length - 1;
+  const areaPath = `${linePath} L${xs[lastIndex]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} L${xs[0]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} Z`;
+
+  // Направление градиента: при росте — «прошлое = оранжевый, настоящее = синий»,
+  // при падении наоборот. Так визуально подсказываем направление за период.
+  const isGrowth = (prices[lastIndex] ?? 0) >= (prices[0] ?? 0);
+  const startColor = isGrowth ? "#f5773e" : "#4d73d8";
+  const endColor = isGrowth ? "#4d73d8" : "#f5773e";
+
+  // Подписи на оси X: короткие периоды чаще, длинные — реже, чтобы даты не наезжали.
+  const labelDivisor = period === "2W" || period === "1M" || period === "3M" ? 4 : 6;
+  const labelStep = Math.max(1, Math.floor(points.length / labelDivisor));
+  const labels: Array<{ x: number; text: string }> = [];
+  const minLabelGap = 112;
+  points.forEach((p, i) => {
+    if (i % labelStep === 0 || i === lastIndex) {
+      const date = new Date(p.date);
+      const text = formatIndexDateLabel(date, period);
+      const x = xs[i]!;
+      const previous = labels[labels.length - 1];
+      if (i === lastIndex && previous && (x - previous.x < minLabelGap || previous.text === text)) {
+        labels.pop();
+      }
+      if (labels.length === 0 || x - labels[labels.length - 1]!.x >= minLabelGap || i === lastIndex) {
+        labels.push({ x, text });
+      }
+    }
+  });
+
+  const lastX = xs[lastIndex]!;
+  const lastY = ys[lastIndex]!;
+
+  // Активная точка: или под курсором (если курсор на графике), или последняя.
+  const activeIndex = hoverIndex !== null && hoverIndex >= 0 && hoverIndex <= lastIndex ? hoverIndex : lastIndex;
+  const activeX = xs[activeIndex]!;
+  const activeY = ys[activeIndex]!;
+  const activePrice = prices[activeIndex]!;
+  const activeDate = new Date(points[activeIndex]!.date);
+  const activeDateLabel = formatIndexTooltipDate(activeDate);
+
+  function handleMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
+    const svg = event.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width === 0) return;
+    // Перевод координаты курсора в систему viewBox.
+    const svgX = ((event.clientX - rect.left) / rect.width) * width;
+    if (points.length === 1) {
+      setHoverIndex((current) => (current === 0 ? current : 0));
+      return;
+    }
+    // Ищем ближайшую точку по X.
+    let nearest = 0;
+    let bestDistance = Math.abs(svgX - xs[0]!);
+    for (let i = 1; i < xs.length; i += 1) {
+      const distance = Math.abs(svgX - xs[i]!);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        nearest = i;
+      }
+    }
+    setHoverIndex((current) => (current === nearest ? current : nearest));
+  }
+
+  // Ширина плашки масштабируем под содержимое: «20 мая · 31 635».
+  const tooltipText = `${activeDateLabel} · ${formatIndexPrice(activePrice)}`;
+  const tooltipWidth = Math.max(82, tooltipText.length * 7 + 20);
+  const tooltipX = Math.min(Math.max(activeX, tooltipWidth / 2 + 6), width - tooltipWidth / 2 - 6);
+  const tooltipY = Math.max(activeY - 24, padding.top + 2);
+  const isHoveringChart = hoverIndex !== null;
+
+  return (
+    <div className="index-chart-wrap">
+      <svg
+        className="index-chart"
+        onMouseLeave={() => setHoverIndex(null)}
+        onMouseMove={handleMouseMove}
+        preserveAspectRatio="xMidYMid meet"
+        ref={svgRef}
+        viewBox={`0 0 ${width} ${height}`}
+      >
+        <defs>
+          {/* Горизонтальный градиент для самой линии. */}
+          <linearGradient id={lineGradId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={startColor} />
+            <stop offset="100%" stopColor={endColor} />
+          </linearGradient>
+          {/* Тот же горизонтальный градиент для заливки области. */}
+          <linearGradient id={areaGradId} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={startColor} />
+            <stop offset="100%" stopColor={endColor} />
+          </linearGradient>
+          {/* Вертикальная маска: непрозрачная сверху, прозрачная внизу —
+              чтобы заливка плавно угасала к оси X, как было раньше. */}
+          <linearGradient id={fadeGradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="white" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </linearGradient>
+          <mask id={fadeMaskId}>
+            <rect x="0" y="0" width={width} height={height} fill={`url(#${fadeGradId})`} />
+          </mask>
+        </defs>
+        <rect x="0" y="0" width={width} height={height} fill="transparent" />
+        <path d={areaPath} fill={`url(#${areaGradId})`} mask={`url(#${fadeMaskId})`} />
+        {isHoveringChart ? (
+          <line
+            x1={activeX}
+            x2={activeX}
+            y1={padding.top}
+            y2={padding.top + innerHeight}
+            stroke="#1a202e"
+            strokeDasharray="3 4"
+            strokeOpacity="0.2"
+          />
+        ) : null}
+        <path
+          d={linePath}
+          fill="none"
+          stroke={`url(#${lineGradId})`}
+          strokeWidth="3.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx={lastX} cy={lastY} r="6.5" fill={endColor} stroke="white" strokeWidth="2.4" />
+        {isHoveringChart && activeIndex !== lastIndex ? (
+          <circle cx={activeX} cy={activeY} r="6.5" fill="#1a202e" stroke="white" strokeWidth="2.4" />
+        ) : null}
+
+        {/* Метка активной точки: без hover показывает последнее значение. */}
+        <g transform={`translate(${tooltipX}, ${tooltipY})`}>
+          <rect x={-tooltipWidth / 2} y="-23" width={tooltipWidth} height="28" rx="14" fill="#1a202e" />
+          <text x="0" y="-5" textAnchor="middle" fontSize="13" fontWeight="700" fill="white">
+            {tooltipText}
+          </text>
+        </g>
+
+        {labels.map((label, i) => {
+          // Крайние подписи якорим к краям, иначе при textAnchor="middle"
+          // половина первой/последней даты уходит за границу SVG и обрезается.
+          const anchor = i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle";
+          return (
+            <text key={i} x={label.x} y={height - 12} textAnchor={anchor} fontSize="13" fill="var(--muted)">
+              {label.text}
+            </text>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}

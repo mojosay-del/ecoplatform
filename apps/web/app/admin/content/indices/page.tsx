@@ -1,4 +1,4 @@
-import { AdminIndicesView } from "../../../../src/components/AdminIndicesView";
+import { AdminIndicesView } from "../../../../src/views/admin/indices";
 
 export default function AdminIndicesPage() {
   return <AdminIndicesView />;

@@ -1,0 +1,1 @@
+export { AdminModerationView } from "./AdminModerationView";

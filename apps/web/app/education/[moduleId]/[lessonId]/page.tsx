@@ -1,4 +1,4 @@
-import { LessonView } from "../../../../src/views/learning-view";
+import { LessonView } from "../../../../src/views/learning";
 
 export default async function LessonPage({
   params,

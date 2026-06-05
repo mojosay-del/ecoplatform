@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FileAccessLevel } from "@prisma/client";
 import sharp from "sharp";
 import { FilesService } from "./files.service";
@@ -11,6 +11,28 @@ vi.mock("@aws-sdk/s3-request-presigner", () => ({
       `https://signed.example/${command.input.Bucket}/${command.input.Key}`,
   ),
 }));
+
+// S3-клиент мокаем на ГРАНИЦЕ SDK (а не присваиванием приватных методов сервиса):
+// new S3Client() отдаёт фейк с общим s3Send. Тесты задают окружение через withEnv*
+// (CONFIGURED_S3_ENV), реальный getS3Config создаёт мок-клиент, а ассерты идут по
+// s3Send. Так тест не зависит от того, где физически лежит S3-логика.
+const { s3Send } = vi.hoisted(() => ({ s3Send: vi.fn() }));
+vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@aws-sdk/client-s3")>();
+  // new S3Client() должен быть конструируемым — поэтому function, а не стрелка.
+  return {
+    ...actual,
+    S3Client: vi.fn(function MockS3Client(this: { send: typeof s3Send; destroy: () => void }) {
+      this.send = s3Send;
+      this.destroy = () => {};
+    }),
+  };
+});
+
+beforeEach(() => {
+  s3Send.mockReset();
+  s3Send.mockResolvedValue({});
+});
 
 function serviceWithPrisma(prisma: Record<string, unknown>) {
   return new FilesService(prisma as any);
@@ -117,7 +139,6 @@ describe("FilesService cleanup", () => {
   });
 
   it("удаляет S3-объекты всех вариантов, если файл не используется", async () => {
-    const send = vi.fn().mockResolvedValue({});
     const prisma = referencePrisma({
       fileAsset: {
         findUnique: vi.fn().mockResolvedValue({
@@ -132,14 +153,10 @@ describe("FilesService cleanup", () => {
       },
     });
     const service = serviceWithPrisma(prisma);
-    (service as unknown as { getS3Config: () => unknown }).getS3Config = () => ({
-      client: { send },
-      bucket: "bucket",
-    });
 
-    await service.deleteIfUnreferenced(["file-1"]);
+    await withEnvAsync(CONFIGURED_S3_ENV, () => service.deleteIfUnreferenced(["file-1"]));
 
-    expect(send.mock.calls.map(([command]) => command.input.Key).sort()).toEqual([
+    expect(s3Send.mock.calls.map(([command]) => command.input.Key).sort()).toEqual([
       "uploads/2026-05-22/file.avif",
       "uploads/2026-05-22/file.webp",
     ]);
@@ -365,7 +382,6 @@ describe("FilesService upload validation", () => {
   });
 
   it("сохраняет разрешённый PDF как attachment с реальным MIME из magic-number", async () => {
-    const send = vi.fn().mockResolvedValue({});
     const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
     const prisma = referencePrisma({
       fileAsset: {
@@ -382,25 +398,23 @@ describe("FilesService upload validation", () => {
       },
     });
     const service = serviceWithPrisma(prisma);
-    (service as unknown as { getClient: () => unknown }).getClient = () => ({
-      client: { send },
-      bucket: "bucket",
-    });
 
-    const result = await service.upload(
-      {
-        originalname: "report.pdf",
-        mimetype: "application/pdf",
-        size: pdf.length,
-        buffer: pdf,
-      },
-      {},
-      "user-1",
+    const result = await withEnvAsync(CONFIGURED_S3_ENV, () =>
+      service.upload(
+        {
+          originalname: "report.pdf",
+          mimetype: "application/pdf",
+          size: pdf.length,
+          buffer: pdf,
+        },
+        {},
+        "user-1",
+      ),
     );
 
-    const command = send.mock.calls[0]?.[0] as { input?: Record<string, unknown> } | undefined;
+    const command = s3Send.mock.calls[0]?.[0] as { input?: Record<string, unknown> } | undefined;
     expect(command?.input).toMatchObject({
-      Bucket: "bucket",
+      Bucket: "public-bucket",
       ContentType: "application/pdf",
       ContentDisposition: expect.stringContaining("attachment;"),
       ContentLength: pdf.length,
@@ -417,7 +431,6 @@ describe("FilesService upload validation", () => {
   });
 
   it("для cover-upload сохраняет WebP и AVIF варианты в S3 и метаданных", async () => {
-    const send = vi.fn().mockResolvedValue({});
     const source = await sharp({
       create: {
         width: 1400,
@@ -444,24 +457,25 @@ describe("FilesService upload validation", () => {
       },
     });
     const service = serviceWithPrisma(prisma);
-    (service as unknown as { getClient: () => unknown }).getClient = () => ({
-      client: { send },
-      bucket: "bucket",
-    });
 
-    const result = await service.upload(
-      {
-        originalname: "cover.png",
-        mimetype: "image/png",
-        size: source.length,
-        buffer: source,
-      },
-      { imagePreset: "cover", accessLevel: FileAccessLevel.public },
-      "user-1",
+    const result = await withEnvAsync(CONFIGURED_S3_ENV, () =>
+      service.upload(
+        {
+          originalname: "cover.png",
+          mimetype: "image/png",
+          size: source.length,
+          buffer: source,
+        },
+        { imagePreset: "cover", accessLevel: FileAccessLevel.public },
+        "user-1",
+      ),
     );
 
-    expect(send).toHaveBeenCalledTimes(2);
-    expect(send.mock.calls.map(([command]) => command.input.ContentType).sort()).toEqual(["image/avif", "image/webp"]);
+    expect(s3Send).toHaveBeenCalledTimes(2);
+    expect(s3Send.mock.calls.map(([command]) => command.input.ContentType).sort()).toEqual([
+      "image/avif",
+      "image/webp",
+    ]);
     expect(prisma.fileAsset.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         originalName: "cover.png",
@@ -498,7 +512,6 @@ describe("FilesService upload validation", () => {
       },
     });
     const service = serviceWithPrisma(prisma);
-    (service as unknown as { getClient: () => unknown }).getClient = vi.fn();
     const buffer = Buffer.alloc(2 * 1024 * 1024);
 
     await expect(
@@ -521,7 +534,7 @@ describe("FilesService upload validation", () => {
       },
       _sum: { sizeBytes: true },
     });
-    expect((service as unknown as { getClient: () => unknown }).getClient).not.toHaveBeenCalled();
+    expect(s3Send).not.toHaveBeenCalled();
   });
 });
 
@@ -573,7 +586,6 @@ describe("FilesService cover ownership", () => {
 
 describe("FilesService приватный бакет + signed URL", () => {
   it("кладёт приватный файл в приватный бакет при upload", async () => {
-    const send = vi.fn().mockResolvedValue({});
     const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
     const prisma = referencePrisma({
       fileAsset: {
@@ -588,10 +600,6 @@ describe("FilesService приватный бакет + signed URL", () => {
       },
     });
     const service = serviceWithPrisma(prisma);
-    (service as unknown as { getClient: () => unknown }).getClient = () => ({
-      client: { send },
-      bucket: "public-bucket",
-    });
 
     await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: "private-bucket" }, async () => {
       await service.upload(
@@ -601,7 +609,7 @@ describe("FilesService приватный бакет + signed URL", () => {
       );
     });
 
-    const command = send.mock.calls[0]?.[0] as { input?: Record<string, unknown> } | undefined;
+    const command = s3Send.mock.calls[0]?.[0] as { input?: Record<string, unknown> } | undefined;
     expect(command?.input?.Bucket).toBe("private-bucket");
   });
 

@@ -1,32 +1,27 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
-import {
-  CommentStatus,
-  CompanyStatus,
-  ComplaintStatus,
-  ContentStatus,
-  DiscussionTargetType,
-  ModerationCaseStatus,
-  ModerationDecisionType,
-  NotificationCategory,
-  SanctionType,
-  UserStatus,
-  type Prisma,
-} from "@prisma/client";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { CommentStatus, ContentStatus, DiscussionTargetType, ModerationCaseStatus } from "@prisma/client";
 import { canOpenFunctionalSections } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { AdminActionLogService } from "../common/admin-action-log.service";
-import { paginatedResponse, resolvePagination, type PaginationInput } from "../common/pagination";
+import type { PaginationInput } from "../common/pagination";
 import type { RequestUser } from "../common/request-user";
-import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
+import {
+  enrichCases,
+  getCase as getCaseWorkflow,
+  listCases as listCasesWorkflow,
+  releaseCaseLock as releaseCaseLockWorkflow,
+  takeCaseLock as takeCaseLockWorkflow,
+  type ModerationCaseDeps,
+} from "./moderation-case.helpers";
+import { createDecision as createDecisionWorkflow, type ModerationDecisionDeps } from "./moderation-decision.helpers";
+import {
+  applyAdminSanction as applyAdminSanctionWorkflow,
+  liftSanction as liftSanctionWorkflow,
+  type ModerationSanctionDeps,
+} from "./moderation-sanction.helpers";
 import type {
   adminSanctionInputSchema,
   complaintInputSchema,
@@ -34,7 +29,6 @@ import type {
   ModeratedEntityType,
   sanctionLiftInputSchema,
 } from "./moderation.schemas";
-import { moderatedEntityTypes } from "./moderation.schemas";
 import type { z } from "zod";
 
 const ACTIVE_CASE_STATUSES = [
@@ -43,49 +37,16 @@ const ACTIVE_CASE_STATUSES = [
   ModerationCaseStatus.escalated,
 ];
 
-function isModeratedEntityType(value: string): value is ModeratedEntityType {
-  return (moderatedEntityTypes as readonly string[]).includes(value);
-}
-
 type EntityResolution = {
   type: ModeratedEntityType;
   authorUserId: string | null;
   authorCompanyId: string | null;
 };
 
-type ResolvedEntitySummary =
-  | {
-      type: "news_comment";
-      id: string;
-      text: string;
-      status: CommentStatus;
-      createdAt: Date;
-      newsPost: { id: string; title: string; slug: string };
-    }
-  | { type: "news_post"; id: string; title: string; slug: string; status: ContentStatus }
-  | { type: "knowledge_article"; id: string; title: string; slug: string; status: ContentStatus };
-
-type DecisionLink = { title: string; link: string };
-
-const moderationCaseInclude = {
-  complaints: { orderBy: { createdAt: "asc" } },
-  decisions: { orderBy: { createdAt: "asc" } },
-  sanctions: { orderBy: { appliedAt: "asc" } },
-} satisfies Prisma.ModerationCaseInclude;
-
 type ComplaintInput = z.infer<typeof complaintInputSchema>;
 type ModerationDecisionInput = z.infer<typeof moderationDecisionInputSchema>;
 type AdminSanctionInput = z.infer<typeof adminSanctionInputSchema>;
 type SanctionLiftInput = z.infer<typeof sanctionLiftInputSchema>;
-type ModerationCaseWithRelations = Prisma.ModerationCaseGetPayload<{ include: typeof moderationCaseInclude }>;
-
-type UserSummary = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  company: { id: string; organizationName: string } | null;
-};
 
 @Injectable()
 export class ModerationService {
@@ -154,623 +115,57 @@ export class ModerationService {
   }
 
   async listCases(paginationInput: PaginationInput = {}) {
-    const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 100 });
-    const [total, cases] = await this.prisma.$transaction([
-      this.prisma.moderationCase.count(),
-      this.prisma.moderationCase.findMany({
-        orderBy: { createdAt: "asc" },
-        include: moderationCaseInclude,
-        take: pagination.limit,
-        skip: pagination.offset,
-      }),
-    ]);
-
-    return paginatedResponse(await this.enrichCases(cases), total, pagination);
+    return listCasesWorkflow(this.moderationCaseDeps(), paginationInput);
   }
 
   async getCase(id: string) {
-    const found = await this.prisma.moderationCase.findUnique({
-      where: { id },
-      include: moderationCaseInclude,
-    });
-
-    if (!found) {
-      throw new NotFoundException("Кейс модерации не найден.");
-    }
-
-    return (await this.enrichCases([found]))[0];
+    return getCaseWorkflow(this.moderationCaseDeps(), id);
   }
 
   async takeCaseLock(id: string, user: RequestUser) {
-    const found = await this.prisma.moderationCase.findUnique({ where: { id } });
-    if (!found) {
-      throw new NotFoundException("Кейс модерации не найден.");
-    }
-    if (found.status === ModerationCaseStatus.resolved || found.status === ModerationCaseStatus.closed_by_admin) {
-      throw new BadRequestException("Закрытый кейс нельзя взять в работу.");
-    }
-
-    const now = new Date();
-    if (found.lockedById && found.lockedById !== user.id && found.lockedUntil && found.lockedUntil > now) {
-      throw new ConflictException("Кейс уже находится в работе у другого сотрудника.");
-    }
-
-    const maxLocks = await this.settings.getValue("moderation.max_locks_per_moderator");
-    const lockDurationMs = (await this.settings.getValue("moderation.lock_duration_minutes")) * 60 * 1000;
-
-    if (!this.isAdmin(user)) {
-      const activeLocks = await this.prisma.moderationCase.count({
-        where: {
-          lockedById: user.id,
-          lockedUntil: { gt: now },
-          status: ModerationCaseStatus.in_review,
-          NOT: { id },
-        },
-      });
-
-      if (activeLocks >= maxLocks) {
-        throw new ConflictException(`Модератор может держать в работе не более ${maxLocks} кейсов.`);
-      }
-    }
-
-    const locked = await this.prisma.moderationCase.update({
-      where: { id },
-      data: {
-        status: found.status === ModerationCaseStatus.open ? ModerationCaseStatus.in_review : found.status,
-        lockedById: user.id,
-        lockedUntil: new Date(now.getTime() + lockDurationMs),
-      },
-      include: moderationCaseInclude,
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "moderation.case.lock",
-      entityType: "ModerationCase",
-      entityId: id,
-      payload: { lockedUntil: locked.lockedUntil?.toISOString() },
-    });
-
-    return (await this.enrichCases([locked]))[0];
+    return takeCaseLockWorkflow(this.moderationCaseDeps(), id, user);
   }
 
   async releaseCaseLock(id: string, user: RequestUser) {
-    const found = await this.prisma.moderationCase.findUnique({ where: { id } });
-    if (!found) {
-      throw new NotFoundException("Кейс модерации не найден.");
-    }
-    if (found.lockedById && found.lockedById !== user.id && !this.isAdmin(user)) {
-      throw new ForbiddenException("Освободить чужой lock может только администратор.");
-    }
-
-    const updated = await this.prisma.moderationCase.update({
-      where: { id },
-      data: {
-        lockedById: null,
-        lockedUntil: null,
-        status: found.status === ModerationCaseStatus.in_review ? ModerationCaseStatus.open : found.status,
-      },
-      include: moderationCaseInclude,
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "moderation.case.release",
-      entityType: "ModerationCase",
-      entityId: id,
-    });
-
-    return (await this.enrichCases([updated]))[0];
+    return releaseCaseLockWorkflow(this.moderationCaseDeps(), id, user);
   }
 
   async createDecision(id: string, input: ModerationDecisionInput, user: RequestUser) {
-    const found = await this.prisma.moderationCase.findUnique({
-      where: { id },
-      include: moderationCaseInclude,
-    });
-    if (!found) {
-      throw new NotFoundException("Кейс модерации не найден.");
-    }
-    if (found.status === ModerationCaseStatus.resolved || found.status === ModerationCaseStatus.closed_by_admin) {
-      throw new BadRequestException("По закрытому кейсу нельзя вынести новое решение.");
-    }
-    if (found.status === ModerationCaseStatus.escalated && !this.isAdmin(user)) {
-      throw new ForbiddenException("Эскалированный кейс решает администратор.");
-    }
-
-    const now = new Date();
-    if (!this.isAdmin(user) && (found.lockedById !== user.id || !found.lockedUntil || found.lockedUntil <= now)) {
-      throw new ForbiddenException("Перед решением модератор должен взять кейс в работу.");
-    }
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const decision = await tx.moderationDecision.create({
-        data: {
-          caseId: found.id,
-          actorId: user.id,
-          actorRole: this.isAdmin(user) ? "admin" : "moderator",
-          type: input.type,
-          reasonCode: input.reasonCode,
-          comment: input.comment,
-        },
-      });
-
-      if (input.type === ModerationDecisionType.remove_content) {
-        await this.removeModeratedEntity(tx, found);
-        await tx.sanction.create({
-          data: {
-            caseId: found.id,
-            decisionId: decision.id,
-            type: SanctionType.content_removal,
-            targetType: found.entityType,
-            targetId: found.entityId,
-            appliedById: user.id,
-            parameters: { reasonCode: input.reasonCode, comment: input.comment },
-          },
-        });
-      }
-
-      if (input.type === ModerationDecisionType.warn_company) {
-        if (!found.entityCompanyId) {
-          throw new BadRequestException("У автора сущности нет компании для предупреждения.");
-        }
-        await tx.sanction.create({
-          data: {
-            caseId: found.id,
-            decisionId: decision.id,
-            type: SanctionType.warning,
-            targetType: "company",
-            targetId: found.entityCompanyId,
-            appliedById: user.id,
-            parameters: { reasonCode: input.reasonCode, comment: input.comment },
-          },
-        });
-      }
-
-      const nextStatus =
-        input.type === ModerationDecisionType.escalate_to_admin
-          ? ModerationCaseStatus.escalated
-          : ModerationCaseStatus.resolved;
-
-      await tx.complaint.updateMany({
-        where: { caseId: found.id },
-        data: {
-          status: nextStatus === ModerationCaseStatus.resolved ? ComplaintStatus.resolved : ComplaintStatus.pending,
-        },
-      });
-
-      const updatedCase = await tx.moderationCase.update({
-        where: { id: found.id },
-        data: {
-          status: nextStatus,
-          lockedById: null,
-          lockedUntil: null,
-          closedAt: nextStatus === ModerationCaseStatus.resolved ? new Date() : null,
-        },
-        include: moderationCaseInclude,
-      });
-
-      return { decision, updatedCase };
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: `moderation.case.${input.type}`,
-      entityType: "ModerationCase",
-      entityId: found.id,
-      comment: input.comment,
-      payload: { reasonCode: input.reasonCode, entityType: found.entityType, entityId: found.entityId },
-    });
-
-    await this.notifyDecision(result.updatedCase, result.decision).catch(
-      swallowAndLog("moderation.decision.notify", { caseId: result.updatedCase.id }),
-    );
-
-    return (await this.enrichCases([result.updatedCase]))[0];
+    const updatedCase = await createDecisionWorkflow(this.moderationDecisionDeps(), id, input, user);
+    return (await enrichCases(this.moderationCaseDeps(), [updatedCase]))[0];
   }
 
   async applyAdminSanction(id: string, input: AdminSanctionInput, user: RequestUser) {
-    if (!this.isAdmin(user)) {
-      throw new ForbiddenException("Применить эту санкцию может только администратор.");
-    }
-
-    const found = await this.prisma.moderationCase.findUnique({
-      where: { id },
-      include: moderationCaseInclude,
-    });
-    if (!found) {
-      throw new NotFoundException("Кейс модерации не найден.");
-    }
-    if (found.status !== ModerationCaseStatus.escalated) {
-      throw new BadRequestException("Админ-санкция применяется только по эскалированному кейсу.");
-    }
-
-    if (input.type === "module_restriction" || input.type === "user_block") {
-      if (!found.entityAuthorId) {
-        throw new BadRequestException("У сущности нет автора-пользователя для применения санкции.");
-      }
-    }
-    if (input.type === "company_block" && !found.entityCompanyId) {
-      throw new BadRequestException("У сущности нет компании для блокировки.");
-    }
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const sanctionType =
-        input.type === "user_block"
-          ? SanctionType.user_block
-          : input.type === "company_block"
-            ? SanctionType.company_block
-            : SanctionType.module_restriction;
-
-      const { targetType, targetId } = this.resolveSanctionTarget(input.type, found);
-      const auditBefore: Record<string, unknown> = input.type === "module_restriction" ? { restriction: null } : {};
-      const auditAfter: Record<string, unknown> = {};
-
-      const baseParameters: Prisma.InputJsonValue = {
-        reasonCode: input.reasonCode,
-        ...(input.comment ? { comment: input.comment } : {}),
-      };
-
-      if (input.type === "user_block") {
-        const target = await tx.user.findUnique({
-          where: { id: targetId },
-          select: { email: true, status: true },
-        });
-        if (!target) {
-          throw new NotFoundException("Пользователь не найден.");
-        }
-        this.assertUserBlockAllowed(targetId, target, user);
-        auditBefore.status = target.status;
-        await tx.user.update({ where: { id: targetId }, data: { status: UserStatus.blocked } });
-        auditAfter.status = UserStatus.blocked;
-        await tx.session.updateMany({
-          where: { userId: targetId, revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
-      } else if (input.type === "company_block") {
-        const target = await tx.company.findUnique({
-          where: { id: targetId },
-          select: { status: true },
-        });
-        if (!target) {
-          throw new NotFoundException("Компания не найдена.");
-        }
-        if (target.status === CompanyStatus.blocked) {
-          throw new BadRequestException("Компания уже заблокирована.");
-        }
-        auditBefore.status = target.status;
-        await tx.company.update({ where: { id: targetId }, data: { status: CompanyStatus.blocked } });
-        auditAfter.status = CompanyStatus.blocked;
-        await tx.session.updateMany({
-          where: { user: { companyId: targetId }, revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
-      }
-
-      const sanction = await tx.sanction.create({
-        data: {
-          caseId: found.id,
-          type: sanctionType,
-          targetType,
-          targetId,
-          appliedById: user.id,
-          parameters:
-            input.type === "module_restriction"
-              ? {
-                  ...baseParameters,
-                  moduleCode: input.moduleCode!,
-                  durationDays: input.durationDays!,
-                }
-              : { ...baseParameters, previousStatus: auditBefore.status as string },
-        },
-      });
-
-      if (input.type === "module_restriction") {
-        const expiresAt = new Date(Date.now() + input.durationDays! * 24 * 60 * 60 * 1000);
-        const restriction = await tx.userModuleRestriction.create({
-          data: {
-            userId: found.entityAuthorId!,
-            companyId: found.entityCompanyId,
-            moduleCode: input.moduleCode!,
-            sanctionId: sanction.id,
-            reasonCode: input.reasonCode,
-            comment: input.comment,
-            appliedById: user.id,
-            expiresAt,
-          },
-        });
-        auditAfter.restriction = {
-          moduleCode: restriction.moduleCode,
-          expiresAt: restriction.expiresAt.toISOString(),
-        };
-      }
-
-      const updatedCase = await tx.moderationCase.update({
-        where: { id: found.id },
-        data: {
-          status: ModerationCaseStatus.closed_by_admin,
-          closedAt: new Date(),
-          lockedById: null,
-          lockedUntil: null,
-        },
-        include: moderationCaseInclude,
-      });
-
-      return { sanction, updatedCase, auditBefore, auditAfter };
-    });
-
-    await this.invalidateCacheForSanction(result.sanction.type, result.sanction.targetId);
-
-    await this.auditLog.recordChange({
-      actorId: user.id,
-      action: `moderation.admin_sanction.${input.type}`,
-      entityType: "ModerationCase",
-      entityId: found.id,
-      comment: input.comment,
-      before: result.auditBefore,
-      after: result.auditAfter,
-      extra: {
-        sanctionId: result.sanction.id,
-        reasonCode: input.reasonCode,
-        targetType: result.sanction.targetType,
-        targetId: result.sanction.targetId,
-        ...(input.type === "module_restriction"
-          ? { moduleCode: input.moduleCode, durationDays: input.durationDays }
-          : {}),
-      },
-    });
-
-    await this.notifyAdminSanction(found, result.sanction, input).catch(
-      swallowAndLog("moderation.sanction.notify", { sanctionId: result.sanction.id }),
-    );
-
-    return (await this.enrichCases([result.updatedCase]))[0];
+    const updatedCase = await applyAdminSanctionWorkflow(this.moderationSanctionDeps(), id, input, user);
+    return (await enrichCases(this.moderationCaseDeps(), [updatedCase]))[0];
   }
 
   async liftSanction(id: string, input: SanctionLiftInput, user: RequestUser) {
-    if (!this.isAdmin(user)) {
-      throw new ForbiddenException("Снять санкцию может только администратор.");
-    }
-
-    const sanction = await this.prisma.sanction.findUnique({ where: { id } });
-    if (!sanction) {
-      throw new NotFoundException("Санкция не найдена.");
-    }
-    if (sanction.liftedAt) {
-      throw new BadRequestException("Санкция уже снята.");
-    }
-    if (sanction.type === SanctionType.warning || sanction.type === SanctionType.content_removal) {
-      throw new BadRequestException("Эта санкция не снимается через данный эндпойнт.");
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.sanction.update({
-        where: { id },
-        data: { liftedAt: new Date(), liftedById: user.id },
-      });
-
-      if (sanction.type === SanctionType.user_block) {
-        const hasOtherActiveBlock = await this.hasOtherActiveBlock(tx, sanction);
-        const previousStatus = this.previousUserStatus(sanction.parameters);
-        if (!hasOtherActiveBlock && previousStatus !== UserStatus.blocked) {
-          await tx.user.update({ where: { id: sanction.targetId }, data: { status: previousStatus } });
-        }
-      } else if (sanction.type === SanctionType.company_block) {
-        const hasOtherActiveBlock = await this.hasOtherActiveBlock(tx, sanction);
-        const previousStatus = this.previousCompanyStatus(sanction.parameters);
-        if (!hasOtherActiveBlock && previousStatus !== CompanyStatus.blocked) {
-          await tx.company.update({ where: { id: sanction.targetId }, data: { status: previousStatus } });
-        }
-      } else if (sanction.type === SanctionType.module_restriction) {
-        await tx.userModuleRestriction.updateMany({
-          where: { sanctionId: id, liftedAt: null },
-          data: { liftedAt: new Date(), liftedById: user.id },
-        });
-      }
-    });
-
-    await this.invalidateCacheForSanction(sanction.type, sanction.targetId);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: `moderation.sanction.lift.${sanction.type}`,
-      entityType: "Sanction",
-      entityId: id,
-      comment: input.comment,
-      payload: { reasonCode: input.reasonCode },
-    });
-
-    await this.notifySanctionLift(sanction).catch(
-      swallowAndLog("moderation.sanction.lift.notify", { sanctionId: sanction.id }),
-    );
-
-    return this.prisma.sanction.findUniqueOrThrow({ where: { id } });
+    return liftSanctionWorkflow(this.moderationSanctionDeps(), id, input, user);
   }
 
-  private resolveSanctionTarget(
-    type: AdminSanctionInput["type"],
-    found: ModerationCaseWithRelations,
-  ): { targetType: string; targetId: string } {
-    if (type === "company_block") {
-      return { targetType: "company", targetId: found.entityCompanyId! };
-    }
-    return { targetType: "user", targetId: found.entityAuthorId! };
-  }
-
-  private assertUserBlockAllowed(targetId: string, target: { email: string; status: UserStatus }, actor: RequestUser) {
-    if (targetId === actor.id) {
-      throw new BadRequestException("Нельзя заблокировать собственную учётную запись.");
-    }
-
-    const ownerEmail = (process.env.PLATFORM_OWNER_EMAIL ?? "mojosay@icloud.com").toLowerCase();
-    if (target.email.toLowerCase() === ownerEmail) {
-      throw new BadRequestException("Этот аккаунт защищён как первый администратор платформы.");
-    }
-
-    if (target.status === UserStatus.blocked) {
-      throw new BadRequestException("Пользователь уже заблокирован.");
-    }
-  }
-
-  private async hasOtherActiveBlock(
-    tx: Prisma.TransactionClient,
-    sanction: { id: string; type: SanctionType; targetType: string; targetId: string },
-  ) {
-    const count = await tx.sanction.count({
-      where: {
-        id: { not: sanction.id },
-        type: sanction.type,
-        targetType: sanction.targetType,
-        targetId: sanction.targetId,
-        liftedAt: null,
-      },
-    });
-    return count > 0;
-  }
-
-  private previousUserStatus(parameters: Prisma.JsonValue | null): UserStatus {
-    const previousStatus = this.parameterString(parameters, "previousStatus");
-    return previousStatus === UserStatus.blocked ? UserStatus.blocked : UserStatus.active;
-  }
-
-  private previousCompanyStatus(parameters: Prisma.JsonValue | null): CompanyStatus {
-    const previousStatus = this.parameterString(parameters, "previousStatus");
-    const allowed = Object.values(CompanyStatus) as string[];
-    return previousStatus && allowed.includes(previousStatus)
-      ? (previousStatus as CompanyStatus)
-      : CompanyStatus.active;
-  }
-
-  private parameterString(parameters: Prisma.JsonValue | null, key: string): string | null {
-    if (!parameters || typeof parameters !== "object" || Array.isArray(parameters)) {
-      return null;
-    }
-
-    const value = parameters[key];
-    return typeof value === "string" ? value : null;
-  }
-
-  private async invalidateCacheForSanction(type: SanctionType, targetId: string) {
-    if (type === SanctionType.user_block) {
-      await this.sessionCache.invalidateUser(targetId);
-    } else if (type === SanctionType.company_block) {
-      await this.sessionCache.invalidateCompany(targetId);
-    }
-  }
-
-  private async notifyAdminSanction(
-    found: ModerationCaseWithRelations,
-    sanction: { id: string },
-    input: AdminSanctionInput,
-  ) {
-    const recipients =
-      input.type === "company_block"
-        ? await this.prisma.user.findMany({
-            where: { companyId: found.entityCompanyId ?? undefined },
-            select: { id: true },
-          })
-        : found.entityAuthorId
-          ? [{ id: found.entityAuthorId }]
-          : [];
-
-    if (recipients.length === 0) return;
-
-    const category =
-      input.type === "module_restriction" ? NotificationCategory.moderation : NotificationCategory.security;
-
-    const titles = this.adminSanctionCopy(input);
-
-    await Promise.all(
-      recipients.map((recipient) =>
-        this.notifications.createInApp({
-          userId: recipient.id,
-          eventType: titles.eventType,
-          sourceId: `${sanction.id}:${recipient.id}`,
-          category,
-          title: titles.title,
-          body: titles.body,
-          link: "/notifications",
-          payload: { caseId: found.id, sanctionId: sanction.id, reasonCode: input.reasonCode },
-        }),
-      ),
-    );
-  }
-
-  private async notifySanctionLift(sanction: { id: string; type: SanctionType; targetType: string; targetId: string }) {
-    const recipients =
-      sanction.type === SanctionType.company_block
-        ? await this.prisma.user.findMany({
-            where: { companyId: sanction.targetId },
-            select: { id: true },
-          })
-        : [{ id: sanction.targetId }];
-
-    if (recipients.length === 0) return;
-
-    const category =
-      sanction.type === SanctionType.module_restriction
-        ? NotificationCategory.moderation
-        : NotificationCategory.security;
-
-    const titles = this.sanctionLiftCopy(sanction.type);
-
-    await Promise.all(
-      recipients.map((recipient) =>
-        this.notifications.createInApp({
-          userId: recipient.id,
-          eventType: titles.eventType,
-          sourceId: `${sanction.id}:lift:${recipient.id}`,
-          category,
-          title: titles.title,
-          body: titles.body,
-          link: "/notifications",
-          payload: { sanctionId: sanction.id },
-        }),
-      ),
-    );
-  }
-
-  private adminSanctionCopy(input: AdminSanctionInput) {
-    if (input.type === "user_block") {
-      return {
-        eventType: "moderation.user.blocked",
-        title: "Учётная запись заблокирована",
-        body: "Ваша учётная запись заблокирована администратором платформы.",
-      };
-    }
-    if (input.type === "company_block") {
-      return {
-        eventType: "moderation.company.blocked",
-        title: "Компания заблокирована",
-        body: "Компания заблокирована администратором платформы.",
-      };
-    }
+  private moderationCaseDeps(): ModerationCaseDeps {
     return {
-      eventType: "moderation.module_restriction.applied",
-      title: "Ограничение доступа к модулю",
-      body: `Доступ к модулю «${input.moduleCode}» ограничен на ${input.durationDays} дн.`,
+      prisma: this.prisma,
+      auditLog: this.auditLog,
+      settings: this.settings,
     };
   }
 
-  private sanctionLiftCopy(type: SanctionType) {
-    if (type === SanctionType.user_block) {
-      return {
-        eventType: "moderation.user.unblocked",
-        title: "Учётная запись разблокирована",
-        body: "Доступ к учётной записи восстановлен.",
-      };
-    }
-    if (type === SanctionType.company_block) {
-      return {
-        eventType: "moderation.company.unblocked",
-        title: "Компания разблокирована",
-        body: "Доступ компании восстановлен.",
-      };
-    }
+  private moderationSanctionDeps(): ModerationSanctionDeps {
     return {
-      eventType: "moderation.module_restriction.lifted",
-      title: "Ограничение доступа к модулю снято",
-      body: "Доступ к модулю восстановлен досрочно.",
+      prisma: this.prisma,
+      auditLog: this.auditLog,
+      notifications: this.notifications,
+      sessionCache: this.sessionCache,
+    };
+  }
+
+  private moderationDecisionDeps(): ModerationDecisionDeps {
+    return {
+      prisma: this.prisma,
+      auditLog: this.auditLog,
+      notifications: this.notifications,
     };
   }
 
@@ -825,307 +220,5 @@ export class ModerationService {
       throw new NotFoundException("Статья базы знаний не найдена или недоступна для жалобы.");
     }
     return { type: "knowledge_article", authorUserId: article.createdById, authorCompanyId: null };
-  }
-
-  private async removeModeratedEntity(tx: Prisma.TransactionClient, found: ModerationCaseWithRelations) {
-    if (found.entityType === "news_comment") {
-      await tx.comment.update({
-        where: { id: found.entityId },
-        data: { status: CommentStatus.hidden_by_moderator },
-      });
-      return;
-    }
-
-    if (found.entityType === "news_post") {
-      const post = await tx.newsPost.findUnique({ where: { id: found.entityId }, select: { status: true } });
-      if (!post) {
-        throw new BadRequestException("Новость уже удалена.");
-      }
-      await tx.newsPost.update({
-        where: { id: found.entityId },
-        data: { status: ContentStatus.draft },
-      });
-      return;
-    }
-
-    if (found.entityType === "knowledge_article") {
-      const article = await tx.knowledgeBaseArticle.findUnique({
-        where: { id: found.entityId },
-        select: { status: true },
-      });
-      if (!article) {
-        throw new BadRequestException("Статья базы знаний уже удалена.");
-      }
-      await tx.knowledgeBaseArticle.update({
-        where: { id: found.entityId },
-        data: { status: ContentStatus.draft },
-      });
-      return;
-    }
-
-    throw new BadRequestException("Тип сущности не поддерживается модерацией.");
-  }
-
-  private async notifyDecision(
-    found: ModerationCaseWithRelations,
-    decision: { id: string; type: ModerationDecisionType; reasonCode: string },
-  ) {
-    if (decision.type === ModerationDecisionType.escalate_to_admin) return;
-
-    const entity = await this.getModerationEntity(found);
-    const fallbackLink = this.fallbackLinkForEntityType(found.entityType);
-    const complaintAuthors = [...new Set(found.complaints.map((complaint) => complaint.authorId))];
-
-    const subject = this.subjectForEntity(found.entityType, entity?.title);
-
-    await Promise.all(
-      complaintAuthors.map((userId) =>
-        this.notifications.createInApp({
-          userId,
-          eventType: "moderation.complaint.resolved",
-          sourceId: `${decision.id}:${userId}`,
-          category: NotificationCategory.moderation,
-          title: "Жалоба рассмотрена",
-          body: `${subject.complaintBody} рассмотрена.`,
-          link: entity?.link ?? fallbackLink,
-          payload: { caseId: found.id, decisionId: decision.id, reasonCode: decision.reasonCode },
-        }),
-      ),
-    );
-
-    if (decision.type === ModerationDecisionType.remove_content && found.entityAuthorId) {
-      await this.notifications.createInApp({
-        userId: found.entityAuthorId,
-        eventType: "moderation.content.removed",
-        sourceId: decision.id,
-        category: NotificationCategory.moderation,
-        title: subject.removalTitle,
-        body: subject.removalBody,
-        link: entity?.link ?? fallbackLink,
-        payload: { caseId: found.id, decisionId: decision.id },
-      });
-    }
-
-    if (decision.type === ModerationDecisionType.warn_company && found.entityAuthorId) {
-      await this.notifications.createInApp({
-        userId: found.entityAuthorId,
-        eventType: "moderation.warning.issued",
-        sourceId: decision.id,
-        category: NotificationCategory.moderation,
-        title: "Предупреждение от модератора",
-        body: `${subject.warningBody} вынесено предупреждение компании.`,
-        link: "/notifications",
-        payload: { caseId: found.id, decisionId: decision.id },
-      });
-    }
-  }
-
-  private subjectForEntity(entityType: string, title: string | undefined) {
-    const safeTitle = title ?? "—";
-    if (entityType === "news_comment") {
-      return {
-        complaintBody: `Жалоба по комментарию к новости «${safeTitle}»`,
-        removalTitle: "Комментарий снят модератором",
-        removalBody: `Ваш комментарий к новости «${safeTitle}» скрыт по итогам модерации.`,
-        warningBody: `По комментарию к новости «${safeTitle}»`,
-      };
-    }
-    if (entityType === "news_post") {
-      return {
-        complaintBody: `Жалоба по новости «${safeTitle}»`,
-        removalTitle: "Новость снята модератором",
-        removalBody: `Новость «${safeTitle}» снята с публикации по итогам модерации.`,
-        warningBody: `По новости «${safeTitle}»`,
-      };
-    }
-    return {
-      complaintBody: `Жалоба по статье «${safeTitle}»`,
-      removalTitle: "Статья базы знаний снята модератором",
-      removalBody: `Статья «${safeTitle}» снята с публикации по итогам модерации.`,
-      warningBody: `По статье «${safeTitle}»`,
-    };
-  }
-
-  private fallbackLinkForEntityType(entityType: string): string {
-    if (entityType === "knowledge_article") return "/knowledge-base";
-    return "/news";
-  }
-
-  private async enrichCases(cases: ModerationCaseWithRelations[]) {
-    if (cases.length === 0) return [];
-
-    const commentIds = cases.filter((item) => item.entityType === "news_comment").map((item) => item.entityId);
-    const newsPostIds = cases.filter((item) => item.entityType === "news_post").map((item) => item.entityId);
-    const articleIds = cases.filter((item) => item.entityType === "knowledge_article").map((item) => item.entityId);
-
-    const [commentsRaw, newsPosts, articles] = await Promise.all([
-      this.prisma.comment.findMany({
-        where: { id: { in: commentIds } },
-        include: { discussion: { select: { targetType: true, targetId: true } } },
-      }),
-      this.prisma.newsPost.findMany({
-        where: { id: { in: newsPostIds } },
-        select: { id: true, title: true, slug: true, status: true },
-      }),
-      this.prisma.knowledgeBaseArticle.findMany({
-        where: { id: { in: articleIds } },
-        select: { id: true, title: true, slug: true, status: true },
-      }),
-    ]);
-
-    // Подмешиваем NewsPost к Comment через Discussion. Раньше это было прямой
-    // join (Comment.newsPost), сейчас — отдельный батч-запрос по targetId.
-    const commentNewsPostIds = commentsRaw
-      .filter((c) => c.discussion.targetType === DiscussionTargetType.news_post)
-      .map((c) => c.discussion.targetId);
-    const commentNewsPosts =
-      commentNewsPostIds.length > 0
-        ? await this.prisma.newsPost.findMany({
-            where: { id: { in: commentNewsPostIds } },
-            select: { id: true, title: true, slug: true },
-          })
-        : [];
-    const commentNewsPostMap = new Map(commentNewsPosts.map((post) => [post.id, post]));
-    const comments = commentsRaw
-      .map((comment) => {
-        const post =
-          comment.discussion.targetType === DiscussionTargetType.news_post
-            ? commentNewsPostMap.get(comment.discussion.targetId)
-            : null;
-        if (!post) return null;
-        return {
-          id: comment.id,
-          text: comment.text,
-          status: comment.status,
-          createdAt: comment.createdAt,
-          newsPost: post,
-        };
-      })
-      .filter((value): value is NonNullable<typeof value> => value !== null);
-
-    const commentMap = new Map(comments.map((comment) => [comment.id, comment]));
-    const newsPostMap = new Map(newsPosts.map((item) => [item.id, item]));
-    const articleMap = new Map(articles.map((item) => [item.id, item]));
-
-    const userIds = [
-      ...cases.flatMap((item) => [
-        item.entityAuthorId,
-        item.lockedById,
-        ...item.complaints.map((complaint) => complaint.authorId),
-        ...item.decisions.map((decision) => decision.actorId),
-      ]),
-    ].filter(Boolean) as string[];
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: [...new Set(userIds)] } },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        company: { select: { id: true, organizationName: true } },
-      },
-    });
-    const userMap = new Map<string, UserSummary>(users.map((item) => [item.id, item]));
-
-    return cases.map((item) => {
-      const entity = this.buildEntitySummary(item, commentMap, newsPostMap, articleMap);
-      return {
-        ...item,
-        lockedBy: item.lockedById ? (userMap.get(item.lockedById) ?? null) : null,
-        entity:
-          entity && entity.type === "news_comment"
-            ? { ...entity, author: item.entityAuthorId ? (userMap.get(item.entityAuthorId) ?? null) : null }
-            : entity,
-        complaints: item.complaints.map((complaint) => ({
-          ...complaint,
-          author: userMap.get(complaint.authorId) ?? null,
-        })),
-        decisions: item.decisions.map((decision) => ({
-          ...decision,
-          actor: userMap.get(decision.actorId) ?? null,
-        })),
-      };
-    });
-  }
-
-  private buildEntitySummary(
-    item: ModerationCaseWithRelations,
-    commentMap: Map<
-      string,
-      {
-        id: string;
-        text: string;
-        status: CommentStatus;
-        createdAt: Date;
-        newsPost: { id: string; title: string; slug: string };
-      }
-    >,
-    newsPostMap: Map<string, { id: string; title: string; slug: string; status: ContentStatus }>,
-    articleMap: Map<string, { id: string; title: string; slug: string; status: ContentStatus }>,
-  ): ResolvedEntitySummary | null {
-    if (item.entityType === "news_comment") {
-      const found = commentMap.get(item.entityId);
-      if (!found) return null;
-      return {
-        type: "news_comment",
-        id: found.id,
-        text: found.text,
-        status: found.status,
-        createdAt: found.createdAt,
-        newsPost: found.newsPost,
-      };
-    }
-    if (item.entityType === "news_post") {
-      const found = newsPostMap.get(item.entityId);
-      if (!found) return null;
-      return { type: "news_post", id: found.id, title: found.title, slug: found.slug, status: found.status };
-    }
-    if (item.entityType === "knowledge_article") {
-      const found = articleMap.get(item.entityId);
-      if (!found) return null;
-      return {
-        type: "knowledge_article",
-        id: found.id,
-        title: found.title,
-        slug: found.slug,
-        status: found.status,
-      };
-    }
-    return null;
-  }
-
-  private async getModerationEntity(found: ModerationCaseWithRelations): Promise<DecisionLink | null> {
-    if (!isModeratedEntityType(found.entityType)) return null;
-    if (found.entityType === "news_comment") {
-      const comment = await this.prisma.comment.findUnique({
-        where: { id: found.entityId },
-        include: { discussion: { select: { targetType: true, targetId: true } } },
-      });
-      if (!comment || comment.discussion.targetType !== DiscussionTargetType.news_post) return null;
-      const newsPost = await this.prisma.newsPost.findUnique({
-        where: { id: comment.discussion.targetId },
-        select: { title: true, slug: true },
-      });
-      if (!newsPost) return null;
-      return { title: newsPost.title, link: `/news/${newsPost.slug}` };
-    }
-    if (found.entityType === "news_post") {
-      const post = await this.prisma.newsPost.findUnique({
-        where: { id: found.entityId },
-        select: { title: true, slug: true },
-      });
-      if (!post) return null;
-      return { title: post.title, link: `/news/${post.slug}` };
-    }
-    const article = await this.prisma.knowledgeBaseArticle.findUnique({
-      where: { id: found.entityId },
-      select: { title: true, slug: true },
-    });
-    if (!article) return null;
-    return { title: article.title, link: `/knowledge-base/${article.slug}` };
-  }
-
-  private isAdmin(user: RequestUser) {
-    return user.platformRoles.includes("admin");
   }
 }

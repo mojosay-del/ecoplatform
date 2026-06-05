@@ -1,0 +1,1 @@
+export { AdminSettingsView } from "./AdminSettingsView";

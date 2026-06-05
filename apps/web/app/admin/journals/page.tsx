@@ -1,4 +1,4 @@
-import { AdminJournalsView } from "../../../src/components/AdminJournalsView";
+import { AdminJournalsView } from "../../../src/views/admin/journals";
 
 export default function AdminJournalsPage() {
   return <AdminJournalsView />;

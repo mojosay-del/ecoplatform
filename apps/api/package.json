@@ -37,7 +37,6 @@
     "file-type": "^21.3.4",
     "helmet": "^8.2.0",
     "ioredis": "^5.4.0",
-    "isomorphic-dompurify": "^3.14.0",
     "nestjs-pino": "^4.6.1",
     "nodemailer": "^8.0.10",
     "pino": "^10.3.1",

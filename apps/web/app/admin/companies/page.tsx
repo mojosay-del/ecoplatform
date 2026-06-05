@@ -1,4 +1,4 @@
-import { AdminCompaniesView } from "../../../src/components/AdminCompaniesView";
+import { AdminCompaniesView } from "../../../src/views/admin/companies";
 
 export default function AdminCompaniesPage() {
   return <AdminCompaniesView />;

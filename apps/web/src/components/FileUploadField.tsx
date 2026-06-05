@@ -172,7 +172,13 @@ export function FileUploadField({
   const percent = Math.round((progress ?? 0) * 100);
 
   const hiddenInput = (
-    <input accept={accept} hidden onChange={(event) => void upload(event.target.files?.[0])} ref={inputRef} type="file" />
+    <input
+      accept={accept}
+      hidden
+      onChange={(event) => void upload(event.target.files?.[0])}
+      ref={inputRef}
+      type="file"
+    />
   );
 
   const progressView = (
@@ -183,7 +189,10 @@ export function FileUploadField({
         <span className="file-upload-progress-percent">{percent >= 100 ? "Обработка…" : `${percent}%`}</span>
       </div>
       <div className="file-upload-progress-track">
-        <div className={`file-upload-progress-fill${percent >= 100 ? " is-indeterminate" : ""}`} style={{ width: `${percent}%` }} />
+        <div
+          className={`file-upload-progress-fill${percent >= 100 ? " is-indeterminate" : ""}`}
+          style={{ width: `${percent}%` }}
+        />
       </div>
     </div>
   );

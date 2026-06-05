@@ -20,7 +20,6 @@
     "@sentry/nextjs": "^10.54.0",
     "@tiptap/core": "3.23.6",
     "@tiptap/extension-color": "^3.23.6",
-    "@tiptap/extension-link": "^3.23.6",
     "@tiptap/extension-placeholder": "^3.23.6",
     "@tiptap/extension-text-style": "^3.23.6",
     "@tiptap/html": "^3.23.6",
@@ -29,9 +28,7 @@
     "@tiptap/starter-kit": "^3.23.6",
     "@tiptap/suggestion": "3.23.6",
     "country-flag-icons": "^1.6.17",
-    "isomorphic-dompurify": "^3.14.0",
     "lucide-react": "^0.555.0",
-    "motion": "^12.40.0",
     "next": "^16.0.7",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"

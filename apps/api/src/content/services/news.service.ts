@@ -1,6 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { CommentStatus, ContentStatus, DiscussionTargetType, Prisma } from "@prisma/client";
-import { newsBlockSchema, slugify, validateContentBlocks } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../../admin/settings/platform-settings.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
@@ -10,66 +9,23 @@ import type { RequestUser } from "../../common/request-user";
 import type { z } from "zod";
 import type { newsInputSchema } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
+import {
+  decorateNewsComment,
+  loadAllNewsCommentCounts,
+  loadPublishedNewsCommentCounts,
+  newsCommentAuthorSelect,
+} from "./news-comment.helpers";
+import {
+  createNewsPost,
+  deleteNewsPost,
+  publishNewsPost,
+  unpublishNewsPost,
+  updateNewsPost,
+} from "./news-admin-workflow.helpers";
+import { normaliseTagFilters } from "./news-tag.helpers";
 
 type NewsInput = z.infer<typeof newsInputSchema>;
 type NewsReadOptions = { preview?: boolean };
-
-const commentAuthorSelect = {
-  id: true,
-  firstName: true,
-  lastName: true,
-  gender: true,
-  company: { select: { type: true } },
-  platformStaff: { select: { roles: true, isActive: true } },
-} satisfies Prisma.UserSelect;
-
-type NewsCommentAuthor = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  gender: string;
-  company: { type: string } | null;
-  platformStaff: { roles: string[]; isActive: boolean } | null;
-};
-
-type NewsCommentPayload = {
-  user: NewsCommentAuthor;
-  likes?: Array<{ id: string }>;
-  replies?: NewsCommentPayload[];
-  [key: string]: unknown;
-};
-
-// Маппинги для генерации public URL аватара. Лежат рядом, потому что нужны
-// только декоратору комментариев новостей.
-const companyAvatarPrefixByType: Record<string, string> = {
-  collector: "z",
-  trader: "t",
-  processor: "p",
-};
-
-const avatarSuffixByGender: Record<string, string> = {
-  male: "man",
-  female: "woman",
-};
-
-function resolveProfileAvatarUrl(platformRoles: string[], companyType: string | null, gender: string): string | null {
-  const platformPrefix = platformRoles.includes("admin")
-    ? "a"
-    : platformRoles.includes("moderator") || platformRoles.includes("content_manager")
-      ? "m"
-      : null;
-  const suffix = avatarSuffixByGender[gender];
-  if (platformPrefix && suffix) {
-    return `/avatars/platform/${platformPrefix}${suffix}.png`;
-  }
-  const companyPrefix = companyType ? companyAvatarPrefixByType[companyType] : null;
-  if (!companyPrefix || !suffix) return null;
-  return `/avatars/company/${companyPrefix}${suffix}.png`;
-}
-
-function normaliseTagFilters(tagNames: string[] = []): string[] {
-  return Array.from(new Set(tagNames.map((name) => name.trim()).filter(Boolean)));
-}
 
 function canPreviewAuthoredContent(user: RequestUser, createdById: string) {
   return (
@@ -126,7 +82,10 @@ export class NewsService {
     // Комментарии теперь живут в Discussion(targetType=news_post, targetId=NewsPost.id).
     // Считаем их батчем для всех новостей страницы — иначе на каждую карточку
     // отдельный запрос.
-    const commentCounts = await this.loadPublishedCommentCounts(posts.map((post) => post.id));
+    const commentCounts = await loadPublishedNewsCommentCounts(
+      this.prisma,
+      posts.map((post) => post.id),
+    );
 
     const items = posts.map(({ likes, _count, ...post }) => ({
       ...post,
@@ -152,30 +111,6 @@ export class NewsService {
       take: limit,
       select: { id: true, name: true, slug: true, usageCount: true },
     });
-  }
-
-  // Для списочного эндпоинта /news и админ-листинга. На вход — id новостей,
-  // на выход — Map(newsPostId → число опубликованных комментариев).
-  // Один SQL: Discussion ⋈ Comment (group by discussionId).
-  private async loadPublishedCommentCounts(newsPostIds: string[]): Promise<Map<string, number>> {
-    if (newsPostIds.length === 0) return new Map();
-
-    const discussions = await this.prisma.discussion.findMany({
-      where: { targetType: DiscussionTargetType.news_post, targetId: { in: newsPostIds } },
-      select: { id: true, targetId: true },
-    });
-    if (discussions.length === 0) return new Map();
-
-    const counts = await this.prisma.comment.groupBy({
-      by: ["discussionId"],
-      where: {
-        discussionId: { in: discussions.map((d) => d.id) },
-        status: CommentStatus.published,
-      },
-      _count: { _all: true },
-    });
-    const countByDiscussion = new Map(counts.map((row) => [row.discussionId, row._count._all]));
-    return new Map(discussions.map((d) => [d.targetId, countByDiscussion.get(d.id) ?? 0]));
   }
 
   async getNews(slug: string, user: RequestUser, options: NewsReadOptions = {}) {
@@ -215,12 +150,12 @@ export class NewsService {
             where: { status: CommentStatus.published },
             orderBy: { createdAt: "asc" },
             include: {
-              user: { select: commentAuthorSelect },
+              user: { select: newsCommentAuthorSelect },
               likes: { where: { userId: user.id }, select: { id: true } },
               _count: { select: { likes: true } },
             },
           },
-          user: { select: commentAuthorSelect },
+          user: { select: newsCommentAuthorSelect },
           likes: { where: { userId: user.id }, select: { id: true } },
           _count: { select: { likes: true } },
         },
@@ -232,243 +167,29 @@ export class NewsService {
     return {
       ...payload,
       _count: { likes: _count.likes, comments: commentsCount },
-      comments: comments.map((comment) => this.decorateNewsComment(comment)),
+      comments: comments.map((comment) => decorateNewsComment(comment)),
       likedByMe: likes.length > 0,
-    };
-  }
-
-  private decorateNewsComment(comment: NewsCommentPayload): Record<string, unknown> {
-    const { likes = [], replies, ...publicComment } = comment;
-    return {
-      ...publicComment,
-      likedByMe: likes.length > 0,
-      user: this.decorateCommentAuthor(comment.user),
-      replies: replies?.map((reply) => this.decorateNewsComment(reply)),
-    };
-  }
-
-  private decorateCommentAuthor(user: NewsCommentAuthor) {
-    const { company, platformStaff, ...publicUser } = user;
-    const platformRoles = platformStaff?.isActive ? platformStaff.roles : [];
-    return {
-      ...publicUser,
-      avatarUrl: resolveProfileAvatarUrl(platformRoles, company?.type ?? null, user.gender),
     };
   }
 
   async createNews(input: NewsInput, user: RequestUser) {
-    const check = validateContentBlocks(input.blocks, newsBlockSchema);
-    if (!check.ok) {
-      throw new ForbiddenException(check.message);
-    }
-    await this.common.assertCoverImageAllowed(input.coverImageId, user);
-
-    const slug =
-      input.slug ??
-      (await this.common.uniqueSlug(input.title, async (candidate) =>
-        Boolean(await this.prisma.newsPost.findUnique({ where: { slug: candidate } })),
-      ));
-
-    const post = await this.prisma.newsPost.create({
-      data: {
-        title: input.title,
-        lead: input.lead,
-        coverImageId: input.coverImageId,
-        slug,
-        createdById: user.id,
-        blocks: {
-          create: input.blocks.map((block, position) => ({
-            position,
-            type: block.type,
-            payload: this.common.payload(block),
-          })),
-        },
-      },
-    });
-
-    await this.replaceNewsTags(post.id, input.tags, user.id);
-
-    // Регистрируем «новость → fileIds» в FileReference, чтобы
-    // deleteIfUnreferenced работал O(1) вместо сканирования всех блоков.
-    await this.common.recordEntityReferences("news_post", post.id, [
-      input.coverImageId,
-      ...input.blocks.flatMap((block) => Array.from(this.common.collectFileIdsFromPayload(block.payload))),
-    ]);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "news.create",
-      entityType: "NewsPost",
-      entityId: post.id,
-    });
-
-    return this.adminGetNews(post.id);
+    return createNewsPost(this.workflowDeps(), input, user);
   }
 
   async updateNews(id: string, input: NewsInput, user: RequestUser) {
-    const check = validateContentBlocks(input.blocks, newsBlockSchema);
-    if (!check.ok) {
-      throw new ForbiddenException(check.message);
-    }
-    await this.common.assertCoverImageAllowed(input.coverImageId, user);
-
-    const before = await this.prisma.newsPost.findUnique({
-      where: { id },
-      include: { tags: true, blocks: true },
-    });
-    if (!before) {
-      throw new NotFoundException("Новость не найдена.");
-    }
-    const previousTagIds = before.tags.map((tag) => tag.newsTagId);
-    const previousFileIds = this.common.compactFileIds([
-      before.coverImageId,
-      ...this.common.collectFileIdsFromBlocks(before.blocks),
-    ]);
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.newsContentBlock.deleteMany({ where: { newsPostId: id } });
-      await tx.newsPost.update({
-        where: { id },
-        data: {
-          title: input.title,
-          lead: input.lead,
-          coverImageId: input.coverImageId,
-          blocks: {
-            create: input.blocks.map((block, position) => ({
-              position,
-              type: block.type,
-              payload: this.common.payload(block),
-            })),
-          },
-        },
-      });
-      await tx.newsPostTag.deleteMany({ where: { newsPostId: id } });
-    });
-
-    await this.replaceNewsTags(id, input.tags, user.id);
-    await this.refreshTagUsage(previousTagIds);
-
-    // Сначала обновляем FileReference для этой новости (новый набор файлов),
-    // потом cleanupDetachedFiles — он увидит, что старый fileId больше никем
-    // не упомянут, и удалит из S3.
-    await this.common.recordEntityReferences("news_post", id, [
-      input.coverImageId,
-      ...input.blocks.flatMap((block) => Array.from(this.common.collectFileIdsFromPayload(block.payload))),
-    ]);
-    await this.common.cleanupDetachedFiles(previousFileIds);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "news.update",
-      entityType: "NewsPost",
-      entityId: id,
-    });
-
-    return this.adminGetNews(id);
+    return updateNewsPost(this.workflowDeps(), id, input, user);
   }
 
   async publishNews(id: string, user: RequestUser) {
-    const existing = await this.prisma.newsPost.findUnique({
-      where: { id },
-      include: { _count: { select: { blocks: true } } },
-    });
-    if (!existing) {
-      throw new NotFoundException("Новость не найдена.");
-    }
-    if (existing._count.blocks === 0) {
-      throw new ForbiddenException("Нельзя опубликовать новость без блоков.");
-    }
-
-    const updated = await this.prisma.newsPost.update({
-      where: { id },
-      data: {
-        status: ContentStatus.published,
-        firstPublishedAt: existing.firstPublishedAt ?? new Date(),
-      },
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "news.publish",
-      entityType: "NewsPost",
-      entityId: id,
-    });
-
-    return updated;
+    return publishNewsPost(this.workflowDeps(), id, user);
   }
 
   async unpublishNews(id: string, user: RequestUser, reason?: string) {
-    const existing = await this.prisma.newsPost.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException("Новость не найдена.");
-    }
-
-    const updated = await this.prisma.newsPost.update({
-      where: { id },
-      data: { status: ContentStatus.draft },
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "news.unpublish",
-      entityType: "NewsPost",
-      entityId: id,
-      comment: reason,
-    });
-
-    return updated;
+    return unpublishNewsPost(this.workflowDeps(), id, user, reason);
   }
 
   async deleteNews(id: string, user: RequestUser, reason?: string) {
-    const existing = await this.prisma.newsPost.findUnique({
-      where: { id },
-      include: {
-        tags: true,
-        blocks: true,
-      },
-    });
-    if (!existing) {
-      throw new NotFoundException("Новость не найдена.");
-    }
-
-    // Файлы комментариев берём через Discussion — у Comment больше нет прямой
-    // ссылки на NewsPost.
-    const commentAttachments = await this.prisma.commentAttachment.findMany({
-      where: { comment: { discussion: { targetType: DiscussionTargetType.news_post, targetId: id } } },
-      select: { fileId: true },
-    });
-
-    const affectedTagIds = existing.tags.map((tag) => tag.newsTagId);
-    const deletedFileIds = this.common.compactFileIds([
-      existing.coverImageId,
-      ...this.common.collectFileIdsFromBlocks(existing.blocks),
-      ...commentAttachments.map((attachment) => attachment.fileId),
-    ]);
-
-    // Discussion(targetType=news_post, targetId=id) удаляем явно ДО NewsPost.delete,
-    // потому что прямого FK NewsPost ↔ Comment больше нет. Каскад Discussion → Comment
-    // → CommentLike/CommentAttachment продолжает работать через onDelete: Cascade.
-    await this.prisma.discussion.deleteMany({
-      where: { targetType: DiscussionTargetType.news_post, targetId: id },
-    });
-    await this.prisma.newsPost.delete({ where: { id } });
-
-    await this.refreshTagUsage(affectedTagIds);
-    // FileReference для этой новости очищаем ДО cleanupDetachedFiles, иначе
-    // ссылки бы блокировали удаление файла.
-    await this.common.clearEntityReferences("news_post", id);
-    await this.common.cleanupDetachedFiles(deletedFileIds);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "news.delete",
-      entityType: "NewsPost",
-      entityId: id,
-      comment: reason,
-      payload: { title: existing.title, slug: existing.slug },
-    });
-
-    return { ok: true };
+    return deleteNewsPost(this.workflowDeps(), id, user, reason);
   }
 
   // Списочный эндпоинт для админки: пагинация + БЕЗ `blocks`. Раньше
@@ -479,9 +200,7 @@ export class NewsService {
     const limit = Math.min(Math.max(pagination.limit ?? 20, 1), 100);
     const offset = Math.max(pagination.offset ?? 0, 0);
     const titleQuery = pagination.q?.trim();
-    const where: Prisma.NewsPostWhereInput = titleQuery
-      ? { title: { contains: titleQuery, mode: "insensitive" } }
-      : {};
+    const where: Prisma.NewsPostWhereInput = titleQuery ? { title: { contains: titleQuery, mode: "insensitive" } } : {};
 
     const [total, postsRaw] = await this.prisma.$transaction([
       this.prisma.newsPost.count({ where }),
@@ -500,7 +219,10 @@ export class NewsService {
     // Комментарии — через Discussion (см. listNews). В админ-таблице считаем
     // ВСЕ комментарии без фильтра по статусу: модератор должен видеть, что
     // у новости есть скрытые/удалённые комментарии в очереди модерации.
-    const commentCounts = await this.loadAllCommentCounts(postsRaw.map((post) => post.id));
+    const commentCounts = await loadAllNewsCommentCounts(
+      this.prisma,
+      postsRaw.map((post) => post.id),
+    );
 
     const items = postsRaw.map(({ _count, ...post }) => ({
       ...post,
@@ -512,26 +234,6 @@ export class NewsService {
       total,
       hasMore: offset + items.length < total,
     };
-  }
-
-  // То же, что loadPublishedCommentCounts, но без фильтра по status — для
-  // админ-листинга, где важно видеть общее количество.
-  private async loadAllCommentCounts(newsPostIds: string[]): Promise<Map<string, number>> {
-    if (newsPostIds.length === 0) return new Map();
-
-    const discussions = await this.prisma.discussion.findMany({
-      where: { targetType: DiscussionTargetType.news_post, targetId: { in: newsPostIds } },
-      select: { id: true, targetId: true },
-    });
-    if (discussions.length === 0) return new Map();
-
-    const counts = await this.prisma.comment.groupBy({
-      by: ["discussionId"],
-      where: { discussionId: { in: discussions.map((d) => d.id) } },
-      _count: { _all: true },
-    });
-    const countByDiscussion = new Map(counts.map((row) => [row.discussionId, row._count._all]));
-    return new Map(discussions.map((d) => [d.targetId, countByDiscussion.get(d.id) ?? 0]));
   }
 
   async adminListNewsTags() {
@@ -552,69 +254,6 @@ export class NewsService {
       throw new NotFoundException("Новость не найдена.");
     }
     return post;
-  }
-
-  private async adminGetNews(id: string) {
-    return this.prisma.newsPost.findUnique({
-      where: { id },
-      include: { tags: { include: { newsTag: true } }, blocks: { orderBy: { position: "asc" } } },
-    });
-  }
-
-  // Раньше тут был N+1: для каждого тега upsert + create — 20 запросов на
-  // 10 тегов. Теперь — 3 запроса вне зависимости от длины списка:
-  //   1) createMany skipDuplicates — добавляем недостающие теги одним пакетом;
-  //   2) findMany по name — берём все id (включая уже существующие);
-  //   3) createMany skipDuplicates — связываем NewsPost с тегами.
-  private async replaceNewsTags(newsPostId: string, tagNames: string[], actorId: string) {
-    const uniqueNames = Array.from(new Set(tagNames.map((name) => name.trim()).filter(Boolean)));
-    if (uniqueNames.length === 0) {
-      return;
-    }
-
-    await this.prisma.newsTag.createMany({
-      data: uniqueNames.map((name) => ({
-        name,
-        slug: slugify(name),
-        createdById: actorId,
-      })),
-      skipDuplicates: true,
-    });
-
-    const tags = await this.prisma.newsTag.findMany({
-      where: { name: { in: uniqueNames } },
-      select: { id: true },
-    });
-
-    await this.prisma.newsPostTag.createMany({
-      data: tags.map((tag) => ({ newsPostId, newsTagId: tag.id })),
-      skipDuplicates: true,
-    });
-
-    await this.refreshTagUsage(tags.map((tag) => tag.id));
-  }
-
-  private async refreshTagUsage(tagIds: string[]) {
-    const unique = Array.from(new Set(tagIds));
-    if (unique.length === 0) {
-      return;
-    }
-
-    const counts = await this.prisma.newsPostTag.groupBy({
-      by: ["newsTagId"],
-      where: { newsTagId: { in: unique } },
-      _count: { newsTagId: true },
-    });
-    const countMap = new Map(counts.map((row) => [row.newsTagId, row._count.newsTagId]));
-
-    await Promise.all(
-      unique.map((tagId) =>
-        this.prisma.newsTag.update({
-          where: { id: tagId },
-          data: { usageCount: countMap.get(tagId) ?? 0 },
-        }),
-      ),
-    );
   }
 
   async toggleNewsLike(id: string, user: RequestUser) {
@@ -751,5 +390,13 @@ export class NewsService {
         parentCommentId,
       },
     });
+  }
+
+  private workflowDeps() {
+    return {
+      prisma: this.prisma,
+      auditLog: this.auditLog,
+      common: this.common,
+    };
   }
 }
