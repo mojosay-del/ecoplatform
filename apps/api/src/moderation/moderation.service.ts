@@ -7,7 +7,6 @@ import {
 } from "@nestjs/common";
 import {
   CommentStatus,
-  CompanyStatus,
   ComplaintStatus,
   ContentStatus,
   DiscussionTargetType,
@@ -15,7 +14,6 @@ import {
   ModerationDecisionType,
   NotificationCategory,
   SanctionType,
-  UserStatus,
   type Prisma,
 } from "@prisma/client";
 import { canOpenFunctionalSections } from "@ecoplatform/shared";
@@ -27,7 +25,11 @@ import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
-import { notifyAdminSanction, notifySanctionLift, type ModerationNotifyDeps } from "./moderation-notify.helpers";
+import {
+  applyAdminSanction as applyAdminSanctionWorkflow,
+  liftSanction as liftSanctionWorkflow,
+  type ModerationSanctionDeps,
+} from "./moderation-sanction.helpers";
 import type {
   adminSanctionInputSchema,
   complaintInputSchema,
@@ -371,298 +373,20 @@ export class ModerationService {
   }
 
   async applyAdminSanction(id: string, input: AdminSanctionInput, user: RequestUser) {
-    if (!this.isAdmin(user)) {
-      throw new ForbiddenException("Применить эту санкцию может только администратор.");
-    }
-
-    const found = await this.prisma.moderationCase.findUnique({
-      where: { id },
-      include: moderationCaseInclude,
-    });
-    if (!found) {
-      throw new NotFoundException("Кейс модерации не найден.");
-    }
-    if (found.status !== ModerationCaseStatus.escalated) {
-      throw new BadRequestException("Админ-санкция применяется только по эскалированному кейсу.");
-    }
-
-    if (input.type === "module_restriction" || input.type === "user_block") {
-      if (!found.entityAuthorId) {
-        throw new BadRequestException("У сущности нет автора-пользователя для применения санкции.");
-      }
-    }
-    if (input.type === "company_block" && !found.entityCompanyId) {
-      throw new BadRequestException("У сущности нет компании для блокировки.");
-    }
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const sanctionType =
-        input.type === "user_block"
-          ? SanctionType.user_block
-          : input.type === "company_block"
-            ? SanctionType.company_block
-            : SanctionType.module_restriction;
-
-      const { targetType, targetId } = this.resolveSanctionTarget(input.type, found);
-      const auditBefore: Record<string, unknown> = input.type === "module_restriction" ? { restriction: null } : {};
-      const auditAfter: Record<string, unknown> = {};
-
-      const baseParameters: Prisma.InputJsonValue = {
-        reasonCode: input.reasonCode,
-        ...(input.comment ? { comment: input.comment } : {}),
-      };
-
-      if (input.type === "user_block") {
-        const target = await tx.user.findUnique({
-          where: { id: targetId },
-          select: { email: true, status: true },
-        });
-        if (!target) {
-          throw new NotFoundException("Пользователь не найден.");
-        }
-        this.assertUserBlockAllowed(targetId, target, user);
-        auditBefore.status = target.status;
-        await tx.user.update({ where: { id: targetId }, data: { status: UserStatus.blocked } });
-        auditAfter.status = UserStatus.blocked;
-        await tx.session.updateMany({
-          where: { userId: targetId, revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
-      } else if (input.type === "company_block") {
-        const target = await tx.company.findUnique({
-          where: { id: targetId },
-          select: { status: true },
-        });
-        if (!target) {
-          throw new NotFoundException("Компания не найдена.");
-        }
-        if (target.status === CompanyStatus.blocked) {
-          throw new BadRequestException("Компания уже заблокирована.");
-        }
-        auditBefore.status = target.status;
-        await tx.company.update({ where: { id: targetId }, data: { status: CompanyStatus.blocked } });
-        auditAfter.status = CompanyStatus.blocked;
-        await tx.session.updateMany({
-          where: { user: { companyId: targetId }, revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
-      }
-
-      const sanction = await tx.sanction.create({
-        data: {
-          caseId: found.id,
-          type: sanctionType,
-          targetType,
-          targetId,
-          appliedById: user.id,
-          parameters:
-            input.type === "module_restriction"
-              ? {
-                  ...baseParameters,
-                  moduleCode: input.moduleCode!,
-                  durationDays: input.durationDays!,
-                }
-              : { ...baseParameters, previousStatus: auditBefore.status as string },
-        },
-      });
-
-      if (input.type === "module_restriction") {
-        const expiresAt = new Date(Date.now() + input.durationDays! * 24 * 60 * 60 * 1000);
-        const restriction = await tx.userModuleRestriction.create({
-          data: {
-            userId: found.entityAuthorId!,
-            companyId: found.entityCompanyId,
-            moduleCode: input.moduleCode!,
-            sanctionId: sanction.id,
-            reasonCode: input.reasonCode,
-            comment: input.comment,
-            appliedById: user.id,
-            expiresAt,
-          },
-        });
-        auditAfter.restriction = {
-          moduleCode: restriction.moduleCode,
-          expiresAt: restriction.expiresAt.toISOString(),
-        };
-      }
-
-      const updatedCase = await tx.moderationCase.update({
-        where: { id: found.id },
-        data: {
-          status: ModerationCaseStatus.closed_by_admin,
-          closedAt: new Date(),
-          lockedById: null,
-          lockedUntil: null,
-        },
-        include: moderationCaseInclude,
-      });
-
-      return { sanction, updatedCase, auditBefore, auditAfter };
-    });
-
-    await this.invalidateCacheForSanction(result.sanction.type, result.sanction.targetId);
-
-    await this.auditLog.recordChange({
-      actorId: user.id,
-      action: `moderation.admin_sanction.${input.type}`,
-      entityType: "ModerationCase",
-      entityId: found.id,
-      comment: input.comment,
-      before: result.auditBefore,
-      after: result.auditAfter,
-      extra: {
-        sanctionId: result.sanction.id,
-        reasonCode: input.reasonCode,
-        targetType: result.sanction.targetType,
-        targetId: result.sanction.targetId,
-        ...(input.type === "module_restriction"
-          ? { moduleCode: input.moduleCode, durationDays: input.durationDays }
-          : {}),
-      },
-    });
-
-    await notifyAdminSanction(this.moderationNotifyDeps(), found, result.sanction, input).catch(
-      swallowAndLog("moderation.sanction.notify", { sanctionId: result.sanction.id }),
-    );
-
-    return (await this.enrichCases([result.updatedCase]))[0];
+    const updatedCase = await applyAdminSanctionWorkflow(this.moderationSanctionDeps(), id, input, user);
+    return (await this.enrichCases([updatedCase]))[0];
   }
 
   async liftSanction(id: string, input: SanctionLiftInput, user: RequestUser) {
-    if (!this.isAdmin(user)) {
-      throw new ForbiddenException("Снять санкцию может только администратор.");
-    }
-
-    const sanction = await this.prisma.sanction.findUnique({ where: { id } });
-    if (!sanction) {
-      throw new NotFoundException("Санкция не найдена.");
-    }
-    if (sanction.liftedAt) {
-      throw new BadRequestException("Санкция уже снята.");
-    }
-    if (sanction.type === SanctionType.warning || sanction.type === SanctionType.content_removal) {
-      throw new BadRequestException("Эта санкция не снимается через данный эндпойнт.");
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.sanction.update({
-        where: { id },
-        data: { liftedAt: new Date(), liftedById: user.id },
-      });
-
-      if (sanction.type === SanctionType.user_block) {
-        const hasOtherActiveBlock = await this.hasOtherActiveBlock(tx, sanction);
-        const previousStatus = this.previousUserStatus(sanction.parameters);
-        if (!hasOtherActiveBlock && previousStatus !== UserStatus.blocked) {
-          await tx.user.update({ where: { id: sanction.targetId }, data: { status: previousStatus } });
-        }
-      } else if (sanction.type === SanctionType.company_block) {
-        const hasOtherActiveBlock = await this.hasOtherActiveBlock(tx, sanction);
-        const previousStatus = this.previousCompanyStatus(sanction.parameters);
-        if (!hasOtherActiveBlock && previousStatus !== CompanyStatus.blocked) {
-          await tx.company.update({ where: { id: sanction.targetId }, data: { status: previousStatus } });
-        }
-      } else if (sanction.type === SanctionType.module_restriction) {
-        await tx.userModuleRestriction.updateMany({
-          where: { sanctionId: id, liftedAt: null },
-          data: { liftedAt: new Date(), liftedById: user.id },
-        });
-      }
-    });
-
-    await this.invalidateCacheForSanction(sanction.type, sanction.targetId);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: `moderation.sanction.lift.${sanction.type}`,
-      entityType: "Sanction",
-      entityId: id,
-      comment: input.comment,
-      payload: { reasonCode: input.reasonCode },
-    });
-
-    await notifySanctionLift(this.moderationNotifyDeps(), sanction).catch(
-      swallowAndLog("moderation.sanction.lift.notify", { sanctionId: sanction.id }),
-    );
-
-    return this.prisma.sanction.findUniqueOrThrow({ where: { id } });
+    return liftSanctionWorkflow(this.moderationSanctionDeps(), id, input, user);
   }
 
-  private resolveSanctionTarget(
-    type: AdminSanctionInput["type"],
-    found: ModerationCaseWithRelations,
-  ): { targetType: string; targetId: string } {
-    if (type === "company_block") {
-      return { targetType: "company", targetId: found.entityCompanyId! };
-    }
-    return { targetType: "user", targetId: found.entityAuthorId! };
-  }
-
-  private assertUserBlockAllowed(targetId: string, target: { email: string; status: UserStatus }, actor: RequestUser) {
-    if (targetId === actor.id) {
-      throw new BadRequestException("Нельзя заблокировать собственную учётную запись.");
-    }
-
-    const ownerEmail = (process.env.PLATFORM_OWNER_EMAIL ?? "mojosay@icloud.com").toLowerCase();
-    if (target.email.toLowerCase() === ownerEmail) {
-      throw new BadRequestException("Этот аккаунт защищён как первый администратор платформы.");
-    }
-
-    if (target.status === UserStatus.blocked) {
-      throw new BadRequestException("Пользователь уже заблокирован.");
-    }
-  }
-
-  private async hasOtherActiveBlock(
-    tx: Prisma.TransactionClient,
-    sanction: { id: string; type: SanctionType; targetType: string; targetId: string },
-  ) {
-    const count = await tx.sanction.count({
-      where: {
-        id: { not: sanction.id },
-        type: sanction.type,
-        targetType: sanction.targetType,
-        targetId: sanction.targetId,
-        liftedAt: null,
-      },
-    });
-    return count > 0;
-  }
-
-  private previousUserStatus(parameters: Prisma.JsonValue | null): UserStatus {
-    const previousStatus = this.parameterString(parameters, "previousStatus");
-    return previousStatus === UserStatus.blocked ? UserStatus.blocked : UserStatus.active;
-  }
-
-  private previousCompanyStatus(parameters: Prisma.JsonValue | null): CompanyStatus {
-    const previousStatus = this.parameterString(parameters, "previousStatus");
-    const allowed = Object.values(CompanyStatus) as string[];
-    return previousStatus && allowed.includes(previousStatus)
-      ? (previousStatus as CompanyStatus)
-      : CompanyStatus.active;
-  }
-
-  private parameterString(parameters: Prisma.JsonValue | null, key: string): string | null {
-    if (!parameters || typeof parameters !== "object" || Array.isArray(parameters)) {
-      return null;
-    }
-
-    const value = parameters[key];
-    return typeof value === "string" ? value : null;
-  }
-
-  private async invalidateCacheForSanction(type: SanctionType, targetId: string) {
-    if (type === SanctionType.user_block) {
-      await this.sessionCache.invalidateUser(targetId);
-    } else if (type === SanctionType.company_block) {
-      await this.sessionCache.invalidateCompany(targetId);
-    }
-  }
-
-  private moderationNotifyDeps(): ModerationNotifyDeps {
+  private moderationSanctionDeps(): ModerationSanctionDeps {
     return {
       prisma: this.prisma,
+      auditLog: this.auditLog,
       notifications: this.notifications,
+      sessionCache: this.sessionCache,
     };
   }
 
