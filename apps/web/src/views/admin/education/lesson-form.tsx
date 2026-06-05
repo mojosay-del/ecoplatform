@@ -125,6 +125,12 @@ export function LessonForm({
     await onMutate(path, "POST");
   }
 
+  async function removeLesson() {
+    if (!confirm(`Удалить урок «${lesson.title}»?`)) return;
+    const ok = await onMutate(`/admin/content/education/lessons/${lesson.id}`, "DELETE");
+    if (ok) onSelect({ kind: "chapter", id: lesson.chapterId });
+  }
+
   // Сравниваем draft с последней сохранённой версией, чтобы refetch после
   // сохранения не залипал в состоянии "Не сохранено".
   const hasChanges = useMemo(() => {
@@ -162,16 +168,8 @@ export function LessonForm({
       </header>
 
       <section className="lesson-section lesson-cover-section">
-        <h3 className="lesson-section-title">Обложка урока</h3>
-        <FileUploadField
-          accept="image/*"
-          buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
-          imagePreset="cover"
-          label="Обложка урока"
-          value={draft.coverImageId}
-          onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
-        />
-        <label className="news-lead-field lesson-cover-subtitle-field">
+        <label className="form-field news-content-field lesson-cover-subtitle-field">
+          <span>Подзаголовок</span>
           <input
             className="news-form-lead"
             aria-label="Подзаголовок на обложке"
@@ -181,6 +179,18 @@ export function LessonForm({
             onChange={(event) => setDraft((prev) => ({ ...prev, coverSubtitle: event.target.value }))}
           />
         </label>
+        <div className="form-field news-content-field lesson-cover-upload-field">
+          <h3 className="lesson-section-title">Обложка урока</h3>
+          <FileUploadField
+            accept="image/*"
+            buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+            hideLabel
+            imagePreset="cover"
+            label="Обложка урока"
+            value={draft.coverImageId}
+            onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+          />
+        </div>
       </section>
 
       <section className="lesson-section">
@@ -248,7 +258,7 @@ export function LessonForm({
         </section>
       ) : null}
 
-      <div className="lesson-save-bar news-save-bar">
+      <div className="lesson-save-bar news-save-bar education-detail-save-bar">
         <span className={`lesson-save-bar-status ${saveStatusClass}`}>
           {saving ? "Сохраняется…" : lessonAutosave.autosaveLabel}
         </span>
@@ -259,6 +269,10 @@ export function LessonForm({
             onClick={() => onSelect({ kind: "chapter", id: lesson.chapterId })}
           >
             К главе
+          </button>
+          <button className="button secondary danger" type="button" onClick={removeLesson}>
+            <Trash2 size={14} />
+            Удалить
           </button>
           <button className="button secondary" type="button" onClick={publishToggle}>
             {lesson.status === "published" ? "Снять с публикации" : "Опубликовать"}

@@ -23,12 +23,14 @@ export function DetailPanel({
   if (selection.kind === "module") {
     const module = modules.find((candidate) => candidate.id === selection.id);
     if (!module) return <p className="page-subtitle">Модуль не найден.</p>;
-    return <ModuleForm module={module} onMutate={onMutate} />;
+    return <ModuleForm module={module} onMutate={onMutate} onSelect={onSelect} />;
   }
   if (selection.kind === "chapter") {
     const chapter = findChapter(modules, selection.id);
     if (!chapter) return <p className="page-subtitle">Глава не найдена.</p>;
-    return <ChapterForm chapter={chapter} onMutate={onMutate} />;
+    const module = modules.find((candidate) => candidate.id === chapter.moduleId);
+    if (!module) return <p className="page-subtitle">Модуль главы не найден.</p>;
+    return <ChapterForm chapter={chapter} module={module} onMutate={onMutate} onSelect={onSelect} />;
   }
   const lesson = findLesson(modules, selection.id);
   if (!lesson) return <p className="page-subtitle">Урок не найден.</p>;

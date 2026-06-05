@@ -1,12 +1,21 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { FileUploadField } from "../../../components/FileUploadField";
 import { LEARNING_ACCESS_LEVEL_LABELS } from "../../../lib/display-labels";
 import { MODULE_ACCESS_OPTIONS } from "./constants";
-import type { EducationMutation, LearningModule } from "./types";
+import type { EducationMutation, LearningModule, SetEducationSelection } from "./types";
 
-export function ModuleForm({ module, onMutate }: { module: LearningModule; onMutate: EducationMutation }) {
+export function ModuleForm({
+  module,
+  onMutate,
+  onSelect,
+}: {
+  module: LearningModule;
+  onMutate: EducationMutation;
+  onSelect: SetEducationSelection;
+}) {
   const [draft, setDraft] = useState({
     title: module.title,
     summary: module.summary,
@@ -18,8 +27,8 @@ export function ModuleForm({ module, onMutate }: { module: LearningModule; onMut
     promotionalDescription: module.preview?.promotionalDescription ?? "",
     whatYouWillLearn: module.preview?.whatYouWillLearn ?? [],
   });
-  const [bullet, setBullet] = useState("");
   const [saving, setSaving] = useState(false);
+  const preview = module.preview ?? { promotionalDescription: "", whatYouWillLearn: [] };
 
   useEffect(() => {
     setDraft({
@@ -45,27 +54,69 @@ export function ModuleForm({ module, onMutate }: { module: LearningModule; onMut
     module.preview,
   ]);
 
+  const hasChanges =
+    draft.title !== module.title ||
+    draft.summary !== module.summary ||
+    draft.description !== module.description ||
+    draft.coverImageId !== (module.coverImageId ?? "") ||
+    draft.accessLevel !== module.accessLevel ||
+    draft.oneTimePrice !== (module.oneTimePrice ?? 0) ||
+    draft.isInDevelopment !== module.isInDevelopment ||
+    draft.promotionalDescription !== preview.promotionalDescription ||
+    JSON.stringify(draft.whatYouWillLearn) !== JSON.stringify(preview.whatYouWillLearn);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    await onMutate(`/admin/content/education/modules/${module.id}`, "PATCH", {
-      title: draft.title,
-      summary: draft.summary,
-      description: draft.description,
-      coverImageId: draft.coverImageId.trim() || null,
-      accessLevel: draft.accessLevel,
-      oneTimePrice: draft.accessLevel === "one_time" && draft.oneTimePrice > 0 ? draft.oneTimePrice : null,
-      isInDevelopment: draft.isInDevelopment,
-      preview: {
-        promotionalDescription: draft.promotionalDescription,
-        whatYouWillLearn: draft.whatYouWillLearn,
-      },
+    try {
+      await onMutate(`/admin/content/education/modules/${module.id}`, "PATCH", {
+        title: draft.title,
+        summary: draft.summary,
+        description: draft.description,
+        coverImageId: draft.coverImageId.trim() || null,
+        accessLevel: draft.accessLevel,
+        oneTimePrice: draft.accessLevel === "one_time" && draft.oneTimePrice > 0 ? draft.oneTimePrice : null,
+        isInDevelopment: draft.isInDevelopment,
+        preview: {
+          promotionalDescription: draft.promotionalDescription,
+          whatYouWillLearn: draft.whatYouWillLearn.map((item) => item.trim()).filter(Boolean),
+        },
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function publishToggleModule() {
+    const path =
+      module.status === "published"
+        ? `/admin/content/education/modules/${module.id}/unpublish`
+        : `/admin/content/education/modules/${module.id}/publish`;
+    await onMutate(path, "POST");
+  }
+
+  async function addChapter() {
+    await onMutate(`/admin/content/education/modules/${module.id}/chapters`, "POST", {
+      title: `Глава ${module.chapters.length + 1}`,
+      position: module.chapters.length,
     });
-    setSaving(false);
+  }
+
+  async function removeModule() {
+    if (!confirm(`Удалить модуль «${module.title}»? Все главы и уроки будут удалены.`)) return;
+    const ok = await onMutate(`/admin/content/education/modules/${module.id}`, "DELETE");
+    if (ok) onSelect({ kind: "none" });
+  }
+
+  function addLearningPoint() {
+    setDraft((prev) => ({
+      ...prev,
+      whatYouWillLearn: [...prev.whatYouWillLearn, ""],
+    }));
   }
 
   return (
-    <form className="form news-form" onSubmit={submit}>
+    <form className="form news-form education-detail-form" onSubmit={submit}>
       <header className="module-form-header">
         <span className="news-form-mode">Модуль</span>
         <div className="module-form-controls">
@@ -94,26 +145,28 @@ export function ModuleForm({ module, onMutate }: { module: LearningModule; onMut
           </label>
         </div>
       </header>
-      <div className="news-form-preview">
-        <FileUploadField
-          accept="image/*"
-          buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
-          imagePreset="cover"
-          label="Обложка модуля"
-          value={draft.coverImageId}
-          onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
-        />
-      </div>
       <label className="form-field news-content-field">
         <span>Название</span>
         <input
-          className="news-form-title"
+          className="news-form-lead education-module-title-input"
           placeholder="Название модуля…"
           value={draft.title}
           onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
           required
         />
       </label>
+      <div className="form-field news-content-field news-form-preview">
+        <span>Обложка модуля</span>
+        <FileUploadField
+          accept="image/*"
+          buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+          hideLabel
+          imagePreset="cover"
+          label="Обложка модуля"
+          value={draft.coverImageId}
+          onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+        />
+      </div>
       <label className="form-field news-content-field">
         <span>Краткое описание</span>
         <input
@@ -156,14 +209,33 @@ export function ModuleForm({ module, onMutate }: { module: LearningModule; onMut
           />
         </label>
       ) : null}
-      <div className="form-field news-content-field">
-        <span>Что узнает пользователь</span>
-        <div className="stack-list">
+      <div className="form-field news-content-field education-list-field">
+        <div className="education-list-field-head">
+          <span>Что узнает пользователь</span>
+          <button type="button" className="education-inline-add" onClick={addLearningPoint} aria-label="Добавить пункт">
+            <Plus size={14} />
+          </button>
+        </div>
+        <div className="education-learning-list">
           {draft.whatYouWillLearn.map((bulletItem, index) => (
-            <div className="list-row" key={index}>
+            <div className="education-learning-row" key={index}>
+              <button
+                className="education-learning-remove"
+                type="button"
+                onClick={() =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    whatYouWillLearn: prev.whatYouWillLearn.filter((_, idx) => idx !== index),
+                  }))
+                }
+                aria-label="Удалить пункт"
+              >
+                <Trash2 size={14} />
+              </button>
               <input
-                className="input"
+                className="news-form-lead education-learning-input"
                 value={bulletItem}
+                placeholder="Пункт программы"
                 onChange={(event) =>
                   setDraft((prev) => ({
                     ...prev,
@@ -172,50 +244,32 @@ export function ModuleForm({ module, onMutate }: { module: LearningModule; onMut
                     ),
                   }))
                 }
-                style={{ flex: 1 }}
               />
-              <button
-                className="button secondary"
-                type="button"
-                onClick={() =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    whatYouWillLearn: prev.whatYouWillLearn.filter((_, idx) => idx !== index),
-                  }))
-                }
-              >
-                Удалить
-              </button>
             </div>
           ))}
         </div>
-        <div className="list-row">
-          <input
-            className="input"
-            placeholder="Новый пункт"
-            value={bullet}
-            onChange={(event) => setBullet(event.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button
-            className="button secondary"
-            type="button"
-            onClick={() => {
-              if (!bullet.trim()) return;
-              setDraft((prev) => ({
-                ...prev,
-                whatYouWillLearn: [...prev.whatYouWillLearn, bullet.trim()],
-              }));
-              setBullet("");
-            }}
-          >
-            + Пункт
+      </div>
+      <div className="lesson-save-bar news-save-bar education-detail-save-bar">
+        <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : " is-saved"}`}>
+          {saving ? "Сохраняю…" : hasChanges ? "Есть несохранённые изменения" : "Сохранено"}
+        </span>
+        <div className="lesson-save-bar-actions">
+          <button className="button secondary" type="button" onClick={addChapter}>
+            <Plus size={14} />
+            Глава
+          </button>
+          <button className="button secondary" type="button" onClick={publishToggleModule}>
+            {module.status === "published" ? "Снять с публикации" : "Опубликовать"}
+          </button>
+          <button className="button secondary danger" type="button" onClick={removeModule}>
+            <Trash2 size={14} />
+            Удалить
+          </button>
+          <button className="button" type="submit" disabled={!hasChanges || saving}>
+            {saving ? "Сохраняю…" : "Сохранить модуль"}
           </button>
         </div>
       </div>
-      <button className="button" type="submit" disabled={saving}>
-        {saving ? "Сохраняю…" : "Сохранить модуль"}
-      </button>
     </form>
   );
 }

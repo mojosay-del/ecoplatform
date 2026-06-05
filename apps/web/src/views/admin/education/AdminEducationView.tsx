@@ -3,7 +3,7 @@
 // Экран CMS «Обучение»: слева дерево модулей/глав/уроков, справа редактор
 // выбранного узла. Этот файл держит auth, загрузку и общий API-mutator.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
@@ -12,7 +12,6 @@ import { useAuth } from "../../../lib/auth";
 import { DetailPanel } from "./detail-panel";
 import { EducationTree } from "./tree";
 import type { EducationMutation, LearningModule, Selection, ViewState } from "./types";
-import { findChapter, findLesson } from "./utils";
 
 export function AdminEducationView() {
   const { token } = useAuth();
@@ -62,21 +61,6 @@ export function AdminEducationView() {
     void loadAll();
   }, [loadAll]);
 
-  const selectedModule = useMemo(() => {
-    if (selection.kind === "module") return modules.find((module) => module.id === selection.id) ?? null;
-    if (selection.kind === "chapter") {
-      const chapter = findChapter(modules, selection.id);
-      return chapter ? (modules.find((module) => module.id === chapter.moduleId) ?? null) : null;
-    }
-    if (selection.kind === "lesson") {
-      const lesson = findLesson(modules, selection.id);
-      if (!lesson) return null;
-      const chapter = findChapter(modules, lesson.chapterId);
-      return chapter ? (modules.find((module) => module.id === chapter.moduleId) ?? null) : null;
-    }
-    return null;
-  }, [modules, selection]);
-
   if (state === "unauthenticated") {
     return (
       <AppShell>
@@ -104,7 +88,7 @@ export function AdminEducationView() {
       <section className="page">
         <header className="page-header">
           <h1 className="page-title">Обучение</h1>
-          <p className="page-subtitle">Модули, главы и уроки. Структура справа — детали слева.</p>
+          <p className="page-subtitle">Терминал управления обучающего сектора.</p>
         </header>
         {message ? (
           <StatusPill as="p" variant="danger">
@@ -120,7 +104,6 @@ export function AdminEducationView() {
             <DetailPanel selection={selection} modules={modules} onSelect={setSelection} onMutate={mutate} />
           </div>
         </div>
-        {selectedModule ? <p className="page-subtitle">Контекст: {selectedModule.title}</p> : null}
       </section>
     </AppShell>
   );
