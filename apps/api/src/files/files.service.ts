@@ -22,11 +22,22 @@ import { PlatformSettingsService } from "../admin/settings/platform-settings.ser
 // условие экспорта "module-sync" (стабильно на нашем Node 24). В vitest swc
 // оставляет ESM-import. Типы tsc берёт из index.d.ts в корне пакета.
 import { fileTypeFromBuffer } from "file-type";
-import { randomUUID } from "crypto";
-import { extname } from "path";
 import type { RequestUser } from "../common/request-user";
 import { PrismaService } from "../prisma/prisma.service";
 import { processCoverImage, type ProcessedImageVariant } from "./image-presets";
+import {
+  BLOCKED_UPLOAD_MIME_TYPES,
+  GENERIC_DECLARED_MIME_TYPES,
+  buildStorageKey,
+  canonicalMimeType,
+  contentDisposition,
+  downloadContentDisposition,
+  hasBlockedExtension,
+  isAllowedDetectedMime,
+  isDeclaredMimeCompatible,
+  normalizeMimeType,
+  storageKeyWithExtension,
+} from "./files-validation.helpers";
 
 export type UploadedMemoryFile = {
   originalname: string;
@@ -70,55 +81,6 @@ const DEFAULT_MAX_UPLOAD_MB = 100;
 const DEFAULT_MAX_COVER_MB = 10;
 const DEFAULT_DAILY_QUOTA_MB = 500;
 const MB_IN_BYTES = 1024 * 1024;
-const SAFE_NAME_PATTERN = /[^a-zA-Z0-9._-]+/g;
-const GENERIC_DECLARED_MIME_TYPES = new Set(["application/octet-stream", "binary/octet-stream"]);
-const BLOCKED_UPLOAD_MIME_TYPES = new Set([
-  "text/html",
-  "application/xhtml+xml",
-  "image/svg+xml",
-  "application/xml",
-  "text/xml",
-  "application/javascript",
-  "text/javascript",
-  "application/x-msdownload",
-]);
-const BLOCKED_UPLOAD_EXTENSIONS = new Set([
-  ".bat",
-  ".cmd",
-  ".com",
-  ".cpl",
-  ".dll",
-  ".exe",
-  ".htm",
-  ".html",
-  ".js",
-  ".mjs",
-  ".msi",
-  ".php",
-  ".ps1",
-  ".scr",
-  ".sh",
-  ".svg",
-  ".xhtml",
-  ".xml",
-]);
-const ALLOWED_DETECTED_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/pdf",
-  "application/zip",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.oasis.opendocument.text",
-  "application/vnd.oasis.opendocument.spreadsheet",
-]);
-const MIME_ALIASES: Record<string, string[]> = {
-  "application/zip": ["application/x-zip-compressed", "multipart/x-zip"],
-  "application/pdf": ["application/x-pdf"],
-  "image/jpeg": ["image/pjpeg"],
-  "video/quicktime": ["video/mov"],
-};
 const S3_HEALTH_TIMEOUT_MS = 1_000;
 // Срок жизни presigned-ссылки на приватный файл. Час — достаточно, чтобы открыть
 // урок и скачать материалы за сессию; по истечении фронт перезапрашивает урок,
@@ -263,11 +225,6 @@ export class FilesService {
     return this.privateBucket() ?? publicBucket;
   }
 
-  private downloadContentDisposition(originalName: string): string {
-    // filename* (RFC 5987) корректно отдаёт кириллические имена при скачивании.
-    return `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`;
-  }
-
   /**
    * Считает ссылку для скачивания пачки файлов с учётом уровня доступа:
    *  - public → прямая публичная ссылка (как раньше, кешируется CDN);
@@ -307,7 +264,7 @@ export class FilesService {
         const command = new GetObjectCommand({
           Bucket: privateBucket,
           Key: asset.storageKey,
-          ResponseContentDisposition: this.downloadContentDisposition(asset.originalName),
+          ResponseContentDisposition: downloadContentDisposition(asset.originalName),
         });
         urls.set(asset.id, await getSignedUrl(config.client, command, { expiresIn: ttlSeconds }));
       }
@@ -521,63 +478,17 @@ export class FilesService {
     return Object.values(record).some((value) => this.payloadContainsFileId(value, fileId));
   }
 
-  private normalizeMimeType(mimeType: string | undefined | null): string {
-    return (mimeType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
-  }
-
-  private canonicalMimeType(mimeType: string): string {
-    for (const [canonical, aliases] of Object.entries(MIME_ALIASES)) {
-      if (mimeType === canonical || aliases.includes(mimeType)) {
-        return canonical;
-      }
-    }
-
-    return mimeType;
-  }
-
-  private isAllowedDetectedMime(mimeType: string): boolean {
-    return ALLOWED_DETECTED_MIME_TYPES.has(mimeType) || mimeType.startsWith("audio/") || mimeType.startsWith("video/");
-  }
-
-  private isDeclaredMimeCompatible(declaredMime: string, detectedMime: string): boolean {
-    if (!declaredMime || GENERIC_DECLARED_MIME_TYPES.has(declaredMime)) {
-      return true;
-    }
-    if (declaredMime === detectedMime) {
-      return true;
-    }
-
-    return (MIME_ALIASES[detectedMime] ?? []).includes(declaredMime);
-  }
-
-  private hasBlockedExtension(originalName: string): boolean {
-    return BLOCKED_UPLOAD_EXTENSIONS.has(extname(originalName).toLowerCase());
-  }
-
-  private attachmentDisposition(originalName: string): string {
-    const fallback = (originalName.replace(/[^\x20-\x7E]+/g, "_").replace(/["\\]/g, "_") || "file").slice(0, 120);
-    return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(originalName)}`;
-  }
-
-  private contentDisposition(mimeType: string, originalName: string): string | undefined {
-    if (mimeType.startsWith("image/") || mimeType.startsWith("audio/") || mimeType.startsWith("video/")) {
-      return undefined;
-    }
-
-    return this.attachmentDisposition(originalName);
-  }
-
   private async detectUploadMime(buffer: Buffer): Promise<string | null> {
     try {
-      return this.normalizeMimeType((await fileTypeFromBuffer(buffer))?.mime);
+      return normalizeMimeType((await fileTypeFromBuffer(buffer))?.mime);
     } catch {
       return null;
     }
   }
 
   private async validateUpload(file: UploadedMemoryFile, input: { imagePreset?: "cover" }): Promise<ValidatedUpload> {
-    const declaredMime = this.normalizeMimeType(file.mimetype);
-    if (BLOCKED_UPLOAD_MIME_TYPES.has(declaredMime) || this.hasBlockedExtension(file.originalname)) {
+    const declaredMime = normalizeMimeType(file.mimetype);
+    if (BLOCKED_UPLOAD_MIME_TYPES.has(declaredMime) || hasBlockedExtension(file.originalname)) {
       throw new BadRequestException("Формат файла не поддерживается.");
     }
 
@@ -585,10 +496,10 @@ export class FilesService {
     if (!detectedMime) {
       throw new BadRequestException("Не удалось определить безопасный тип файла.");
     }
-    if (BLOCKED_UPLOAD_MIME_TYPES.has(detectedMime) || !this.isAllowedDetectedMime(detectedMime)) {
+    if (BLOCKED_UPLOAD_MIME_TYPES.has(detectedMime) || !isAllowedDetectedMime(detectedMime)) {
       throw new BadRequestException("Формат файла не поддерживается.");
     }
-    if (!this.isDeclaredMimeCompatible(declaredMime, detectedMime)) {
+    if (!isDeclaredMimeCompatible(declaredMime, detectedMime)) {
       throw new BadRequestException("Тип файла не совпадает с его содержимым.");
     }
 
@@ -600,7 +511,7 @@ export class FilesService {
       buffer: file.buffer,
       extension: undefined,
       mimeType: detectedMime,
-      contentDisposition: this.contentDisposition(detectedMime, file.originalname),
+      contentDisposition: contentDisposition(detectedMime, file.originalname),
     };
   }
 
@@ -610,15 +521,15 @@ export class FilesService {
     sizeBytes: number;
     accessLevel?: FileAccessLevel;
   }) {
-    const declaredMime = this.normalizeMimeType(input.mimeType);
-    const mimeType = this.canonicalMimeType(declaredMime);
+    const declaredMime = normalizeMimeType(input.mimeType);
+    const mimeType = canonicalMimeType(declaredMime);
 
     if (
       !mimeType ||
       GENERIC_DECLARED_MIME_TYPES.has(mimeType) ||
       BLOCKED_UPLOAD_MIME_TYPES.has(mimeType) ||
-      this.hasBlockedExtension(input.originalName) ||
-      !this.isAllowedDetectedMime(mimeType)
+      hasBlockedExtension(input.originalName) ||
+      !isAllowedDetectedMime(mimeType)
     ) {
       throw new BadRequestException("Формат файла не поддерживается.");
     }
@@ -627,26 +538,6 @@ export class FilesService {
       ...input,
       mimeType,
     };
-  }
-
-  private storageKey(originalName: string, extensionOverride?: string): string {
-    const originalExtension = extname(originalName).toLowerCase();
-    const extension = extensionOverride ?? originalExtension;
-    const baseName = originalName
-      .slice(0, Math.max(0, originalName.length - originalExtension.length))
-      .trim()
-      .replace(SAFE_NAME_PATTERN, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80);
-    const safeBaseName = baseName || "file";
-    const date = new Date().toISOString().slice(0, 10);
-
-    return `uploads/${date}/${randomUUID()}-${safeBaseName}${extension}`;
-  }
-
-  private storageKeyWithExtension(storageKey: string, extension: string): string {
-    const currentExtension = extname(storageKey);
-    return `${storageKey.slice(0, Math.max(0, storageKey.length - currentExtension.length))}${extension}`;
   }
 
   private fileStorageKeys(asset: FileAsset): string[] {
@@ -734,7 +625,7 @@ export class FilesService {
         mimeType: metadata.mimeType,
         sizeBytes: metadata.sizeBytes,
         accessLevel: metadata.accessLevel ?? FileAccessLevel.authenticated,
-        storageKey: this.storageKey(metadata.originalName),
+        storageKey: buildStorageKey(metadata.originalName),
         uploadedById: userId,
       },
     });
@@ -773,10 +664,10 @@ export class FilesService {
     // публичные остаются в public-read бакете. Удаление и presign используют ту
     // же функцию выбора бакета, поэтому объект всегда ищется там, где лежит.
     const targetBucket = this.bucketForAccessLevel(accessLevel, bucket);
-    const storageKey = this.storageKey(file.originalname, upload.extension);
+    const storageKey = buildStorageKey(file.originalname, upload.extension);
     const variantUploads = (upload.variants ?? []).map((variant) => ({
       ...variant,
-      storageKey: this.storageKeyWithExtension(storageKey, variant.extension),
+      storageKey: storageKeyWithExtension(storageKey, variant.extension),
     }));
 
     await Promise.all([
