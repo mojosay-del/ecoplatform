@@ -5,7 +5,6 @@ import { DndContext, closestCenter, useSensors, type DragEndEvent } from "@dnd-k
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronRight, GripVertical, Plus } from "lucide-react";
-import { RowKebab, type ActionItem } from "../../../components/RowKebab";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";
 import { pluralizeRu } from "../../../lib/ru-plural";
 import type { Article } from "./types";
@@ -18,9 +17,7 @@ export function KnowledgeCategoryNode({
   sensors,
   onToggle,
   onSelect,
-  onPublishToggle,
   onAddMaterial,
-  onRemove,
   onReorder,
 }: {
   category: Article;
@@ -30,26 +27,9 @@ export function KnowledgeCategoryNode({
   sensors: ReturnType<typeof useSensors>;
   onToggle: () => void;
   onSelect: (article: Article) => void;
-  onPublishToggle: (article: Article) => void;
   onAddMaterial: () => void;
-  onRemove: (article: Article) => void;
   onReorder: (event: DragEndEvent) => void;
 }) {
-  const actions: ActionItem[] = [
-    {
-      label: category.status === "published" ? "Снять с публикации" : "Опубликовать",
-      onClick: () => onPublishToggle(category),
-    },
-    {
-      label: "Добавить материал",
-      onClick: () => {
-        onAddMaterial();
-        if (!expanded) onToggle();
-      },
-    },
-    { label: "Удалить категорию", onClick: () => onRemove(category), danger: true },
-  ];
-
   return (
     <li role="treeitem" aria-expanded={expanded}>
       <KnowledgeTreeRow
@@ -62,7 +42,6 @@ export function KnowledgeCategoryNode({
         status={category.status}
         title={category.title}
         meta={`${materials.length} ${pluralizeRu(materials.length, "материал", "материала", "материалов")}`}
-        actions={actions}
       />
       {expanded ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onReorder}>
@@ -157,7 +136,6 @@ export function KnowledgeUncategorizedNode({
         active={false}
         title="Без категории"
         meta={`${materials.length} ${pluralizeRu(materials.length, "материал", "материала", "материалов")}`}
-        actions={[]}
       />
       {expanded ? (
         <ul className="tree-children" role="group">
@@ -191,7 +169,6 @@ function KnowledgeMaterialRow({
       status={material.status}
       title={material.title}
       meta={`${material.blocks.length} ${pluralizeRu(material.blocks.length, "блок", "блока", "блоков")}`}
-      actions={[]}
       dragHandle={dragHandle}
     />
   );
@@ -207,7 +184,6 @@ function KnowledgeTreeRow({
   status,
   title,
   meta,
-  actions,
   dragHandle,
 }: {
   depth: number;
@@ -219,7 +195,6 @@ function KnowledgeTreeRow({
   status?: "draft" | "published";
   title: string;
   meta?: string;
-  actions: ActionItem[];
   dragHandle?: ReactNode;
 }) {
   return (
@@ -248,7 +223,6 @@ function KnowledgeTreeRow({
         <span className="tree-row-title">{title}</span>
         {meta ? <span className="tree-row-meta">{meta}</span> : null}
       </button>
-      {actions.length > 0 ? <RowKebab actions={actions} /> : <span aria-hidden />}
     </div>
   );
 }

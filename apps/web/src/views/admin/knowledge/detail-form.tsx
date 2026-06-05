@@ -1,6 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import type { Block } from "../../../lib/editor/block-types";
 import { DocumentEditor } from "../../../components/editor/DocumentEditor";
 import { FileUploadField } from "../../../components/FileUploadField";
@@ -19,6 +20,7 @@ export function KnowledgeDetailForm({
   setDraft,
   onSubmit,
   onCancel,
+  onAddMaterial,
   onRemove,
   onPublishToggle,
 }: {
@@ -33,6 +35,7 @@ export function KnowledgeDetailForm({
   setDraft: SetKnowledgeDraft;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
+  onAddMaterial: (categoryId: string) => void;
   onRemove: (article: Article) => void;
   onPublishToggle: (article: Article) => void;
 }) {
@@ -42,16 +45,18 @@ export function KnowledgeDetailForm({
   return (
     <form className="form news-form" onSubmit={onSubmit} onBlur={autosave.handleAutosaveBlur}>
       <div className="news-form-head">
-        <span className="news-form-mode">{isEditingNew ? `Новый ${draftLabel.toLowerCase()}` : draftLabel}</span>
+        <span className="news-form-mode">
+          {isEditingNew ? `Новый ${draftLabel.toLowerCase()}` : draftLabel}
+          {draft.kind === "material" && activeCategoryTitle ? ` · ${activeCategoryTitle}` : ""}
+        </span>
       </div>
 
       {draft.kind === "category" ? (
-        <fieldset className="form-fieldset">
-          <legend className="form-legend">Категория</legend>
-          <label className="form-field">
+        <>
+          <label className="form-field news-content-field">
             <span>Название</span>
             <input
-              className="news-form-title"
+              className="news-form-lead education-module-title-input"
               placeholder="Например: «Бумага и картон»"
               value={draft.title}
               onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
@@ -59,48 +64,51 @@ export function KnowledgeDetailForm({
             />
           </label>
 
-          <label className="form-field">
+          <label className="form-field news-content-field">
             <span>Короткое описание</span>
             <input
-              className="input"
+              className="news-form-lead"
               placeholder="Необязательно"
               value={draft.subtitle}
               onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
             />
           </label>
-        </fieldset>
+        </>
       ) : (
         <>
-          <div className="news-form-preview">
+          <label className="form-field news-content-field">
+            <span>Название материала</span>
+            <input
+              className="news-form-lead education-module-title-input"
+              placeholder="Заголовок материала..."
+              value={draft.title}
+              onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+              required
+            />
+          </label>
+
+          <label className="form-field news-content-field">
+            <span>Код номенклатуры</span>
+            <input
+              className="news-form-lead"
+              placeholder="Например: МС-5Б"
+              value={draft.subtitle}
+              onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
+            />
+          </label>
+
+          <div className="form-field news-content-field news-form-preview">
+            <span>Обложка материала</span>
             <FileUploadField
               accept="image/*"
               buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+              hideLabel
               imagePreset="cover"
               label="Обложка материала"
               value={draft.coverImageId}
               onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
             />
-            <div className="news-form-copy">
-              <span className="news-tile-category">{activeCategoryTitle ?? "Материал базы знаний"}</span>
-              <input
-                className="news-form-title"
-                placeholder="Заголовок материала..."
-                value={draft.title}
-                onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-                required
-              />
-            </div>
           </div>
-
-          <label className="news-lead-field">
-            <input
-              className="news-form-lead"
-              aria-label="Подзаголовок материала"
-              placeholder="Подзаголовок материала"
-              value={draft.subtitle}
-              onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
-            />
-          </label>
 
           <div className="form-field news-content-field">
             <span>Содержание материала</span>
@@ -132,8 +140,21 @@ export function KnowledgeDetailForm({
               Отмена
             </button>
           ) : null}
+          {!isEditingNew && original && draft.kind === "category" ? (
+            <button className="button secondary" type="button" onClick={() => onAddMaterial(original.id)}>
+              <Plus size={14} />
+              Материал
+            </button>
+          ) : null}
+          {!isEditingNew && original && draft.kind === "category" ? (
+            <button className="button secondary danger" type="button" onClick={() => onRemove(original)}>
+              <Trash2 size={14} />
+              Удалить категорию
+            </button>
+          ) : null}
           {!isEditingNew && original && draft.kind === "material" ? (
             <button className="button secondary danger" type="button" onClick={() => onRemove(original)}>
+              <Trash2 size={14} />
               Удалить публикацию
             </button>
           ) : null}

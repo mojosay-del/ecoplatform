@@ -87,10 +87,11 @@ export function NewsEditorForm({
         </div>
       </div>
 
-      <label className="news-lead-field">
+      <label className="form-field news-content-field">
+        <span>Подзаголовок</span>
         <input
           className="news-form-lead"
-          aria-label="Описание новости"
+          aria-label="Подзаголовок новости"
           placeholder="Краткое содержание, 1–2 предложения"
           value={draft.lead}
           onChange={(event) => onDraftChange((prev) => ({ ...prev, lead: event.target.value }))}

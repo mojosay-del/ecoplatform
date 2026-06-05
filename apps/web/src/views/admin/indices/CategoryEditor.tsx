@@ -3,9 +3,20 @@
 // Правая панель при выборе категории: переименование и позиция.
 
 import { FormEvent, useEffect, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import type { Category, MutateFn } from "./types";
 
-export function CategoryEditor({ category, onMutate }: { category: Category; onMutate: MutateFn }) {
+export function CategoryEditor({
+  category,
+  onMutate,
+  onAddNomenclature,
+  onDeleteCategory,
+}: {
+  category: Category;
+  onMutate: MutateFn;
+  onAddNomenclature: (category: Category) => void;
+  onDeleteCategory: (category: Category) => void;
+}) {
   const [draft, setDraft] = useState({ name: category.name, position: category.position });
   const [saving, setSaving] = useState(false);
 
@@ -52,6 +63,14 @@ export function CategoryEditor({ category, onMutate }: { category: Category; onM
           {saving ? "Сохраняю…" : hasChanges ? "Есть несохранённые изменения" : "Всё сохранено"}
         </span>
         <div className="lesson-save-bar-actions">
+          <button className="button secondary" type="button" onClick={() => onAddNomenclature(category)}>
+            <Plus size={14} />
+            Номенклатура
+          </button>
+          <button className="button secondary danger" type="button" onClick={() => onDeleteCategory(category)}>
+            <Trash2 size={14} />
+            Удалить категорию
+          </button>
           <button className="button" type="submit" disabled={!hasChanges || saving}>
             {saving ? "Сохраняю…" : "Сохранить"}
           </button>

@@ -443,9 +443,7 @@ export function AdminKnowledgeView() {
                   sensors={sensors}
                   onToggle={() => toggleExpand(category.id)}
                   onSelect={startEdit}
-                  onPublishToggle={publishToggle}
                   onAddMaterial={() => startNewMaterial(category.id)}
-                  onRemove={remove}
                   onReorder={(event) => void reorderMaterials(category.id, event)}
                 />
               ))}
@@ -475,6 +473,7 @@ export function AdminKnowledgeView() {
                 setDraft={setDraft}
                 onSubmit={(event) => void submit(event)}
                 onCancel={() => setDraft(EMPTY_MATERIAL_DRAFT)}
+                onAddMaterial={(categoryId) => startNewMaterial(categoryId)}
                 onRemove={(article) => void remove(article)}
                 onPublishToggle={(article) => void publishToggle(article)}
               />

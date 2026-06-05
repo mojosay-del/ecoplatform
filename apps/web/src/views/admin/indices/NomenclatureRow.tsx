@@ -4,29 +4,25 @@ import { type CSSProperties } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Package } from "lucide-react";
-import { RowKebab, type ActionItem } from "../../../components/RowKebab";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";
 import type { Nomenclature } from "./types";
 
 // Строка номенклатуры в дереве каталога: drag-handle, индикатор статуса индекса
-// и kebab-меню. Перетаскивание обслуживает dnd-kit (sortable).
+// и выбор записи. Перетаскивание обслуживает dnd-kit (sortable).
 export function SortableNomenclatureRow({
   nomenclature,
   active,
   onSelect,
-  onDelete,
 }: {
   nomenclature: Nomenclature;
   active: boolean;
   onSelect: () => void;
-  onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: nomenclature.id,
   });
   const hasIndex = Boolean(nomenclature.priceIndex);
   const isPublished = nomenclature.priceIndex?.status === "published";
-  const actions: ActionItem[] = [{ label: "Удалить номенклатуру", danger: true, onClick: onDelete }];
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -69,7 +65,6 @@ export function SortableNomenclatureRow({
           <span className="tree-row-title">{nomenclature.name}</span>
           <span className="tree-row-meta">{nomenclature.code}</span>
         </button>
-        <RowKebab actions={actions} />
       </div>
     </li>
   );

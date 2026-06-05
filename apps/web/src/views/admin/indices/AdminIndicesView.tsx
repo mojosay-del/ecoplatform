@@ -15,7 +15,6 @@ import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-ki
 import { ChevronRight, FolderOpen, Plus } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
-import { RowKebab, type ActionItem } from "../../../components/RowKebab";
 import { apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { formatPriceValuesCount } from "./format";
@@ -121,6 +120,19 @@ export function AdminIndicesView() {
     }
   }
 
+  async function deleteCategory(category: Category) {
+    if (!confirm(`Удалить категорию «${category.name}»?`)) return;
+    const ok = await mutate(`/admin/content/indices/categories/${category.id}`, "DELETE");
+    if (ok && selection.kind === "category" && selection.id === category.id) {
+      setSelection({ kind: "none" });
+    }
+  }
+
+  function openNomenclatureCreate(categoryId: string) {
+    setCreateOpen({ type: "nomenclature", categoryId });
+    setExpanded((prev) => (prev.has(categoryId) ? prev : new Set(prev).add(categoryId)));
+  }
+
   async function reorderNomenclatures(categoryId: string, event: DragEndEvent) {
     if (!token) return;
     const { active, over } = event;
@@ -191,24 +203,6 @@ export function AdminIndicesView() {
             <ul className="tree" role="tree">
               {categories.map((category) => {
                 const isExpanded = expanded.has(category.id);
-                const categoryActions: ActionItem[] = [
-                  {
-                    label: "Добавить номенклатуру",
-                    onClick: () => {
-                      setCreateOpen({ type: "nomenclature", categoryId: category.id });
-                      if (!isExpanded) toggleExpand(category.id);
-                    },
-                  },
-                  {
-                    label: "Удалить категорию",
-                    danger: true,
-                    onClick: () => {
-                      if (confirm(`Удалить категорию «${category.name}»?`)) {
-                        void mutate(`/admin/content/indices/categories/${category.id}`, "DELETE");
-                      }
-                    },
-                  },
-                ];
                 return (
                   <li key={category.id} role="treeitem" aria-expanded={isExpanded}>
                     <div
@@ -241,7 +235,6 @@ export function AdminIndicesView() {
                         <span className="tree-row-title">{category.name}</span>
                         <span className="tree-row-meta">{category.nomenclatures.length} позиций</span>
                       </button>
-                      <RowKebab actions={categoryActions} />
                     </div>
                     {isExpanded ? (
                       <DndContext
@@ -260,7 +253,6 @@ export function AdminIndicesView() {
                                 nomenclature={nomenclature}
                                 active={selection.kind === "nomenclature" && selection.id === nomenclature.id}
                                 onSelect={() => setSelection({ kind: "nomenclature", id: nomenclature.id })}
-                                onDelete={() => void deleteNomenclature(nomenclature)}
                               />
                             ))}
                             {createOpen &&
@@ -279,7 +271,7 @@ export function AdminIndicesView() {
                                 <button
                                   type="button"
                                   className="tree-add-button"
-                                  onClick={() => setCreateOpen({ type: "nomenclature", categoryId: category.id })}
+                                  onClick={() => openNomenclatureCreate(category.id)}
                                 >
                                   <Plus size={14} /> Номенклатура
                                 </button>
@@ -305,7 +297,13 @@ export function AdminIndicesView() {
                 onDeleteNomenclature={deleteNomenclature}
               />
             ) : activeCategory ? (
-              <CategoryEditor key={activeCategory.id} category={activeCategory} onMutate={mutate} />
+              <CategoryEditor
+                key={activeCategory.id}
+                category={activeCategory}
+                onMutate={mutate}
+                onAddNomenclature={(category) => openNomenclatureCreate(category.id)}
+                onDeleteCategory={(category) => void deleteCategory(category)}
+              />
             ) : (
               <div className="indices-empty-detail">
                 <FolderOpen size={28} />
