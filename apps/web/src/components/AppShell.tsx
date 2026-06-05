@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { HelpCircle, Menu } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import {
@@ -28,7 +28,15 @@ import { UserSupportDrawer } from "./UserSupportDrawer";
 
 export type { AppShellChrome };
 
-export function AppShell({ children, chrome = {} }: { children: React.ReactNode; chrome?: AppShellChrome }) {
+export function AppShell({ children, chrome = {} }: { children: ReactNode; chrome?: AppShellChrome }) {
+  return (
+    <Suspense fallback={null}>
+      <AppShellContent chrome={chrome}>{children}</AppShellContent>
+    </Suspense>
+  );
+}
+
+function AppShellContent({ children, chrome }: { children: ReactNode; chrome: AppShellChrome }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
