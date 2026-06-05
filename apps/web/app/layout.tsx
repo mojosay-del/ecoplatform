@@ -1,16 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { CookieConsent } from "../src/components/CookieConsent";
 import { AuthProvider } from "../src/lib/auth";
 import "../src/styles/tokens.css";
 import "../src/styles/globals.css";
 
-// Подключаем Inter (с кириллицей) через next/font — раньше шрифт был только
-// заявлен в CSS, но не загружался, и на телефонах текст рендерился системным.
-const inter = Inter({
-  subsets: ["latin", "cyrillic"],
+// Шрифт лежит в репозитории, чтобы production build не зависел от Google Fonts.
+const inter = localFont({
+  src: "../src/fonts/Inter-Variable.ttf",
   display: "swap",
   variable: "--font-inter",
+  weight: "100 900",
 });
 
 export const metadata: Metadata = {

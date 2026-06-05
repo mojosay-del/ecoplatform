@@ -16,6 +16,7 @@
   --lp-line-soft: rgb(26 18 8 / 0.06);
   --lp-muted: #6b5f50;
   --lp-display: var(--font-display, "Unbounded"), var(--font-inter), system-ui, sans-serif;
+  --lp-numeric: var(--font-display, "Unbounded"), var(--font-inter), system-ui, sans-serif;
   --lp-shell: min(1180px, 92vw);
 
   position: relative;
@@ -24,7 +25,7 @@
   background: var(--lp-paper);
   color: var(--lp-ink);
   overflow-x: clip;
-  font-feature-settings: "ss01", "cv01";
+  font-feature-settings: normal;
 }
 
 .lp * {
@@ -424,10 +425,16 @@
   fill: rgb(215 58 73 / 0.08);
 }
 .lp-idx__price {
-  font-family: var(--lp-display);
+  font-family: var(--lp-numeric);
   font-weight: 700;
   font-size: 19px;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings:
+    "ss01" 0,
+    "cv01" 0,
+    "tnum" 1,
+    "lnum" 1;
 }
 .lp-idx__price span {
   font-family: var(--font-inter);
@@ -758,11 +765,17 @@
   display: inline-flex;
   align-items: flex-start;
   gap: 3px;
-  font-family: var(--lp-display);
+  font-family: var(--lp-numeric);
   font-weight: 700;
   font-size: clamp(36px, 5vw, 60px);
   letter-spacing: -0.03em;
   line-height: 1.12;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings:
+    "ss01" 0,
+    "cv01" 0,
+    "tnum" 1,
+    "lnum" 1;
 }
 .lp-metric__v > span {
   display: inline-block;

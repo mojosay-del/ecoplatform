@@ -87,6 +87,7 @@ function referencePrisma(overrides: Record<string, unknown> = {}) {
   return {
     newsPost: { count: vi.fn().mockResolvedValue(0) },
     learningModule: { count: vi.fn().mockResolvedValue(0) },
+    lesson: { count: vi.fn().mockResolvedValue(0) },
     knowledgeBaseArticle: { count: vi.fn().mockResolvedValue(0) },
     lessonAttachment: { count: vi.fn().mockResolvedValue(0) },
     commentAttachment: { count: vi.fn().mockResolvedValue(0) },

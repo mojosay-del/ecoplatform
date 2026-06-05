@@ -1,4 +1,4 @@
-import { Unbounded } from "next/font/google";
+import localFont from "next/font/local";
 import "../../styles/landing.css";
 import { LandingClient } from "../../components/LandingClient";
 import { CtaSection } from "./CtaSection";
@@ -14,13 +14,13 @@ import { PriceIndicesSection } from "./PriceIndicesSection";
 import { WhySection } from "./WhySection";
 import { WorkspaceSection } from "./WorkspaceSection";
 
-// Display-шрифт только для заголовков лендинга (с кириллицей). Подключаем здесь,
-// чтобы он не грузился на остальных страницах кабинета.
-const display = Unbounded({
-  subsets: ["latin", "cyrillic"],
-  weight: ["600", "700"],
+// Display-шрифт только для заголовков лендинга; файл лежит в репозитории,
+// чтобы сборка не зависела от внешних font-сервисов.
+const display = localFont({
+  src: "../../fonts/Unbounded-Variable.ttf",
   display: "swap",
   variable: "--font-display",
+  weight: "600 700",
 });
 
 export function LandingView() {
