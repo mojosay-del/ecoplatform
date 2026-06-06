@@ -131,10 +131,17 @@ export function bucketForAccessLevel(accessLevel: FileAccessLevel, publicBucket:
  *    (объект ещё в публичном бакете, не мигрирован) — без регрессии выдачи;
  *  - S3 не настроен → null.
  * Принимает пачку, чтобы на странице урока создавать S3-клиент один раз.
+ *
+ * options.inline: для медиа-плеера (video/audio) presign БЕЗ
+ * Content-Disposition: attachment — иначе Safari/iOS отказываются проигрывать
+ * ресурс в <video>/<audio> и предлагают только скачать. Объект в S3 хранится с
+ * корректным ContentType и inline-расположением, presigned-GET поддерживает
+ * Range — этого достаточно для воспроизведения во всех браузерах.
  */
 export async function signS3DownloadUrls(
   assets: Array<Pick<FileAsset, "id" | "storageKey" | "accessLevel" | "originalName">>,
   ttlSeconds: number,
+  options: { inline?: boolean } = {},
 ): Promise<Map<string, string | null>> {
   const urls = new Map<string, string | null>();
   if (assets.length === 0) {
@@ -162,7 +169,7 @@ export async function signS3DownloadUrls(
       const command = new GetObjectCommand({
         Bucket: bucket,
         Key: asset.storageKey,
-        ResponseContentDisposition: downloadContentDisposition(asset.originalName),
+        ...(options.inline ? {} : { ResponseContentDisposition: downloadContentDisposition(asset.originalName) }),
       });
       urls.set(asset.id, await getSignedUrl(config.client, command, { expiresIn: ttlSeconds }));
     }

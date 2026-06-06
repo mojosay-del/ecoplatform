@@ -5,10 +5,10 @@
 // helpers по работе с деревом.
 
 import Link from "next/link";
-import Image from "next/image";
 import { useMemo } from "react";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
+import { CoverImage } from "../components/CoverImage";
 import { api, preferredFileAssetImageUrl } from "../lib/api";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./shared";
@@ -52,7 +52,14 @@ export function KnowledgeArticleView({ slug }: { slug: string }) {
     return (
       <AppShell>
         <section className="page">
-          <PageHeader title="База знаний" subtitle="Загружаем статью…" />
+          <PageHeader title="База знаний" />
+          <div className="page-skeleton-body page-skeleton-article" aria-busy="true">
+            <div className="page-skeleton-bar w-3-4" />
+            <div className="page-skeleton-bar w-2-3" />
+            <div className="page-skeleton-bar w-full" />
+            <div className="page-skeleton-bar w-full" />
+            <div className="page-skeleton-bar w-1-2" />
+          </div>
         </section>
       </AppShell>
     );
@@ -131,15 +138,13 @@ function KnowledgeBaseLayout({
                 </div>
 
                 {activeCoverUrl ? (
-                  <div className="knowledge-article-shell">
+                  <div className="knowledge-article-shell content-fade-in" key={active.slug}>
                     <figure className="knowledge-cover">
-                      <Image
+                      <CoverImage
                         alt={activeCover?.originalName ?? active.title}
                         src={activeCoverUrl}
-                        fill
-                        loading="eager"
+                        eager
                         sizes="(max-width: 1024px) 100vw, 800px"
-                        style={{ objectFit: "cover" }}
                       />
                     </figure>
                     <article className="knowledge-article-card content-article">
@@ -151,7 +156,7 @@ function KnowledgeBaseLayout({
                     </article>
                   </div>
                 ) : (
-                  <article className="knowledge-article-card content-article">
+                  <article className="knowledge-article-card content-article content-fade-in" key={active.slug}>
                     {(active.blocks ?? []).length > 0 ? (
                       <ContentBlocks blocks={active.blocks ?? []} />
                     ) : (
@@ -175,13 +180,7 @@ function KnowledgeBaseLayout({
                           >
                             {childCoverUrl ? (
                               <div className="knowledge-child-card-cover">
-                                <Image
-                                  alt=""
-                                  src={childCoverUrl}
-                                  fill
-                                  sizes="(max-width: 768px) 100vw, 280px"
-                                  style={{ objectFit: "cover" }}
-                                />
+                                <CoverImage alt="" src={childCoverUrl} sizes="(max-width: 768px) 100vw, 280px" />
                               </div>
                             ) : null}
                             <strong>{child.title}</strong>

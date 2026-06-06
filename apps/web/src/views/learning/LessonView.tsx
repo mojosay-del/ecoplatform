@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { GraduationCap } from "lucide-react";
 import type { LearningChapterDetail, LearningModuleDetail, LessonDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
+import { CoverImage } from "../../components/CoverImage";
 import { StatusPill } from "../../components/StatusPill";
 import { ApiError, api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -129,7 +129,14 @@ export function LessonView({
     return (
       <AppShell>
         <section className="page">
-          <PageHeader title="Урок" subtitle="Загружаем…" />
+          <PageHeader title="Урок" />
+          <div className="page-skeleton-body page-skeleton-article" aria-busy="true">
+            <div className="page-skeleton-card" style={{ minHeight: 260 }} />
+            <div className="page-skeleton-bar w-3-4" />
+            <div className="page-skeleton-bar w-full" />
+            <div className="page-skeleton-bar w-full" />
+            <div className="page-skeleton-bar w-1-2" />
+          </div>
         </section>
       </AppShell>
     );
@@ -231,13 +238,11 @@ export function LessonView({
           <article className="lesson-main lesson-scroll-reveal" ref={lessonMainRef}>
             {lessonCoverUrl ? (
               <figure className="lesson-cover">
-                <Image
+                <CoverImage
                   alt={lessonCover?.originalName ?? lesson.title}
                   src={lessonCoverUrl}
-                  fill
-                  loading="eager"
+                  eager
                   sizes="(max-width: 1100px) 100vw, 760px"
-                  style={{ objectFit: "cover" }}
                 />
                 <div className="lesson-cover-title-wrap">
                   <div className="lesson-cover-caption">

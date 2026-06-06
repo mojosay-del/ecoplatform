@@ -74,6 +74,12 @@ const S3_HEALTH_TIMEOUT_MS = 1_000;
 // и доступ перепроверяется заново (истёкшая подписка ссылку уже не получит).
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
+// Медиа, которое проигрывается в плеере прямо на странице (видео/аудио уроков).
+// Для таких файлов считаем inline-ссылку (streamUrl) без attachment-расположения.
+function isPlayableMedia(mimeType: string): boolean {
+  return mimeType.startsWith("video/") || mimeType.startsWith("audio/");
+}
+
 @Injectable()
 export class FilesService {
   constructor(
@@ -105,8 +111,9 @@ export class FilesService {
   async signDownloadUrls(
     assets: Array<Pick<FileAsset, "id" | "storageKey" | "accessLevel" | "originalName">>,
     ttlSeconds = SIGNED_URL_TTL_SECONDS,
+    options: { inline?: boolean } = {},
   ): Promise<Map<string, string | null>> {
-    return signS3DownloadUrls(assets, ttlSeconds);
+    return signS3DownloadUrls(assets, ttlSeconds, options);
   }
 
   async createSignedDownloadUrl(
@@ -350,6 +357,10 @@ export class FilesService {
     // чтобы редактор/превью показали загруженный файл без отдельного запроса.
     const response = toFileAssetResponse(asset);
     response.downloadUrl = await this.createSignedDownloadUrl(asset);
+    if (isPlayableMedia(asset.mimeType)) {
+      response.streamUrl =
+        (await this.signDownloadUrls([asset], SIGNED_URL_TTL_SECONDS, { inline: true })).get(asset.id) ?? null;
+    }
     return response;
   }
 
@@ -372,7 +383,18 @@ export class FilesService {
     });
 
     const signed = await this.signDownloadUrls(assets);
-    return assets.map((asset) => ({ ...toFileAssetResponse(asset), downloadUrl: signed.get(asset.id) ?? null }));
+    // Для медиа (video/audio) дополнительно считаем inline-ссылку для плеера —
+    // без attachment-расположения, иначе Safari/iOS не воспроизводят файл.
+    const mediaAssets = assets.filter((asset) => isPlayableMedia(asset.mimeType));
+    const streamed =
+      mediaAssets.length > 0
+        ? await this.signDownloadUrls(mediaAssets, SIGNED_URL_TTL_SECONDS, { inline: true })
+        : new Map<string, string | null>();
+    return assets.map((asset) => ({
+      ...toFileAssetResponse(asset),
+      downloadUrl: signed.get(asset.id) ?? null,
+      streamUrl: streamed.get(asset.id) ?? null,
+    }));
   }
 
   private async hasStructuredReference(fileId: string) {

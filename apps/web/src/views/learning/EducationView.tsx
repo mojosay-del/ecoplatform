@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import type { LearningChapterSummary, LearningModuleListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
+import { CoverImage } from "../../components/CoverImage";
 import { StatusPill } from "../../components/StatusPill";
 import { api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useCoverAssets } from "../../lib/use-cover-assets";
@@ -38,6 +38,17 @@ export function EducationView() {
     <AppShell>
       <section className="page">
         <PageHeader title="Обучение" />
+        {state === "loading" ? (
+          <div className="education-grid" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <article className="education-card" key={index} aria-hidden="true">
+                <div className="education-card-cover">
+                  <span className="cover-skeleton" />
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
         <div className="education-grid">
           {data.map((module) => {
             const lessonsCount =
@@ -53,12 +64,10 @@ export function EducationView() {
                 <Link className="education-card-link" href={`/education/${module.id}`}>
                   <div className="education-card-cover">
                     {coverUrl ? (
-                      <Image
+                      <CoverImage
                         alt=""
                         src={coverUrl}
-                        fill
                         sizes="(max-width: 880px) 100vw, (max-width: 1180px) 35vw, (max-width: 1500px) 25vw, 480px"
-                        style={{ objectFit: "cover" }}
                       />
                     ) : (
                       <div className="education-card-cover-fallback" />
@@ -83,6 +92,7 @@ export function EducationView() {
             );
           })}
         </div>
+        )}
       </section>
     </AppShell>
   );

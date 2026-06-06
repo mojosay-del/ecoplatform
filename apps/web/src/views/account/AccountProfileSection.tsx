@@ -8,7 +8,6 @@ import {
   PLATFORM_ROLE_LABELS,
   USER_GENDER_LABELS,
 } from "../../lib/display-labels";
-import { StatusPill, companyStatusPillVariant } from "../../components/StatusPill";
 import { PROFILE_PHOTO_HINT } from "./constants";
 import { describeSubscription } from "./format";
 import { AccountDetailList, AccountEditableValue, AccountPasswordValue, AccountScrollSection } from "./shared";
@@ -198,6 +197,8 @@ export function AccountProfileSection({
             ]}
           />
         </article>
+        {/* Для сотрудников платформы карточка компании не нужна — их роли уже
+            показаны в верхней приветственной плашке кабинета. */}
         {!isPlatformStaff ? (
           billing ? (
             <CompanyProfileForm billing={billing} onSaved={onBillingSaved} />
@@ -209,19 +210,7 @@ export function AccountProfileSection({
               </p>
             </article>
           )
-        ) : (
-          <article className="card account-card">
-            <h2>Сотрудник платформы</h2>
-            <p className="page-subtitle">Этот аккаунт не привязан к клиентской компании.</p>
-            <div className="account-pill-row">
-              {user?.platformRoles?.map((role) => (
-                <StatusPill key={role} variant="brand">
-                  {PLATFORM_ROLE_LABELS[role] ?? role}
-                </StatusPill>
-              ))}
-            </div>
-          </article>
-        )}
+        ) : null}
       </div>
     </AccountScrollSection>
   );

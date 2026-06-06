@@ -21,6 +21,10 @@ export type FileAssetResponse = Omit<FileAsset, "variants"> & {
   // приватных — короткоживущая presigned-ссылка (или null, если S3 не настроен
   // / запросившему не положено). См. signDownloadUrls.
   downloadUrl: string | null;
+  // Ссылка для inline-воспроизведения медиа (video/audio) в плеере: presigned
+  // БЕЗ attachment-расположения, чтобы играло в Safari/iOS. null для не-медиа.
+  // См. findManyByIds.
+  streamUrl: string | null;
   variants: FileAssetImageVariants | null;
 };
 
@@ -72,6 +76,8 @@ export function toFileAssetResponse(asset: FileAsset): FileAssetResponse {
     // Вызовы, которым нужна presigned-ссылка для приватного файла, перезаписывают
     // это поле через signDownloadUrls (см. upload / findManyByIds).
     downloadUrl: resolvedPublicUrl,
+    // По умолчанию нет inline-ссылки; findManyByIds/upload проставляют её для медиа.
+    streamUrl: null,
     variants: variantResponse(asset),
   };
 }

@@ -101,7 +101,11 @@ export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
           return (
             <figure className="media-block" key={index}>
               {payload.episodeTitle ? <h3>{payload.episodeTitle}</h3> : null}
-              {asset?.publicUrl ? <audio controls src={asset.publicUrl} /> : <MissingAsset />}
+              {asset?.streamUrl ?? asset?.publicUrl ? (
+                <audio controls src={asset.streamUrl ?? asset.publicUrl ?? undefined} />
+              ) : (
+                <MissingAsset />
+              )}
               {payload.caption ? <figcaption>{payload.caption}</figcaption> : null}
             </figure>
           );
@@ -256,25 +260,35 @@ function MissingAsset() {
 
 function VideoBlock({ asset, caption }: { asset: FileAsset | null | undefined; caption?: string }) {
   const [failed, setFailed] = useState(false);
-  const url = asset?.publicUrl ?? asset?.downloadUrl ?? null;
+  // streamUrl — inline-presigned для медиа (играет в Safari/iOS). publicUrl —
+  // для публичных видео. downloadUrl (attachment) только как крайний фолбэк.
+  const url = asset?.streamUrl ?? asset?.publicUrl ?? asset?.downloadUrl ?? null;
 
   return (
     <figure className="media-block">
       {!url ? (
         <MissingAsset />
       ) : failed ? (
-        // Браузер не смог проиграть файл (частый случай — видео с iPhone в
-        // формате .mov/HEVC, которое Chrome и Firefox не декодируют). Вместо
-        // перечёркнутой кнопки показываем понятное сообщение и ссылку на скачивание.
+        // Крайний случай: даже с inline-ссылкой браузер не смог декодировать
+        // кодек (например .mov/HEVC). Скачивание материалов — в «Материалах
+        // урока»; здесь даём только понятное сообщение.
         <div className="video-fallback">
-          <p className="video-fallback-text">Это видео не воспроизводится в браузере.</p>
-          <a className="button secondary" href={url} target="_blank" rel="noreferrer">
-            Скачать видео
-          </a>
+          <p className="video-fallback-text">
+            Не удалось воспроизвести видео в этом браузере. Попробуйте обновить страницу или открыть урок в другом
+            браузере.
+          </p>
         </div>
       ) : (
         <div className="video-player">
-          <video controls playsInline preload="metadata" src={url} onError={() => setFailed(true)} />
+          <video
+            controls
+            playsInline
+            preload="metadata"
+            controlsList="nodownload"
+            onError={() => setFailed(true)}
+          >
+            <source src={url} type={asset?.mimeType || undefined} />
+          </video>
         </div>
       )}
       {caption ? <figcaption>{caption}</figcaption> : null}

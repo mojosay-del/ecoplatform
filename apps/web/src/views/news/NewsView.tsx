@@ -146,9 +146,20 @@ export function NewsView() {
         {showOnboarding && user ? <NewsOnboardingCard user={user} onDismiss={dismissOnboarding} /> : null}
 
         {state === "loading" ? (
-          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            Загрузка…
-          </p>
+          <div className="news-masonry" aria-busy="true">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <article className="news-tile" key={index} aria-hidden="true">
+                <div className="news-tile-cover">
+                  <span className="cover-skeleton" />
+                </div>
+                <div className="news-tile-body">
+                  <div className="page-skeleton-bar w-3-4" />
+                  <div className="page-skeleton-bar w-full" />
+                  <div className="page-skeleton-bar w-1-2" />
+                </div>
+              </article>
+            ))}
+          </div>
         ) : items.length === 0 ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
             {selectedTags.length > 0 ? "Нет публикаций с выбранными тегами." : "Пока нет публикаций."}

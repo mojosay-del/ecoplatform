@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FileAccessLevel } from "@prisma/client";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import sharp from "sharp";
 import { FilesService } from "./files.service";
 
@@ -32,6 +33,7 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
 beforeEach(() => {
   s3Send.mockReset();
   s3Send.mockResolvedValue({});
+  vi.mocked(getSignedUrl).mockClear();
 });
 
 function serviceWithPrisma(prisma: Record<string, unknown>) {
@@ -646,6 +648,44 @@ describe("FilesService приватный бакет + signed URL", () => {
       orderBy: { createdAt: "desc" },
     });
     expect(result[0]?.downloadUrl).toBe("https://signed.example/private-bucket/uploads/2026-06-02/a.pdf");
+  });
+
+  it("findManyByIds: приватное видео получает inline streamUrl без attachment-расположения", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "vid-1",
+            storageKey: "uploads/2026-06-06/lesson.mp4",
+            accessLevel: FileAccessLevel.authenticated,
+            originalName: "lesson.mp4",
+            mimeType: "video/mp4",
+            sizeBytes: 100,
+            variants: null,
+            createdAt: new Date("2026-06-06T00:00:00.000Z"),
+          },
+        ]),
+        findUnique: vi.fn(),
+        aggregate: vi.fn(),
+        delete: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    const result = await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: "private-bucket" }, () =>
+      service.findManyByIds(["vid-1"], { id: "cm-1", platformRoles: ["content_manager"] } as any),
+    );
+
+    // streamUrl присутствует (плеер играет в Safari/iOS), downloadUrl тоже.
+    expect(result[0]?.streamUrl).toBe("https://signed.example/private-bucket/uploads/2026-06-06/lesson.mp4");
+    expect(result[0]?.downloadUrl).toBe("https://signed.example/private-bucket/uploads/2026-06-06/lesson.mp4");
+
+    // Для inline-ссылки presign идёт БЕЗ ResponseContentDisposition, для скачивания — С ним.
+    const dispositions = vi.mocked(getSignedUrl).mock.calls.map(
+      ([, command]) => (command as { input?: Record<string, unknown> }).input?.ResponseContentDisposition,
+    );
+    expect(dispositions).toContain(undefined);
+    expect(dispositions.some((value) => typeof value === "string")).toBe(true);
   });
 
   it("signDownloadUrls: public → прямая публичная ссылка", async () => {

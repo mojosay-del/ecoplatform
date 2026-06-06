@@ -29,6 +29,9 @@ export type FileAsset = {
   // Ссылка для скачивания: для public совпадает с publicUrl, для приватных —
   // короткоживущая presigned-ссылка (или null, если файл недоступен запросившему).
   downloadUrl?: string | null;
+  // Ссылка для inline-воспроизведения медиа (video/audio) в плеере — presigned
+  // без attachment-расположения, чтобы играло в Safari/iOS. null для не-медиа.
+  streamUrl?: string | null;
   createdAt: string;
 };
 

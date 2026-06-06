@@ -8,7 +8,6 @@ import {
   Headphones,
   Newspaper,
   ScrollText,
-  Settings2,
   ShieldAlert,
   SlidersHorizontal,
   TrendingUp,
@@ -155,15 +154,6 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         roles: ["admin", "moderator"],
         description: "Жалобы, кейсы и решения модераторов.",
         icon: ShieldAlert,
-      },
-      {
-        href: "/admin/settings#moderation",
-        label: "Модерация",
-        pathname: "/admin/settings",
-        hash: "moderation",
-        roles: ["admin"],
-        description: "Правила санкций и сроков блокировок.",
-        icon: Settings2,
       },
       {
         href: "/admin/journals",

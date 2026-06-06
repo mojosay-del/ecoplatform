@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { GraduationCap } from "lucide-react";
 import type { LearningChapterDetail, LearningModuleDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
+import { CoverImage } from "../../components/CoverImage";
 import { StatusPill } from "../../components/StatusPill";
 import { api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useCoverAssets } from "../../lib/use-cover-assets";
@@ -76,14 +76,7 @@ export function LearningModuleView({ moduleId, preview = false }: { moduleId: st
         <header className={`module-hero${coverUrl ? "" : " no-cover"}`}>
           <div className="module-hero-cover">
             {coverUrl ? (
-              <Image
-                alt={data.title}
-                src={coverUrl}
-                fill
-                sizes="(max-width: 1024px) 100vw, 600px"
-                style={{ objectFit: "cover" }}
-                priority
-              />
+              <CoverImage alt={data.title} src={coverUrl} sizes="(max-width: 1024px) 100vw, 600px" priority />
             ) : (
               <div className="module-hero-cover-fallback" />
             )}

@@ -1,7 +1,7 @@
-import Image from "next/image";
 import { MessageCircle, ThumbsUp } from "lucide-react";
 import type { NewsListItem } from "@ecoplatform/shared";
 import { preferredFileAssetImageUrl, type FileAsset } from "../../lib/api";
+import { CoverImage } from "../../components/CoverImage";
 import { NewsMetaItem, formatNewsDate } from "../shared";
 
 export function NewsCard({
@@ -39,13 +39,11 @@ export function NewsCard({
       >
         {hasCover ? (
           <div className="news-tile-cover">
-            <Image
+            <CoverImage
               alt={cover?.originalName ?? post.title}
               src={coverUrl!}
-              fill
-              loading={index < 4 ? "eager" : "lazy"}
+              eager={index < 4}
               sizes="(max-width: 640px) 100vw, (max-width: 880px) 50vw, (max-width: 1024px) 40vw, (max-width: 1360px) 25vw, 20vw"
-              style={{ objectFit: "cover" }}
             />
           </div>
         ) : null}
