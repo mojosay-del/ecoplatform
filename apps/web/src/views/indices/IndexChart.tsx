@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   buildSmoothChartPath,
   formatIndexDateLabel,
@@ -11,8 +11,13 @@ import {
 import type { IndexPeriod, IndexPoint } from "./types";
 
 export function IndexChart({ points, period }: { points: IndexPoint[]; period: IndexPeriod }) {
-  // Хук всегда вызывается, до раннего return — иначе сломается порядок hooks.
-  const uid = useMemo(() => Math.random().toString(36).slice(2, 9), []);
+  // useId даёт стабильный идентификатор и на SSR, и на клиенте. Раньше тут был
+  // Math.random(): на сервере и при гидрации значения расходились, из-за чего
+  // ссылки `fill/stroke="url(#…)"` на части карточек указывали на несуществующий
+  // градиент — и кривая/заливка просто не рисовались. Двоеточия из useId
+  // экранируем — они недопустимы в SVG id/url(#…).
+  const rawId = useId();
+  const uid = rawId.replace(/:/g, "");
   const lineGradId = `index-line-${uid}`;
   const areaGradId = `index-area-${uid}`;
   const fadeMaskId = `index-fade-${uid}`;
@@ -145,6 +150,11 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
     <div className="index-chart-wrap">
       <svg
         className="index-chart"
+        // width/height задают интринсик-пропорции: без них Safari при
+        // CSS `height:auto` + только viewBox иногда считает высоту нулевой, и
+        // график «пропадает». CSS (width:100%) масштабирует svg адаптивно.
+        width={width}
+        height={height}
         onMouseLeave={() => setHoverIndex(null)}
         onMouseMove={handleMouseMove}
         preserveAspectRatio="xMidYMid meet"

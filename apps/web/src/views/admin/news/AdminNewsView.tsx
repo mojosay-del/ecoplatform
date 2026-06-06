@@ -6,6 +6,7 @@ import { AppShell } from "../../../components/AppShell";
 import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
+import { canonicalizeBlocks } from "../../../lib/editor/serializer";
 import { useCoverAssets } from "../../../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 import type { DraftState, NewsDetail, NewsItem, NewsTagOption, TagSuggestion, ViewState } from "./types";
@@ -97,8 +98,8 @@ export function AdminNewsView() {
     const draftTags = [...draft.tags].sort().join("|");
     if (origTags !== draftTags) return true;
     if (
-      JSON.stringify(draft.blocks) !==
-      JSON.stringify(original.blocks.map((b) => ({ type: b.type, payload: b.payload })))
+      JSON.stringify(canonicalizeBlocks(draft.blocks)) !==
+      JSON.stringify(canonicalizeBlocks(original.blocks.map((b) => ({ type: b.type, payload: b.payload }))))
     ) {
       return true;
     }

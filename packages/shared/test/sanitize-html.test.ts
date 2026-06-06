@@ -16,6 +16,13 @@ describe("paragraph HTML sanitizer", () => {
     expect(clean).toBe("<span>Текст</span>");
   });
 
+  it("keeps the red-line paragraph indent and rejects arbitrary text-indent", () => {
+    expect(sanitizeParagraphHtml('<p style="text-indent:1.5em">Абзац</p>')).toBe(
+      '<p style="text-indent: 1.5em">Абзац</p>',
+    );
+    expect(sanitizeParagraphHtml('<p style="text-indent:9999px">Абзац</p>')).toBe("<p>Абзац</p>");
+  });
+
   it("keeps link hardening while stripping unsafe hrefs", () => {
     expect(sanitizeParagraphHtml('<a href="https://example.com" target="_blank">ok</a>')).toBe(
       '<a href="https://example.com" target="_blank" rel="noopener noreferrer">ok</a>',

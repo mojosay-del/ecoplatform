@@ -3,6 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { CompanyStatus, Prisma } from "@prisma/client";
 import { BillingNotificationsService } from "../billing/billing-notifications.service";
 import { FilesService } from "../files/files.service";
+import { VideoTranscodeService } from "../files/video-transcode.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 const BILLING_HOURLY_LOCK_KEY = "cron:billing-hourly-check";
@@ -74,10 +75,24 @@ export class SchedulerService {
     private readonly billing: BillingNotificationsService,
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
+    private readonly videoTranscode: VideoTranscodeService,
   ) {}
 
   private get disabled(): boolean {
     return process.env.SCHEDULER_DISABLED === "1";
+  }
+
+  // Подбираем видео, не успевшие перекодироваться (упал процесс/был занят
+  // транскодер при загрузке). Сам сервис гонит ffmpeg строго по одному (running),
+  // поэтому отдельный advisory-lock не нужен на единственном инстансе API.
+  @Cron(CronExpression.EVERY_5_MINUTES, { name: "process-video-renditions" })
+  async handleVideoRenditions() {
+    if (this.disabled) return;
+    try {
+      await this.videoTranscode.processPending();
+    } catch (error) {
+      this.logger.error("Video renditions processing failed", error as Error);
+    }
   }
 
   @Cron(CronExpression.EVERY_HOUR, { name: "billing-hourly-check" })

@@ -40,7 +40,18 @@ import {
   s3PingBucket,
   signS3DownloadUrls,
 } from "./files-storage.helpers";
-import { parseImageVariants, toFileAssetResponse, type FileAssetResponse } from "./files-response.helpers";
+import {
+  parseImageVariants,
+  toFileAssetResponse,
+  type FileAssetResponse,
+  type FileAssetVideoSource,
+} from "./files-response.helpers";
+import {
+  isVideoMime,
+  parseVideoRenditions,
+  serializeVideoRenditions,
+} from "./video-renditions";
+import { VideoTranscodeService } from "./video-transcode.service";
 
 export type { FileAssetResponse } from "./files-response.helpers";
 
@@ -85,6 +96,7 @@ export class FilesService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly settings?: PlatformSettingsService,
+    @Optional() private readonly videoTranscode?: VideoTranscodeService,
   ) {}
 
   private async maxUploadMb(): Promise<number> {
@@ -341,6 +353,12 @@ export class FilesService {
           } satisfies Prisma.InputJsonObject)
         : undefined;
 
+    // Видео сразу помечаем pending — фоновый транскодер (VideoTranscodeService)
+    // перекодирует его в H.264/AAC MP4 в нескольких разрешениях.
+    const videoRenditions = isVideoMime(upload.mimeType)
+      ? (serializeVideoRenditions({ status: "pending", renditions: [] }) as Prisma.InputJsonValue)
+      : undefined;
+
     const asset = await this.prisma.fileAsset.create({
       data: {
         originalName: file.originalname,
@@ -349,9 +367,15 @@ export class FilesService {
         accessLevel,
         storageKey,
         variants,
+        videoRenditions,
         uploadedById: userId,
       },
     });
+
+    if (videoRenditions) {
+      // Не блокируем HTTP-ответ: перекодировка идёт в фоне.
+      this.videoTranscode?.enqueue(asset.id);
+    }
 
     // Сразу отдаём загрузившему рабочую ссылку — для приватного файла presigned,
     // чтобы редактор/превью показали загруженный файл без отдельного запроса.
@@ -390,11 +414,56 @@ export class FilesService {
       mediaAssets.length > 0
         ? await this.signDownloadUrls(mediaAssets, SIGNED_URL_TTL_SECONDS, { inline: true })
         : new Map<string, string | null>();
-    return assets.map((asset) => ({
-      ...toFileAssetResponse(asset),
-      downloadUrl: signed.get(asset.id) ?? null,
-      streamUrl: streamed.get(asset.id) ?? null,
-    }));
+    const videoSources = await this.buildVideoSourcesMap(assets);
+    return assets.map((asset) => {
+      const base = {
+        ...toFileAssetResponse(asset),
+        downloadUrl: signed.get(asset.id) ?? null,
+        streamUrl: streamed.get(asset.id) ?? null,
+      };
+      const sources = videoSources.get(asset.id);
+      if (base.videoRenditions && sources) {
+        base.videoRenditions = { ...base.videoRenditions, sources };
+      }
+      return base;
+    });
+  }
+
+  // Подписывает inline-ссылки на готовые видео-ренишены (по убыванию высоты —
+  // лучшее качество первым, как дефолт плеера). Для public-видео это прямые
+  // ссылки, для приватных — короткоживущие presigned (та же логика, что у
+  // streamUrl). Возвращает Map<assetId, sources>.
+  private async buildVideoSourcesMap(
+    assets: Array<Pick<FileAsset, "id" | "accessLevel" | "originalName" | "videoRenditions">>,
+  ): Promise<Map<string, FileAssetVideoSource[]>> {
+    const result = new Map<string, FileAssetVideoSource[]>();
+    const synthetic: Array<Pick<FileAsset, "id" | "storageKey" | "accessLevel" | "originalName">> = [];
+    const back: Array<{ synthId: string; assetId: string; width: number; height: number }> = [];
+
+    for (const asset of assets) {
+      const data = parseVideoRenditions(asset.videoRenditions);
+      if (!data || data.status !== "ready" || data.renditions.length === 0) continue;
+      const sorted = [...data.renditions].sort((a, b) => b.height - a.height);
+      for (const rendition of sorted) {
+        const synthId = `${asset.id}::${rendition.height}`;
+        synthetic.push({
+          id: synthId,
+          storageKey: rendition.storageKey,
+          accessLevel: asset.accessLevel,
+          originalName: asset.originalName,
+        });
+        back.push({ synthId, assetId: asset.id, width: rendition.width, height: rendition.height });
+      }
+    }
+
+    if (synthetic.length === 0) return result;
+    const signed = await this.signDownloadUrls(synthetic, SIGNED_URL_TTL_SECONDS, { inline: true });
+    for (const item of back) {
+      const list = result.get(item.assetId) ?? [];
+      list.push({ src: signed.get(item.synthId) ?? null, width: item.width, height: item.height, type: "video/mp4" });
+      result.set(item.assetId, list);
+    }
+    return result;
   }
 
   private async hasStructuredReference(fileId: string) {

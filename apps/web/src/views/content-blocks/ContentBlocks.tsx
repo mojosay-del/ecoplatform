@@ -5,10 +5,12 @@
 // knowledge-base) могли его импортировать без циркулярных ссылок.
 
 import { useEffect, useMemo, useState } from "react";
+import { Check, X } from "lucide-react";
 import { api, type FileAsset } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { sanitizeParagraphHtml } from "../../lib/sanitize-html";
 import { MatchingPlayer, type MatchingPayload } from "./MatchingPlayer";
+import { VideoPlayer, type VideoPlayerSource } from "./VideoPlayer";
 
 // Известные типы блоков из shared/content-blocks. Используем минимальные
 // shape-типы вместо BaseContentBlock — здесь только то, что реально рендерим.
@@ -259,36 +261,47 @@ function MissingAsset() {
 }
 
 function VideoBlock({ asset, caption }: { asset: FileAsset | null | undefined; caption?: string }) {
-  const [failed, setFailed] = useState(false);
-  // streamUrl — inline-presigned для медиа (играет в Safari/iOS). publicUrl —
-  // для публичных видео. downloadUrl (attachment) только как крайний фолбэк.
-  const url = asset?.streamUrl ?? asset?.publicUrl ?? asset?.downloadUrl ?? null;
+  // Готовые перекодированные ренишены (H.264/AAC MP4, несколько разрешений) —
+  // надёжно играют во всех браузерах и дают выбор качества. Пока они не готовы,
+  // отдаём оригинал (web-safe MP4 заиграет сразу; HEVC/.mov подхватится, как
+  // только фоновый транскодер достроит ренишены).
+  const renditions = asset?.videoRenditions;
+  const renditionSources: VideoPlayerSource[] =
+    renditions?.status === "ready"
+      ? renditions.sources
+          .filter((source): source is typeof source & { src: string } => Boolean(source.src))
+          .map((source) => ({
+            src: source.src,
+            type: source.type || "video/mp4",
+            width: source.width || undefined,
+            height: source.height || undefined,
+          }))
+      : [];
+
+  const fallbackUrl = asset?.streamUrl ?? asset?.publicUrl ?? asset?.downloadUrl ?? null;
+  const sources: VideoPlayerSource[] =
+    renditionSources.length > 0
+      ? renditionSources
+      : fallbackUrl
+        ? [{ src: fallbackUrl, type: asset?.mimeType || "video/mp4" }]
+        : [];
+
+  const processing =
+    sources.length === 0 && (renditions?.status === "pending" || renditions?.status === "processing");
 
   return (
     <figure className="media-block">
-      {!url ? (
-        <MissingAsset />
-      ) : failed ? (
-        // Крайний случай: даже с inline-ссылкой браузер не смог декодировать
-        // кодек (например .mov/HEVC). Скачивание материалов — в «Материалах
-        // урока»; здесь даём только понятное сообщение.
-        <div className="video-fallback">
-          <p className="video-fallback-text">
-            Не удалось воспроизвести видео в этом браузере. Попробуйте обновить страницу или открыть урок в другом
-            браузере.
-          </p>
-        </div>
+      {sources.length === 0 ? (
+        processing ? (
+          <div className="video-fallback">
+            <p className="video-fallback-text">Видео обрабатывается — версия для воспроизведения скоро появится.</p>
+          </div>
+        ) : (
+          <MissingAsset />
+        )
       ) : (
         <div className="video-player">
-          <video
-            controls
-            playsInline
-            preload="metadata"
-            controlsList="nodownload"
-            onError={() => setFailed(true)}
-          >
-            <source src={url} type={asset?.mimeType || undefined} />
-          </video>
+          <VideoPlayer sources={sources} title={asset?.originalName} />
         </div>
       )}
       {caption ? <figcaption>{caption}</figcaption> : null}
@@ -326,8 +339,11 @@ function QuizPlayer({ payload }: { payload: QuizPayload }) {
 
   return (
     <div className="quiz-block">
+      <div className="quiz-head">
+        <span className="quiz-badge">{multiple ? "Несколько ответов" : "Один ответ"}</span>
+      </div>
       <p className="quiz-question">{payload.question}</p>
-      <div className="quiz-options">
+      <div className="quiz-options" role="group" aria-label="Варианты ответа">
         {options.map((option, index) => {
           const isSelected = selected.includes(index);
           let state = "";
@@ -337,6 +353,8 @@ function QuizPlayer({ payload }: { payload: QuizPayload }) {
           } else if (isSelected) {
             state = "is-selected";
           }
+          const showCheck = (checked && option.correct) || (!checked && isSelected);
+          const showCross = checked && !option.correct && isSelected;
           return (
             <button
               type="button"
@@ -345,23 +363,30 @@ function QuizPlayer({ payload }: { payload: QuizPayload }) {
               onClick={() => toggle(index)}
               aria-pressed={isSelected}
             >
-              <span className={`quiz-option-marker${multiple ? " is-multiple" : ""}`} aria-hidden />
-              <span>{option.text}</span>
+              <span className={`quiz-option-marker${multiple ? " is-multiple" : ""}`} aria-hidden>
+                {showCheck ? <Check size={14} strokeWidth={3} /> : showCross ? <X size={14} strokeWidth={3} /> : null}
+              </span>
+              <span className="quiz-option-text">{option.text}</span>
             </button>
           );
         })}
       </div>
       <div className="quiz-actions">
-        <button className="button" type="button" disabled={selected.length === 0} onClick={() => setChecked(true)}>
+        <button className="button quiz-check" type="button" disabled={selected.length === 0} onClick={() => setChecked(true)}>
           Проверить
         </button>
         {checked ? (
-          <span className={`quiz-verdict ${isCorrect ? "is-correct" : "is-wrong"}`}>
+          <span className={`quiz-verdict ${isCorrect ? "is-correct" : "is-wrong"}`} role="status">
+            <span className="quiz-verdict-icon" aria-hidden>
+              {isCorrect ? <Check size={15} strokeWidth={3} /> : <X size={15} strokeWidth={3} />}
+            </span>
             {isCorrect ? "Верно!" : "Не совсем — попробуйте ещё раз"}
           </span>
         ) : null}
       </div>
-      {checked && payload.explanation ? <p className="quiz-explanation">{payload.explanation}</p> : null}
+      {checked && payload.explanation ? (
+        <p className="quiz-explanation">{payload.explanation}</p>
+      ) : null}
     </div>
   );
 }

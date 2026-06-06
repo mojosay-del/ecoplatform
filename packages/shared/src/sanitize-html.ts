@@ -37,6 +37,9 @@ const PARAGRAPH_CONFIG: Parameters<typeof DOMPurify.sanitize>[1] = {
 };
 
 const ALLOWED_FONT_SIZES = new Set(["13px", "16px", "18px", "22px"]);
+// Абзацный отступ («красная строка»). Единственное допустимое значение —
+// согласовано с PARAGRAPH_INDENT в apps/web/src/lib/editor/rich-text-extensions.ts.
+const ALLOWED_TEXT_INDENTS = new Set(["1.5em"]);
 const HEX_COLOR_RE = /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i;
 const RGB_COLOR_RE =
   /^rgba?\(\s*(?:\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\s*,\s*(?:\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\s*,\s*(?:\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i;
@@ -57,6 +60,10 @@ function sanitizeStyleAttribute(style: string): string {
 
     if (property === "font-size" && ALLOWED_FONT_SIZES.has(value)) {
       allowed.push(`font-size: ${value}`);
+    }
+
+    if (property === "text-indent" && ALLOWED_TEXT_INDENTS.has(value)) {
+      allowed.push(`text-indent: ${value}`);
     }
   }
 

@@ -1575,15 +1575,10 @@ input[type="checkbox"]:focus-visible {
    «свежие сверху» — теперь обычный grid сохраняет порядок чтения слева-направо. */
 .news-masonry {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 3 колонки на десктопе — плашки чуть шире, чем при прежних четырёх. */
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
   align-items: stretch;
-}
-
-@media (max-width: 1360px) {
-  .news-masonry {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 @media (max-width: 1024px) {
@@ -2998,6 +2993,8 @@ input[type="checkbox"]:focus-visible {
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
+  /* Любой контент (длинные названия, график) держим в границах карточки. */
+  overflow: hidden;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
@@ -6033,8 +6030,11 @@ body.news-modal-open .app-shell {
 }
 
 .knowledge-child-card-cover {
+  position: relative;
   width: 100%;
   height: 130px;
+  overflow: hidden;
+  background: var(--surface-muted);
   object-fit: cover;
 }
 
@@ -6372,10 +6372,206 @@ body.news-modal-open .app-shell {
 }
 
 .indices-value-form {
-  grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 1fr) auto;
-  align-items: center;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(150px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
   border-top: 1px solid var(--line);
   padding-top: 14px;
+}
+
+.indices-value-control {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.indices-value-control-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Поле значения с единицей (₽/т) внутри. */
+.indices-price-input {
+  position: relative;
+  display: block;
+}
+
+.indices-price-input .input {
+  width: 100%;
+  padding-right: 52px;
+}
+
+.indices-price-unit {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.indices-value-submit {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .indices-value-form {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
+
+/* --- Кастомный календарь (DatePicker) ------------------------------------- */
+.date-picker {
+  position: relative;
+}
+
+.date-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.date-picker-trigger > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.date-picker-trigger.is-placeholder > span {
+  color: var(--muted);
+}
+
+.date-picker-required {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.date-picker-popover {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  width: 268px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card-hover, 0 18px 48px rgb(0 0 0 / 0.18));
+}
+
+.date-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.date-picker-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.date-picker-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.date-picker-nav:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.date-picker-weekdays,
+.date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.date-picker-weekdays {
+  margin-bottom: 4px;
+}
+
+.date-picker-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+.date-picker-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.date-picker-day:hover {
+  background: var(--primary-soft);
+}
+
+.date-picker-day:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-soft-strong, rgb(245 119 62 / 0.35));
+}
+
+.date-picker-day.is-outside {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.date-picker-day.is-today {
+  box-shadow: inset 0 0 0 1.5px var(--primary);
+}
+
+.date-picker-day.is-selected,
+.date-picker-day.is-selected:hover {
+  background: var(--primary);
+  color: var(--white, #fff);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .date-picker-nav,
+  .date-picker-day {
+    transition: none;
+  }
 }
 
 .indices-detail-actions {
@@ -6994,6 +7190,19 @@ body.news-modal-open .app-shell {
   max-height: 620px;
   border-radius: 0;
   background: #121418;
+}
+
+/* Плеер Vidstack сам держит соотношение сторон (prop aspectRatio) и стилизует
+   внутреннее <video>; нейтрализуем легаси-правила .video-player video, чтобы
+   они не конфликтовали, и ограничиваем высоту. */
+.eco-video-player {
+  width: 100%;
+  max-height: 620px;
+}
+
+.video-player .eco-video-player video {
+  aspect-ratio: auto;
+  max-height: 620px;
 }
 
 .video-fallback {
@@ -15340,105 +15549,243 @@ body.account-password-modal-open {
   background: var(--surface);
 }
 
+/* Карточка-викторина: выраженная панель, крупные интерактивные варианты,
+   тактильные состояния выбора/верно/неверно и плавный показ вердикта. */
+.quiz-block {
+  padding: 20px 22px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 16px);
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+}
+
+.quiz-head {
+  margin-bottom: 10px;
+}
+
+.quiz-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 .quiz-question {
-  margin: 0 0 12px;
-  font-weight: 600;
+  margin: 0 0 14px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text);
 }
 
 .quiz-options {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .quiz-option {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 11px 13px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
   background: var(--surface);
   text-align: left;
   font: inherit;
+  font-size: 15px;
   color: var(--text);
   cursor: pointer;
   transition:
-    border-color 0.12s,
-    background 0.12s;
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 120ms ease;
 }
 
 .quiz-option:hover {
-  border-color: var(--brand, #4d73d8);
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.quiz-option:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-soft-strong, rgb(245 119 62 / 0.35));
+}
+
+.quiz-option:active {
+  transform: translateY(1px);
+}
+
+.quiz-option-text {
+  flex: 1;
 }
 
 .quiz-option-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border: 2px solid var(--border-strong, #c7ccd6);
   border-radius: 50%;
+  color: var(--white, #fff);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .quiz-option-marker.is-multiple {
-  border-radius: 5px;
+  border-radius: 7px;
+}
+
+.quiz-option-marker > svg {
+  opacity: 0;
+  transform: scale(0.5);
+  transition:
+    opacity 140ms ease,
+    transform 160ms ease;
 }
 
 .quiz-option.is-selected {
-  border-color: var(--brand, #4d73d8);
-  background: rgb(77 115 216 / 0.06);
+  border-color: var(--primary);
+  background: var(--primary-soft);
 }
 
 .quiz-option.is-selected .quiz-option-marker {
-  border-color: var(--brand, #4d73d8);
-  background: var(--brand, #4d73d8);
-  box-shadow: inset 0 0 0 3px var(--surface);
+  border-color: var(--primary);
+  background: var(--primary);
 }
 
 .quiz-option.is-correct {
-  border-color: var(--success, #5da45c);
-  background: rgb(93 164 92 / 0.1);
+  border-color: var(--success);
+  background: var(--success-soft);
 }
 
 .quiz-option.is-correct .quiz-option-marker {
-  border-color: var(--success, #5da45c);
-  background: var(--success, #5da45c);
-  box-shadow: inset 0 0 0 3px var(--surface);
+  border-color: var(--success);
+  background: var(--success);
+  animation: quiz-pop 280ms ease;
 }
 
 .quiz-option.is-wrong {
-  border-color: var(--danger, #ef6b5b);
-  background: rgb(239 107 91 / 0.08);
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.quiz-option.is-wrong .quiz-option-marker {
+  border-color: var(--danger);
+  background: var(--danger);
+}
+
+.quiz-option-marker > svg {
+  opacity: 0;
+}
+
+.quiz-option.is-selected .quiz-option-marker > svg,
+.quiz-option.is-correct .quiz-option-marker > svg,
+.quiz-option.is-wrong .quiz-option-marker > svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@keyframes quiz-pop {
+  0% {
+    transform: scale(0.7);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .quiz-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 14px;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 18px;
 }
 
 .quiz-verdict {
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
   font-size: 14px;
+  animation: quiz-reveal 260ms ease both;
+}
+
+.quiz-verdict-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--white, #fff);
 }
 
 .quiz-verdict.is-correct {
-  color: var(--success-text-strong, #3f8f3e);
+  color: var(--success-text-strong, var(--success));
+}
+
+.quiz-verdict.is-correct .quiz-verdict-icon {
+  background: var(--success);
 }
 
 .quiz-verdict.is-wrong {
-  color: var(--danger-text-strong, #ef6b5b);
+  color: var(--danger-text-strong, var(--danger));
+}
+
+.quiz-verdict.is-wrong .quiz-verdict-icon {
+  background: var(--danger);
+}
+
+@keyframes quiz-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .quiz-explanation {
-  margin: 12px 0 0;
-  padding: 10px 12px;
-  border-radius: 10px;
+  margin: 14px 0 0;
+  padding: 12px 14px 12px 16px;
+  border-left: 3px solid var(--primary);
+  border-radius: 0 10px 10px 0;
   background: var(--surface-muted, rgb(0 0 0 / 0.04));
   font-size: 14px;
-  color: var(--text-muted, #5b606b);
+  line-height: 1.55;
+  color: var(--muted);
+  animation: quiz-reveal 260ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-option,
+  .quiz-option-marker,
+  .quiz-option-marker > svg,
+  .quiz-verdict,
+  .quiz-explanation {
+    animation: none;
+    transition: none;
+  }
 }
 
 .matching-instruction {

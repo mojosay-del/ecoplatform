@@ -34,3 +34,17 @@ export function paginatedResponse<T>(items: T[], total: number, pagination: Reso
     hasMore: pagination.offset + items.length < total,
   };
 }
+
+// Вариант без дорогого count() на растущих таблицах (журнал действий и т.п.).
+// Вызывающий выбирает `limit + 1` строку; «лишняя» строка означает, что есть
+// ещё страница. `total` не вычисляем — отдаём нижнюю границу (offset + отдано),
+// её потребители infinite-scroll не показывают, ориентируясь на `hasMore`.
+export function paginatedResponseByOverfetch<T>(rows: T[], pagination: ResolvedPagination): PaginatedResponse<T> {
+  const hasMore = rows.length > pagination.limit;
+  const items = hasMore ? rows.slice(0, pagination.limit) : rows;
+  return {
+    items,
+    total: pagination.offset + items.length,
+    hasMore,
+  };
+}

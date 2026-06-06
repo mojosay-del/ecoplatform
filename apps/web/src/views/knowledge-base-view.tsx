@@ -174,13 +174,19 @@ function KnowledgeBaseLayout({
                         const childCoverUrl = preferredFileAssetImageUrl(childCover);
                         return (
                           <Link
-                            className={`knowledge-child-card${childCoverUrl ? " has-cover" : ""}`}
+                            className={`knowledge-child-card${child.coverImageId ? " has-cover" : ""}`}
                             href={`/knowledge-base/${child.slug}`}
                             key={child.id}
                           >
-                            {childCoverUrl ? (
+                            {child.coverImageId ? (
                               <div className="knowledge-child-card-cover">
-                                <CoverImage alt="" src={childCoverUrl} sizes="(max-width: 768px) 100vw, 280px" />
+                                {childCoverUrl ? (
+                                  <CoverImage alt="" src={childCoverUrl} sizes="(max-width: 768px) 100vw, 280px" />
+                                ) : (
+                                  // URL обложки ещё резолвится — держим серый скелетон,
+                                  // чтобы карточка не «прыгала» и грузилась целиком.
+                                  <span className="cover-skeleton" aria-hidden="true" />
+                                )}
                               </div>
                             ) : null}
                             <strong>{child.title}</strong>

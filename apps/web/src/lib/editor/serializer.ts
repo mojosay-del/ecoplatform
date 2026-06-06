@@ -6,11 +6,35 @@ import {
   RICH_TEXT_TOP_LEVEL_TYPES,
   isAtomicBlockKind,
 } from "./block-mapping";
+import { sanitizeParagraphHtml } from "@ecoplatform/shared/sanitize-html";
 import { richTextExtensions } from "./rich-text-extensions";
 
 // Универсальный блок CMS — то, что хранится в БД и валидируется zod-схемами
 // из @ecoplatform/shared. Формат намеренно не меняем (см. editor-direction).
 export type EditorBlock = { type: string; payload: Record<string, unknown> };
+
+/**
+ * Приводит блоки к канонической форме для СРАВНЕНИЯ «черновик == сохранённое».
+ *
+ * Сервер при записи (content-common.service.ts) делает с payload две вещи,
+ * из-за которых эхо после рефетча никогда не совпадает байт-в-байт с тем, что
+ * отдал редактор, и индикатор автосейва вечно горит «Не сохранено»:
+ *   1) в КАЖДЫЙ payload добавляет служебный ключ `v: 1` (версия формата);
+ *   2) у paragraph прогоняет html через sanitizeParagraphHtml.
+ * Поэтому здесь отбрасываем `v` у всех блоков и санитайзим html абзацев тем же
+ * (единым) санитайзером. DOMPurify идемпотентен, так что вывод редактора и уже
+ * санитайзенное эхо сервера сходятся к одному виду. Это форма ТОЛЬКО для
+ * сравнения — на запись/рендер не влияет.
+ */
+export function canonicalizeBlocks(blocks: EditorBlock[]): EditorBlock[] {
+  return blocks.map((block) => {
+    if (block.type === "paragraph") {
+      return { type: "paragraph", payload: { html: sanitizeParagraphHtml(String(block.payload.html ?? "")) } };
+    }
+    const { v: _v, ...rest } = block.payload as Record<string, unknown>;
+    return { type: block.type, payload: rest };
+  });
+}
 
 // "<p></p>" и пустые строки не должны превращаться в блок-абзац: zod требует
 // непустой html, да и хранить пустой абзац незачем (как и в старом редакторе).

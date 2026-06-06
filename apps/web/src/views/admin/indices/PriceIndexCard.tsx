@@ -6,6 +6,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { StatusPill } from "../../../components/StatusPill";
+import { DatePicker } from "../../../components/DatePicker";
 import { normalizeIntegerPriceInput, parseIntegerPriceInput } from "../../../components/admin-indices-price";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";
 import { formatIndexPrice } from "./format";
@@ -160,29 +161,39 @@ export function PriceIndexCard({
             </div>
 
             <form className="indices-value-form" onSubmit={addValue}>
-              <input
-                className="input"
-                type="date"
-                value={valueDraft.date}
-                onChange={(event) => setValueDraft((prev) => ({ ...prev, date: event.target.value }))}
-                required
-              />
-              <input
-                className="input"
-                type="text"
-                inputMode="numeric"
-                placeholder="12 300"
-                value={valueDraft.price}
-                onChange={(event) => {
-                  const normalized = normalizeIntegerPriceInput(event.target.value);
-                  if (normalized !== null) {
-                    setValueDraft((prev) => ({ ...prev, price: normalized }));
-                  }
-                }}
-                required
-              />
-              <button className="button secondary" type="submit">
-                <Plus size={14} /> Значение
+              <label className="indices-value-control">
+                <span className="indices-value-control-label">Дата</span>
+                <DatePicker
+                  value={valueDraft.date}
+                  onChange={(iso) => setValueDraft((prev) => ({ ...prev, date: iso }))}
+                  required
+                  ariaLabel="Дата значения индекса"
+                />
+              </label>
+              <label className="indices-value-control">
+                <span className="indices-value-control-label">Значение</span>
+                <span className="indices-price-input">
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="12 300"
+                    value={valueDraft.price}
+                    onChange={(event) => {
+                      const normalized = normalizeIntegerPriceInput(event.target.value);
+                      if (normalized !== null) {
+                        setValueDraft((prev) => ({ ...prev, price: normalized }));
+                      }
+                    }}
+                    required
+                  />
+                  <span className="indices-price-unit" aria-hidden>
+                    {nomenclature.unit}
+                  </span>
+                </span>
+              </label>
+              <button className="button secondary indices-value-submit" type="submit">
+                <Plus size={14} /> Добавить
               </button>
             </form>
           </div>

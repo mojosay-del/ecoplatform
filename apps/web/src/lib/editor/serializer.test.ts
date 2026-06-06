@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blocksToDoc, docToBlocks, type EditorBlock } from "./serializer";
+import { blocksToDoc, canonicalizeBlocks, docToBlocks, type EditorBlock } from "./serializer";
 
 // helper: блоки → документ → блоки
 function roundTrip(blocks: EditorBlock[]): EditorBlock[] {
@@ -170,5 +170,26 @@ describe("сериализатор: пустой документ", () => {
     const doc = blocksToDoc([]);
     expect(doc.content).toHaveLength(1);
     expect(docToBlocks(doc)).toEqual([]);
+  });
+});
+
+describe("canonicalizeBlocks: эхо сервера == вывод редактора", () => {
+  it("отбрасывает служебный ключ v у всех блоков", () => {
+    const editorOutput: EditorBlock[] = [{ type: "image", payload: { fileId: "f1", caption: "c" } }];
+    const serverEcho: EditorBlock[] = [{ type: "image", payload: { v: 1, fileId: "f1", caption: "c" } }];
+    expect(canonicalizeBlocks(editorOutput)).toEqual(canonicalizeBlocks(serverEcho));
+  });
+
+  it("paragraph: вывод редактора и санитайзенное эхо сервера с v:1 сходятся", () => {
+    const html = "<p>Текст <strong>жирный</strong></p>";
+    const editorOutput: EditorBlock[] = [{ type: "paragraph", payload: { html } }];
+    // сервер: { v: 1, html: sanitize(html) } — здесь html уже безопасный, поэтому совпадает
+    const serverEcho: EditorBlock[] = [{ type: "paragraph", payload: { v: 1, html } }];
+    expect(canonicalizeBlocks(editorOutput)).toEqual(canonicalizeBlocks(serverEcho));
+  });
+
+  it("идемпотентно: повторная канонизация не меняет результат", () => {
+    const once = canonicalizeBlocks([{ type: "paragraph", payload: { v: 1, html: "<p>Раз</p>" } }]);
+    expect(canonicalizeBlocks(once)).toEqual(once);
   });
 });

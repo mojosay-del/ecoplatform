@@ -51,7 +51,10 @@ RUN pnpm --filter @ecoplatform/api... build
 
 # ────────────────── Stage 3: runtime ──────────────────
 FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS runtime
-RUN sed -i 's#dl-cdn.alpinelinux.org/alpine#mirror.yandex.ru/mirrors/alpine#g' /etc/apk/repositories && apk add --no-cache libc6-compat openssl tini
+# ffmpeg/ffprobe нужны VideoTranscodeService для перекодирования видео уроков в
+# H.264/AAC MP4 (несколько разрешений). Без них транскодинг просто помечает
+# видео failed, а плеер отдаёт оригинал (мягкая деградация).
+RUN sed -i 's#dl-cdn.alpinelinux.org/alpine#mirror.yandex.ru/mirrors/alpine#g' /etc/apk/repositories && apk add --no-cache libc6-compat openssl tini ffmpeg
 # CLI prisma и ts-node ставим ГЛОБАЛЬНО (в PATH). В pnpm-раскладке их бинарей
 # нет в корневом node_modules/.bin (это devDeps пакета api), а pnpm в рантайме
 # триггерит install под non-root → EACCES. Глобальные бинари решают обе беды.

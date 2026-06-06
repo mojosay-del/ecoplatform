@@ -179,11 +179,6 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
 
       {journalsQuery.state === "ready" || journalsQuery.items.length > 0 ? (
         <div className="admin-table-shell">
-          <div className="admin-table-meta">
-            <p className="page-subtitle">
-              Загружено {journalsQuery.items.length} из {journalsQuery.total}.
-            </p>
-          </div>
           <div className="admin-table-scroll">
             <table className="admin-table admin-journal-table">
               <thead>

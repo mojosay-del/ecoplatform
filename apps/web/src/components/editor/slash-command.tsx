@@ -6,7 +6,7 @@ import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
-import { Heading2, Heading3, List, ListOrdered, Quote, Type } from "lucide-react";
+import { Heading2, Heading3, IndentIncrease, List, ListOrdered, Quote, Type } from "lucide-react";
 import { ATOMIC_BLOCK_NODE_NAME, type AtomicBlockKind } from "../../lib/editor/block-mapping";
 import { ATOMIC_BLOCK_ICONS, ATOMIC_BLOCK_LABELS, atomicDefaultPayload } from "./atomic-nodes";
 
@@ -24,6 +24,21 @@ const TEXT_ITEMS: SlashItem[] = [
     keywords: ["текст", "абзац", "paragraph", "text"],
     icon: <Type size={16} />,
     run: (editor, range) => editor.chain().focus().deleteRange(range).setParagraph().run(),
+  },
+  {
+    title: "Красная строка",
+    keywords: ["красная строка", "отступ", "абзац", "indent"],
+    icon: <IndentIncrease size={16} />,
+    run: (editor, range) => {
+      const indented = Boolean(editor.getAttributes("paragraph").indent);
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .setParagraph()
+        .updateAttributes("paragraph", { indent: !indented })
+        .run();
+    },
   },
   {
     title: "Заголовок",

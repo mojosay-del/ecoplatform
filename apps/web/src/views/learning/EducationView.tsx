@@ -69,6 +69,10 @@ export function EducationView() {
                         src={coverUrl}
                         sizes="(max-width: 880px) 100vw, (max-width: 1180px) 35vw, (max-width: 1500px) 25vw, 480px"
                       />
+                    ) : module.coverImageId ? (
+                      // Обложка ещё подгружается (useCoverAssets резолвит URL асинхронно) —
+                      // показываем серый пульсирующий скелетон, а не зелёную заглушку.
+                      <span className="cover-skeleton" aria-hidden="true" />
                     ) : (
                       <div className="education-card-cover-fallback" />
                     )}

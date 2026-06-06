@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
-import { paginatedResponse } from "../../common/pagination";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { adminJournalsQuerySchema } from "./admin-journals.schemas";
 import type { z } from "zod";
@@ -56,18 +55,20 @@ export class AdminJournalsService {
       if (query.to) where.createdAt.lte = query.to;
     }
 
-    const [total, entries] = await Promise.all([
-      this.prisma.adminActionLog.count({ where }),
-      this.prisma.adminActionLog.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: query.offset,
-        take: query.limit,
-      }),
-    ]);
+    // Без count(): берём на одну запись больше лимита — «лишняя» строка
+    // означает, что есть следующая страница (см. paginatedResponseByOverfetch).
+    // На растущей таблице журнала это убирает дорогой COUNT(*) при каждом скролле.
+    const entries = await this.prisma.adminActionLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: query.offset,
+      take: query.limit + 1,
+    });
+    const hasMore = entries.length > query.limit;
+    const pageEntries = entries.slice(0, query.limit);
 
-    const entityMap = await this.buildEntitySummaryMap(entries);
-    const actorIds = [...new Set(entries.map((entry) => entry.actorId))];
+    const entityMap = await this.buildEntitySummaryMap(pageEntries);
+    const actorIds = [...new Set(pageEntries.map((entry) => entry.actorId))];
     const actors = actorIds.length
       ? await this.prisma.user.findMany({
           where: { id: { in: actorIds } },
@@ -76,13 +77,13 @@ export class AdminJournalsService {
       : [];
     const actorMap = new Map(actors.map((actor) => [actor.id, actor]));
 
-    const items = entries.map((entry) => ({
+    const items = pageEntries.map((entry) => ({
       ...entry,
       actor: actorMap.get(entry.actorId) ?? null,
       entity: entityMap.get(entityKey(entry.entityType, entry.entityId)) ?? fallbackEntitySummary(entry),
     }));
 
-    return paginatedResponse(items, total, query);
+    return { items, total: query.offset + items.length, hasMore };
   }
 
   private async buildEntitySummaryMap(entries: JournalEntityRef[]) {

@@ -612,6 +612,11 @@ model FileAsset {
   sizeBytes    Int
   storageKey   String
   variants     Json?
+  // Видео-ренишены (Волна полировки 2): перекодированные ffmpeg H.264/AAC MP4 в
+  // 1–3 разрешениях для надёжного воспроизведения и выбора качества в плеере.
+  // Формат: { status, renditions: [{ height, width, storageKey, sizeBytes }] }.
+  // null — либо не видео, либо ещё не обработано.
+  videoRenditions Json?
   accessLevel  FileAccessLevel @default(authenticated)
   uploadedById String?
   createdAt    DateTime        @default(now())

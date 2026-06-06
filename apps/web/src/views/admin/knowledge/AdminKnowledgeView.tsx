@@ -13,6 +13,7 @@ import { AppShell } from "../../../components/AppShell";
 import { ApiError, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
+import { canonicalizeBlocks } from "../../../lib/editor/serializer";
 import {
   EMPTY_CATEGORY_DRAFT,
   EMPTY_MATERIAL_DRAFT,
@@ -97,8 +98,8 @@ export function AdminKnowledgeView() {
     if ((draft.coverImageId || "") !== (original.coverImageId ?? "")) return true;
     if (draft.parentId !== original.parentId) return true;
     if (
-      JSON.stringify(draft.blocks) !==
-      JSON.stringify(original.blocks.map((block) => ({ type: block.type, payload: block.payload })))
+      JSON.stringify(canonicalizeBlocks(draft.blocks)) !==
+      JSON.stringify(canonicalizeBlocks(original.blocks.map((block) => ({ type: block.type, payload: block.payload }))))
     ) {
       return true;
     }

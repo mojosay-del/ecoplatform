@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ExternalLink, Paperclip, Plus, Trash2 } from "lucide-react";
 import type { Block } from "../../../lib/editor/block-types";
+import { canonicalizeBlocks } from "../../../lib/editor/serializer";
 import { DocumentEditor } from "../../../components/editor/DocumentEditor";
 import { FileUploadField } from "../../../components/FileUploadField";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
@@ -137,7 +138,8 @@ export function LessonForm({
     if (normalizedDraft.title !== savedDraft.title) return true;
     if (normalizedDraft.coverImageId !== savedDraft.coverImageId) return true;
     if (normalizedDraft.coverSubtitle !== savedDraft.coverSubtitle) return true;
-    if (JSON.stringify(normalizedDraft.blocks) !== JSON.stringify(savedDraft.blocks)) return true;
+    if (JSON.stringify(canonicalizeBlocks(normalizedDraft.blocks)) !== JSON.stringify(canonicalizeBlocks(savedDraft.blocks)))
+      return true;
     if (JSON.stringify(normalizedDraft.attachments) !== JSON.stringify(savedDraft.attachments)) return true;
     return false;
   }, [normalizedDraft, savedDraft]);

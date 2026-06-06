@@ -32,6 +32,13 @@ export type FileAsset = {
   // Ссылка для inline-воспроизведения медиа (video/audio) в плеере — presigned
   // без attachment-расположения, чтобы играло в Safari/iOS. null для не-медиа.
   streamUrl?: string | null;
+  // Перекодированные видео-копии (H.264/AAC MP4) для надёжного воспроизведения и
+  // выбора качества. status: pending/processing — ещё готовится; ready — sources
+  // заполнены (по убыванию высоты). null — не видео.
+  videoRenditions?: {
+    status: "pending" | "processing" | "ready" | "failed";
+    sources: Array<{ src: string | null; width: number; height: number; type: string }>;
+  } | null;
   createdAt: string;
 };
 

@@ -1,7 +1,33 @@
-import type { Extensions } from "@tiptap/core";
+import { Extension, type Extensions } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle, FontSize } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
+
+// Величина абзацного отступа («красная строка»). Держим единственное значение
+// и согласуем его с whitelist санитайзера (packages/shared/sanitize-html.ts:
+// ALLOWED_TEXT_INDENTS), иначе отступ вырежется при сохранении/рендере.
+export const PARAGRAPH_INDENT = "1.5em";
+
+// Глобальный атрибут `indent` на абзацах: «красная строка» через style="text-indent".
+// Сериализация (renderHTML) и парсинг (parseHTML) общие для редактора и
+// serializer.ts, поэтому отступ переживает round-trip и публикацию.
+const ParagraphIndent = Extension.create({
+  name: "paragraphIndent",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["paragraph"],
+        attributes: {
+          indent: {
+            default: false,
+            parseHTML: (element) => (element as HTMLElement).style?.textIndent ? true : false,
+            renderHTML: (attributes) => (attributes.indent ? { style: `text-indent: ${PARAGRAPH_INDENT}` } : {}),
+          },
+        },
+      },
+    ];
+  },
+});
 
 // Расширения «текстовой» части документа. Используются в ОДНОМ экземпляре и
 // сериализатором (generateJSON/generateHTML), и самим редактором — чтобы
@@ -35,6 +61,7 @@ export function createRichTextExtensions(options: RichTextOptions = {}): Extensi
     TextStyle,
     FontSize,
     Color.configure({ types: [TextStyle.name] }),
+    ParagraphIndent,
   ];
 }
 

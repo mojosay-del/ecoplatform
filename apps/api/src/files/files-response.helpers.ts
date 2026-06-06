@@ -1,5 +1,6 @@
 import { Prisma, type FileAsset } from "@prisma/client";
 import { publicUrl } from "./files-storage.helpers";
+import { parseVideoRenditions, type VideoRenditionStatus } from "./video-renditions";
 
 type ImageVariantFormat = "webp" | "avif";
 
@@ -15,7 +16,19 @@ type FileAssetImageVariant = StoredImageVariant & {
 
 type FileAssetImageVariants = Partial<Record<ImageVariantFormat, FileAssetImageVariant>>;
 
-export type FileAssetResponse = Omit<FileAsset, "variants"> & {
+export type FileAssetVideoSource = {
+  src: string | null;
+  width: number;
+  height: number;
+  type: string;
+};
+
+export type FileAssetVideoRenditions = {
+  status: VideoRenditionStatus;
+  sources: FileAssetVideoSource[];
+};
+
+export type FileAssetResponse = Omit<FileAsset, "variants" | "videoRenditions"> & {
   publicUrl: string | null;
   // Ссылка для скачивания. Для public-файлов совпадает с publicUrl; для
   // приватных — короткоживущая presigned-ссылка (или null, если S3 не настроен
@@ -26,6 +39,10 @@ export type FileAssetResponse = Omit<FileAsset, "variants"> & {
   // См. findManyByIds.
   streamUrl: string | null;
   variants: FileAssetImageVariants | null;
+  // Перекодированные видео-копии для плеера (выбор качества). status всегда
+  // присутствует для видео; sources заполняются signed-ссылками в findManyByIds/
+  // upload, когда ренишены готовы. null — для не-видео.
+  videoRenditions: FileAssetVideoRenditions | null;
 };
 
 export function parseImageVariants(raw: Prisma.JsonValue | null | undefined): Record<string, StoredImageVariant> {
@@ -79,5 +96,13 @@ export function toFileAssetResponse(asset: FileAsset): FileAssetResponse {
     // По умолчанию нет inline-ссылки; findManyByIds/upload проставляют её для медиа.
     streamUrl: null,
     variants: variantResponse(asset),
+    // Статус сразу из БД; signed-ссылки sources докладываются в findManyByIds/upload.
+    videoRenditions: videoRenditionsStatusResponse(asset),
   };
+}
+
+function videoRenditionsStatusResponse(asset: FileAsset): FileAssetVideoRenditions | null {
+  const parsed = parseVideoRenditions(asset.videoRenditions);
+  if (!parsed) return null;
+  return { status: parsed.status, sources: [] };
 }
