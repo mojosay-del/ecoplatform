@@ -36,6 +36,11 @@ function buildContentSecurityPolicy(): string {
   return [
     "default-src 'self'",
     "img-src 'self' data: https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
+    // Видео/аудио уроков отдаются signed-URL с S3 (s3.twcstorage.ru). Без явного
+    // media-src они наследовали default-src 'self', и в проде (блокирующая CSP)
+    // браузер резал загрузку — Vidstack крутил спиннер бесконечно. Зеркалит img-src
+    // по доменам, но без data:.
+    "media-src 'self' https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
     "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline'",
     `connect-src ${connectSrc.join(" ")}`,

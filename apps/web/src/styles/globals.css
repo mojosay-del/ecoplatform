@@ -3015,20 +3015,20 @@ input[type="checkbox"]:focus-visible {
 .index-period-tabs {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  /* Переносим вкладки на новую строку вместо горизонтальной прокрутки: при узкой
+     карточке не влезающие периоды раньше «прятались» под правым краем плашки
+     (на macOS оверлейный скроллбар не виден) и выглядели обрезанными. Перенос
+     гарантирует, что все периоды видны на любой ширине. */
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 2px;
   width: fit-content;
   max-width: 100%;
   margin: 0 auto;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
   background: var(--panel-soft);
   border: 1px solid var(--line);
   border-radius: var(--radius-chip);
   padding: 3px;
-  white-space: nowrap;
 }
 
 .index-period-tab {
@@ -3130,6 +3130,103 @@ input[type="checkbox"]:focus-visible {
   font-size: 14px;
 }
 
+/* Совмещённый график всех номенклатур — плашка во всю ширину между сводкой
+   «Движение индексов» и сеткой карточек. */
+.index-combined {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 0 0 22px;
+  padding: 18px 20px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.index-combined-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.index-combined-heading {
+  min-width: 0;
+}
+
+.index-combined-eyebrow {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.index-combined-head h2 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: var(--text-xl);
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.index-combined-periods {
+  margin: 0;
+}
+
+.index-combined-chart-wrap {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.index-combined-chart {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1080 / 340;
+  display: block;
+}
+
+.index-combined-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.index-combined-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  transition: color 120ms ease;
+}
+
+.index-combined-legend-item.is-active {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.index-combined-legend-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.index-combined-legend-name {
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 720px) {
   .index-movement-summary {
     padding: 16px 14px;
@@ -3189,6 +3286,13 @@ input[type="checkbox"]:focus-visible {
   }
   .index-chart-empty {
     min-height: 240px;
+  }
+  .index-combined {
+    padding: 16px 14px 18px;
+  }
+  .index-combined-chart {
+    /* На узком экране вытягиваем график выше, чтобы кривые не сливались. */
+    aspect-ratio: 3 / 2;
   }
 }
 
@@ -3252,11 +3356,38 @@ input[type="checkbox"]:focus-visible {
 }
 
 .lesson-main {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: 28px 32px 32px;
+}
+
+/* Пока грузятся все изображения урока — поверх статьи лежит серый пульсирующий
+   слой (тот же шиммер, что у скелетонов). Контент остаётся в DOM, чтобы <img>
+   успели загрузиться. Когда готовы — слой убирается, статья мягко проявляется. */
+.lesson-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--surface-muted), var(--surface-elevated), var(--surface-muted));
+  background-size: 220% 100%;
+  animation: app-shell-loading-shimmer 1200ms ease-in-out infinite;
+}
+
+.lesson-main.is-images-ready {
+  animation: content-fade-in 360ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-loading-overlay {
+    animation: none;
+  }
+  .lesson-main.is-images-ready {
+    animation: none;
+  }
 }
 
 .lesson-cover {
@@ -3424,31 +3555,6 @@ input[type="checkbox"]:focus-visible {
 
 .lesson-actions-right {
   margin-left: auto;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .lesson-scroll-reveal .lesson-reveal-item {
-    opacity: 0;
-    transform: translateY(22px);
-    transition:
-      opacity 520ms ease,
-      transform 520ms cubic-bezier(0.2, 0.78, 0.2, 1);
-    transition-delay: calc(var(--lesson-reveal-index, 0) * 45ms);
-    will-change: opacity, transform;
-  }
-
-  .lesson-scroll-reveal .lesson-reveal-item.is-visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lesson-scroll-reveal .lesson-reveal-item {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
 }
 
 .lesson-sidebar {
@@ -5328,6 +5434,14 @@ body.news-modal-open .app-shell {
 .auth-verification-copy {
   max-width: 360px;
   line-height: 1.45;
+}
+
+.auth-verification-hint {
+  margin: 6px 0 0;
+  max-width: 360px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .auth-code-stage {

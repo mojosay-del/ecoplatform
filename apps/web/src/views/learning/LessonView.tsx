@@ -37,6 +37,9 @@ export function LessonView({
   const [completing, setCompleting] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [completionError, setCompletionError] = useState<string | null>(null);
+  // Пока не загрузятся ВСЕ изображения урока — держим статью серой и пульсирующей,
+  // затем показываем её разом с мягким появлением. Так нет ощущения «догрузки на ходу».
+  const [articleReady, setArticleReady] = useState(false);
   const chapters: LearningChapterDetail[] = data?.chapters ?? [];
   const chapter = chapters.find((c) => (c.lessons ?? []).some((l) => l.id === lessonId));
   const lesson: LessonDetail | null = chapter ? ((chapter.lessons ?? []).find((l) => l.id === lessonId) ?? null) : null;
@@ -76,45 +79,61 @@ export function LessonView({
     const container = lessonMainRef.current;
     if (!container) return;
 
-    const revealItems = Array.from(
-      container.querySelectorAll<HTMLElement>(
-        ".lesson-cover, .lesson-title:not(.lesson-title-on-cover), .lesson-blocks > .content-blocks > *, .lesson-actions",
-      ),
-    );
+    setArticleReady(false);
 
-    revealItems.forEach((item, index) => {
-      item.classList.remove("is-visible");
-      item.classList.add("lesson-reveal-item");
-      item.style.setProperty("--lesson-reveal-index", String(Math.min(index, 6)));
-    });
-
-    if (!("IntersectionObserver" in window)) {
-      revealItems.forEach((item) => item.classList.add("is-visible"));
+    const images = Array.from(container.querySelectorAll<HTMLImageElement>("img"));
+    if (images.length === 0) {
+      setArticleReady(true);
       return;
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          const target = entry.target as HTMLElement;
-          target.classList.add("is-visible");
-          observer.unobserve(target);
-        });
-      },
-      { rootMargin: "0px 0px -10% 0px", threshold: 0.12 },
-    );
+    let settled = false;
+    let remaining = images.length;
+    const cleanups: Array<() => void> = [];
 
-    revealItems.forEach((item) => observer.observe(item));
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      cleanups.forEach((fn) => fn());
+      setArticleReady(true);
+    };
+
+    const markOne = () => {
+      remaining -= 1;
+      if (remaining <= 0) finish();
+    };
+
+    images.forEach((img) => {
+      // Картинка из кеша могла догрузиться до навешивания слушателей — проверяем
+      // complete/naturalWidth, иначе ждём load/error (ошибку тоже считаем «готово»,
+      // чтобы битый файл не держал статью серой).
+      if (img.complete && img.naturalWidth > 0) {
+        markOne();
+        return;
+      }
+      const cleanup = () => {
+        img.removeEventListener("load", onSettled);
+        img.removeEventListener("error", onSettled);
+      };
+      function onSettled() {
+        cleanup();
+        markOne();
+      }
+      img.addEventListener("load", onSettled);
+      img.addEventListener("error", onSettled);
+      cleanups.push(cleanup);
+    });
+
+    // Если все картинки уже были готовы синхронно — finish уже вызван внутри markOne.
+    // Фолбэк: не держать статью серой вечно из-за зависшей картинки.
+    const fallback = window.setTimeout(finish, 6000);
+    cleanups.push(() => window.clearTimeout(fallback));
 
     return () => {
-      observer.disconnect();
-      revealItems.forEach((item) => {
-        item.classList.remove("lesson-reveal-item", "is-visible");
-        item.style.removeProperty("--lesson-reveal-index");
-      });
+      settled = true;
+      cleanups.forEach((fn) => fn());
     };
-  }, [lesson?.blocks?.length, lessonCoverUrl, lessonId, nextLessonHref, preview]);
+  }, [lesson?.blocks?.length, lessonCoverUrl, lessonId]);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Урок" />;
@@ -235,7 +254,11 @@ export function LessonView({
         ) : null}
 
         <div className="lesson-layout">
-          <article className="lesson-main lesson-scroll-reveal" ref={lessonMainRef}>
+          <article
+            className={`lesson-main${articleReady ? " is-images-ready" : " is-loading-images"}`}
+            ref={lessonMainRef}
+          >
+            {!articleReady ? <div className="lesson-loading-overlay" aria-hidden="true" /> : null}
             {lessonCoverUrl ? (
               <figure className="lesson-cover">
                 <CoverImage

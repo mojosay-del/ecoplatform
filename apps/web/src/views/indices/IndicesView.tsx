@@ -11,6 +11,7 @@ import { api } from "../../lib/api";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
 import { getIndexMovementSummary } from "../index-movement-summary";
 import { IndexCard } from "./IndexCard";
+import { IndexCombinedChart } from "./IndexCombinedChart";
 import { IndexMovementSummaryTable } from "./IndexMovementSummaryTable";
 
 export function IndicesView() {
@@ -72,6 +73,9 @@ export function IndicesView() {
         ) : (
           <>
             <IndexMovementSummaryTable summary={movementSummary} />
+            {active.nomenclatures.length >= 2 ? (
+              <IndexCombinedChart nomenclatures={active.nomenclatures} categoryName={active.name} />
+            ) : null}
             <div className="indices-grid">
               {active.nomenclatures.map((item) => (
                 <IndexCard key={item.id} item={item} />

@@ -37,7 +37,7 @@ describe("PasswordPolicyService", () => {
 
     const service = new PasswordPolicyService();
 
-    await expect(service.assertAcceptablePassword(password)).rejects.toThrow("Этот пароль найден");
+    await expect(service.assertAcceptablePassword(password)).rejects.toThrow("Этот пароль ненадёжный");
     expect(fetchMock).toHaveBeenCalledWith(
       `https://api.pwnedpasswords.com/range/${prefix}`,
       expect.objectContaining({

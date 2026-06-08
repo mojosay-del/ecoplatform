@@ -27,7 +27,9 @@ export class PasswordPolicyService {
     }
 
     if (await this.isPwnedPassword(password)) {
-      throw new BadRequestException("Этот пароль найден в базе утекших паролей. Выберите другой пароль.");
+      throw new BadRequestException(
+        "Этот пароль ненадёжный — он найден в базе украденных паролей. Придумайте другой, более надёжный.",
+      );
     }
   }
 
