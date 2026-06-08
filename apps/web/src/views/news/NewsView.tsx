@@ -8,7 +8,7 @@ import { NewsOnboardingCard } from "../../components/NewsOnboardingCard";
 import { NEWS_ONBOARDING_STORAGE_KEY, shouldShowNewsOnboarding } from "../../components/news-onboarding-state";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { useCoverAssets } from "../../lib/use-cover-assets";
+import { useCoverAssets, useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
 import { AccessClosed, AuthRequired, ErrorState, getNewsFeedSnapshot, useApiQuery } from "../shared";
 import {
@@ -57,6 +57,16 @@ export function NewsView() {
   );
   const { items, setItems, state, errorMessage, hasMore, isLoadingMore, sentinelRef } = feed;
   const covers = useCoverAssets(items);
+  const audioFileIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          items.map((post) => post.audioAttachment?.fileId).filter((fileId): fileId is string => Boolean(fileId)),
+        ),
+      ).sort(),
+    [items],
+  );
+  const audioAssets = useFileAssetsByIds(audioFileIds);
   const openedSlug = searchParams.get("post");
   const showOnboarding =
     user && onboardingDismissed === false ? shouldShowNewsOnboarding(user, onboardingDismissed) : false;
@@ -168,6 +178,9 @@ export function NewsView() {
           <div className="news-masonry">
             {items.map((post, index) => (
               <NewsCard
+                audioAsset={
+                  post.audioAttachment?.fileId ? (audioAssets.get(post.audioAttachment.fileId) ?? null) : null
+                }
                 cover={post.coverImageId ? (covers.get(post.coverImageId) ?? null) : null}
                 href={postHref(post.slug)}
                 index={index}

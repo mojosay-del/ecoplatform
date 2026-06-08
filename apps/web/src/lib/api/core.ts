@@ -46,6 +46,10 @@ export function preferredFileAssetImageUrl(asset: FileAsset | null | undefined):
   return asset?.variants?.avif?.publicUrl ?? asset?.variants?.webp?.publicUrl ?? asset?.publicUrl ?? null;
 }
 
+export function preferredFileAssetMediaUrl(asset: FileAsset | null | undefined): string | null {
+  return asset?.streamUrl ?? asset?.publicUrl ?? asset?.downloadUrl ?? null;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,

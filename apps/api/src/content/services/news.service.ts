@@ -26,11 +26,34 @@ import { normaliseTagFilters } from "./news-tag.helpers";
 
 type NewsInput = z.infer<typeof newsInputSchema>;
 type NewsReadOptions = { preview?: boolean };
+type AudioAttachment = {
+  fileId: string;
+  episodeTitle: string | null;
+  caption: string | null;
+  durationSeconds: number | null;
+};
 
 function canPreviewAuthoredContent(user: RequestUser, createdById: string) {
   return (
     user.id === createdById || user.platformRoles.includes("admin") || user.platformRoles.includes("content_manager")
   );
+}
+
+function toNewsAudioAttachment(blocks: Array<{ payload: Prisma.JsonValue }>): AudioAttachment | null {
+  for (const block of blocks) {
+    const payload = block.payload;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) continue;
+    const fileId = payload.fileId;
+    if (typeof fileId !== "string" || !fileId) continue;
+    const episodeTitle = typeof payload.episodeTitle === "string" && payload.episodeTitle ? payload.episodeTitle : null;
+    const caption = typeof payload.caption === "string" && payload.caption ? payload.caption : null;
+    const durationSeconds =
+      typeof payload.durationSeconds === "number" && Number.isFinite(payload.durationSeconds)
+        ? payload.durationSeconds
+        : null;
+    return { fileId, episodeTitle, caption, durationSeconds };
+  }
+  return null;
 }
 
 // Раздел «Новости»: чтение, CRUD, теги, лайки, комментарии. Вынесен из
@@ -73,6 +96,12 @@ export class NewsService {
         skip: pagination.offset,
         include: {
           tags: { include: { newsTag: true } },
+          blocks: {
+            where: { type: "audio" },
+            orderBy: { position: "asc" },
+            take: 1,
+            select: { payload: true },
+          },
           likes: { where: { userId: user.id }, select: { id: true } },
           _count: { select: { likes: true } },
         },
@@ -87,8 +116,9 @@ export class NewsService {
       posts.map((post) => post.id),
     );
 
-    const items = posts.map(({ likes, _count, ...post }) => ({
+    const items = posts.map(({ blocks, likes, _count, ...post }) => ({
       ...post,
+      audioAttachment: toNewsAudioAttachment(blocks),
       _count: { likes: _count.likes, comments: commentCounts.get(post.id) ?? 0 },
       likedByMe: likes.length > 0,
     }));
@@ -166,6 +196,7 @@ export class NewsService {
     const { likes, _count, ...payload } = post;
     return {
       ...payload,
+      audioAttachment: toNewsAudioAttachment(post.blocks),
       _count: { likes: _count.likes, comments: commentsCount },
       comments: comments.map((comment) => decorateNewsComment(comment)),
       likedByMe: likes.length > 0,

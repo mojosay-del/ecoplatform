@@ -146,6 +146,60 @@ describe("Content publish", () => {
     expect(forbiddenPreview.status).toBe(404);
   });
 
+  it("публичная новость отдаёт первый audio-блок как audioAttachment", async () => {
+    const adminToken = await loginAdmin();
+    const { token: userToken } = await registerCompany("0000020");
+
+    const draft = await ctx.http
+      .post("/api/admin/content/news")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Новость с аудиоверсией",
+        lead: "Лид новости с аудио",
+        blocks: [
+          { type: "paragraph", payload: { html: "<p>Тело перед аудио.</p>" } },
+          {
+            type: "audio",
+            payload: {
+              fileId: "audio-file-for-contract",
+              episodeTitle: "Короткий выпуск",
+              caption: "Аудиоверсия материала",
+              durationSeconds: 42,
+            },
+          },
+          {
+            type: "audio",
+            payload: {
+              fileId: "second-audio-file",
+              episodeTitle: "Второй выпуск",
+            },
+          },
+        ],
+        tags: ["audio"],
+      });
+    expect(draft.status).toBe(201);
+
+    const publish = await ctx.http
+      .post(`/api/admin/content/news/${draft.body.id}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publish.status).toBe(201);
+
+    const list = await ctx.http.get("/api/news").set("Authorization", `Bearer ${userToken}`);
+    expect(list.status).toBe(200);
+    const item = list.body.items.find((news: { slug: string }) => news.slug === draft.body.slug);
+    expect(item?.audioAttachment).toEqual({
+      fileId: "audio-file-for-contract",
+      episodeTitle: "Короткий выпуск",
+      caption: "Аудиоверсия материала",
+      durationSeconds: 42,
+    });
+    expect(item?.blocks).toBeUndefined();
+
+    const detail = await ctx.http.get(`/api/news/${draft.body.slug}`).set("Authorization", `Bearer ${userToken}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.audioAttachment).toEqual(item.audioAttachment);
+  });
+
   it("CMS-предпросмотр открывает черновой урок только сотруднику CMS", async () => {
     const adminToken = await loginAdmin();
     const { token: userToken } = await registerCompany("0000022");

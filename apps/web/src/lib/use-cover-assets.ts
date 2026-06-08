@@ -8,23 +8,33 @@ import { useAuth } from "./auth";
 // coverImageId. Возвращает Map<assetId, FileAsset>. Используется в каталогах
 // новостей, обучения и любых других списках с превью.
 export function useCoverAssets(items: Array<{ coverImageId?: string | null }>) {
-  const { token } = useAuth();
-  const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
   const ids = useMemo(
     () => Array.from(new Set(items.map((item) => item.coverImageId).filter((id): id is string => Boolean(id)))).sort(),
     [items],
   );
-  const idsKey = ids.join(",");
+  return useFileAssetsByIds(ids);
+}
+
+export function useFileAssetsByIds(ids: string[]) {
+  const { token } = useAuth();
+  const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
+  const idsKey = useMemo(
+    () =>
+      Array.from(new Set(ids.filter(Boolean)))
+        .sort()
+        .join(","),
+    [ids],
+  );
 
   useEffect(() => {
-    if (!token || ids.length === 0) {
+    if (!token || !idsKey) {
       setAssets(new Map());
       return;
     }
     apiFetch<FileAsset[]>(`/files?ids=${encodeURIComponent(idsKey)}`, { token })
       .then((result) => setAssets(new Map(result.map((asset) => [asset.id, asset]))))
       .catch(() => setAssets(new Map()));
-  }, [idsKey, token, ids.length]);
+  }, [idsKey, token]);
 
   return assets;
 }

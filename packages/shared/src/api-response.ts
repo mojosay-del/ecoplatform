@@ -57,12 +57,20 @@ export type NewsTagLink = {
   newsTag: NewsTag;
 };
 
+export type NewsAudioAttachment = {
+  fileId: string;
+  episodeTitle: string | null;
+  caption: string | null;
+  durationSeconds: number | null;
+};
+
 export type NewsListItem = {
   id: string;
   slug: string;
   title: string;
   lead: string;
   coverImageId: string | null;
+  audioAttachment: NewsAudioAttachment | null;
   firstPublishedAt: IsoDateString | null;
   status: string;
   tags: NewsTagLink[];

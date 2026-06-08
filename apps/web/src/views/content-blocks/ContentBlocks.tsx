@@ -6,7 +6,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, X } from "lucide-react";
-import { api, type FileAsset } from "../../lib/api";
+import { AudioMessagePlayer } from "../../components/AudioMessagePlayer";
+import { api, preferredFileAssetMediaUrl, type FileAsset } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { sanitizeParagraphHtml } from "../../lib/sanitize-html";
 import { MatchingPlayer, type MatchingPayload } from "./MatchingPlayer";
@@ -98,18 +99,21 @@ export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
           return <VideoBlock asset={asset} caption={payload.caption} key={index} />;
         }
         if (block.type === "audio") {
-          const payload = block.payload as { fileId: string; episodeTitle?: string; caption?: string };
+          const payload = block.payload as {
+            fileId: string;
+            episodeTitle?: string;
+            caption?: string;
+            durationSeconds?: number;
+          };
           const asset = assets.get(payload.fileId);
           return (
-            <figure className="media-block" key={index}>
-              {payload.episodeTitle ? <h3>{payload.episodeTitle}</h3> : null}
-              {asset?.streamUrl ?? asset?.publicUrl ? (
-                <audio controls src={asset.streamUrl ?? asset.publicUrl ?? undefined} />
-              ) : (
-                <MissingAsset />
-              )}
-              {payload.caption ? <figcaption>{payload.caption}</figcaption> : null}
-            </figure>
+            <AudioMessagePlayer
+              caption={payload.caption}
+              durationSeconds={payload.durationSeconds}
+              key={index}
+              sourceUrl={preferredFileAssetMediaUrl(asset)}
+              title={payload.episodeTitle}
+            />
           );
         }
         if (block.type === "file") {
@@ -286,8 +290,7 @@ function VideoBlock({ asset, caption }: { asset: FileAsset | null | undefined; c
         ? [{ src: fallbackUrl, type: asset?.mimeType || "video/mp4" }]
         : [];
 
-  const processing =
-    sources.length === 0 && (renditions?.status === "pending" || renditions?.status === "processing");
+  const processing = sources.length === 0 && (renditions?.status === "pending" || renditions?.status === "processing");
 
   return (
     <figure className="media-block">
@@ -372,7 +375,12 @@ function QuizPlayer({ payload }: { payload: QuizPayload }) {
         })}
       </div>
       <div className="quiz-actions">
-        <button className="button quiz-check" type="button" disabled={selected.length === 0} onClick={() => setChecked(true)}>
+        <button
+          className="button quiz-check"
+          type="button"
+          disabled={selected.length === 0}
+          onClick={() => setChecked(true)}
+        >
           Проверить
         </button>
         {checked ? (
@@ -384,9 +392,7 @@ function QuizPlayer({ payload }: { payload: QuizPayload }) {
           </span>
         ) : null}
       </div>
-      {checked && payload.explanation ? (
-        <p className="quiz-explanation">{payload.explanation}</p>
-      ) : null}
+      {checked && payload.explanation ? <p className="quiz-explanation">{payload.explanation}</p> : null}
     </div>
   );
 }

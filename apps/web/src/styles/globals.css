@@ -4565,6 +4565,250 @@ body.news-modal-open .app-shell {
   width: 100%;
 }
 
+.audio-message-player {
+  display: block;
+  margin: 0;
+  color: var(--text);
+}
+
+.audio-player-shell {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgb(var(--brand-rgb) / 0.09), transparent 42%), var(--panel);
+  box-shadow: 0 8px 24px rgb(var(--shadow-rgb) / 0.06);
+}
+
+.audio-player-round-button,
+.audio-player-stop {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.audio-player-round-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+}
+
+.audio-player-round-button.is-primary {
+  border-color: transparent;
+  background: var(--brand);
+  color: var(--text-inverse);
+  box-shadow: 0 10px 22px rgb(var(--brand-shadow-rgb) / 0.18);
+}
+
+.audio-player-round-button:not(:disabled):hover,
+.audio-player-stop:not(:disabled):hover {
+  transform: translateY(-1px);
+  border-color: var(--brand-muted);
+  box-shadow: var(--shadow-sm);
+}
+
+.audio-player-round-button.is-primary:not(:disabled):hover {
+  background: var(--brand-hover);
+}
+
+.audio-player-round-button:focus-visible,
+.audio-player-stop:focus-visible,
+.audio-player-speed:focus-visible,
+.audio-player-waveform:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.audio-player-round-button:disabled,
+.audio-player-stop:disabled,
+.audio-player-speed:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.audio-player-body {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+}
+
+.audio-player-head,
+.audio-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.audio-player-head {
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.audio-player-title {
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-player-time {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.audio-player-waveform {
+  position: relative;
+  min-width: 0;
+  min-height: 42px;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.audio-player-waveform-bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 42px;
+  padding: 0 2px;
+}
+
+.audio-player-waveform-bars span {
+  display: block;
+  flex: 1 1 0;
+  min-width: 2px;
+  height: var(--audio-bar-height);
+  border-radius: 999px;
+  background: var(--neutral-soft);
+  transition:
+    background 120ms ease,
+    opacity 120ms ease;
+}
+
+.audio-player-waveform-bars span.is-filled {
+  background: linear-gradient(180deg, var(--brand), var(--brand-hover));
+}
+
+.audio-player-progress-dot {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--panel);
+  border-radius: 999px;
+  background: var(--brand);
+  box-shadow: 0 3px 8px rgb(var(--brand-shadow-rgb) / 0.22);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.audio-player-controls {
+  justify-content: space-between;
+}
+
+.audio-player-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  border-radius: var(--radius-chip);
+  padding: 6px 10px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.audio-player-speed {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  padding: 5px 28px 5px 10px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.audio-message-player figcaption {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.audio-message-player.is-compact .audio-player-shell {
+  gap: 10px;
+  padding: 10px;
+  box-shadow: none;
+}
+
+.audio-message-player.is-compact .audio-player-round-button {
+  width: 40px;
+  height: 40px;
+}
+
+.audio-message-player.is-compact .audio-player-waveform,
+.audio-message-player.is-compact .audio-player-waveform-bars {
+  min-height: 34px;
+  height: 34px;
+}
+
+.audio-message-player.is-compact .audio-player-controls {
+  align-items: center;
+}
+
+.audio-message-player.is-compact .audio-player-stop {
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+.audio-message-player.is-compact .audio-player-speed {
+  min-height: 28px;
+  padding: 4px 24px 4px 8px;
+}
+
+.audio-message-player.is-unavailable .audio-player-waveform {
+  cursor: default;
+}
+
+@media (max-width: 640px) {
+  .audio-player-shell {
+    align-items: flex-start;
+  }
+
+  .audio-player-head,
+  .audio-player-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .audio-player-controls {
+    gap: 8px;
+  }
+}
+
 .media-block figcaption {
   color: var(--muted);
   font-size: 14px;
