@@ -152,6 +152,7 @@
 }
 
 .index-card {
+  container-type: inline-size;
   display: grid;
   gap: 18px;
   box-sizing: border-box;
@@ -179,20 +180,27 @@
 .index-period-tabs {
   display: flex;
   align-items: center;
-  /* Переносим вкладки на новую строку вместо горизонтальной прокрутки: при узкой
-     карточке не влезающие периоды раньше «прятались» под правым краем плашки
-     (на macOS оверлейный скроллбар не виден) и выглядели обрезанными. Перенос
-     гарантирует, что все периоды видны на любой ширине. */
-  flex-wrap: wrap;
-  justify-content: center;
+  align-self: start;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
   gap: 2px;
-  width: fit-content;
+  width: max-content;
   max-width: 100%;
+  box-sizing: border-box;
   margin: 0 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
   background: var(--panel-soft);
   border: 1px solid var(--line);
   border-radius: var(--radius-chip);
   padding: 3px;
+}
+
+.index-period-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .index-period-tab {
@@ -211,8 +219,27 @@
     color 120ms ease;
 }
 
+.index-period-label-short {
+  display: none;
+}
+
 .index-period-tab:hover {
   color: var(--text);
+}
+
+@container (max-width: 430px) {
+  .index-card .index-period-tab {
+    min-width: 44px;
+    padding-inline: 9px;
+  }
+
+  .index-card .index-period-label-full {
+    display: none;
+  }
+
+  .index-card .index-period-label-short {
+    display: inline;
+  }
 }
 
 .index-current-price {
@@ -451,6 +478,12 @@
   }
   .index-combined {
     padding: 16px 14px 18px;
+  }
+  .index-combined-periods .index-period-label-full {
+    display: none;
+  }
+  .index-combined-periods .index-period-label-short {
+    display: inline;
   }
   .index-combined-chart {
     /* На узком экране вытягиваем график выше, чтобы кривые не сливались. */

@@ -7723,19 +7723,18 @@ body.news-modal-open .app-shell {
     font-size: 16px;
   }
 
-  /* Переключатель периода графика: 4 коротких опции делят ширину поровну
-     (segmented control) и влезают целиком — раньше «6 мес» уезжал в скрытый
-     горизонтальный скролл без видимой подсказки. */
+  /* Переключатель периода графика держим в одну строку, чтобы карточки не
+     росли по высоте на узких экранах. */
   .index-period-tabs {
-    width: 100%;
-    overflow-x: visible;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
   }
 
   .index-period-tab {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 7px 4px;
-    font-size: 12px;
+    flex: 0 0 auto;
+    min-width: 44px;
+    padding-inline: 9px;
     text-align: center;
   }
 

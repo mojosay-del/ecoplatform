@@ -10,7 +10,6 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type { NomenclatureListItem } from "@ecoplatform/shared";
-import { INDEX_PERIOD_LABELS } from "./constants";
 import {
   buildSmoothChartPath,
   formatIndexDateLabel,
@@ -19,6 +18,7 @@ import {
   niceAxisTicks,
   smoothPricesForScale,
 } from "./format";
+import { IndexPeriodTabs } from "./IndexPeriodTabs";
 import type { IndexPeriod } from "./types";
 
 // Различимая палитра; циклится по индексу номенклатуры.
@@ -237,18 +237,12 @@ export function IndexCombinedChart({
           <span className="index-combined-eyebrow">Все номенклатуры{categoryName ? ` · ${categoryName}` : ""}</span>
           <h2 id={`index-combined-title-${uid}`}>Сводная динамика</h2>
         </div>
-        <div className="index-period-tabs index-combined-periods" aria-label="Период сводного графика">
-          {(Object.keys(INDEX_PERIOD_LABELS) as IndexPeriod[]).map((value) => (
-            <button
-              className={`index-period-tab ${period === value ? "active" : ""}`}
-              key={value}
-              onClick={() => setPeriod(value)}
-              type="button"
-            >
-              {INDEX_PERIOD_LABELS[value]}
-            </button>
-          ))}
-        </div>
+        <IndexPeriodTabs
+          ariaLabel="Период сводного графика"
+          className="index-combined-periods"
+          period={period}
+          onChange={setPeriod}
+        />
       </div>
 
       {!geometry ? (

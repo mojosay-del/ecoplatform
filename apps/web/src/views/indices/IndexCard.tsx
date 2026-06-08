@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { NomenclatureListItem } from "@ecoplatform/shared";
 import { getIndexAnchorId } from "../index-movement-summary";
-import { INDEX_PERIOD_LABELS } from "./constants";
 import { formatIndexPrice } from "./format";
 import { IndexChart } from "./IndexChart";
+import { IndexPeriodTabs } from "./IndexPeriodTabs";
 import type { IndexPeriod } from "./types";
 
 export function IndexCard({ item }: { item: NomenclatureListItem }) {
@@ -72,18 +72,7 @@ export function IndexCard({ item }: { item: NomenclatureListItem }) {
 
       <IndexChart points={points} period={period} />
 
-      <div className="index-period-tabs" aria-label="Период графика">
-        {(Object.keys(INDEX_PERIOD_LABELS) as IndexPeriod[]).map((value) => (
-          <button
-            className={`index-period-tab ${period === value ? "active" : ""}`}
-            key={value}
-            onClick={() => setPeriod(value)}
-            type="button"
-          >
-            {INDEX_PERIOD_LABELS[value]}
-          </button>
-        ))}
-      </div>
+      <IndexPeriodTabs ariaLabel="Период графика" period={period} onChange={setPeriod} />
     </article>
   );
 }
