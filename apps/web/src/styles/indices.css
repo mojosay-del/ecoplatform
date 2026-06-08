@@ -347,14 +347,14 @@
 .index-combined-chart {
   width: 100%;
   height: auto;
-  aspect-ratio: 1080 / 340;
+  aspect-ratio: 1080 / 360;
   display: block;
 }
 
 .index-combined-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 18px;
+  gap: 6px 16px;
   margin: 0;
   padding: 12px 0 0;
   border-top: 1px solid var(--line);
@@ -368,7 +368,13 @@
   min-width: 0;
   color: var(--muted);
   font-size: 13px;
+  cursor: default;
   transition: color 120ms ease;
+}
+
+.index-combined-legend-item:hover,
+.index-combined-legend-item.is-active {
+  color: var(--text);
 }
 
 .index-combined-legend-dot {
@@ -376,6 +382,7 @@
   height: 11px;
   border-radius: 50%;
   flex: 0 0 auto;
+  box-shadow: 0 0 0 3px rgb(var(--white-rgb) / 0.9);
 }
 
 .index-combined-legend-name {

@@ -3,8 +3,10 @@
 // Совмещённый график всех номенклатур категории: по одной кривой на номенклатуру
 // разными цветами на ОБЩЕЙ шкале реальных цен (₽/т). Помогает увидеть общую
 // тенденцию (напр. по макулатуре) в одной плашке. Ось X — по времени (серии могут
-// иметь разную частоту точек), Y — общий ценовой домен по всем сериям. При наведении
-// показываем название номенклатуры + дату + цену; общей цены справа сверху нет.
+// иметь разную частоту точек), Y — общий ценовой домен по всем сериям, с
+// горизонтальной сеткой и подписями цен слева. При наведении на график
+// показываем название номенклатуры + дату + цену; наведение на легенду
+// подсвечивает соответствующую кривую.
 
 import { useEffect, useId, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type { NomenclatureListItem } from "@ecoplatform/shared";
@@ -14,6 +16,7 @@ import {
   formatIndexDateLabel,
   formatIndexPrice,
   formatIndexTooltipDate,
+  niceAxisTicks,
   smoothPricesForScale,
 } from "./format";
 import type { IndexPeriod } from "./types";
@@ -44,9 +47,40 @@ export function IndexCombinedChart({
 }) {
   const rawId = useId();
   const uid = rawId.replace(/:/g, "");
-  const [period, setPeriod] = useState<IndexPeriod>("3M");
+
+  // Стартовый период подбираем под данные: индексы обновляются редко, поэтому в
+  // коротком окне (3 мес.) у половины номенклатур бывает 1 точка — и кривые
+  // вырождались в одиночные «точки». Берём самый короткий период, в котором ВСЕ
+  // серии рисуются линией (≥2 точек); если такого нет — окно с максимумом
+  // линий. Так карточка открывается на нормальных кривых, а не на россыпи точек.
+  const defaultPeriod = useMemo<IndexPeriod>(() => {
+    const order: IndexPeriod[] = ["3M", "6M", "1Y", "2Y", "3Y"];
+    const total = nomenclatures.length;
+    let best: IndexPeriod = "1Y";
+    let bestScore = -1;
+    for (const value of order) {
+      const lineable = nomenclatures.filter((item) => (item.chart?.[value]?.length ?? 0) >= 2).length;
+      if (total > 0 && lineable === total) return value;
+      if (lineable > bestScore) {
+        bestScore = lineable;
+        best = value;
+      }
+    }
+    return best;
+  }, [nomenclatures]);
+
+  const [period, setPeriod] = useState<IndexPeriod>(defaultPeriod);
   const [hover, setHover] = useState<{ seriesIndex: number; pointIndex: number } | null>(null);
+  // Подсветка кривой при наведении на её строку в легенде (без тултипа).
+  const [legendSeries, setLegendSeries] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+
+  // Сменили категорию (другой набор номенклатур) → переустанавливаем удачный
+  // стартовый период. В пределах одной категории строка defaultPeriod стабильна,
+  // поэтому ручной выбор периода пользователем не сбрасывается.
+  useEffect(() => {
+    setPeriod(defaultPeriod);
+  }, [defaultPeriod]);
 
   useEffect(() => {
     setHover(null);
@@ -86,10 +120,11 @@ export function IndexCombinedChart({
   }, [nomenclatures, period]);
 
   const width = 1080;
-  const height = 340;
-  const padding = { top: 34, right: 26, bottom: 40, left: 26 };
+  const height = 360;
+  const padding = { top: 28, right: 26, bottom: 40, left: 66 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
+  const baselineY = padding.top + innerHeight;
 
   const geometry = useMemo(() => {
     const allPoints = series.flatMap((entry) => entry.points);
@@ -126,6 +161,12 @@ export function IndexCombinedChart({
       return { ...entry, coords, path: buildSmoothChartPath(xs, ys) };
     });
 
+    // Горизонтальная сетка + подписи цены слева — без них кривые «висели в
+    // воздухе» и было непонятно, какому уровню цены они соответствуют.
+    const yTicks = niceAxisTicks(priceMin, priceMax, 4)
+      .filter((value) => value >= domainMin && value <= domainMax)
+      .map((value) => ({ y: scaleY(value), label: formatIndexPrice(value) }));
+
     // Метки оси X: равномерно по времени, формат зависит от периода.
     const tickCount = 5;
     const labels: Array<{ x: number; text: string }> = [];
@@ -137,7 +178,7 @@ export function IndexCombinedChart({
       if (!previous || x - previous.x >= 120) labels.push({ x, text });
     }
 
-    return { projected, labels, tMin, tMax };
+    return { projected, labels, yTicks, tMin, tMax };
   }, [series, period, innerWidth, innerHeight, padding.left, padding.top]);
 
   function handleMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
@@ -165,6 +206,9 @@ export function IndexCombinedChart({
         : { seriesIndex: chosen.seriesIndex, pointIndex: chosen.pointIndex },
     );
   }
+
+  // Подсвеченная кривая: либо под курсором на графике, либо под курсором в легенде.
+  const activeSeriesIndex = hover?.seriesIndex ?? legendSeries;
 
   const active =
     geometry && hover
@@ -224,12 +268,38 @@ export function IndexCombinedChart({
             >
               <rect x="0" y="0" width={width} height={height} fill="transparent" />
 
+              {/* Горизонтальная сетка + подписи цены. */}
+              {geometry.yTicks.map((tick, i) => (
+                <g key={`grid-${i}`}>
+                  <line
+                    x1={padding.left}
+                    x2={width - padding.right}
+                    y1={tick.y}
+                    y2={tick.y}
+                    stroke="var(--line)"
+                    strokeWidth="1"
+                  />
+                  <text x={padding.left - 12} y={tick.y + 4} textAnchor="end" fontSize="12" fill="var(--muted)">
+                    {tick.label}
+                  </text>
+                </g>
+              ))}
+              {/* Базовая линия оси X. */}
+              <line
+                x1={padding.left}
+                x2={width - padding.right}
+                y1={baselineY}
+                y2={baselineY}
+                stroke="var(--line-strong)"
+                strokeWidth="1"
+              />
+
               {active?.point ? (
                 <line
                   x1={active.point.x}
                   x2={active.point.x}
                   y1={padding.top}
-                  y2={padding.top + innerHeight}
+                  y2={baselineY}
                   stroke="#1a202e"
                   strokeDasharray="3 4"
                   strokeOpacity="0.2"
@@ -237,19 +307,30 @@ export function IndexCombinedChart({
               ) : null}
 
               {geometry.projected.map((entry, seriesIndex) => {
-                const dimmed = hover !== null && hover.seriesIndex !== seriesIndex;
+                const dimmed = activeSeriesIndex !== null && activeSeriesIndex !== seriesIndex;
+                const highlighted = activeSeriesIndex === seriesIndex;
+                const last = entry.coords[entry.coords.length - 1];
                 return (
-                  <g key={entry.id} opacity={dimmed ? 0.28 : 1}>
+                  <g key={entry.id} opacity={dimmed ? 0.22 : 1}>
                     <path
                       d={entry.path}
                       fill="none"
                       stroke={entry.color}
-                      strokeWidth={hover?.seriesIndex === seriesIndex ? 3.4 : 2.4}
+                      strokeWidth={highlighted ? 3.4 : 2.4}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
-                    {entry.coords.length === 1 ? (
-                      <circle cx={entry.coords[0]!.x} cy={entry.coords[0]!.y} r="4" fill={entry.color} />
+                    {/* Точка-якорь на последнем значении каждой кривой: показывает
+                        «сейчас» и гарантирует видимость даже у короткой серии. */}
+                    {last ? (
+                      <circle
+                        cx={last.x}
+                        cy={last.y}
+                        r={highlighted ? 4.6 : 3.4}
+                        fill={entry.color}
+                        stroke="var(--panel)"
+                        strokeWidth="1.6"
+                      />
                     ) : null}
                   </g>
                 );
@@ -299,8 +380,10 @@ export function IndexCombinedChart({
           <ul className="index-combined-legend">
             {geometry.projected.map((entry, seriesIndex) => (
               <li
-                className={`index-combined-legend-item${hover?.seriesIndex === seriesIndex ? " is-active" : ""}`}
+                className={`index-combined-legend-item${activeSeriesIndex === seriesIndex ? " is-active" : ""}`}
                 key={entry.id}
+                onMouseEnter={() => setLegendSeries(seriesIndex)}
+                onMouseLeave={() => setLegendSeries((current) => (current === seriesIndex ? null : current))}
               >
                 <span className="index-combined-legend-dot" style={{ background: entry.color }} aria-hidden="true" />
                 <span className="index-combined-legend-name">{entry.name}</span>

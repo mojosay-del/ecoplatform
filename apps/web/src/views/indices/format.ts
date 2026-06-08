@@ -19,7 +19,28 @@ export function formatIndexTooltipDate(date: Date) {
   return `${date.getDate()} ${month} ${date.getFullYear()}`;
 }
 
-export function buildSmoothChartPath(xs: number[], ys: number[]) {
+export function buildSmoothChartPath(rawXs: number[], rawYs: number[]) {
+  // Оставляем только точки со строго возрастающим X и конечными координатами.
+  // На сводном графике X — это время, и две записи за одну дату давали два
+  // одинаковых X. Тогда шаг h=0 → наклон становится Infinity/NaN → контрольные
+  // точки кривой NaN → браузер молча отбрасывает весь <path>. Внешне это
+  // выглядело как «рваные» кривые или просто точки вместо линий. Совпавшие по X
+  // точки схлопываем (усредняем Y), чтобы линия оставалась непрерывной.
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < rawXs.length; i += 1) {
+    const x = rawXs[i]!;
+    const y = rawYs[i]!;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const lastX = xs[xs.length - 1];
+    if (lastX === undefined || x > lastX + 1e-6) {
+      xs.push(x);
+      ys.push(y);
+    } else {
+      ys[ys.length - 1] = (ys[ys.length - 1]! + y) / 2;
+    }
+  }
+
   if (xs.length === 0) return "";
   if (xs.length === 1) return `M${xs[0]!.toFixed(1)},${ys[0]!.toFixed(1)}`;
 
@@ -92,4 +113,24 @@ export function smoothPricesForScale(prices: number[], period: IndexPeriod, inne
 
     return weightedSum / weightTotal;
   });
+}
+
+// «Красивые» отметки для оси Y: ровные значения (1/2/5 × 10ⁿ) внутри диапазона
+// цен, чтобы подписи и горизонтальная сетка читались, а не были рваными числами.
+export function niceAxisTicks(min: number, max: number, count: number): number[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [];
+  const span = max - min;
+  if (span <= 0) return [min];
+
+  const rawStep = span / Math.max(1, count);
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const normalized = rawStep / magnitude;
+  const niceStep = (normalized >= 5 ? 5 : normalized >= 2 ? 2 : 1) * magnitude;
+  const start = Math.ceil(min / niceStep) * niceStep;
+
+  const ticks: number[] = [];
+  for (let value = start; value <= max + niceStep * 0.001; value += niceStep) {
+    ticks.push(Math.round(value * 1000) / 1000);
+  }
+  return ticks;
 }
