@@ -1,0 +1,452 @@
+/* indices.css — извлечено из globals.css (route-scoped, импортируется в корне вью indices). */
+
+/* Индексы цен: список категорий + сетка карточек.
+   Каждая карточка — отдельный индекс со своим периодом и графиком. */
+
+.indices-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.indices-category-tab {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  padding: 8px 16px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.indices-category-tab:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.indices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+.index-movement-summary {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 0 0 22px;
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+}
+
+.index-movement-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.index-movement-eyebrow,
+.index-movement-note {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.index-movement-head h2 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: var(--text-xl);
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.index-movement-note {
+  padding-top: 4px;
+  white-space: nowrap;
+}
+
+.index-movement-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.index-movement-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.index-movement-table th,
+.index-movement-table td {
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.index-movement-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.index-movement-table td {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.index-movement-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 82px;
+  padding: 5px 10px;
+  border-radius: var(--radius-chip);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.index-movement-link {
+  display: inline-block;
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.index-movement-link:hover {
+  color: var(--primary);
+}
+
+.index-movement-code {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.index-movement-change {
+  font-size: 15px;
+}
+
+.index-movement-empty {
+  margin: 0;
+  padding: 14px 0 2px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.index-card {
+  display: grid;
+  gap: 18px;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  /* Любой контент (длинные названия, график) держим в границах карточки. */
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  min-height: 360px;
+  padding: 24px 28px 18px;
+  scroll-margin-top: 120px;
+}
+
+.index-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.index-period-tabs {
+  display: flex;
+  align-items: center;
+  /* Переносим вкладки на новую строку вместо горизонтальной прокрутки: при узкой
+     карточке не влезающие периоды раньше «прятались» под правым краем плашки
+     (на macOS оверлейный скроллбар не виден) и выглядели обрезанными. Перенос
+     гарантирует, что все периоды видны на любой ширине. */
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  padding: 3px;
+}
+
+.index-period-tab {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.index-period-tab:hover {
+  color: var(--text);
+}
+
+.index-current-price {
+  text-align: right;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.index-current-price strong {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+.index-current-price span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.index-card-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.index-card-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.index-card-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.index-change-positive {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.index-change-negative {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.index-chart-wrap {
+  min-width: 0;
+  width: 100%;
+  margin: 4px 0 0;
+  overflow: hidden;
+}
+
+.index-chart {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 720 / 260;
+  display: block;
+}
+
+.index-chart-empty {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Совмещённый график всех номенклатур — плашка во всю ширину между сводкой
+   «Движение индексов» и сеткой карточек. */
+
+.index-combined {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 0 0 22px;
+  padding: 18px 20px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.index-combined-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.index-combined-heading {
+  min-width: 0;
+}
+
+.index-combined-eyebrow {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.index-combined-head h2 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: var(--text-xl);
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.index-combined-periods {
+  margin: 0;
+}
+
+.index-combined-chart-wrap {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.index-combined-chart {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1080 / 340;
+  display: block;
+}
+
+.index-combined-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.index-combined-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  transition: color 120ms ease;
+}
+
+.index-combined-legend-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.index-combined-legend-name {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .index-movement-summary {
+    padding: 16px 14px;
+  }
+  .index-movement-head {
+    display: grid;
+    gap: 6px;
+  }
+  .index-movement-note {
+    padding-top: 0;
+    white-space: normal;
+  }
+  .index-movement-table {
+    min-width: 0;
+    table-layout: auto;
+  }
+  .index-movement-table thead {
+    display: none;
+  }
+  .index-movement-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+  .index-movement-table tr {
+    display: grid;
+    gap: 6px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .index-movement-table th,
+  .index-movement-table td {
+    padding: 0;
+    border-top: 0;
+  }
+  .index-movement-table td:nth-child(3)::before,
+  .index-movement-table td:nth-child(4)::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .indices-grid {
+    grid-template-columns: 1fr;
+  }
+  .index-card {
+    min-height: 340px;
+    padding: 20px 18px 14px;
+  }
+  .index-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .index-current-price {
+    text-align: left;
+  }
+  .index-chart-empty {
+    min-height: 240px;
+  }
+  .index-combined {
+    padding: 16px 14px 18px;
+  }
+  .index-combined-chart {
+    /* На узком экране вытягиваем график выше, чтобы кривые не сливались. */
+    aspect-ratio: 3 / 2;
+  }
+}

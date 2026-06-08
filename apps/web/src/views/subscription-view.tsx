@@ -1,4 +1,5 @@
 "use client";
+import "../styles/subscription.css";
 
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
