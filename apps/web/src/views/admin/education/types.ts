@@ -1,12 +1,14 @@
 import type { Block } from "../../../lib/editor/block-types";
 
 export type Attachment = { fileId: string; displayName: string };
+export type LessonTaskDraft = { title: string; description: string };
 
 export type LessonDraft = {
   title: string;
   coverImageId: string;
   coverSubtitle: string;
   blocks: Block[];
+  lessonTasks: LessonTaskDraft[];
   attachments: Attachment[];
 };
 

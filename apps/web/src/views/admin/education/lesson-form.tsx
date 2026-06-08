@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ExternalLink, Paperclip, Plus, Trash2 } from "lucide-react";
+import { ClipboardList, ExternalLink, Paperclip, Plus, Trash2 } from "lucide-react";
 import type { Block } from "../../../lib/editor/block-types";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
 import { DocumentEditor } from "../../../components/editor/DocumentEditor";
@@ -9,8 +9,15 @@ import { FileUploadField } from "../../../components/FileUploadField";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";
 import { LESSON_ATOMIC_KINDS } from "./constants";
-import type { Attachment, EducationMutation, Lesson, LessonDraft, SetEducationSelection } from "./types";
-import { lessonToDraft, normalizeAttachments, normalizeLessonDraft } from "./utils";
+import type {
+  Attachment,
+  EducationMutation,
+  Lesson,
+  LessonDraft,
+  LessonTaskDraft,
+  SetEducationSelection,
+} from "./types";
+import { lessonToDraft, normalizeLessonDraft } from "./utils";
 
 export function LessonForm({
   lesson,
@@ -27,17 +34,7 @@ export function LessonForm({
   const [savedDraft, setSavedDraft] = useState(() => normalizeLessonDraft(lessonToDraft(lesson)));
   const [attachmentsBlockVisible, setAttachmentsBlockVisible] = useState(lesson.attachments.length > 0);
   const [saving, setSaving] = useState(false);
-  const normalizedDraftAttachments = useMemo(() => normalizeAttachments(draft.attachments), [draft.attachments]);
-  const normalizedDraft = useMemo(
-    () => ({
-      title: draft.title,
-      coverImageId: draft.coverImageId.trim() || null,
-      coverSubtitle: draft.coverSubtitle.trim() || null,
-      blocks: draft.blocks.map((block) => ({ type: block.type, payload: block.payload })),
-      attachments: normalizedDraftAttachments,
-    }),
-    [draft.blocks, draft.coverImageId, draft.coverSubtitle, draft.title, normalizedDraftAttachments],
-  );
+  const normalizedDraft = useMemo(() => normalizeLessonDraft(draft), [draft]);
 
   // Черновик пересинхронизируем только при переключении на другой урок, а
   // "последнюю сохранённую версию" обновляем на каждый refetch. Так refetch
@@ -86,6 +83,27 @@ export function LessonForm({
     if (draft.attachments.length === 0) {
       addAttachment();
     }
+  }
+
+  function addLessonTask() {
+    setDraft((prev) => ({
+      ...prev,
+      lessonTasks: [...prev.lessonTasks, { title: "", description: "" }],
+    }));
+  }
+
+  function updateLessonTask(index: number, patch: Partial<LessonTaskDraft>) {
+    setDraft((prev) => ({
+      ...prev,
+      lessonTasks: prev.lessonTasks.map((task, idx) => (idx === index ? { ...task, ...patch } : task)),
+    }));
+  }
+
+  function removeLessonTask(index: number) {
+    setDraft((prev) => ({
+      ...prev,
+      lessonTasks: prev.lessonTasks.filter((_, idx) => idx !== index),
+    }));
   }
 
   function updateAttachment(index: number, patch: Partial<Attachment>) {
@@ -138,7 +156,10 @@ export function LessonForm({
     if (normalizedDraft.title !== savedDraft.title) return true;
     if (normalizedDraft.coverImageId !== savedDraft.coverImageId) return true;
     if (normalizedDraft.coverSubtitle !== savedDraft.coverSubtitle) return true;
-    if (JSON.stringify(canonicalizeBlocks(normalizedDraft.blocks)) !== JSON.stringify(canonicalizeBlocks(savedDraft.blocks)))
+    if (
+      JSON.stringify(canonicalizeBlocks(normalizedDraft.blocks)) !==
+      JSON.stringify(canonicalizeBlocks(savedDraft.blocks))
+    )
       return true;
     if (JSON.stringify(normalizedDraft.attachments) !== JSON.stringify(savedDraft.attachments)) return true;
     return false;
@@ -203,12 +224,66 @@ export function LessonForm({
           allowedAtomicKinds={LESSON_ATOMIC_KINDS}
           placeholder="Текст урока — пишите или нажмите «/» для вставки блока…"
         />
-        {!attachmentsBlockVisible ? (
-          <button type="button" className="button secondary lesson-attach-reveal" onClick={addAttachmentsBlock}>
-            <Paperclip size={14} /> Прикреплённые файлы
-          </button>
-        ) : null}
       </section>
+
+      <section className="lesson-section lesson-tasks-section">
+        <div className="lesson-section-heading-row">
+          <h3 className="lesson-section-title lesson-section-title-with-icon">
+            <ClipboardList size={16} />
+            Задания урока
+          </h3>
+          {draft.lessonTasks.length > 0 ? (
+            <span className="lesson-section-counter">Задач: {draft.lessonTasks.length}</span>
+          ) : null}
+        </div>
+        <div className="lesson-tasks-editor">
+          {draft.lessonTasks.length > 0 ? (
+            <ol className="lesson-task-editor-list">
+              {draft.lessonTasks.map((task, index) => (
+                <li className="lesson-task-editor-row" key={index}>
+                  <span className="lesson-task-editor-index">{index + 1}</span>
+                  <div className="lesson-task-editor-fields">
+                    <input
+                      className="input"
+                      aria-label={`Название задачи ${index + 1}`}
+                      placeholder="Название задачи"
+                      value={task.title}
+                      onChange={(event) => updateLessonTask(index, { title: event.target.value })}
+                    />
+                    <input
+                      className="input"
+                      aria-label={`Подсказка к задаче ${index + 1}`}
+                      placeholder="Подсказка (необязательно)"
+                      value={task.description}
+                      onChange={(event) => updateLessonTask(index, { description: event.target.value })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="attachment-delete lesson-task-delete"
+                    onClick={() => removeLessonTask(index)}
+                    title="Удалить задачу"
+                    aria-label={`Удалить задачу ${index + 1}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="lesson-task-empty">Задачи не добавлены</div>
+          )}
+          <button type="button" className="attachments-add lesson-task-add" onClick={addLessonTask}>
+            <Plus size={14} /> Добавить задачу
+          </button>
+        </div>
+      </section>
+
+      {!attachmentsBlockVisible ? (
+        <button type="button" className="button secondary lesson-attach-reveal" onClick={addAttachmentsBlock}>
+          <Paperclip size={14} /> Прикреплённые файлы
+        </button>
+      ) : null}
 
       {attachmentsBlockVisible ? (
         <section className="lesson-section">

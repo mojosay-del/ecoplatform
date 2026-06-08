@@ -6,7 +6,6 @@ import {
   RICH_TEXT_TOP_LEVEL_TYPES,
   isAtomicBlockKind,
 } from "./block-mapping";
-import { sanitizeParagraphHtml } from "@ecoplatform/shared/sanitize-html";
 import { richTextExtensions } from "./rich-text-extensions";
 
 // Универсальный блок CMS — то, что хранится в БД и валидируется zod-схемами
@@ -21,15 +20,15 @@ export type EditorBlock = { type: string; payload: Record<string, unknown> };
  * отдал редактор, и индикатор автосейва вечно горит «Не сохранено»:
  *   1) в КАЖДЫЙ payload добавляет служебный ключ `v: 1` (версия формата);
  *   2) у paragraph прогоняет html через sanitizeParagraphHtml.
- * Поэтому здесь отбрасываем `v` у всех блоков и санитайзим html абзацев тем же
- * (единым) санитайзером. DOMPurify идемпотентен, так что вывод редактора и уже
- * санитайзенное эхо сервера сходятся к одному виду. Это форма ТОЛЬКО для
- * сравнения — на запись/рендер не влияет.
+ * Поэтому здесь отбрасываем `v` у всех блоков. Сам sanitizer намеренно не
+ * импортируем: этот файл входит в client-graph редактора, а DOM/JSDOM-зависимый
+ * sanitizer не должен попадать в SSR client-компонентов Next.js. Это форма
+ * ТОЛЬКО для сравнения — на запись/рендер не влияет.
  */
 export function canonicalizeBlocks(blocks: EditorBlock[]): EditorBlock[] {
   return blocks.map((block) => {
     if (block.type === "paragraph") {
-      return { type: "paragraph", payload: { html: sanitizeParagraphHtml(String(block.payload.html ?? "")) } };
+      return { type: "paragraph", payload: { html: String(block.payload.html ?? "") } };
     }
     const { v: _v, ...rest } = block.payload as Record<string, unknown>;
     return { type: block.type, payload: rest };
