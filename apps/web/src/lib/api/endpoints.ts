@@ -22,7 +22,12 @@ import type {
   LegalDocumentDetail,
   LegalDocumentSummary,
   LegalDocumentType,
+  CreateListingDto,
+  MarketplaceListingDetail,
   MarketplaceListingListItem,
+  MarketplaceNomenclatureOption,
+  MyMarketplaceListingItem,
+  UpdateListingDto,
   NewsListItem,
   NewsPostDetail,
   NewsTagSummary,
@@ -112,6 +117,20 @@ export const api = {
   marketplace: {
     listings: (pagination: PaginationInput = {}) =>
       apiFetch<PaginatedResponse<MarketplaceListingListItem>>(`/marketplace/listings${paginationSuffix(pagination)}`),
+    myListings: (pagination: PaginationInput = {}) =>
+      apiFetch<PaginatedResponse<MyMarketplaceListingItem>>(`/marketplace/my/listings${paginationSuffix(pagination)}`),
+    nomenclature: () => apiFetch<MarketplaceNomenclatureOption[]>("/marketplace/nomenclature"),
+    get: (id: string) => apiFetch<MarketplaceListingDetail>(`/marketplace/listings/${enc(id)}`),
+    create: (body: CreateListingDto) =>
+      apiFetch<MarketplaceListingDetail>("/marketplace/listings", { method: "POST", body }),
+    update: (id: string, body: UpdateListingDto) =>
+      apiFetch<MarketplaceListingDetail>(`/marketplace/listings/${enc(id)}`, { method: "PATCH", body }),
+    publish: (id: string) =>
+      apiFetch<MarketplaceListingDetail>(`/marketplace/listings/${enc(id)}/publish`, { method: "POST" }),
+    archive: (id: string) =>
+      apiFetch<MarketplaceListingDetail>(`/marketplace/listings/${enc(id)}/archive`, { method: "POST" }),
+    republish: (id: string) =>
+      apiFetch<MarketplaceListingDetail>(`/marketplace/listings/${enc(id)}/republish`, { method: "POST" }),
   },
 
   // ── Обучение ────────────────────────────────────────────────────────────

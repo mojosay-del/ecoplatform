@@ -4,6 +4,7 @@ import { CompanyStatus, Prisma } from "@prisma/client";
 import { BillingNotificationsService } from "../billing/billing-notifications.service";
 import { FilesService } from "../files/files.service";
 import { VideoTranscodeService } from "../files/video-transcode.service";
+import { MarketplaceListingsService } from "../marketplace/services/marketplace-listings.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 const BILLING_HOURLY_LOCK_KEY = "cron:billing-hourly-check";
@@ -11,6 +12,7 @@ const ACCOUNT_DELETION_CLEANUP_LOCK_KEY = "cron:cleanup-deleted-accounts";
 const ORPHAN_FILE_CLEANUP_LOCK_KEY = "cron:cleanup-orphan-files";
 const EMAIL_CHALLENGE_CLEANUP_LOCK_KEY = "cron:cleanup-email-challenges";
 const STALE_RECORD_CLEANUP_LOCK_KEY = "cron:cleanup-stale-records";
+const MARKETPLACE_ARCHIVE_LOCK_KEY = "cron:marketplace-archive-expired";
 const CRON_LOCK_TRANSACTION_TIMEOUT_MS = 15 * 60 * 1000;
 // Регистрационный challenge хранит хэш пароля + ПДн (телефон, ФИО, тип компании)
 // до подтверждения кода. После истечения (TTL 15 минут) или успешной верификации
@@ -76,6 +78,7 @@ export class SchedulerService {
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
     private readonly videoTranscode: VideoTranscodeService,
+    private readonly marketplace: MarketplaceListingsService,
   ) {}
 
   private get disabled(): boolean {
@@ -102,6 +105,24 @@ export class SchedulerService {
       await this.runWithPostgresAdvisoryLock(BILLING_HOURLY_LOCK_KEY, () => this.billing.runHourlyCheck());
     } catch (error) {
       this.logger.error("Hourly billing check failed", error as Error);
+    }
+  }
+
+  // Авто-архив объявлений торговой площадки: активные с истёкшим сроком (14
+  // дней) переводятся в archived. Раз в час достаточно — задержка до часа после
+  // истечения некритична. Под advisory-lock: вторая реплика пропустит tick.
+  @Cron(CronExpression.EVERY_HOUR, { name: "marketplace-archive-expired" })
+  async handleListingAutoArchive() {
+    if (this.disabled) return;
+    try {
+      await this.runWithPostgresAdvisoryLock(MARKETPLACE_ARCHIVE_LOCK_KEY, async () => {
+        const count = await this.marketplace.archiveExpired();
+        if (count > 0) {
+          this.logger.log(`Marketplace auto-archive: archived ${count} expired listings`);
+        }
+      });
+    } catch (error) {
+      this.logger.error("Marketplace listing auto-archive failed", error as Error);
     }
   }
 

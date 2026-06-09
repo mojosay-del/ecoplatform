@@ -654,7 +654,71 @@ export type MarketplaceListingListItem = {
   publishedAt: IsoDateString | null;
   expiresAt: IsoDateString | null;
   photoCount: number;
+  coverFileId: string | null;
   sellerType: CompanyType;
   sellerRating: number | null;
+  positions: MarketplaceListingPositionSummary[];
+};
+
+export type MarketplaceListingMediaItem = {
+  id: string;
+  fileId: string;
+  kind: string; // 'photo' | 'video'
+  position: number;
+};
+
+export type MarketplaceListingPositionDetail = {
+  id: string;
+  nomenclatureId: string;
+  nomenclatureName: string;
+  weightKg: number;
+  form: ListingPositionForm;
+  moisturePct: number | null;
+  contaminationPct: number | null;
+};
+
+// Детальная карточка объявления. `address`/`contactPhone` приходят только тем,
+// кому разрешено их видеть (владелец; позже — покупатель после акцепта), иначе
+// null — точное местоположение и телефон скрыты.
+export type MarketplaceListingDetail = {
+  id: string;
+  status: ListingStatus;
+  seller: { companyId: string; type: CompanyType; rating: number | null };
+  city: string;
+  region: string | null;
+  address: CompanyAddress | null;
+  contactPhone: string | null;
+  description: string | null;
+  color: string | null;
+  packaging: string | null;
+  paymentTerms: string | null;
+  readyNow: boolean;
+  readinessDate: IsoDateString | null;
+  publishedAt: IsoDateString | null;
+  expiresAt: IsoDateString | null;
+  archiveReason: string | null;
+  positions: MarketplaceListingPositionDetail[];
+  media: MarketplaceListingMediaItem[];
+  isOwner: boolean;
+};
+
+// Опция номенклатуры (вид сырья) для селекта позиций в форме объявления.
+export type MarketplaceNomenclatureOption = {
+  id: string;
+  name: string;
+  category: string;
+};
+
+// Карточка объявления в кабинете заготовителя «Мои объявления».
+export type MyMarketplaceListingItem = {
+  id: string;
+  status: ListingStatus;
+  city: string;
+  region: string | null;
+  publishedAt: IsoDateString | null;
+  expiresAt: IsoDateString | null;
+  archiveReason: string | null;
+  photoCount: number;
+  coverFileId: string | null;
   positions: MarketplaceListingPositionSummary[];
 };

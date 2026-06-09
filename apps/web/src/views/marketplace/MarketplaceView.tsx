@@ -1,16 +1,19 @@
 "use client";
 
-// Торговая площадка — публичная лента объявлений о продаже вторсырья.
-// Этап фундамента: раздел открывается только администраторам (строится «за
-// закрытыми дверьми»), лента пока пустая. На фазе объявлений здесь появятся
-// карточки, фильтры (сырьё/регион), карта и сортировка.
+// Торговая площадка — публичная лента активных объявлений о продаже вторсырья.
+// Заготовителям показываем кнопки «Мои объявления» и «Разместить объявление».
 
+import Link from "next/link";
 import type { MarketplaceListingListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
-import { api } from "../../lib/api";
+import { api, preferredFileAssetImageUrl } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
+import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
+import { ListingCard } from "./listing-ui";
 
 export function MarketplaceView() {
+  const { user } = useAuth();
   const {
     data: page,
     state,
@@ -20,16 +23,18 @@ export function MarketplaceView() {
     total: 0,
     hasMore: false,
   } as PaginatedResponse<MarketplaceListingListItem>);
+
   const listings = page.items;
+  const coverIds = listings.map((listing) => listing.coverFileId).filter((id): id is string => Boolean(id));
+  const assets = useFileAssetsByIds(coverIds);
+  const isCollector = user?.company?.type === "collector";
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Торговая площадка" />;
   }
-
   if (state === "forbidden") {
     return <AccessClosed title="Торговая площадка" />;
   }
-
   if (state === "error") {
     return <ErrorState title="Торговая площадка" message={errorMessage} />;
   }
@@ -37,27 +42,38 @@ export function MarketplaceView() {
   return (
     <AppShell>
       <section className="page">
-        <PageHeader
-          title="Торговая площадка"
-          subtitle="Объявления о продаже вторсырья от заготовителей."
-        />
+        <div className="mp-toolbar">
+          <PageHeader title="Торговая площадка" subtitle="Объявления о продаже вторсырья от заготовителей." />
+          {isCollector ? (
+            <div className="mp-toolbar-actions">
+              <Link className="button secondary" href="/marketplace/my">
+                Мои объявления
+              </Link>
+              <Link className="button" href="/marketplace/new">
+                Разместить объявление
+              </Link>
+            </div>
+          ) : null}
+        </div>
+
         {state === "loading" ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
             Загрузка объявлений…
           </p>
         ) : listings.length === 0 ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            Раздел в разработке. Опубликованных объявлений пока нет.
+            Пока нет активных объявлений.
           </p>
         ) : (
-          <ul className="marketplace-listings">
+          <div className="mp-grid">
             {listings.map((listing) => (
-              <li key={listing.id} className="marketplace-listing-stub">
-                {[listing.city, listing.region].filter(Boolean).join(", ")} ·{" "}
-                {listing.positions.map((position) => position.nomenclatureName).join(", ")}
-              </li>
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                coverUrl={listing.coverFileId ? preferredFileAssetImageUrl(assets.get(listing.coverFileId)) : null}
+              />
             ))}
-          </ul>
+          </div>
         )}
       </section>
     </AppShell>

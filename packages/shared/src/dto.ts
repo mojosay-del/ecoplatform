@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { companyTypes, consentSources, legalDocumentTypes, userGenders } from "./domain";
+import { companyTypes, consentSources, legalDocumentTypes, listingPositionForms, userGenders } from "./domain";
 
 // Единое правило сложности пароля для новых паролей.
 // Регулярка покрывает кириллицу + латиницу, требует минимум одну букву и одну цифру.
@@ -195,3 +195,55 @@ export const companyProfileUpdateDtoSchema = z.object({
 });
 
 export type CompanyProfileUpdateDto = z.infer<typeof companyProfileUpdateDtoSchema>;
+
+// ── Торговая площадка: объявления ──────────────────────────────────────────
+// Бизнес-ограничения объявления (docs/04-marketplace/listings.md). Держим в
+// shared, чтобы и бэк-валидация, и UI («10/10 активных», «мин. 100 кг») брали
+// одни и те же числа.
+export const LISTING_MIN_WEIGHT_KG = 100;
+export const LISTING_MAX_ACTIVE = 10;
+export const LISTING_LIFETIME_DAYS = 14;
+export const LISTING_MIN_PHOTOS = 4;
+export const LISTING_MAX_PHOTOS = 10;
+export const LISTING_MAX_VIDEOS = 2;
+
+export const listingPositionInputSchema = z.object({
+  nomenclatureId: z.string().min(1),
+  // Вес позиции в кг. Минимум 100 кг — агрегатно по объявлению (проверяется в сервисе).
+  weightKg: z.number().positive().max(100_000_000),
+  form: z.enum(listingPositionForms).default("loose"),
+  moisturePct: z.number().min(0).max(100).nullish(),
+  contaminationPct: z.number().min(0).max(100).nullish(),
+});
+
+export type ListingPositionInput = z.infer<typeof listingPositionInputSchema>;
+
+export const listingMediaInputSchema = z.object({
+  fileId: z.string().min(1),
+  kind: z.enum(["photo", "video"]),
+});
+
+export type ListingMediaInput = z.infer<typeof listingMediaInputSchema>;
+
+export const createListingDtoSchema = z.object({
+  positions: z.array(listingPositionInputSchema).min(1, "Добавьте хотя бы одну позицию"),
+  address: addressDtoSchema,
+  contactPhone: z
+    .string()
+    .trim()
+    .regex(/^\+?\d[\d\s()-]{6,30}$/, "Телефон в формате +7XXXXXXXXXX"),
+  description: z.string().trim().max(2000).nullish(),
+  color: z.string().trim().max(120).nullish(),
+  packaging: z.string().trim().max(200).nullish(),
+  paymentTerms: z.string().trim().max(500).nullish(),
+  // Готовность: «готово сейчас» или конкретная дата (валидируется в сервисе ≤14 дней).
+  readyNow: z.boolean().default(true),
+  readinessDate: z.string().datetime().nullish(),
+  media: z.array(listingMediaInputSchema).max(LISTING_MAX_PHOTOS + LISTING_MAX_VIDEOS).default([]),
+});
+
+export type CreateListingDto = z.infer<typeof createListingDtoSchema>;
+
+export const updateListingDtoSchema = createListingDtoSchema.partial();
+
+export type UpdateListingDto = z.infer<typeof updateListingDtoSchema>;
