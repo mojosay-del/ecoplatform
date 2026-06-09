@@ -142,7 +142,7 @@ export function NewsView() {
     <AppShell>
       <section className="page">
         <header className="news-feed-header">
-          <h1>Новости рынка</h1>
+          <h1>Новости</h1>
           <NewsTagFilters
             isAllTagsOpen={isAllTagsOpen}
             isLoading={tagState === "loading"}
