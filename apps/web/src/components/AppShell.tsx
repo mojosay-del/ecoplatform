@@ -126,7 +126,10 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
   const visibleAppNav = appNavSections
     .map((section) => ({
       ...section,
-      items: filterVisibleItems(section.items, user?.platformRoles ?? []),
+      items: filterVisibleItems(section.items, {
+        roles: user?.platformRoles ?? [],
+        companyType: user?.company?.type ?? null,
+      }),
     }))
     // Если в секции не осталось ни одного пункта (например, «Служебное»
     // для обычного пользователя без админских ролей) — секцию не показываем.

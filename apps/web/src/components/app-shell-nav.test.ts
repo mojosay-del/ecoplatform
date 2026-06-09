@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { CompanyType } from "@ecoplatform/shared";
+import { filterVisibleItems } from "./app-shell/nav-utils";
 import {
   accountProfileModalFromHref,
   accountSectionFromHref,
@@ -28,6 +30,18 @@ describe("AppShell future navigation teasers", () => {
 
     expect(serviceSection?.items.map((item) => item.label)).toEqual(["Панель управления"]);
     expect(serviceSection?.items[0]?.activePathPrefixes).toEqual(["/admin"]);
+  });
+
+  it("shows education only to collectors among regular users", () => {
+    const labelsFor = (companyType: CompanyType | null, roles: string[] = []) =>
+      appNavSections.flatMap((section) =>
+        filterVisibleItems(section.items, { roles, companyType }).map((item) => item.label),
+      );
+
+    expect(labelsFor("collector")).toContain("Обучение");
+    expect(labelsFor("trader")).not.toContain("Обучение");
+    expect(labelsFor("processor")).not.toContain("Обучение");
+    expect(labelsFor(null, ["content_manager"])).toContain("Обучение");
   });
 
   it("keeps account and notification links out of the global sidebar", () => {

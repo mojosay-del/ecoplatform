@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { canAccessEducationSection } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { StatusPill } from "../../components/StatusPill";
 import { useAuth } from "../../lib/auth";
@@ -39,6 +40,24 @@ export function AccessClosed({ title }: { title: string }) {
   const pathname = usePathname();
   const [currentPath, setCurrentPath] = useState(pathname);
   const shouldRedirect = isSubscriptionSelectionRequired(user?.company);
+  const isEducationRoute = pathname === "/education" || pathname.startsWith("/education/");
+  const isEducationCompanyTypeBlocked =
+    !shouldRedirect && isEducationRoute && !canAccessEducationSection(user?.company, user?.platformRoles ?? []);
+  const description = isEducationCompanyTypeBlocked
+    ? "Раздел обучения сейчас доступен только заготовителям. Остальные рабочие разделы остаются открыты."
+    : shouldRedirect
+      ? "Срок доступа истёк. Перенаправляем на выбор подписки."
+      : "Для этого раздела нужен другой уровень доступа. Личный кабинет, биллинг и поддержка остаются доступны.";
+  const actionHref = isEducationCompanyTypeBlocked
+    ? "/news"
+    : shouldRedirect
+      ? subscriptionSelectionHref(currentPath)
+      : "/account/billing";
+  const actionLabel = isEducationCompanyTypeBlocked
+    ? "К новостям"
+    : shouldRedirect
+      ? "Выбрать подписку"
+      : "Открыть подписку";
 
   useEffect(() => {
     setCurrentPath(currentBrowserPath(pathname));
@@ -56,15 +75,11 @@ export function AccessClosed({ title }: { title: string }) {
       <section className="page">
         <header className="page-header">
           <h1 className="page-title">{title}</h1>
-          <p className="page-subtitle">
-            {shouldRedirect
-              ? "Срок доступа истёк. Перенаправляем на выбор подписки."
-              : "Для этого раздела нужен другой уровень доступа. Личный кабинет, биллинг и поддержка остаются доступны."}
-          </p>
+          <p className="page-subtitle">{description}</p>
         </header>
         <div className="auth-actions">
-          <Link className="button" href={shouldRedirect ? subscriptionSelectionHref(currentPath) : "/account/billing"}>
-            {shouldRedirect ? "Выбрать подписку" : "Открыть подписку"}
+          <Link className="button" href={actionHref}>
+            {actionLabel}
           </Link>
         </div>
       </section>

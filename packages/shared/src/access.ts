@@ -1,6 +1,7 @@
 import type { CompanyAccessSnapshot, LearningAccessLevel, PlatformRole } from "./domain";
 
 export const DEMO_DURATION_HOURS = 24;
+export const EDUCATION_COMPANY_TYPES: readonly CompanyAccessSnapshot["type"][] = ["collector"];
 
 export function hasPlatformRole(roles: PlatformRole[], expected: PlatformRole): boolean {
   return roles.includes(expected);
@@ -90,4 +91,15 @@ export function canAccessLearningLevel(
 
 export function demoEndsAt(createdAt = new Date()): Date {
   return new Date(createdAt.getTime() + DEMO_DURATION_HOURS * 60 * 60 * 1000);
+}
+
+export function canAccessEducationSection(
+  company: Pick<CompanyAccessSnapshot, "type"> | null | undefined,
+  platformRoles: readonly PlatformRole[] = [],
+): boolean {
+  if (platformRoles.length > 0) {
+    return true;
+  }
+
+  return Boolean(company && EDUCATION_COMPANY_TYPES.includes(company.type));
 }

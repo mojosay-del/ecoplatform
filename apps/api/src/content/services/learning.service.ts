@@ -17,6 +17,7 @@ import type {
 } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
 import {
+  assertEducationSectionAccess,
   canAccessPublishedLearningModule,
   canPreviewAuthoredContent,
   type LearningReadOptions,
@@ -66,6 +67,7 @@ export class LearningService {
 
   async listLearningModules(user: RequestUser, paginationInput: PaginationInput = {}) {
     this.common.assertFunctionalAccess(user);
+    assertEducationSectionAccess(user);
     const pagination = resolvePagination(paginationInput, { defaultLimit: 20, maxLimit: 100 });
     const where = { status: ContentStatus.published };
     const [total, modules] = await this.prisma.$transaction([
@@ -96,6 +98,7 @@ export class LearningService {
 
   async getLearningModule(id: string, user: RequestUser, options: LearningReadOptions = {}) {
     this.common.assertFunctionalAccess(user);
+    assertEducationSectionAccess(user);
     const module = await this.prisma.learningModule.findUnique({
       where: { id },
       include: {
@@ -253,6 +256,7 @@ export class LearningService {
 
   async completeLesson(lessonId: string, user: RequestUser) {
     this.common.assertFunctionalAccess(user);
+    assertEducationSectionAccess(user);
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { chapter: { include: { module: true } } },

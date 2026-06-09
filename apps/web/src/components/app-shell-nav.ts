@@ -1,3 +1,4 @@
+import { EDUCATION_COMPANY_TYPES, type CompanyType } from "@ecoplatform/shared";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
@@ -27,6 +28,7 @@ export type NavItem = {
   disabled?: boolean;
   disabledHint?: string;
   roles?: string[];
+  companyTypes?: readonly CompanyType[];
   children?: NavItem[];
 };
 
@@ -61,7 +63,13 @@ export const appNavSections: NavSection[] = [
     items: [
       { key: "news", href: "/news", label: "Новости", icon: Newspaper },
       { key: "indices", href: "/indices", label: "Индексы цен", icon: LineChart },
-      { key: "education", href: "/education", label: "Обучение", icon: GraduationCap },
+      {
+        key: "education",
+        href: "/education",
+        label: "Обучение",
+        icon: GraduationCap,
+        companyTypes: EDUCATION_COMPANY_TYPES,
+      },
     ],
   },
   {

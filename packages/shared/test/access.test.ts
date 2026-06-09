@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canAccessEducationSection,
   canAccessLearningLevel,
   canOpenFunctionalSections,
   demoEndsAt,
@@ -80,6 +81,13 @@ describe("MVP access rules", () => {
 
     expect(canOpenFunctionalSections(company, now)).toBe(true);
     expect(effectivePlan(company, now)).toBe("extended");
+  });
+
+  it("opens education only to collectors among regular company users", () => {
+    expect(canAccessEducationSection({ type: "collector" })).toBe(true);
+    expect(canAccessEducationSection({ type: "trader" })).toBe(false);
+    expect(canAccessEducationSection({ type: "processor" })).toBe(false);
+    expect(canAccessEducationSection(null, ["content_manager"])).toBe(true);
   });
 });
 

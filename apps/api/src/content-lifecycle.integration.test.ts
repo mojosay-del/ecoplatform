@@ -5,6 +5,7 @@ import {
   CommentStatus,
   CompanyRole,
   CompanyStatus,
+  CompanyType,
   ContentStatus,
   FileAccessLevel,
   LegalDocumentType,
@@ -305,6 +306,19 @@ describe("Content lifecycle: learning modules", () => {
     return { moduleId: moduleRes.body.id as string, lessonId: lessonRes.body.id as string };
   }
 
+  async function registerCompanyByType(suffix: string, companyType: CompanyType): Promise<string> {
+    return registerWithBody({
+      organizationName: `ООО ${companyType} ${suffix}`,
+      companyType,
+      firstName: "Иван",
+      lastName: "Тестов",
+      gender: "male",
+      phone: `+7900${suffix}`,
+      email: `${companyType}${suffix}@test.local`,
+      password: "User12345678",
+    });
+  }
+
   it("publish модуля делает его видимым в публичной выдаче, unpublish — скрывает, delete — удаляет", async () => {
     const adminToken = await loginAdmin();
     const reader = await registerCompany("0800010");
@@ -372,6 +386,39 @@ describe("Content lifecycle: learning modules", () => {
       .post(`/api/education/lessons/${lessonId}/complete`)
       .set("Authorization", `Bearer ${reader.token}`);
     expect(complete.status).toBe(403);
+  });
+
+  it("публичное обучение доступно обычным пользователям только для типа компании заготовитель", async () => {
+    const adminToken = await loginAdmin();
+    const collector = await registerCompany("0800012");
+    const traderToken = await registerCompanyByType("0800013", CompanyType.trader);
+    const processorToken = await registerCompanyByType("0800014", CompanyType.processor);
+    const { moduleId, lessonId } = await createLearningModuleWithLesson(adminToken, "company-type-access");
+
+    const publish = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleId}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publish.status).toBe(201);
+
+    const collectorList = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${collector.token}`);
+    expect(collectorList.status).toBe(200);
+    expect(collectorList.body.items.find((item: { id: string }) => item.id === moduleId)).toBeTruthy();
+
+    for (const token of [traderToken, processorToken]) {
+      const list = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${token}`);
+      expect(list.status).toBe(403);
+      expect(list.body.message).toContain("только заготовителям");
+
+      const detail = await ctx.http.get(`/api/education/modules/${moduleId}`).set("Authorization", `Bearer ${token}`);
+      expect(detail.status).toBe(403);
+      expect(detail.body.message).toContain("только заготовителям");
+
+      const complete = await ctx.http
+        .post(`/api/education/lessons/${lessonId}/complete`)
+        .set("Authorization", `Bearer ${token}`);
+      expect(complete.status).toBe(403);
+      expect(complete.body.message).toContain("только заготовителям");
+    }
   });
 
   it("publish модуля без уроков отбивается 403", async () => {

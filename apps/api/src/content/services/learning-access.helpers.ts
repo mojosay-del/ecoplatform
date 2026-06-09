@@ -1,6 +1,6 @@
 import { ForbiddenException } from "@nestjs/common";
 import type { LearningAccessLevel } from "@prisma/client";
-import { canAccessLearningLevel } from "@ecoplatform/shared";
+import { canAccessEducationSection, canAccessLearningLevel } from "@ecoplatform/shared";
 import type { RequestUser } from "../../common/request-user";
 
 export type LearningReadOptions = { preview?: boolean };
@@ -24,6 +24,14 @@ export function canAccessPublishedLearningModule(
   module: { accessLevel: LearningAccessLevel; isInDevelopment: boolean },
 ) {
   return !module.isInDevelopment && hasLearningAccess(user, module.accessLevel);
+}
+
+export function assertEducationSectionAccess(user: RequestUser) {
+  if (canAccessEducationSection(user.company, user.platformRoles)) {
+    return;
+  }
+
+  throw new ForbiddenException("Раздел обучения доступен только заготовителям.");
 }
 
 export function assertLearningModulePublishable(module: {
