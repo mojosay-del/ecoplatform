@@ -312,10 +312,10 @@ model EmailVerificationChallenge {
 }
 
 model Company {
-  id                       String              @id @default(cuid())
+  id                       String               @id @default(cuid())
   organizationName         String
-  type                     CompanyType         @default(collector)
-  status                   CompanyStatus       @default(demo)
+  type                     CompanyType          @default(collector)
+  status                   CompanyStatus        @default(demo)
   statusBeforeDeletion     CompanyStatus?
   demoEndsAt               DateTime?
   subscriptionPlan         SubscriptionPlan?
@@ -325,17 +325,17 @@ model Company {
   // поэтому дефолт 1. Добавление сотрудника = докупленное место; при
   // подключении биллинга это число будет расти после оплаты. Денормализовано
   // на компанию (текущее состояние), история мест — в Subscription.seats.
-  seatsPurchased           Int                 @default(1)
+  seatsPurchased           Int                  @default(1)
   billingInn               String?
   billingKpp               String?
   // Старое текстовое поле legalAddress оставлено для обратной совместимости
   // (на форму биллинга, где адрес показывается как одна строка). Полноценная
   // структура адреса — в Address (factualAddress/legalAddress relation'ами).
   legalAddress             String?
-  factualAddressId         String?             @unique
-  factualAddress           Address?            @relation("CompanyFactualAddress", fields: [factualAddressId], references: [id])
-  structuredLegalAddressId String?             @unique
-  structuredLegalAddress   Address?            @relation("CompanyStructuredLegalAddress", fields: [structuredLegalAddressId], references: [id])
+  factualAddressId         String?              @unique
+  factualAddress           Address?             @relation("CompanyFactualAddress", fields: [factualAddressId], references: [id])
+  structuredLegalAddressId String?              @unique
+  structuredLegalAddress   Address?             @relation("CompanyStructuredLegalAddress", fields: [structuredLegalAddressId], references: [id])
   // Контакты компании. Все опциональные, заполняются в /account → Компания.
   websiteUrl               String?
   corporatePhone           String?
@@ -358,8 +358,9 @@ model Company {
   paymentMethods           PaymentMethod[]
   payments                 Payment[]
   apiKeys                  ApiKey[]
-  createdAt                DateTime            @default(now())
-  updatedAt                DateTime            @updatedAt
+  listings                 MarketplaceListing[] @relation("CompanyListings")
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
 }
 
 // Сохранённый способ оплаты компании. В MVP UI заглушен «Подключим в
@@ -467,8 +468,9 @@ model Address {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  companyAsFactual Company? @relation("CompanyFactualAddress")
-  companyAsLegal   Company? @relation("CompanyStructuredLegalAddress")
+  companyAsFactual   Company?            @relation("CompanyFactualAddress")
+  companyAsLegal     Company?            @relation("CompanyStructuredLegalAddress")
+  marketplaceListing MarketplaceListing? @relation("ListingAddress")
 }
 
 model Subscription {
@@ -606,21 +608,21 @@ model PlatformSetting {
 }
 
 model FileAsset {
-  id           String          @id @default(cuid())
-  originalName String
-  mimeType     String
-  sizeBytes    Int
-  storageKey   String
-  variants     Json?
+  id              String          @id @default(cuid())
+  originalName    String
+  mimeType        String
+  sizeBytes       Int
+  storageKey      String
+  variants        Json?
   // Видео-ренишены (Волна полировки 2): перекодированные ffmpeg H.264/AAC MP4 в
   // 1–3 разрешениях для надёжного воспроизведения и выбора качества в плеере.
   // Формат: { status, renditions: [{ height, width, storageKey, sizeBytes }] }.
   // null — либо не видео, либо ещё не обработано.
   videoRenditions Json?
-  accessLevel  FileAccessLevel @default(authenticated)
-  uploadedById String?
-  createdAt    DateTime        @default(now())
-  references   FileReference[]
+  accessLevel     FileAccessLevel @default(authenticated)
+  uploadedById    String?
+  createdAt       DateTime        @default(now())
+  references      FileReference[]
 }
 
 // Полиморфная таблица «кто на какой файл ссылается». Заменяет старый
@@ -792,18 +794,19 @@ model NomenclatureCategory {
 }
 
 model Nomenclature {
-  id          String               @id @default(cuid())
-  code        String               @unique
-  name        String
-  unit        String               @default("₽/т")
-  description String?
-  categoryId  String
-  category    NomenclatureCategory @relation(fields: [categoryId], references: [id])
-  position    Int                  @default(0)
-  isActive    Boolean              @default(true)
-  priceIndex  PriceIndex?
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  id               String               @id @default(cuid())
+  code             String               @unique
+  name             String
+  unit             String               @default("₽/т")
+  description      String?
+  categoryId       String
+  category         NomenclatureCategory @relation(fields: [categoryId], references: [id])
+  position         Int                  @default(0)
+  isActive         Boolean              @default(true)
+  priceIndex       PriceIndex?
+  listingPositions ListingPosition[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   // FK + порядок: список номенклатур категории и публичная сортировка /indices.
   @@index([categoryId])
@@ -1198,4 +1201,117 @@ model ConsentRecord {
   @@unique([userId, documentId])
   @@index([userId, acceptedAt(sort: Desc)])
   @@index([documentId, acceptedAt(sort: Desc)])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ТОРГОВАЯ ПЛОЩАДКА (закрытый аукцион)
+//
+// Модуль строится по фазам. Здесь — слой ОБЪЯВЛЕНИЙ (этап 1): заготовитель
+// публикует объявление о продаже сырья с позициями, фото/видео и адресом.
+// Закрытые ценовые предложения (Offer*) и отзывы (MarketplaceReview*) добавятся
+// отдельными аддитивными миграциями на своих фазах — таблицы не заводим заранее,
+// чтобы каждая миграция была привязана к работающему коду.
+//
+// Раздел скрыт за ролью admin + флагом MARKETPLACE_ENABLED до публичного запуска
+// (см. apps/api/src/marketplace/marketplace-feature.guard.ts). Модерация
+// объявлений переиспользует полиморфные ModerationCase/Complaint/Sanction
+// (entityType='marketplace_listing'), без новых таблиц.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum ListingStatus {
+  draft // создано, ещё не опубликовано
+  active // опубликовано, идёт 14-дневный отсчёт
+  archived // снято: продано / истёк срок / снято автором или модератором
+}
+
+// Форма поставки позиции: прессованные тюки или несортированная россыпь.
+enum ListingPositionForm {
+  pressed
+  loose
+}
+
+model MarketplaceListing {
+  id              String        @id @default(cuid())
+  sellerCompanyId String
+  sellerCompany   Company       @relation("CompanyListings", fields: [sellerCompanyId], references: [id], onDelete: Cascade)
+  // User внутри компании, опубликовавший объявление (аудит + «мои объявления»).
+  createdById     String
+  status          ListingStatus @default(draft)
+
+  // Снимок адреса на момент создания: адрес компании может измениться, а у
+  // объявления он зафиксирован. Точные координаты — в Address.latitude/longitude.
+  addressId String   @unique
+  address   Address  @relation("ListingAddress", fields: [addressId], references: [id])
+  // Центр круга 4 км для публичной карты. Случайное смещение от реального адреса,
+  // сгенерированное ОДИН раз при публикации и зафиксированное на всю жизнь
+  // объявления — иначе сдвиг маркера между загрузками выдал бы точку. Точный
+  // адрес раскрывается покупателю только после принятия предложения (фаза 3).
+  circleLat Decimal? @db.Decimal(10, 7)
+  circleLon Decimal? @db.Decimal(10, 7)
+
+  // Контактный телефон вводится вручную (не из профиля) и раскрывается покупателю
+  // только после акцепта предложения.
+  contactPhone  String
+  description   String?
+  color         String?
+  packaging     String?
+  paymentTerms  String?
+  // Готовность к отгрузке: «готово сейчас» либо дата в пределах 14 дней.
+  readyNow      Boolean   @default(true)
+  readinessDate DateTime?
+
+  publishedAt   DateTime?
+  // publishedAt + 14 дней. По истечении cron переводит объявление в archived.
+  expiresAt     DateTime?
+  archivedAt    DateTime?
+  // 'sold' | 'expired' | 'withdrawn' | 'removed_by_moderator' | 'not_settled'.
+  // Строкой, а не enum — по соглашению проекта (ср. Payment.purpose).
+  archiveReason String?
+
+  positions ListingPosition[]
+  media     ListingMedia[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Публичная лента: активные объявления, свежие сверху.
+  @@index([status, publishedAt(sort: Desc)])
+  // «Мои объявления» компании.
+  @@index([sellerCompanyId, status, createdAt(sort: Desc)])
+  // Cron авто-архива: where status=active AND expiresAt < now.
+  @@index([status, expiresAt])
+}
+
+model ListingPosition {
+  id               String              @id @default(cuid())
+  listingId        String
+  listing          MarketplaceListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  nomenclatureId   String
+  nomenclature     Nomenclature        @relation(fields: [nomenclatureId], references: [id])
+  position         Int
+  // Минимум 100 кг агрегатно по объявлению — проверяется в сервисе.
+  weightKg         Decimal             @db.Decimal(12, 2)
+  form             ListingPositionForm @default(loose)
+  // Влажность и засор в процентах (0–100), опциональны.
+  moisturePct      Decimal?            @db.Decimal(5, 2)
+  contaminationPct Decimal?            @db.Decimal(5, 2)
+  createdAt        DateTime            @default(now())
+
+  @@unique([listingId, position])
+  @@index([nomenclatureId])
+}
+
+model ListingMedia {
+  id        String             @id @default(cuid())
+  listingId String
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  // FileAsset.id. Учёт ссылок для очистки — через FileReference(entityType='marketplace_listing').
+  fileId    String
+  // 'photo' | 'video'. 4–10 фото и 0–2 видео — проверяется в сервисе.
+  kind      String
+  position  Int
+  createdAt DateTime           @default(now())
+
+  @@unique([listingId, position])
+  @@index([fileId])
 }

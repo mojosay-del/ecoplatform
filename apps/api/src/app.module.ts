@@ -14,6 +14,7 @@ import { ContentModule } from "./content/content.module";
 import { FilesModule } from "./files/files.module";
 import { HealthModule } from "./health/health.module";
 import { LegalModule } from "./legal/legal.module";
+import { MarketplaceModule } from "./marketplace/marketplace.module";
 import { ModerationModule } from "./moderation/moderation.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { ObservabilityModule } from "./observability/observability.module";
@@ -77,6 +78,7 @@ function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
     FilesModule,
     HealthModule,
     LegalModule,
+    MarketplaceModule,
     ModerationModule,
     NotificationsModule,
     ObservabilityModule,

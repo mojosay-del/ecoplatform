@@ -87,3 +87,15 @@ export type CompanyAccessSnapshot = {
   subscriptionPlan: SubscriptionPlan | null;
   subscriptionEndsAt: string | Date | null;
 };
+
+// ── Торговая площадка ──────────────────────────────────────────────────────
+// Статус объявления о продаже сырья. `draft` — черновик, `active` —
+// опубликовано (идёт 14-дневный отсчёт), `archived` — снято/продано/истекло.
+export const listingStatuses = ["draft", "active", "archived"] as const;
+
+export type ListingStatus = (typeof listingStatuses)[number];
+
+// Форма поставки позиции: прессованные тюки или несортированная россыпь.
+export const listingPositionForms = ["pressed", "loose"] as const;
+
+export type ListingPositionForm = (typeof listingPositionForms)[number];

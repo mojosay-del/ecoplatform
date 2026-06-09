@@ -14,6 +14,7 @@ import {
   Map as MapIcon,
   MessageCircle,
   Smartphone,
+  Store,
   Newspaper,
   UserRound,
 } from "lucide-react";
@@ -69,6 +70,21 @@ export const appNavSections: NavSection[] = [
         label: "Обучение",
         icon: GraduationCap,
         companyTypes: EDUCATION_COMPANY_TYPES,
+      },
+    ],
+  },
+  {
+    title: "Торговая площадка",
+    items: [
+      {
+        key: "marketplace",
+        href: "/marketplace",
+        label: "Объявления",
+        icon: Store,
+        // Пока раздел строится «за закрытыми дверьми» — виден только админам
+        // (дог-фуд). На фазе запуска заменим на companyTypes (заготовитель/
+        // трейдер/переработчик) + гейт по подписке, и пункт появится у людей.
+        roles: ["admin"],
       },
     ],
   },

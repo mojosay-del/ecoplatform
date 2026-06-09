@@ -13,6 +13,8 @@ import type {
   ConsentSource,
   ContentStatus,
   LegalDocumentType,
+  ListingPositionForm,
+  ListingStatus,
   PlatformRole,
   SubscriptionPlan,
   UserGender,
@@ -631,3 +633,28 @@ export type ModerationCaseListItem = {
 };
 
 export type ModerationCaseDetail = ModerationCaseListItem;
+
+// ── Marketplace (торговая площадка) ────────────────────────────────────────
+// Карточка позиции в ленте объявлений: что и сколько продаётся.
+export type MarketplaceListingPositionSummary = {
+  nomenclatureId: string;
+  nomenclatureName: string;
+  weightKg: number;
+  form: ListingPositionForm;
+};
+
+// Элемент публичной ленты объявлений. Точный адрес скрыт — отдаётся только
+// город/регион и (на фазе карты) координаты центра круга 4 км. Рейтинг продавца
+// подключается на фазе отзывов; до первого отзыва — null («Рейтинг отсутствует»).
+export type MarketplaceListingListItem = {
+  id: string;
+  status: ListingStatus;
+  city: string;
+  region: string | null;
+  publishedAt: IsoDateString | null;
+  expiresAt: IsoDateString | null;
+  photoCount: number;
+  sellerType: CompanyType;
+  sellerRating: number | null;
+  positions: MarketplaceListingPositionSummary[];
+};

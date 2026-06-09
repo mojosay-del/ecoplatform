@@ -22,6 +22,7 @@ import type {
   LegalDocumentDetail,
   LegalDocumentSummary,
   LegalDocumentType,
+  MarketplaceListingListItem,
   NewsListItem,
   NewsPostDetail,
   NewsTagSummary,
@@ -105,6 +106,12 @@ export const api = {
   indices: {
     list: (pagination: PaginationInput = {}) =>
       apiFetch<PaginatedResponse<NomenclatureCategoryListItem>>(`/indices${paginationSuffix(pagination)}`),
+  },
+
+  // ── Торговая площадка ─────────────────────────────────────────────────────
+  marketplace: {
+    listings: (pagination: PaginationInput = {}) =>
+      apiFetch<PaginatedResponse<MarketplaceListingListItem>>(`/marketplace/listings${paginationSuffix(pagination)}`),
   },
 
   // ── Обучение ────────────────────────────────────────────────────────────
