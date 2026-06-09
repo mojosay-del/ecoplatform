@@ -1,1 +1,1 @@
-export { ContentBlocks } from "./ContentBlocks";
+export { collectContentBlockImageFileIds, ContentBlocks } from "./ContentBlocks";

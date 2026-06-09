@@ -52,36 +52,74 @@ export function IndicesView() {
           title="Индексы цен на вторсырьё"
           subtitle="Актуальные ценовые индексы по основным категориям сырья."
         />
-        <div className="indices-categories">
-          {data.map((category) => (
-            <button
-              className={`indices-category-tab ${category.slug === active?.slug ? "active" : ""}`}
-              onClick={() => setActiveSlug(category.slug)}
-              key={category.id}
-              type="button"
-            >
-              {category.name}
-            </button>
-          ))}
-        </div>
-        {!active || (active.nomenclatures ?? []).length === 0 ? (
-          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            В этой категории пока нет опубликованных индексов.
-          </p>
+        {state === "loading" ? (
+          <IndicesLoadingShell />
         ) : (
           <>
-            <IndexMovementSummaryTable items={active.nomenclatures} />
-            {active.nomenclatures.length >= 2 ? (
-              <IndexCombinedChart nomenclatures={active.nomenclatures} categoryName={active.name} />
-            ) : null}
-            <div className="indices-grid">
-              {active.nomenclatures.map((item) => (
-                <IndexCard key={item.id} item={item} />
+            <div className="indices-categories">
+              {data.map((category) => (
+                <button
+                  className={`indices-category-tab ${category.slug === active?.slug ? "active" : ""}`}
+                  onClick={() => setActiveSlug(category.slug)}
+                  key={category.id}
+                  type="button"
+                >
+                  {category.name}
+                </button>
               ))}
             </div>
+            {!active || (active.nomenclatures ?? []).length === 0 ? (
+              <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
+                В этой категории пока нет опубликованных индексов.
+              </p>
+            ) : (
+              <>
+                <IndexMovementSummaryTable items={active.nomenclatures} />
+                {active.nomenclatures.length >= 2 ? (
+                  <IndexCombinedChart nomenclatures={active.nomenclatures} categoryName={active.name} />
+                ) : null}
+                <div className="indices-grid">
+                  {active.nomenclatures.map((item) => (
+                    <IndexCard key={item.id} item={item} />
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
       </section>
     </AppShell>
+  );
+}
+
+function IndicesLoadingShell() {
+  return (
+    <div className="indices-loading-shell" aria-busy="true" aria-hidden="true">
+      <div className="indices-categories">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <span className="indices-category-tab-skeleton" key={index} />
+        ))}
+      </div>
+      <div className="index-movement-summary">
+        <div className="index-movement-head">
+          <div className="index-movement-title indices-loading-title">
+            <div className="page-skeleton-bar w-1-2" />
+            <div className="page-skeleton-bar w-3-4" />
+          </div>
+          <div className="indices-loading-periods" />
+        </div>
+        <div className="indices-loading-table" />
+      </div>
+      <div className="indices-grid">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <article className="index-card" key={index}>
+            <div className="page-skeleton-bar w-3-4" />
+            <div className="page-skeleton-bar w-1-2" />
+            <div className="indices-loading-chart" />
+            <div className="indices-loading-periods" />
+          </article>
+        ))}
+      </div>
+    </div>
   );
 }

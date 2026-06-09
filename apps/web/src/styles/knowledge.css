@@ -147,6 +147,44 @@
   box-shadow: var(--shadow-card);
 }
 
+.knowledge-article-loader {
+  position: relative;
+  min-width: 0;
+}
+
+.knowledge-article-ready-content {
+  transition: opacity 160ms ease;
+}
+
+.knowledge-article-loader.is-loading .knowledge-article-ready-content {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.knowledge-article-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgb(var(--white-rgb) / 0.96);
+  box-shadow: var(--shadow-card);
+}
+
+.knowledge-article-skeleton .knowledge-cover,
+.knowledge-article-skeleton .knowledge-article-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.knowledge-article-skeleton .knowledge-article-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
 .knowledge-cover {
   position: relative;
   margin: 0;

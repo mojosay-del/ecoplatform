@@ -11,6 +11,42 @@
   min-width: 0;
 }
 
+.education-card.is-awaiting-cover .education-card-link {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.education-card.is-awaiting-cover .education-card-link:hover,
+.education-card.is-awaiting-cover .education-card-link:focus-visible {
+  transform: none;
+}
+
+.education-card-skeleton {
+  display: grid;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.education-card-skeleton.is-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+}
+
+.education-card-skeleton .education-card-cover {
+  border: 0;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  box-shadow: none;
+}
+
+.education-card-skeleton .education-card-panel {
+  gap: 10px;
+  align-content: start;
+}
+
 .education-card-link {
   position: relative;
   display: grid;

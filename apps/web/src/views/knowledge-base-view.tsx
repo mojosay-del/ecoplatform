@@ -6,14 +6,14 @@ import "../styles/knowledge.css";
 // helpers по работе с деревом.
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { CoverImage } from "../components/CoverImage";
 import { api, preferredFileAssetImageUrl } from "../lib/api";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./shared";
-import { ContentBlocks } from "./content-blocks";
+import { collectContentBlockImageFileIds, ContentBlocks } from "./content-blocks";
 
 export function KnowledgeBaseView() {
   const { data, state, errorMessage } = useApiQuery("kb-tree", () => api.knowledgeBase.tree(), [] as KnowledgeNode[]);
@@ -89,6 +89,32 @@ function KnowledgeBaseLayout({
   const covers = useCoverAssets(coverItems);
   const activeCover = active?.coverImageId ? covers.get(active.coverImageId) : null;
   const activeCoverUrl = preferredFileAssetImageUrl(activeCover);
+  const shouldReserveActiveCover = Boolean(active?.coverImageId || activeCoverUrl);
+  const articleImageIds = useMemo(() => {
+    if (!active) return [];
+    return Array.from(
+      new Set([
+        ...(active.coverImageId ? [active.coverImageId] : []),
+        ...collectContentBlockImageFileIds(active.blocks ?? []),
+      ]),
+    ).sort();
+  }, [active]);
+  const articleImageIdsKey = articleImageIds.join(",");
+  const [settledArticleImageIds, setSettledArticleImageIds] = useState<Set<string>>(new Set());
+  const isArticleReady =
+    articleImageIds.length === 0 || articleImageIds.every((imageId) => settledArticleImageIds.has(imageId));
+  const markArticleImageSettled = useCallback((fileId: string) => {
+    setSettledArticleImageIds((current) => {
+      if (current.has(fileId)) return current;
+      const next = new Set(current);
+      next.add(fileId);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    setSettledArticleImageIds(new Set());
+  }, [active?.slug, articleImageIdsKey]);
 
   return (
     <AppShell>
@@ -138,33 +164,48 @@ function KnowledgeBaseLayout({
                   </div>
                 </div>
 
-                {activeCoverUrl ? (
-                  <div className="knowledge-article-shell content-fade-in" key={active.slug}>
-                    <figure className="knowledge-cover">
-                      <CoverImage
-                        alt={activeCover?.originalName ?? active.title}
-                        src={activeCoverUrl}
-                        eager
-                        sizes="(max-width: 1024px) 100vw, 800px"
-                      />
-                    </figure>
-                    <article className="knowledge-article-card content-article">
-                      {(active.blocks ?? []).length > 0 ? (
-                        <ContentBlocks blocks={active.blocks ?? []} />
-                      ) : (
-                        <p className="page-subtitle">Описание появится после наполнения материала.</p>
-                      )}
-                    </article>
-                  </div>
-                ) : (
-                  <article className="knowledge-article-card content-article content-fade-in" key={active.slug}>
-                    {(active.blocks ?? []).length > 0 ? (
-                      <ContentBlocks blocks={active.blocks ?? []} />
+                <div
+                  className={`knowledge-article-loader ${isArticleReady ? "is-ready" : "is-loading"}`}
+                  key={active.slug}
+                >
+                  <div aria-hidden={!isArticleReady || undefined} className="knowledge-article-ready-content">
+                    {shouldReserveActiveCover ? (
+                      <div className="knowledge-article-shell content-fade-in">
+                        <figure className="knowledge-cover">
+                          {activeCoverUrl ? (
+                            <CoverImage
+                              alt={activeCover?.originalName ?? active.title}
+                              src={activeCoverUrl}
+                              eager
+                              onLoadSettled={() => {
+                                if (active.coverImageId) markArticleImageSettled(active.coverImageId);
+                              }}
+                              sizes="(max-width: 1024px) 100vw, 800px"
+                            />
+                          ) : (
+                            <span className="cover-skeleton" aria-hidden="true" />
+                          )}
+                        </figure>
+                        <article className="knowledge-article-card content-article">
+                          {(active.blocks ?? []).length > 0 ? (
+                            <ContentBlocks blocks={active.blocks ?? []} onImageLoadSettled={markArticleImageSettled} />
+                          ) : (
+                            <p className="page-subtitle">Описание появится после наполнения материала.</p>
+                          )}
+                        </article>
+                      </div>
                     ) : (
-                      <p className="page-subtitle">Описание появится после наполнения материала.</p>
+                      <article className="knowledge-article-card content-article content-fade-in">
+                        {(active.blocks ?? []).length > 0 ? (
+                          <ContentBlocks blocks={active.blocks ?? []} onImageLoadSettled={markArticleImageSettled} />
+                        ) : (
+                          <p className="page-subtitle">Описание появится после наполнения материала.</p>
+                        )}
+                      </article>
                     )}
-                  </article>
-                )}
+                  </div>
+                  {!isArticleReady ? <KnowledgeArticleSkeleton /> : null}
+                </div>
 
                 {activeChildren.length > 0 ? (
                   <section className="knowledge-child-section" aria-label="Материалы раздела">
@@ -204,6 +245,23 @@ function KnowledgeBaseLayout({
         </div>
       </section>
     </AppShell>
+  );
+}
+
+function KnowledgeArticleSkeleton() {
+  return (
+    <div className="knowledge-article-skeleton" aria-hidden="true">
+      <div className="knowledge-cover">
+        <span className="cover-skeleton" />
+      </div>
+      <div className="knowledge-article-card content-article">
+        <div className="page-skeleton-bar w-3-4" />
+        <div className="page-skeleton-bar w-2-3" />
+        <div className="page-skeleton-bar w-full" />
+        <div className="page-skeleton-bar w-full" />
+        <div className="page-skeleton-bar w-1-2" />
+      </div>
+    </div>
   );
 }
 

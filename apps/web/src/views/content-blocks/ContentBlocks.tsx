@@ -35,8 +35,14 @@ type RenderableBlock =
     }
   | { type: string; payload: Record<string, unknown> };
 
-export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
-  const assets = useFileAssets(blocks);
+export function ContentBlocks({
+  blocks,
+  onImageLoadSettled,
+}: {
+  blocks: RenderableBlock[];
+  onImageLoadSettled?: (fileId: string) => void;
+}) {
+  const { assets, isLoading } = useFileAssets(blocks);
 
   return (
     <div className="content-blocks">
@@ -72,9 +78,12 @@ export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
           return (
             <ImageBlock
               asset={assets.get(payload.fileId)}
+              assetsLoading={isLoading}
               altText={payload.altText}
               caption={payload.caption}
+              fileId={payload.fileId}
               key={index}
+              onImageLoadSettled={onImageLoadSettled}
             />
           );
         }
@@ -85,9 +94,12 @@ export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
               {payload.images.map((image, imageIndex) => (
                 <ImageBlock
                   asset={assets.get(image.fileId)}
+                  assetsLoading={isLoading}
                   altText={image.altText}
                   caption={image.caption}
+                  fileId={image.fileId}
                   key={`${image.fileId}-${imageIndex}`}
+                  onImageLoadSettled={onImageLoadSettled}
                 />
               ))}
             </div>
@@ -159,8 +171,11 @@ export function ContentBlocks({ blocks }: { blocks: RenderableBlock[] }) {
             <div className="image-checklist-block" key={index}>
               <ImageBlock
                 asset={assets.get(payload.image.fileId)}
+                assetsLoading={isLoading}
                 altText={payload.image.altText}
                 caption={payload.image.caption}
+                fileId={payload.image.fileId}
+                onImageLoadSettled={onImageLoadSettled}
               />
               <div className={`checklist-block checklist-${payload.style}`}>
                 <h3>{payload.title}</h3>
@@ -206,22 +221,40 @@ function HeadingIcon({ kind }: { kind: "heading" | "subheading" }) {
 function useFileAssets(blocks: RenderableBlock[]) {
   const { token } = useAuth();
   const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
+  const [resolvedIdsKey, setResolvedIdsKey] = useState("");
   const ids = useMemo(() => collectFileIds(blocks), [blocks]);
   const idsKey = ids.join(",");
+  const isLoading = ids.length > 0 && resolvedIdsKey !== idsKey;
 
   useEffect(() => {
     if (!token || ids.length === 0) {
       setAssets(new Map());
+      setResolvedIdsKey(idsKey);
       return;
     }
 
+    let isActive = true;
+    setResolvedIdsKey("");
     api.files
       .listByIds(ids)
-      .then((result) => setAssets(new Map(result.map((asset) => [asset.id, asset]))))
-      .catch(() => setAssets(new Map()));
+      .then((result) => {
+        if (!isActive) return;
+        setAssets(new Map(result.map((asset) => [asset.id, asset])));
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setAssets(new Map());
+      })
+      .finally(() => {
+        if (isActive) setResolvedIdsKey(idsKey);
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [ids.length, idsKey, token]);
 
-  return assets;
+  return { assets, isLoading };
 }
 
 function collectFileIds(blocks: RenderableBlock[]) {
@@ -251,10 +284,67 @@ function collectFileIds(blocks: RenderableBlock[]) {
   return Array.from(ids).sort();
 }
 
-function ImageBlock({ asset, altText, caption }: { asset: FileAsset | undefined; altText?: string; caption?: string }) {
+export function collectContentBlockImageFileIds(blocks: RenderableBlock[]) {
+  const ids = new Set<string>();
+  for (const block of blocks) {
+    const payload = block.payload as Record<string, unknown>;
+    if (block.type === "image" && typeof payload.fileId === "string" && payload.fileId) {
+      ids.add(payload.fileId);
+    }
+    if (block.type === "gallery" && Array.isArray(payload.images)) {
+      for (const image of payload.images) {
+        if (typeof image === "object" && image && "fileId" in image && typeof image.fileId === "string") {
+          ids.add(image.fileId);
+        }
+      }
+    }
+    if (
+      block.type === "image_checklist" &&
+      typeof payload.image === "object" &&
+      payload.image &&
+      "fileId" in payload.image &&
+      typeof payload.image.fileId === "string"
+    ) {
+      ids.add(payload.image.fileId);
+    }
+  }
+
+  return Array.from(ids).sort();
+}
+
+function ImageBlock({
+  asset,
+  assetsLoading,
+  altText,
+  caption,
+  fileId,
+  onImageLoadSettled,
+}: {
+  asset: FileAsset | undefined;
+  assetsLoading: boolean;
+  altText?: string;
+  caption?: string;
+  fileId: string;
+  onImageLoadSettled?: (fileId: string) => void;
+}) {
+  useEffect(() => {
+    if (!assetsLoading && !asset?.publicUrl) {
+      onImageLoadSettled?.(fileId);
+    }
+  }, [asset?.publicUrl, assetsLoading, fileId, onImageLoadSettled]);
+
   return (
     <figure className="media-block">
-      {asset?.publicUrl ? <img alt={altText ?? asset.originalName} src={asset.publicUrl} /> : <MissingAsset />}
+      {asset?.publicUrl ? (
+        <img
+          alt={altText ?? asset.originalName}
+          onError={() => onImageLoadSettled?.(fileId)}
+          onLoad={() => onImageLoadSettled?.(fileId)}
+          src={asset.publicUrl}
+        />
+      ) : (
+        <MissingAsset />
+      )}
       {caption ? <figcaption>{caption}</figcaption> : null}
     </figure>
   );

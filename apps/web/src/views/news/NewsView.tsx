@@ -19,7 +19,7 @@ import {
   toggleNewsTagSelection,
 } from "../news-tag-filters";
 import { NEWS_PAGE_SIZE } from "./constants";
-import { NewsCard } from "./NewsCard";
+import { NewsCard, NewsCardSkeleton } from "./NewsCard";
 import { NewsModal } from "./NewsModal";
 import { NewsTagFilters } from "./NewsTagFilters";
 
@@ -158,15 +158,8 @@ export function NewsView() {
         {state === "loading" ? (
           <div className="news-masonry" aria-busy="true">
             {Array.from({ length: 8 }).map((_, index) => (
-              <article className="news-tile" key={index} aria-hidden="true">
-                <div className="news-tile-cover">
-                  <span className="cover-skeleton" />
-                </div>
-                <div className="news-tile-body">
-                  <div className="page-skeleton-bar w-3-4" />
-                  <div className="page-skeleton-bar w-full" />
-                  <div className="page-skeleton-bar w-1-2" />
-                </div>
+              <article className="news-tile news-tile-with-cover is-awaiting-cover" key={index} aria-hidden="true">
+                <NewsCardSkeleton />
               </article>
             ))}
           </div>

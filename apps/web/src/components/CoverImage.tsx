@@ -15,24 +15,40 @@ export function CoverImage({
   sizes,
   eager = false,
   priority = false,
+  onLoadSettled,
 }: {
   src: string;
   alt: string;
   sizes?: string;
   eager?: boolean;
   priority?: boolean;
+  onLoadSettled?: () => void;
 }) {
-  const [loaded, setLoaded] = useState(false);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const ref = useRef<HTMLImageElement>(null);
+  const settledSrcRef = useRef<string | null>(null);
+  const onLoadSettledRef = useRef(onLoadSettled);
+  const loaded = loadedSrc === src;
+
+  useEffect(() => {
+    onLoadSettledRef.current = onLoadSettled;
+  }, [onLoadSettled]);
+
+  function settleImage() {
+    setLoadedSrc(src);
+    if (settledSrcRef.current === src) return;
+    settledSrcRef.current = src;
+    onLoadSettledRef.current?.();
+  }
 
   // Картинка из кеша могла догрузиться ещё до навешивания onLoad (особенно при
   // гидрации) — тогда событие не сработает и обложка осталась бы скрытой.
   // Проверяем complete на маунте, чтобы такой случай не «завис» на скелетоне.
   useEffect(() => {
     if (ref.current?.complete) {
-      setLoaded(true);
+      settleImage();
     }
-  }, []);
+  }, [src]);
 
   return (
     <>
@@ -45,8 +61,8 @@ export function CoverImage({
         sizes={sizes}
         // priority и loading взаимоисключающие в next/image.
         {...(priority ? { priority: true } : { loading: eager ? "eager" : "lazy" })}
-        onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(true)}
+        onLoad={settleImage}
+        onError={settleImage}
         className={`cover-image${loaded ? " is-loaded" : ""}`}
         style={{ objectFit: "cover" }}
       />
