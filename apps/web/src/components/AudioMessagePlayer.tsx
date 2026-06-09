@@ -13,8 +13,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-// Скорости перебираются по кругу одной кнопкой: 1 → 1.25 → 1.5 → 2 → снова 1.
-const SPEED_STEPS = [1, 1.25, 1.5, 2] as const;
+// Скорости перебираются по кругу одной кнопкой: 1 → 1.5 → 2 → снова 1.
+const SPEED_STEPS = [1, 1.5, 2] as const;
 const AUDIO_PLAY_EVENT = "ecoplatform-audio-player:play";
 
 type AudioMessagePlayerProps = {
@@ -61,9 +61,12 @@ export function AudioMessagePlayer({
   const displayDuration = duration > 0 ? duration : (durationSeconds ?? 0);
   const progress = displayDuration > 0 ? Math.min(Math.max(currentTime / displayDuration, 0), 1) : 0;
   const hasSource = Boolean(sourceUrl);
-  // На референсе показывается одно значение времени: текущее при проигрывании,
-  // иначе — общая длительность.
-  const shownTime = isPlaying || currentTime > 0 ? currentTime : displayDuration;
+  const speedLabel = formatPlaybackRate(playbackRate);
+  const timeOffset = progress <= 0.08 ? 0 : progress >= 0.92 ? -100 : -50;
+  const timeStyle = {
+    "--audio-time-x": `${progress * 100}%`,
+    "--audio-time-offset": `${timeOffset}%`,
+  } as CSSProperties;
 
   useEffect(() => {
     setBars(fallbackBars);
@@ -295,44 +298,52 @@ export function AudioMessagePlayer({
     <figure className={rootClassName} aria-label={displayTitle}>
       <audio ref={audioRef} preload="metadata" src={sourceUrl ?? undefined} />
       <div className="audio-player-shell">
-        <div className="audio-player-launch">
-          <button
-            className="audio-player-round-button is-primary"
-            disabled={!hasSource}
-            type="button"
-            onClick={togglePlayback}
-            aria-label={isPlaying ? "Пауза" : "Воспроизвести аудио"}
-            aria-pressed={isPlaying}
-          >
-            {isPlaying ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
-          </button>
-          <span className="audio-player-time">{formatAudioTime(shownTime)}</span>
-        </div>
-
-        <div
-          ref={waveformRef}
-          className="audio-player-waveform"
-          role="slider"
-          tabIndex={hasSource ? 0 : -1}
-          aria-label="Позиция аудио"
-          aria-valuemin={0}
-          aria-valuemax={Math.max(Math.round(displayDuration), 0)}
-          aria-valuenow={Math.round(currentTime)}
-          onPointerDown={startSeek}
-          onKeyDown={seekByKeyboard}
+        <button
+          className="audio-player-round-button is-primary"
+          disabled={!hasSource}
+          type="button"
+          onClick={togglePlayback}
+          aria-label={isPlaying ? "Пауза" : "Воспроизвести аудио"}
+          aria-pressed={isPlaying}
         >
-          <div className="audio-player-waveform-bars" aria-hidden="true">
-            {bars.map((bar, index) => {
-              const barProgress = bars.length <= 1 ? 1 : index / (bars.length - 1);
-              return (
-                <span
-                  className={barProgress <= progress ? "is-filled" : ""}
-                  key={`${index}-${bar.toFixed(3)}`}
-                  style={{ "--audio-bar-height": `${Math.round(5 + bar * 26)}px` } as CSSProperties}
-                />
-              );
-            })}
+          {isPlaying ? (
+            <Pause size={30} strokeWidth={3} aria-hidden="true" />
+          ) : (
+            <Play size={34} fill="currentColor" strokeWidth={0} aria-hidden="true" />
+          )}
+        </button>
+
+        <div className="audio-player-track">
+          <div
+            ref={waveformRef}
+            className="audio-player-waveform"
+            role="slider"
+            tabIndex={hasSource ? 0 : -1}
+            aria-label="Позиция аудио"
+            aria-valuemin={0}
+            aria-valuemax={Math.max(Math.round(displayDuration), 0)}
+            aria-valuenow={Math.round(currentTime)}
+            aria-valuetext={`${formatAudioTime(currentTime)} из ${formatAudioTime(displayDuration)}`}
+            onPointerDown={startSeek}
+            onKeyDown={seekByKeyboard}
+          >
+            <div className="audio-player-waveform-bars" aria-hidden="true">
+              {bars.map((bar, index) => {
+                const barProgress = bars.length <= 1 ? 1 : index / (bars.length - 1);
+                const barHeight = compact ? Math.round(8 + bar * 40) : Math.round(14 + bar * 62);
+                return (
+                  <span
+                    className={barProgress <= progress ? "is-filled" : ""}
+                    key={`${index}-${bar.toFixed(3)}`}
+                    style={{ "--audio-bar-height": `${barHeight}px` } as CSSProperties}
+                  />
+                );
+              })}
+            </div>
           </div>
+          <span className="audio-player-time" style={timeStyle}>
+            {formatAudioTime(currentTime)}
+          </span>
         </div>
 
         <button
@@ -340,9 +351,9 @@ export function AudioMessagePlayer({
           disabled={!hasSource}
           type="button"
           onClick={cycleSpeed}
-          aria-label={`Скорость воспроизведения ${playbackRate}x. Нажмите, чтобы изменить.`}
+          aria-label={`Скорость воспроизведения ${speedLabel}. Нажмите, чтобы изменить.`}
         >
-          {playbackRate}×
+          {speedLabel}
         </button>
       </div>
 
@@ -359,6 +370,12 @@ function formatAudioTime(value: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatPlaybackRate(value: number) {
+  if (value === 1) return "1X";
+  if (value === 1.5) return "1,5X";
+  return "2X";
 }
 
 function extractWaveformBars(audioBuffer: AudioBuffer, barCount: number) {

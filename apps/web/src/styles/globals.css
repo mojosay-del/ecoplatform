@@ -4568,30 +4568,23 @@ body.news-modal-open .app-shell {
 }
 
 .audio-message-player {
+  --audio-player-dark: #303030;
+  --audio-player-dark-hover: #202020;
+  --audio-player-muted: #838886;
+  --audio-player-soft: #eef1f0;
   display: block;
   margin: 0;
   color: var(--text);
 }
 
 .audio-player-shell {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px;
   width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgb(var(--brand-rgb) / 0.09), transparent 42%), var(--panel);
-  box-shadow: 0 8px 24px rgb(var(--shadow-rgb) / 0.06);
-}
-
-/* Левый блок: круглая кнопка, под ней — время (как у голосового сообщения). */
-.audio-player-launch {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  min-height: 112px;
+  padding: 8px 0 4px;
 }
 
 .audio-player-round-button {
@@ -4599,36 +4592,37 @@ body.news-modal-open .app-shell {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  border: 1px solid var(--line);
+  width: 76px;
+  height: 76px;
+  margin-top: 1px;
+  border: 0;
   border-radius: 999px;
-  background: var(--panel);
-  color: var(--text);
+  background: var(--audio-player-dark);
+  color: #ffffff;
   cursor: pointer;
   transition:
     background 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease,
     transform 140ms ease,
     box-shadow 140ms ease;
 }
 
 .audio-player-round-button.is-primary {
-  border-color: transparent;
-  background: var(--brand);
-  color: var(--text-inverse);
-  box-shadow: 0 10px 22px rgb(var(--brand-shadow-rgb) / 0.18);
+  background: var(--audio-player-dark);
+  color: #ffffff;
+}
+
+.audio-player-round-button svg {
+  display: block;
 }
 
 .audio-player-round-button:not(:disabled):hover {
   transform: translateY(-1px);
-  border-color: var(--brand-muted);
-  box-shadow: var(--shadow-sm);
+  background: var(--audio-player-dark-hover);
+  box-shadow: 0 12px 26px rgb(var(--shadow-rgb) / 0.16);
 }
 
 .audio-player-round-button.is-primary:not(:disabled):hover {
-  background: var(--brand-hover);
+  background: var(--audio-player-dark-hover);
 }
 
 .audio-player-round-button:focus-visible,
@@ -4645,20 +4639,31 @@ body.news-modal-open .app-shell {
 }
 
 .audio-player-time {
-  color: var(--muted);
-  font-size: var(--text-xs);
+  position: absolute;
+  bottom: 0;
+  left: var(--audio-time-x, 0%);
+  transform: translateX(var(--audio-time-offset, 0%));
+  color: var(--audio-player-dark);
+  font-size: 31px;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
-/* Дорожка-эквалайзер: тянется на всю доступную ширину, прогресс — цветом столбиков. */
+.audio-player-track {
+  position: relative;
+  min-width: 0;
+  min-height: 102px;
+  padding-bottom: 30px;
+}
+
 .audio-player-waveform {
   position: relative;
-  flex: 1;
-  min-width: 0;
-  height: 34px;
-  overflow: hidden;
+  width: 100%;
+  height: 78px;
+  overflow: visible;
   cursor: pointer;
   touch-action: none;
 }
@@ -4666,49 +4671,53 @@ body.news-modal-open .app-shell {
 .audio-player-waveform-bars {
   display: flex;
   align-items: center;
-  gap: 2px;
-  height: 34px;
+  justify-content: space-between;
+  width: 100%;
+  height: 78px;
 }
 
 .audio-player-waveform-bars span {
   display: block;
-  flex: 1 1 0;
-  min-width: 1px;
+  flex: 1 1 3px;
+  min-width: 3px;
+  max-width: 5px;
   height: var(--audio-bar-height);
   border-radius: 999px;
-  background: var(--neutral-soft);
+  background: var(--audio-player-muted);
   transition:
     background 120ms ease,
     opacity 120ms ease;
 }
 
 .audio-player-waveform-bars span.is-filled {
-  background: linear-gradient(180deg, var(--brand), var(--brand-hover));
+  background: var(--audio-player-dark);
 }
 
-/* Скорость: кнопка справа от волны, по клику циклически меняет значение. */
 .audio-player-speed {
   flex: 0 0 auto;
-  min-width: 46px;
-  min-height: 30px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-chip);
-  padding: 5px 10px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: var(--text-xs);
+  min-width: 58px;
+  height: 44px;
+  margin-top: 17px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 14px;
+  background: var(--audio-player-dark);
+  color: #ffffff;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
   font-weight: 800;
+  letter-spacing: 0;
   cursor: pointer;
   transition:
     background 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease;
+    transform 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .audio-player-speed:not(:disabled):hover {
-  border-color: var(--brand-muted);
-  color: var(--brand);
+  transform: translateY(-1px);
+  background: var(--audio-player-dark-hover);
+  box-shadow: 0 10px 22px rgb(var(--shadow-rgb) / 0.14);
 }
 
 .audio-message-player figcaption {
@@ -4718,30 +4727,93 @@ body.news-modal-open .app-shell {
   line-height: 1.45;
 }
 
-/* Компактный режим (карточки новостей): меньше отступы и кнопка. */
 .audio-message-player.is-compact .audio-player-shell {
   gap: 10px;
-  padding: 9px 11px;
-  box-shadow: none;
+  min-height: 76px;
+  padding: 2px 0 0;
 }
 
 .audio-message-player.is-compact .audio-player-round-button {
-  width: 36px;
-  height: 36px;
+  width: 52px;
+  height: 52px;
+  margin-top: 0;
+}
+
+.audio-message-player.is-compact .audio-player-track {
+  min-height: 70px;
+  padding-bottom: 21px;
 }
 
 .audio-message-player.is-compact .audio-player-waveform,
 .audio-message-player.is-compact .audio-player-waveform-bars {
-  height: 30px;
+  height: 52px;
+}
+
+.audio-message-player.is-compact .audio-player-waveform-bars span {
+  flex-basis: 2px;
+  min-width: 2px;
+  max-width: 4px;
+}
+
+.audio-message-player.is-compact .audio-player-time {
+  font-size: 20px;
 }
 
 .audio-message-player.is-compact .audio-player-speed {
-  min-height: 28px;
-  padding: 4px 8px;
+  min-width: 48px;
+  height: 36px;
+  margin-top: 8px;
+  padding: 0 10px;
+  font-size: 13px;
 }
 
 .audio-message-player.is-unavailable .audio-player-waveform {
   cursor: default;
+}
+
+.audio-message-player.is-unavailable .audio-player-waveform-bars {
+  opacity: 0.45;
+}
+
+@media (max-width: 540px) {
+  .audio-player-shell {
+    gap: 12px;
+    min-height: 84px;
+  }
+
+  .audio-player-round-button {
+    width: 58px;
+    height: 58px;
+    margin-top: 0;
+  }
+
+  .audio-player-track {
+    min-height: 78px;
+    padding-bottom: 24px;
+  }
+
+  .audio-player-waveform,
+  .audio-player-waveform-bars {
+    height: 58px;
+  }
+
+  .audio-player-waveform-bars span {
+    flex-basis: 2px;
+    min-width: 2px;
+    max-width: 4px;
+  }
+
+  .audio-player-time {
+    font-size: 22px;
+  }
+
+  .audio-player-speed {
+    min-width: 46px;
+    height: 36px;
+    margin-top: 11px;
+    padding: 0 9px;
+    font-size: 13px;
+  }
 }
 
 .media-block figcaption {

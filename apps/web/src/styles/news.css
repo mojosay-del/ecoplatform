@@ -363,11 +363,6 @@
   margin-top: 2px;
 }
 
-.news-tile-audio .audio-player-shell {
-  border-color: var(--line);
-  background: linear-gradient(135deg, rgb(var(--brand-rgb) / 0.1), rgb(var(--success-rgb) / 0.06)), var(--surface-soft);
-}
-
 .news-tile-audio figcaption {
   display: none;
 }
