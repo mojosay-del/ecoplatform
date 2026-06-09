@@ -29,10 +29,10 @@ export function KnowledgeCategoryCreateForm({
   return (
     <form className="card form knowledge-category-create-form" onSubmit={submit}>
       <h2>Новая категория</h2>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Название</span>
         <input
-          className="input"
+          className="news-form-lead education-module-title-input"
           placeholder="Например: «Пластики»"
           value={title}
           onChange={(event) => setTitle(event.target.value)}

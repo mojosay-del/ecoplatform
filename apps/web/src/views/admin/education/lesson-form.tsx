@@ -181,16 +181,19 @@ export function LessonForm({
         <span className={`lesson-header-status${lesson.status === "published" ? " is-published" : ""}`}>
           {CONTENT_STATUS_LABELS[lesson.status]}
         </span>
-        <input
-          className="lesson-title-input"
-          value={draft.title}
-          placeholder="Название урока"
-          onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-          required
-        />
       </header>
 
       <section className="lesson-section lesson-cover-section">
+        <label className="form-field news-content-field">
+          <span>Название урока</span>
+          <input
+            className="news-form-lead education-module-title-input"
+            value={draft.title}
+            placeholder="Введите название урока…"
+            onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+            required
+          />
+        </label>
         <label className="form-field news-content-field lesson-cover-subtitle-field">
           <span>Подзаголовок</span>
           <input

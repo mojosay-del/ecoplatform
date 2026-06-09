@@ -32,9 +32,15 @@ export function CategoryCreateForm({
 
   return (
     <form className="card form indices-inline-form" onSubmit={submit}>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Название категории</span>
-        <input className="input" autoFocus value={name} onChange={(event) => setName(event.target.value)} required />
+        <input
+          className="news-form-lead education-module-title-input"
+          autoFocus
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          required
+        />
       </label>
       <div className="auth-actions">
         <button className="button" type="submit">
@@ -72,20 +78,20 @@ export function NomenclatureCreateForm({
 
   return (
     <form className="card form indices-inline-form" onSubmit={submit}>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Название сырья</span>
         <input
-          className="input"
+          className="news-form-lead education-module-title-input"
           autoFocus
           value={draft.name}
           onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
           required
         />
       </label>
-      <label className="form-field">
+      <label className="form-field news-content-field">
         <span>Код</span>
         <input
-          className="input"
+          className="news-form-lead"
           placeholder="например, МС5-Б"
           value={draft.code}
           onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))}

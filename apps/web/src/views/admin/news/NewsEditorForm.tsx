@@ -75,16 +75,16 @@ export function NewsEditorForm({
           value={draft.coverImageId}
           onChange={(fileId) => onDraftChange((prev) => ({ ...prev, coverImageId: fileId }))}
         />
-        <div className="news-form-copy">
-          <span className="news-tile-category">Новости</span>
+        <label className="form-field news-content-field">
+          <span>Заголовок новости</span>
           <input
-            className="news-form-title"
-            placeholder="Заголовок новости…"
+            className="news-form-lead education-module-title-input"
+            placeholder="Введите заголовок новости…"
             value={draft.title}
             onChange={(event) => onDraftChange((prev) => ({ ...prev, title: event.target.value }))}
             required
           />
-        </div>
+        </label>
       </div>
 
       <label className="form-field news-content-field">

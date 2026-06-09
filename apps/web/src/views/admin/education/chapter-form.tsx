@@ -54,8 +54,14 @@ export function ChapterForm({
         <span className="news-form-mode">Глава</span>
       </div>
       <label className="form-field news-content-field">
-        <span>Название</span>
-        <input className="news-form-title" value={title} onChange={(event) => setTitle(event.target.value)} required />
+        <span>Название главы</span>
+        <input
+          className="news-form-lead education-module-title-input"
+          value={title}
+          placeholder="Введите название главы…"
+          onChange={(event) => setTitle(event.target.value)}
+          required
+        />
       </label>
       <div className="lesson-save-bar news-save-bar education-detail-save-bar">
         <span className={`lesson-save-bar-status${hasChanges ? " has-changes" : " is-saved"}`}>

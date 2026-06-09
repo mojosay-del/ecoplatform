@@ -48,7 +48,7 @@ export function ModuleCreateForm({ onMutate, onClose }: { onMutate: EducationMut
       <label className="form-field news-content-field">
         <span>Название</span>
         <input
-          className="news-form-title"
+          className="news-form-lead education-module-title-input"
           placeholder="Название модуля…"
           onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
           required

@@ -41,13 +41,17 @@ export function CategoryEditor({
       <div className="news-form-head">
         <span className="news-form-mode">Категория</span>
       </div>
-      <input
-        className="news-form-title"
-        value={draft.name}
-        onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
-        required
-      />
-      <label className="form-field">
+      <label className="form-field news-content-field">
+        <span>Название категории</span>
+        <input
+          className="news-form-lead education-module-title-input"
+          value={draft.name}
+          placeholder="Например: «Бумага и картон»"
+          onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
+          required
+        />
+      </label>
+      <label className="form-field news-content-field">
         <span>Позиция</span>
         <input
           className="input"

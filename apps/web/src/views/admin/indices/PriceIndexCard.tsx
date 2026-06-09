@@ -112,7 +112,7 @@ export function PriceIndexCard({
       <label className="indices-title-field">
         <span>Название сырья</span>
         <input
-          className="news-form-title"
+          className="news-form-lead education-module-title-input"
           value={draft.name}
           onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
           required
@@ -122,7 +122,7 @@ export function PriceIndexCard({
       <label className="indices-title-field">
         <span>Код</span>
         <input
-          className="news-form-title indices-code-title"
+          className="news-form-lead"
           value={draft.code}
           onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))}
           required
