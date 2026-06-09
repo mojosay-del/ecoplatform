@@ -338,7 +338,7 @@ export function LessonView({
           <aside className="lesson-sidebar">
             {!preview ? (
               <div className="lesson-side-card">
-                <div className="lesson-side-card-header">Прогресс курса</div>
+                <div className="lesson-side-card-header">Прогресс модуля</div>
                 <div className="lesson-progress">
                   <div className="lesson-progress-ring" style={{ ["--progress" as any]: progressPercent }}>
                     <span>{progressPercent}%</span>

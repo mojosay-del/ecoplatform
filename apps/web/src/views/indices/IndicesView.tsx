@@ -4,12 +4,11 @@
 // у IndicesView нет общих state/хелперов с лентой новостей или базой знаний,
 // поэтому он жил в монолите только из-за лени.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { NomenclatureCategoryListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
-import { getIndexMovementSummary } from "../index-movement-summary";
 import { IndexCard } from "./IndexCard";
 import { IndexCombinedChart } from "./IndexCombinedChart";
 import { IndexMovementSummaryTable } from "./IndexMovementSummaryTable";
@@ -27,7 +26,6 @@ export function IndicesView() {
   const data = page.items;
   const [activeSlug, setActiveSlug] = useState<string | undefined>(undefined);
   const active = data.find((category) => category.slug === activeSlug) ?? data[0];
-  const movementSummary = useMemo(() => getIndexMovementSummary(active?.nomenclatures ?? []), [active?.nomenclatures]);
 
   useEffect(() => {
     if (!activeSlug && data[0]?.slug) {
@@ -72,7 +70,7 @@ export function IndicesView() {
           </p>
         ) : (
           <>
-            <IndexMovementSummaryTable summary={movementSummary} />
+            <IndexMovementSummaryTable items={active.nomenclatures} />
             {active.nomenclatures.length >= 2 ? (
               <IndexCombinedChart nomenclatures={active.nomenclatures} categoryName={active.name} />
             ) : null}

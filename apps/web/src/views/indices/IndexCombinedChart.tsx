@@ -21,19 +21,25 @@ import {
 import { IndexPeriodTabs } from "./IndexPeriodTabs";
 import type { IndexPeriod } from "./types";
 
-// Различимая палитра; циклится по индексу номенклатуры.
+// Различимая палитра; циклится по индексу номенклатуры. Синий и оранжевый
+// зарезервированы под направление хвоста линии: рост / снижение.
 const SERIES_COLORS = [
-  "#4d73d8",
-  "#f5773e",
-  "#1f9d6b",
-  "#9b59d0",
-  "#e0457b",
-  "#14b1c4",
-  "#d9a420",
-  "#5b6b7a",
-  "#d65a4f",
-  "#6aa84f",
+  "#7c3aed",
+  "#16a34a",
+  "#db2777",
+  "#52525b",
+  "#0f766e",
+  "#a21caf",
+  "#4d7c0f",
+  "#64748b",
+  "#be185d",
+  "#15803d",
 ];
+const TREND_GROWTH_COLOR = "#4d73d8";
+const TREND_FALL_COLOR = "#f5773e";
+const TREND_START_RATIO = 0.9;
+const TREND_SOLID_START_OFFSET = "92%";
+const TREND_BASE_END_OFFSET = "90%";
 
 type SeriesPoint = { t: number; price: number };
 type ProjectedPoint = { x: number; y: number; t: number; price: number };
@@ -147,6 +153,9 @@ export function IndexCombinedChart({
       tMax === tMin ? padding.left + innerWidth / 2 : padding.left + ((t - tMin) / tRange) * innerWidth;
     const scaleY = (price: number) => padding.top + innerHeight - ((price - domainMin) / domainRange) * innerHeight;
 
+    const trendStartT = tMin + tRange * TREND_START_RATIO;
+    const trendStartX = scaleX(trendStartT);
+
     const projected = series.map((entry) => {
       const xs = entry.points.map((point) => scaleX(point.t));
       const rawY = entry.points.map((point) => point.price);
@@ -158,7 +167,12 @@ export function IndexCombinedChart({
         t: point.t,
         price: point.price,
       }));
-      return { ...entry, coords, path: buildSmoothChartPath(xs, ys) };
+      const lastPoint = coords[coords.length - 1];
+      const firstTailPoint =
+        coords.find((point) => point.t >= trendStartT) ?? (coords.length > 1 ? coords[coords.length - 2] : coords[0]);
+      const trendColor =
+        lastPoint && firstTailPoint && lastPoint.price >= firstTailPoint.price ? TREND_GROWTH_COLOR : TREND_FALL_COLOR;
+      return { ...entry, coords, path: buildSmoothChartPath(xs, ys), trendColor };
     });
 
     // Горизонтальная сетка + подписи цены слева — без них кривые «висели в
@@ -178,7 +192,7 @@ export function IndexCombinedChart({
       if (!previous || x - previous.x >= 120) labels.push({ x, text });
     }
 
-    return { projected, labels, yTicks, tMin, tMax };
+    return { projected, labels, yTicks, tMin, tMax, trendStartX };
   }, [series, period, innerWidth, innerHeight, padding.left, padding.top]);
 
   function handleMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
@@ -213,7 +227,12 @@ export function IndexCombinedChart({
   const active =
     geometry && hover
       ? {
-          color: geometry.projected[hover.seriesIndex]?.color,
+          color:
+            geometry.projected[hover.seriesIndex] && geometry.projected[hover.seriesIndex]?.coords[hover.pointIndex]
+              ? geometry.projected[hover.seriesIndex]!.coords[hover.pointIndex]!.x >= geometry.trendStartX
+                ? geometry.projected[hover.seriesIndex]!.trendColor
+                : geometry.projected[hover.seriesIndex]!.color
+              : undefined,
           name: geometry.projected[hover.seriesIndex]?.name,
           unit: geometry.projected[hover.seriesIndex]?.unit,
           point: geometry.projected[hover.seriesIndex]?.coords[hover.pointIndex],
@@ -260,6 +279,24 @@ export function IndexCombinedChart({
               onMouseMove={handleMouseMove}
               onMouseLeave={() => setHover(null)}
             >
+              <defs>
+                {geometry.projected.map((entry) => (
+                  <linearGradient
+                    id={`index-combined-line-${uid}-${entry.id}`}
+                    key={entry.id}
+                    x1={padding.left}
+                    x2={width - padding.right}
+                    y1="0"
+                    y2="0"
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <stop offset="0%" stopColor={entry.color} />
+                    <stop offset={TREND_BASE_END_OFFSET} stopColor={entry.color} />
+                    <stop offset={TREND_SOLID_START_OFFSET} stopColor={entry.trendColor} />
+                    <stop offset="100%" stopColor={entry.trendColor} />
+                  </linearGradient>
+                ))}
+              </defs>
               <rect x="0" y="0" width={width} height={height} fill="transparent" />
 
               {/* Горизонтальная сетка + подписи цены. */}
@@ -309,7 +346,7 @@ export function IndexCombinedChart({
                     <path
                       d={entry.path}
                       fill="none"
-                      stroke={entry.color}
+                      stroke={`url(#index-combined-line-${uid}-${entry.id})`}
                       strokeWidth={highlighted ? 3.4 : 2.4}
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -321,7 +358,7 @@ export function IndexCombinedChart({
                         cx={last.x}
                         cy={last.y}
                         r={highlighted ? 4.6 : 3.4}
-                        fill={entry.color}
+                        fill={entry.trendColor}
                         stroke="var(--panel)"
                         strokeWidth="1.6"
                       />
@@ -356,14 +393,7 @@ export function IndexCombinedChart({
               {geometry.labels.map((label, i) => {
                 const anchor = i === 0 ? "start" : i === geometry.labels.length - 1 ? "end" : "middle";
                 return (
-                  <text
-                    key={i}
-                    x={label.x}
-                    y={height - 12}
-                    textAnchor={anchor}
-                    fontSize="13"
-                    fill="var(--muted)"
-                  >
+                  <text key={i} x={label.x} y={height - 12} textAnchor={anchor} fontSize="13" fill="var(--muted)">
                     {label.text}
                   </text>
                 );

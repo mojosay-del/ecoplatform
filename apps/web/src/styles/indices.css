@@ -39,42 +39,52 @@
 
 .index-movement-summary {
   display: grid;
-  gap: 16px;
+  gap: 18px;
   min-width: 0;
   margin: 0 0 22px;
-  padding: 18px 20px;
-  background: var(--panel);
+  padding: 20px;
+  background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.96), rgb(var(--white-rgb) / 0.9)), var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow-card);
+  overflow: hidden;
 }
 
 .index-movement-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 18px;
+  min-width: 0;
 }
 
-.index-movement-eyebrow,
-.index-movement-note {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
+.index-movement-title {
+  min-width: 0;
 }
 
-.index-movement-head h2 {
-  margin: 4px 0 0;
+.index-movement-title h2 {
+  margin: 0;
   color: var(--text);
   font-size: var(--text-xl);
   line-height: 1.25;
   letter-spacing: 0;
 }
 
-.index-movement-note {
-  padding-top: 4px;
-  white-space: nowrap;
+.index-movement-title span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.index-movement-periods {
+  margin: 0;
+  background: var(--panel);
+}
+
+.index-movement-periods.index-period-tabs {
+  margin: 0 0 0 auto;
 }
 
 .index-movement-table-wrap {
@@ -82,32 +92,68 @@
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
 }
 
 .index-movement-table {
   width: 100%;
-  min-width: 620px;
-  border-collapse: collapse;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
+}
+
+.index-movement-col-kind {
+  width: 23%;
+}
+
+.index-movement-col-name {
+  width: 24%;
+}
+
+.index-movement-col-code {
+  width: 16%;
+}
+
+.index-movement-col-price {
+  width: 20%;
+}
+
+.index-movement-col-change {
+  width: 17%;
 }
 
 .index-movement-table th,
 .index-movement-table td {
-  padding: 12px 14px;
+  padding: 13px 14px;
   border-top: 1px solid var(--line);
   text-align: left;
   vertical-align: middle;
 }
 
 .index-movement-table th {
+  border-top: 0;
+  background: var(--panel-soft);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .index-movement-table td {
   color: var(--text);
   font-size: 14px;
+}
+
+.index-movement-table tbody tr {
+  transition: background 150ms ease;
+}
+
+.index-movement-table tbody tr:hover {
+  background: var(--panel-soft);
 }
 
 .index-movement-kind {
@@ -119,6 +165,11 @@
   border-radius: var(--radius-chip);
   font-size: 12px;
   font-weight: 700;
+}
+
+.index-movement-kind.neutral {
+  background: var(--panel-soft);
+  color: var(--muted);
 }
 
 .index-movement-link {
@@ -133,20 +184,32 @@
 }
 
 .index-movement-code {
-  display: block;
-  margin-top: 3px;
+  display: inline-flex;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  background: var(--panel-soft);
   color: var(--muted);
   font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .index-movement-change {
   font-size: 15px;
 }
 
+.index-movement-change.neutral {
+  color: var(--muted);
+}
+
 .index-movement-empty {
   margin: 0;
-  padding: 14px 0 2px;
-  border-top: 1px solid var(--line);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
   color: var(--muted);
   font-size: 14px;
 }
@@ -225,6 +288,17 @@
 
 .index-period-tab:hover {
   color: var(--text);
+}
+
+.index-period-tab.active,
+.index-period-tab.active:hover,
+.index-period-tab.active:focus-visible {
+  background: var(--text);
+  color: var(--white);
+}
+
+.index-combined-periods.index-period-tabs {
+  margin: 0 0 0 auto;
 }
 
 @container (max-width: 430px) {
@@ -381,6 +455,7 @@
 .index-combined-legend {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 6px 16px;
   margin: 0;
   padding: 12px 0 0;
@@ -422,11 +497,17 @@
   }
   .index-movement-head {
     display: grid;
-    gap: 6px;
+    gap: 12px;
   }
-  .index-movement-note {
-    padding-top: 0;
-    white-space: normal;
+  .index-movement-periods {
+    width: 100%;
+    margin: 0;
+  }
+  .index-movement-periods .index-period-label-full {
+    display: none;
+  }
+  .index-movement-periods .index-period-label-short {
+    display: inline;
   }
   .index-movement-table {
     min-width: 0;
@@ -451,7 +532,8 @@
     border-top: 0;
   }
   .index-movement-table td:nth-child(3)::before,
-  .index-movement-table td:nth-child(4)::before {
+  .index-movement-table td:nth-child(4)::before,
+  .index-movement-table td:nth-child(5)::before {
     content: attr(data-label);
     display: block;
     margin-bottom: 2px;
