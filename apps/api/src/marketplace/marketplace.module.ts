@@ -5,6 +5,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { MarketplaceController } from "./marketplace.controller";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
+import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
 
 // Торговая площадка (закрытый аукцион). Модуль строится по фазам: объявления →
 // карта → закрытые предложения → отзывы. До публичного запуска скрыт за
@@ -14,7 +15,7 @@ import { MarketplaceOffersService } from "./services/marketplace-offers.service"
 @Module({
   imports: [AuthModule, FilesModule, NotificationsModule],
   controllers: [MarketplaceController],
-  providers: [MarketplaceListingsService, MarketplaceOffersService],
-  exports: [MarketplaceListingsService, MarketplaceOffersService],
+  providers: [MarketplaceListingsService, MarketplaceOffersService, MarketplaceReviewsService],
+  exports: [MarketplaceListingsService, MarketplaceOffersService, MarketplaceReviewsService],
 })
 export class MarketplaceModule {}

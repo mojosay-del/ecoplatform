@@ -491,3 +491,132 @@
   font-size: 13px;
   margin: 0;
 }
+
+/* ── Отзывы и рейтинг (фаза 4) ─────────────────────────────────────────────── */
+.mp-stars {
+  display: inline-flex;
+  gap: 1px;
+  letter-spacing: 1px;
+}
+
+.mp-star {
+  color: #cbd5e1;
+}
+
+.mp-star.on {
+  color: #f59e0b;
+}
+
+.mp-rating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mp-rating-empty {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.mp-reviews {
+  border-top: 1px solid var(--border, #e5e7eb);
+  padding-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mp-rating-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mp-rating-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.mp-rating-criteria {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 6px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.mp-review {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mp-review-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mp-review-comment {
+  margin: 0;
+}
+
+.mp-review-response {
+  margin: 0;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.mp-review-respond {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mp-review-form {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface, #fff);
+  max-width: 520px;
+}
+
+.mp-review-form h4 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mp-review-criterion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.mp-star-input {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.mp-star-input .mp-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  padding: 0;
+  line-height: 1;
+}

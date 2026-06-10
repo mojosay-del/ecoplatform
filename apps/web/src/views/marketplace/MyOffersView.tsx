@@ -10,6 +10,7 @@ import { AppShell } from "../../components/AppShell";
 import { ApiError, api } from "../../lib/api";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
 import { OfferStatusBadge, PRICE_CONDITION_LABEL, formatPrice } from "./offer-ui";
+import { ReviewForm } from "./ReviewForm";
 
 export function MyOffersView() {
   const [refresh, setRefresh] = useState(0);
@@ -26,6 +27,7 @@ export function MyOffersView() {
   const offers = page.items;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Мои предложения" />;
@@ -73,37 +75,60 @@ export function MyOffersView() {
         ) : (
           <div className="mp-mylist">
             {offers.map((offer) => (
-              <div className="mp-row" key={offer.id} style={{ gridTemplateColumns: "1fr auto" }}>
-                <div className="mp-row-main">
-                  <Link className="mp-row-title" href={`/marketplace/${offer.listingId}`}>
-                    {offer.listingSummary || "Объявление"}
-                  </Link>
-                  <span className="mp-row-sub">
-                    {PRICE_CONDITION_LABEL[offer.priceCondition]} ·{" "}
-                    {offer.positions
-                      .filter((position) => position.pricePerKg != null)
-                      .map((position) => `${position.nomenclatureName} ${formatPrice(position.pricePerKg)}`)
-                      .join(", ")}
-                  </span>
-                  {offer.sellerContact ? (
-                    <span className="mp-revealed">
-                      Продавец: {offer.sellerContact.companyName}, тел. {offer.sellerContact.phone}
+              <div key={offer.id}>
+                <div className="mp-row" style={{ gridTemplateColumns: "1fr auto" }}>
+                  <div className="mp-row-main">
+                    <Link className="mp-row-title" href={`/marketplace/${offer.listingId}`}>
+                      {offer.listingSummary || "Объявление"}
+                    </Link>
+                    <span className="mp-row-sub">
+                      {PRICE_CONDITION_LABEL[offer.priceCondition]} ·{" "}
+                      {offer.positions
+                        .filter((position) => position.pricePerKg != null)
+                        .map((position) => `${position.nomenclatureName} ${formatPrice(position.pricePerKg)}`)
+                        .join(", ")}
                     </span>
-                  ) : null}
+                    {offer.sellerContact ? (
+                      <span className="mp-revealed">
+                        Продавец: {offer.sellerContact.companyName}, тел. {offer.sellerContact.phone}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mp-row-actions">
+                    <OfferStatusBadge status={offer.status} />
+                    {offer.status === "active" ? (
+                      <button
+                        className="button secondary"
+                        disabled={busyId === offer.id}
+                        onClick={() => withdraw(offer.id)}
+                        type="button"
+                      >
+                        Отозвать
+                      </button>
+                    ) : null}
+                    {offer.canReview ? (
+                      <button
+                        className="button"
+                        type="button"
+                        onClick={() => setReviewingId(reviewingId === offer.id ? null : offer.id)}
+                      >
+                        Оставить отзыв
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="mp-row-actions">
-                  <OfferStatusBadge status={offer.status} />
-                  {offer.status === "active" ? (
-                    <button
-                      className="button secondary"
-                      disabled={busyId === offer.id}
-                      onClick={() => withdraw(offer.id)}
-                      type="button"
-                    >
-                      Отозвать
-                    </button>
-                  ) : null}
-                </div>
+                {reviewingId === offer.id ? (
+                  <div style={{ marginTop: 8 }}>
+                    <ReviewForm
+                      offerId={offer.id}
+                      direction="buyer_to_seller"
+                      onDone={() => {
+                        setReviewingId(null);
+                        setRefresh((value) => value + 1);
+                      }}
+                    />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

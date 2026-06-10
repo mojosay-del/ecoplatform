@@ -22,8 +22,10 @@ import type {
   LegalDocumentDetail,
   LegalDocumentSummary,
   LegalDocumentType,
+  CompanyRatingSummary,
   CreateListingDto,
   CreateOfferDto,
+  CreateReviewDto,
   DealResult,
   ListingOfferItem,
   MarketplaceListingDetail,
@@ -31,6 +33,7 @@ import type {
   MarketplaceNomenclatureOption,
   MyMarketplaceListingItem,
   MyOfferItem,
+  ReviewItem,
   UpdateListingDto,
   NewsListItem,
   NewsPostDetail,
@@ -150,6 +153,18 @@ export const api = {
         apiFetch<ListingOfferItem>(`/marketplace/offers/${enc(offerId)}/accept`, { method: "POST" }),
       deal: (offerId: string, result: DealResult) =>
         apiFetch<ListingOfferItem>(`/marketplace/offers/${enc(offerId)}/deal`, { method: "POST", body: { result } }),
+    },
+    reviews: {
+      forCompany: (companyId: string) =>
+        apiFetch<ReviewItem[]>(`/marketplace/companies/${enc(companyId)}/reviews`),
+      rating: (companyId: string) =>
+        apiFetch<CompanyRatingSummary>(`/marketplace/companies/${enc(companyId)}/rating`),
+      create: (offerId: string, body: CreateReviewDto) =>
+        apiFetch<ReviewItem>(`/marketplace/offers/${enc(offerId)}/reviews`, { method: "POST", body }),
+      remove: (reviewId: string) =>
+        apiFetch<{ ok: true }>(`/marketplace/reviews/${enc(reviewId)}`, { method: "DELETE" }),
+      respond: (reviewId: string, text: string) =>
+        apiFetch<ReviewItem>(`/marketplace/reviews/${enc(reviewId)}/response`, { method: "POST", body: { text } }),
     },
   },
 

@@ -6,6 +6,7 @@ import {
   legalDocumentTypes,
   listingPositionForms,
   priceConditions,
+  reviewCriteria,
   userGenders,
 } from "./domain";
 
@@ -285,3 +286,24 @@ export type UpdateOfferDto = z.infer<typeof updateOfferDtoSchema>;
 export const dealDecisionDtoSchema = z.object({ result: z.enum(dealResults) });
 
 export type DealDecisionDto = z.infer<typeof dealDecisionDtoSchema>;
+
+// ── Торговая площадка: отзывы (фаза 4) ────────────────────────────────────
+// Направление вычисляет сервер (кто кого оценивает) — клиент шлёт только баллы
+// и комментарий. Состав критериев сервер проверяет по направлению.
+export const reviewScoreInputSchema = z.object({
+  criterion: z.enum(reviewCriteria),
+  score: z.number().int().min(1).max(5),
+});
+
+export const createReviewDtoSchema = z.object({
+  scores: z.array(reviewScoreInputSchema).min(1, "Оцените хотя бы по одному критерию"),
+  comment: z.string().trim().max(2000).nullish(),
+});
+
+export type CreateReviewDto = z.infer<typeof createReviewDtoSchema>;
+
+export const reviewResponseDtoSchema = z.object({
+  text: z.string().trim().min(1).max(2000),
+});
+
+export type ReviewResponseDto = z.infer<typeof reviewResponseDtoSchema>;

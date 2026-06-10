@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import {
   createListingDtoSchema,
   createOfferDtoSchema,
+  createReviewDtoSchema,
   dealDecisionDtoSchema,
+  reviewResponseDtoSchema,
   updateListingDtoSchema,
 } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
@@ -13,6 +15,7 @@ import { MarketplaceFeatureGuard } from "./marketplace-feature.guard";
 import { marketplaceListQuerySchema } from "./marketplace.schemas";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
+import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
 
 // Маршруты торговой площадки. Два гейта на контроллере: JwtAuthGuard (нужен
 // авторизованный пользователь) и MarketplaceFeatureGuard («за закрытыми
@@ -24,6 +27,7 @@ export class MarketplaceController {
   constructor(
     private readonly listings: MarketplaceListingsService,
     private readonly offers: MarketplaceOffersService,
+    private readonly reviews: MarketplaceReviewsService,
   ) {}
 
   @Get("marketplace/listings")
@@ -106,5 +110,32 @@ export class MarketplaceController {
   @Post("marketplace/offers/:id/deal")
   async recordDeal(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: unknown) {
     return this.offers.recordDeal(user, id, parseBody(dealDecisionDtoSchema, body));
+  }
+
+  // ── Отзывы и рейтинг ──────────────────────────────────────────────────────
+
+  @Post("marketplace/offers/:id/reviews")
+  async createReview(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: unknown) {
+    return this.reviews.createReview(user, id, parseBody(createReviewDtoSchema, body));
+  }
+
+  @Delete("marketplace/reviews/:id")
+  async deleteReview(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.reviews.deleteOwnReview(user, id);
+  }
+
+  @Post("marketplace/reviews/:id/response")
+  async respondReview(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: unknown) {
+    return this.reviews.respondToReview(user, id, parseBody(reviewResponseDtoSchema, body));
+  }
+
+  @Get("marketplace/companies/:id/reviews")
+  async companyReviews(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.reviews.getCompanyReviews(user, id);
+  }
+
+  @Get("marketplace/companies/:id/rating")
+  async companyRating(@Param("id") id: string) {
+    return this.reviews.getCompanyRating(id);
   }
 }

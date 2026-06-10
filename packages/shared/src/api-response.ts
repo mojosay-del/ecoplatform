@@ -19,6 +19,9 @@ import type {
   OfferStatus,
   PlatformRole,
   PriceCondition,
+  ReviewCriterion,
+  ReviewDirection,
+  ReviewStatus,
   SubscriptionPlan,
   UserGender,
   UserStatus,
@@ -753,6 +756,8 @@ export type MyOfferItem = {
   createdAt: IsoDateString;
   acceptedAt: IsoDateString | null;
   dealResult: DealResult | null;
+  // Покупатель может оставить отзыв о продавце (сделка состоялась, отзыва ещё нет).
+  canReview: boolean;
   sellerContact: RevealedContact;
 };
 
@@ -769,5 +774,44 @@ export type ListingOfferItem = {
   acceptedAt: IsoDateString | null;
   decisionDeadline: IsoDateString | null;
   dealResult: DealResult | null;
+  // Продавец может оставить отзыв о покупателе (сделка состоялась, отзыва ещё нет).
+  canReview: boolean;
   buyerContact: RevealedContact;
+};
+
+// ── Marketplace: отзывы и рейтинг (фаза 4) ────────────────────────────────
+export type ReviewScoreView = {
+  criterion: ReviewCriterion;
+  score: number;
+};
+
+// Отзыв в ленте о компании. overall — средний балл по критериям этого отзыва.
+export type ReviewItem = {
+  id: string;
+  offerId: string;
+  direction: ReviewDirection;
+  fromCompanyName: string;
+  toCompanyId: string;
+  comment: string | null;
+  status: ReviewStatus;
+  scores: ReviewScoreView[];
+  overall: number;
+  response: { text: string; createdAt: IsoDateString } | null;
+  editableUntil: IsoDateString;
+  canRespond: boolean;
+  isAuthor: boolean;
+  createdAt: IsoDateString;
+};
+
+export type CompanyRatingCriterion = {
+  criterion: ReviewCriterion;
+  average: number;
+  count: number;
+};
+
+// overall = null → «Рейтинг отсутствует» (нет опубликованных отзывов).
+export type CompanyRatingSummary = {
+  overall: number | null;
+  reviewCount: number;
+  byCriterion: CompanyRatingCriterion[];
 };

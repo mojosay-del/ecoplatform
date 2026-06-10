@@ -18,7 +18,9 @@ export const listingInclude = {
     include: { nomenclature: { select: { name: true } } },
   },
   media: { orderBy: { position: "asc" } },
-  sellerCompany: { select: { id: true, type: true } },
+  sellerCompany: {
+    select: { id: true, type: true, marketplaceRating: { select: { overall: true, reviewCount: true } } },
+  },
 } satisfies Prisma.MarketplaceListingInclude;
 
 export type ListingWithRelations = Prisma.MarketplaceListingGetPayload<{ include: typeof listingInclude }>;
@@ -33,6 +35,12 @@ function photoCount(media: ListingWithRelations["media"]): number {
 
 function coverFileId(media: ListingWithRelations["media"]): string | null {
   return media.find((item) => item.kind === "photo")?.fileId ?? null;
+}
+
+// Рейтинг компании для карточек: показываем число только при наличии отзывов
+// (иначе «Рейтинг отсутствует» → null), несмотря на служебный старт-5★ в кэше.
+export function companyRating(rating: { overall: Prisma.Decimal; reviewCount: number } | null): number | null {
+  return rating && rating.reviewCount > 0 ? Number(rating.overall) : null;
 }
 
 function positionSummaries(listing: ListingWithRelations): MarketplaceListingPositionSummary[] {
@@ -55,8 +63,7 @@ export function mapToListItem(listing: ListingWithRelations): MarketplaceListing
     photoCount: photoCount(listing.media),
     coverFileId: coverFileId(listing.media),
     sellerType: listing.sellerCompany.type,
-    // Рейтинг продавца подключается на фазе отзывов; до неё — null.
-    sellerRating: null,
+    sellerRating: companyRating(listing.sellerCompany.marketplaceRating),
     positions: positionSummaries(listing),
   };
 }
@@ -99,7 +106,11 @@ export function mapToDetail(listing: ListingWithRelations, options: { canSeeCont
   return {
     id: listing.id,
     status: listing.status,
-    seller: { companyId: listing.sellerCompany.id, type: listing.sellerCompany.type, rating: null },
+    seller: {
+      companyId: listing.sellerCompany.id,
+      type: listing.sellerCompany.type,
+      rating: companyRating(listing.sellerCompany.marketplaceRating),
+    },
     city: listing.address.city,
     region: listing.address.region,
     address: options.canSeeContacts ? toCompanyAddress(listing.address) : null,

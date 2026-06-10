@@ -98,6 +98,48 @@ function offerPayload(listingPositionId: string, overrides: Record<string, unkno
   };
 }
 
+function buyerScores(value = 5) {
+  return [
+    { criterion: "quality", score: value },
+    { criterion: "weight_accuracy", score: value },
+    { criterion: "shipping_speed", score: value },
+    { criterion: "reliability", score: value },
+  ];
+}
+
+function sellerScores(value = 5) {
+  return [
+    { criterion: "payment_speed", score: value },
+    { criterion: "terms_adherence", score: value },
+    { criterion: "reliability", score: value },
+  ];
+}
+
+// Доводит сделку до «Договорились» и возвращает токены/компании/offerId.
+async function agreedDeal(sellerSuffix: string, buyerSuffix: string) {
+  const seller = await registerCompany(sellerSuffix);
+  const nomenclatureId = await seedNomenclature();
+  const { listingId, positionId } = await createPublishedListing(seller.token, nomenclatureId);
+  const buyerToken = await registerTrader(buyerSuffix);
+  const me = await ctx.http.get("/api/auth/me").set(bearer(buyerToken));
+  const offer = (
+    await ctx.http
+      .post(`/api/marketplace/listings/${listingId}/offers`)
+      .set(bearer(buyerToken))
+      .send(offerPayload(positionId))
+  ).body;
+  await ctx.http.post(`/api/marketplace/offers/${offer.id}/accept`).set(bearer(seller.token));
+  await ctx.http.post(`/api/marketplace/offers/${offer.id}/deal`).set(bearer(seller.token)).send({ result: "agreed" });
+  return {
+    sellerToken: seller.token,
+    sellerCompanyId: seller.companyId,
+    buyerToken,
+    buyerCompanyId: me.body.companyId as string,
+    listingId,
+    offerId: offer.id as string,
+  };
+}
+
 describe("Marketplace — доступ за закрытыми дверьми", () => {
   it("требует авторизацию", async () => {
     const res = await ctx.http.get("/api/marketplace/listings");
@@ -518,6 +560,154 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
       const listing = await ctx.prisma.marketplaceListing.findUnique({ where: { id: listingId } });
       expect(listing?.status).toBe("archived");
       expect(listing?.archiveReason).toBe("not_settled");
+    });
+  });
+});
+
+describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
+  it("покупатель оценивает продавца; рейтинг считается по-яндексовски (старт-5★)", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const deal = await agreedDeal("0009301", "0009301");
+
+      const review = await ctx.http
+        .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+        .set(bearer(deal.buyerToken))
+        .send({ scores: buyerScores(4), comment: "норм" });
+      expect(review.status).toBe(201);
+      expect(review.body.direction).toBe("buyer_to_seller");
+      expect(review.body.overall).toBe(4);
+
+      const rating = await ctx.http
+        .get(`/api/marketplace/companies/${deal.sellerCompanyId}/rating`)
+        .set(bearer(deal.buyerToken));
+      expect(rating.body.reviewCount).toBe(1);
+      // (старт 5 + отзыв 4) / 2 = 4.5
+      expect(rating.body.overall).toBe(4.5);
+
+      const dup = await ctx.http
+        .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+        .set(bearer(deal.buyerToken))
+        .send({ scores: buyerScores(4) });
+      expect(dup.status).toBe(400);
+    });
+  });
+
+  it("обе стороны оценивают друг друга по своим критериям", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const deal = await agreedDeal("0009302", "0009302");
+      await ctx.http.post(`/api/marketplace/offers/${deal.offerId}/reviews`).set(bearer(deal.buyerToken)).send({ scores: buyerScores(5) });
+
+      const sellerReview = await ctx.http
+        .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+        .set(bearer(deal.sellerToken))
+        .send({ scores: sellerScores(5) });
+      expect(sellerReview.status).toBe(201);
+      expect(sellerReview.body.direction).toBe("seller_to_buyer");
+
+      const buyerRating = await ctx.http
+        .get(`/api/marketplace/companies/${deal.buyerCompanyId}/rating`)
+        .set(bearer(deal.sellerToken));
+      expect(buyerRating.body.reviewCount).toBe(1);
+      expect(buyerRating.body.overall).toBe(5);
+    });
+  });
+
+  it("неверный набор критериев и не-участник отклоняются", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const deal = await agreedDeal("0009303", "0009303");
+
+      // покупатель присылает критерии продавца → 400
+      const wrong = await ctx.http
+        .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+        .set(bearer(deal.buyerToken))
+        .send({ scores: sellerScores(5) });
+      expect(wrong.status).toBe(400);
+
+      // посторонняя компания → 403
+      const stranger = await registerTrader("0009313");
+      const forbidden = await ctx.http
+        .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+        .set(bearer(stranger))
+        .send({ scores: buyerScores(5) });
+      expect(forbidden.status).toBe(403);
+    });
+  });
+
+  it("по несостоявшейся сделке отзыв оставить нельзя", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009304");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyerToken = await registerTrader("0009304");
+      const offer = (
+        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyerToken)).send(offerPayload(positionId))
+      ).body;
+
+      const review = await ctx.http
+        .post(`/api/marketplace/offers/${offer.id}/reviews`)
+        .set(bearer(buyerToken))
+        .send({ scores: buyerScores(5) });
+      expect(review.status).toBe(400);
+    });
+  });
+
+  it("ответ на отзыв — только адресат и один раз", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const deal = await agreedDeal("0009305", "0009305");
+      const review = (
+        await ctx.http.post(`/api/marketplace/offers/${deal.offerId}/reviews`).set(bearer(deal.buyerToken)).send({ scores: buyerScores(4) })
+      ).body;
+
+      const authorResponse = await ctx.http
+        .post(`/api/marketplace/reviews/${review.id}/response`)
+        .set(bearer(deal.buyerToken))
+        .send({ text: "сам себе" });
+      expect(authorResponse.status).toBe(403);
+
+      const response = await ctx.http
+        .post(`/api/marketplace/reviews/${review.id}/response`)
+        .set(bearer(deal.sellerToken))
+        .send({ text: "Спасибо за сделку" });
+      expect(response.status).toBe(201);
+      expect(response.body.response?.text).toBe("Спасибо за сделку");
+
+      const second = await ctx.http
+        .post(`/api/marketplace/reviews/${review.id}/response`)
+        .set(bearer(deal.sellerToken))
+        .send({ text: "ещё раз" });
+      expect(second.status).toBe(400);
+    });
+  });
+
+  it("автор удаляет свой отзыв в окне 3 мин; рейтинг сбрасывается", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const deal = await agreedDeal("0009306", "0009306");
+      const review = (
+        await ctx.http.post(`/api/marketplace/offers/${deal.offerId}/reviews`).set(bearer(deal.buyerToken)).send({ scores: buyerScores(5) })
+      ).body;
+
+      const del = await ctx.http.delete(`/api/marketplace/reviews/${review.id}`).set(bearer(deal.buyerToken));
+      expect(del.status).toBe(200);
+
+      const rating = await ctx.http
+        .get(`/api/marketplace/companies/${deal.sellerCompanyId}/rating`)
+        .set(bearer(deal.buyerToken));
+      expect(rating.body.reviewCount).toBe(0);
+      expect(rating.body.overall).toBeNull();
+    });
+  });
+
+  it("canReview на оффере: true после сделки, false после отзыва", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const deal = await agreedDeal("0009307", "0009307");
+
+      const before = await ctx.http.get("/api/marketplace/my/offers").set(bearer(deal.buyerToken));
+      expect(before.body.items[0].canReview).toBe(true);
+
+      await ctx.http.post(`/api/marketplace/offers/${deal.offerId}/reviews`).set(bearer(deal.buyerToken)).send({ scores: buyerScores(5) });
+
+      const after = await ctx.http.get("/api/marketplace/my/offers").set(bearer(deal.buyerToken));
+      expect(after.body.items[0].canReview).toBe(false);
     });
   });
 });

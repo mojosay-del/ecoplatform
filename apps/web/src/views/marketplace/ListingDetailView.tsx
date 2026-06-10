@@ -14,6 +14,7 @@ import { useAuth } from "../../lib/auth";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AuthRequired, ErrorState, useApiQuery } from "../shared";
 import { LISTING_FORM_LABEL, ListingStatusBadge, formatWeight } from "./listing-ui";
+import { CompanyReviews } from "./CompanyReviews";
 import { ListingOffersPanel } from "./ListingOffersPanel";
 import { MakeOfferForm } from "./MakeOfferForm";
 
@@ -246,6 +247,10 @@ export function ListingDetailView({ id }: { id: string }) {
             <MakeOfferForm listing={listing} onSubmitted={() => undefined} />
           </div>
         ) : null}
+
+        <div style={{ marginTop: 28 }}>
+          <CompanyReviews companyId={listing.seller.companyId} />
+        </div>
       </section>
     </AppShell>
   );

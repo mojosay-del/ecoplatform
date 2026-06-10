@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { ListingOfferItem, MyOfferItem, OfferPositionView } from "@ecoplatform/shared";
+import { companyRating } from "./marketplace-listings.helpers";
 
 // Единый include для предложения: позиции (с названием номенклатуры),
 // компания-покупатель и объявление (продавец, контакты, позиции для сводки).
@@ -8,7 +9,10 @@ export const offerInclude = {
     orderBy: { listingPosition: { position: "asc" } },
     include: { listingPosition: { select: { id: true, nomenclature: { select: { name: true } } } } },
   },
-  buyerCompany: { select: { id: true, organizationName: true } },
+  buyerCompany: {
+    select: { id: true, organizationName: true, marketplaceRating: { select: { overall: true, reviewCount: true } } },
+  },
+  reviews: { select: { direction: true, status: true } },
   listing: {
     select: {
       id: true,
@@ -53,6 +57,9 @@ export function toMyOfferItem(offer: OfferWithRelations): MyOfferItem {
     createdAt: offer.createdAt.toISOString(),
     acceptedAt: offer.acceptedAt?.toISOString() ?? null,
     dealResult: offer.dealResult,
+    canReview:
+      offer.dealResult === "agreed" &&
+      !offer.reviews.some((review) => review.direction === "buyer_to_seller" && review.status !== "removed_by_author"),
     sellerContact: revealed
       ? {
           companyName: offer.listing.sellerCompany.organizationName,
@@ -71,12 +78,14 @@ export function toListingOfferItem(offer: OfferWithRelations): ListingOfferItem 
     priceCondition: offer.priceCondition,
     city: offer.city,
     positions: offerPositionViews(offer),
-    // Рейтинг покупателя — фаза отзывов.
-    buyerRating: null,
+    buyerRating: companyRating(offer.buyerCompany.marketplaceRating),
     createdAt: offer.createdAt.toISOString(),
     acceptedAt: offer.acceptedAt?.toISOString() ?? null,
     decisionDeadline: offer.decisionDeadline?.toISOString() ?? null,
     dealResult: offer.dealResult,
+    canReview:
+      offer.dealResult === "agreed" &&
+      !offer.reviews.some((review) => review.direction === "seller_to_buyer" && review.status !== "removed_by_author"),
     buyerContact: revealed
       ? { companyName: offer.buyerCompany.organizationName, phone: offer.contactPhone, city: offer.city }
       : null,

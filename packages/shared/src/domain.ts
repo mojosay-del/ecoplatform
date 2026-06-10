@@ -112,3 +112,38 @@ export type PriceCondition = (typeof priceConditions)[number];
 export const dealResults = ["agreed", "not_agreed"] as const;
 
 export type DealResult = (typeof dealResults)[number];
+
+// Отзывы (фаза 4): направление, статус, критерии. Критерии РАЗНЫЕ по
+// направлению (решение владельца) — см. REVIEW_CRITERIA_BY_DIRECTION.
+export const reviewDirections = ["buyer_to_seller", "seller_to_buyer"] as const;
+
+export type ReviewDirection = (typeof reviewDirections)[number];
+
+export const reviewStatuses = ["published", "hidden_by_moderator", "removed_by_author"] as const;
+
+export type ReviewStatus = (typeof reviewStatuses)[number];
+
+export const reviewCriteria = [
+  "quality",
+  "weight_accuracy",
+  "shipping_speed",
+  "payment_speed",
+  "terms_adherence",
+  "reliability",
+] as const;
+
+export type ReviewCriterion = (typeof reviewCriteria)[number];
+
+// Покупатель оценивает продавца по одним осям, продавец покупателя — по другим.
+export const REVIEW_CRITERIA_BY_DIRECTION: Record<ReviewDirection, readonly ReviewCriterion[]> = {
+  buyer_to_seller: ["quality", "weight_accuracy", "shipping_speed", "reliability"],
+  seller_to_buyer: ["payment_speed", "terms_adherence", "reliability"],
+};
+
+// Критерии, по которым оценивается компания данного типа (что она получает):
+// заготовитель — как продавец, трейдер/переработчик — как покупатель.
+export function reviewCriteriaForCompanyType(type: CompanyType): readonly ReviewCriterion[] {
+  return type === "collector"
+    ? REVIEW_CRITERIA_BY_DIRECTION.buyer_to_seller
+    : REVIEW_CRITERIA_BY_DIRECTION.seller_to_buyer;
+}

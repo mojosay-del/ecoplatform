@@ -312,10 +312,10 @@ model EmailVerificationChallenge {
 }
 
 model Company {
-  id                       String               @id @default(cuid())
+  id                       String                    @id @default(cuid())
   organizationName         String
-  type                     CompanyType          @default(collector)
-  status                   CompanyStatus        @default(demo)
+  type                     CompanyType               @default(collector)
+  status                   CompanyStatus             @default(demo)
   statusBeforeDeletion     CompanyStatus?
   demoEndsAt               DateTime?
   subscriptionPlan         SubscriptionPlan?
@@ -325,17 +325,17 @@ model Company {
   // поэтому дефолт 1. Добавление сотрудника = докупленное место; при
   // подключении биллинга это число будет расти после оплаты. Денормализовано
   // на компанию (текущее состояние), история мест — в Subscription.seats.
-  seatsPurchased           Int                  @default(1)
+  seatsPurchased           Int                       @default(1)
   billingInn               String?
   billingKpp               String?
   // Старое текстовое поле legalAddress оставлено для обратной совместимости
   // (на форму биллинга, где адрес показывается как одна строка). Полноценная
   // структура адреса — в Address (factualAddress/legalAddress relation'ами).
   legalAddress             String?
-  factualAddressId         String?              @unique
-  factualAddress           Address?             @relation("CompanyFactualAddress", fields: [factualAddressId], references: [id])
-  structuredLegalAddressId String?              @unique
-  structuredLegalAddress   Address?             @relation("CompanyStructuredLegalAddress", fields: [structuredLegalAddressId], references: [id])
+  factualAddressId         String?                   @unique
+  factualAddress           Address?                  @relation("CompanyFactualAddress", fields: [factualAddressId], references: [id])
+  structuredLegalAddressId String?                   @unique
+  structuredLegalAddress   Address?                  @relation("CompanyStructuredLegalAddress", fields: [structuredLegalAddressId], references: [id])
   // Контакты компании. Все опциональные, заполняются в /account → Компания.
   websiteUrl               String?
   corporatePhone           String?
@@ -358,10 +358,13 @@ model Company {
   paymentMethods           PaymentMethod[]
   payments                 Payment[]
   apiKeys                  ApiKey[]
-  listings                 MarketplaceListing[] @relation("CompanyListings")
-  offers                   Offer[]              @relation("CompanyOffers")
-  createdAt                DateTime             @default(now())
-  updatedAt                DateTime             @updatedAt
+  listings                 MarketplaceListing[]      @relation("CompanyListings")
+  offers                   Offer[]                   @relation("CompanyOffers")
+  reviewsAuthored          MarketplaceReview[]       @relation("ReviewsAuthored")
+  reviewsReceived          MarketplaceReview[]       @relation("ReviewsReceived")
+  marketplaceRating        CompanyMarketplaceRating?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
 }
 
 // Сохранённый способ оплаты компании. В MVP UI заглушен «Подключим в
@@ -1364,8 +1367,9 @@ model Offer {
   resolvedAt       DateTime? // когда зафиксировано решение или истёк дедлайн
 
   positions OfferPosition[]
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  reviews   MarketplaceReview[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
 
   // Лента предложений по объявлению (продавцу) + проверка «активный/принятый на объявление».
   @@index([listingId, status])
@@ -1387,4 +1391,89 @@ model OfferPosition {
 
   @@unique([offerId, listingPositionId])
   @@index([listingPositionId])
+}
+
+// ── Отзывы и рейтинг (фаза 4): мультикритерий, направленные ───────────────
+// Отзыв оставляется по состоявшейся сделке (Offer с dealResult=agreed), обе
+// стороны оценивают друг друга. Критерии РАЗНЫЕ по направлению (решение
+// владельца): покупатель→продавца — quality/weight_accuracy/shipping_speed/
+// reliability; продавец→покупателя — payment_speed/terms_adherence/reliability.
+// Рейтинг компании усредняется «по-яндексовски» со служебным старт-5★ и кэшируется
+// в CompanyMarketplaceRating (пересчёт при публикации/снятии отзыва).
+
+enum ReviewDirection {
+  buyer_to_seller // покупатель оценивает продавца
+  seller_to_buyer // продавец оценивает покупателя
+}
+
+enum ReviewStatus {
+  published
+  hidden_by_moderator
+  removed_by_author
+}
+
+enum ReviewCriterion {
+  quality // покупатель→продавца: качество / соответствие описанию
+  weight_accuracy // покупатель→продавца: точность веса и объёма
+  shipping_speed // покупатель→продавца: скорость отгрузки
+  payment_speed // продавец→покупателя: скорость оплаты
+  terms_adherence // продавец→покупателя: соблюдение договорённостей
+  reliability // общий: надёжность и коммуникация
+}
+
+model MarketplaceReview {
+  id            String                     @id @default(cuid())
+  offerId       String
+  offer         Offer                      @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  direction     ReviewDirection
+  fromCompanyId String
+  fromCompany   Company                    @relation("ReviewsAuthored", fields: [fromCompanyId], references: [id], onDelete: Cascade)
+  toCompanyId   String
+  toCompany     Company                    @relation("ReviewsReceived", fields: [toCompanyId], references: [id], onDelete: Cascade)
+  createdById   String
+  comment       String?
+  status        ReviewStatus               @default(published)
+  // Окно правки/удаления автором — 3 минуты с создания (проверяется в сервисе).
+  editableUntil DateTime
+  scores        MarketplaceReviewScore[]
+  response      MarketplaceReviewResponse?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  // По сделке (offer) одна сторона оставляет один отзыв.
+  @@unique([offerId, direction])
+  // Лента отзывов о компании + пересчёт рейтинга.
+  @@index([toCompanyId, status, createdAt(sort: Desc)])
+  @@index([fromCompanyId])
+}
+
+model MarketplaceReviewScore {
+  id        String            @id @default(cuid())
+  reviewId  String
+  review    MarketplaceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  criterion ReviewCriterion
+  score     Int // 1..5
+
+  @@unique([reviewId, criterion])
+}
+
+model MarketplaceReviewResponse {
+  id          String            @id @default(cuid())
+  reviewId    String            @unique
+  review      MarketplaceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  createdById String
+  text        String
+  createdAt   DateTime          @default(now())
+}
+
+// Кэш агрегата рейтинга компании. overall — среднее «общих баллов» отзывов +
+// служебный старт-5★ (показывать только при reviewCount>0). byCriterion — JSON
+// { criterion: { avg, count } } по критериям, релевантным типу компании.
+model CompanyMarketplaceRating {
+  companyId   String   @id
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  overall     Decimal  @db.Decimal(3, 2)
+  reviewCount Int      @default(0)
+  byCriterion Json
+  updatedAt   DateTime @updatedAt
 }

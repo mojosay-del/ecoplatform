@@ -9,6 +9,7 @@ import type { ListingOfferItem } from "@ecoplatform/shared";
 import { ApiError, api } from "../../lib/api";
 import { useApiQuery } from "../shared";
 import { OfferStatusBadge, PRICE_CONDITION_LABEL, formatPrice } from "./offer-ui";
+import { ReviewForm } from "./ReviewForm";
 
 export function ListingOffersPanel({ listingId, onChanged }: { listingId: string; onChanged?: () => void }) {
   const [refresh, setRefresh] = useState(0);
@@ -19,6 +20,7 @@ export function ListingOffersPanel({ listingId, onChanged }: { listingId: string
   );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   async function act(id: string, fn: () => Promise<unknown>) {
     setBusyId(id);
@@ -51,6 +53,9 @@ export function ListingOffersPanel({ listingId, onChanged }: { listingId: string
               {PRICE_CONDITION_LABEL[offer.priceCondition]}
               {offer.city ? ` · ${offer.city}` : ""}
             </span>
+            {offer.buyerRating != null ? (
+              <span className="mp-hint">· рейтинг покупателя {offer.buyerRating.toFixed(1)} ★</span>
+            ) : null}
           </div>
           <ul className="mp-offer-prices">
             {offer.positions.map((position) => (
@@ -98,7 +103,26 @@ export function ListingOffersPanel({ listingId, onChanged }: { listingId: string
                 </button>
               </>
             ) : null}
+            {offer.canReview ? (
+              <button
+                className="button"
+                type="button"
+                onClick={() => setReviewingId(reviewingId === offer.id ? null : offer.id)}
+              >
+                Оставить отзыв
+              </button>
+            ) : null}
           </div>
+          {reviewingId === offer.id ? (
+            <ReviewForm
+              offerId={offer.id}
+              direction="seller_to_buyer"
+              onDone={() => {
+                setReviewingId(null);
+                setRefresh((value) => value + 1);
+              }}
+            />
+          ) : null}
         </div>
       ))}
     </div>
