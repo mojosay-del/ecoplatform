@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { companyTypes, consentSources, legalDocumentTypes, listingPositionForms, userGenders } from "./domain";
+import {
+  companyTypes,
+  consentSources,
+  dealResults,
+  legalDocumentTypes,
+  listingPositionForms,
+  priceConditions,
+  userGenders,
+} from "./domain";
 
 // Единое правило сложности пароля для новых паролей.
 // Регулярка покрывает кириллицу + латиницу, требует минимум одну букву и одну цифру.
@@ -247,3 +255,33 @@ export type CreateListingDto = z.infer<typeof createListingDtoSchema>;
 export const updateListingDtoSchema = createListingDtoSchema.partial();
 
 export type UpdateListingDto = z.infer<typeof updateListingDtoSchema>;
+
+// ── Торговая площадка: предложения (фаза 3) ───────────────────────────────
+export const offerPositionInputSchema = z.object({
+  listingPositionId: z.string().min(1),
+  // Цена за кг, ₽. null/опущено = «не интересует» эту позицию.
+  pricePerKg: z.number().positive().max(100_000_000).nullish(),
+});
+
+export type OfferPositionInput = z.infer<typeof offerPositionInputSchema>;
+
+export const createOfferDtoSchema = z.object({
+  priceCondition: z.enum(priceConditions),
+  // Город покупателя — обязателен для «цена на воротах» (проверяется в сервисе).
+  city: z.string().trim().max(120).nullish(),
+  contactPhone: z
+    .string()
+    .trim()
+    .regex(/^\+?\d[\d\s()-]{6,30}$/, "Телефон в формате +7XXXXXXXXXX"),
+  positions: z.array(offerPositionInputSchema).min(1, "Добавьте хотя бы одну позицию"),
+});
+
+export type CreateOfferDto = z.infer<typeof createOfferDtoSchema>;
+
+export const updateOfferDtoSchema = createOfferDtoSchema.partial();
+
+export type UpdateOfferDto = z.infer<typeof updateOfferDtoSchema>;
+
+export const dealDecisionDtoSchema = z.object({ result: z.enum(dealResults) });
+
+export type DealDecisionDto = z.infer<typeof dealDecisionDtoSchema>;

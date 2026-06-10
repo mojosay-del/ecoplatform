@@ -281,10 +281,19 @@ export class MarketplaceListingsService {
       return mapToDetail(listing, { canSeeContacts: true });
     }
 
-    const updated = await this.prisma.marketplaceListing.update({
-      where: { id },
-      data: { status: "archived", archivedAt: new Date(), archiveReason: "withdrawn" },
-      include: listingInclude,
+    const now = new Date();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.marketplaceListing.update({
+        where: { id },
+        data: { status: "archived", archivedAt: now, archiveReason: "withdrawn" },
+        include: listingInclude,
+      });
+      // Снятие объявления закрывает все его открытые/принятые предложения.
+      await tx.offer.updateMany({
+        where: { listingId: id, status: { in: ["active", "accepted"] }, dealResult: null },
+        data: { status: "declined", resolvedAt: now },
+      });
+      return result;
     });
     return mapToDetail(updated, { canSeeContacts: true });
   }
@@ -351,14 +360,32 @@ export class MarketplaceListingsService {
     return mapToDetail(created, { canSeeContacts: true });
   }
 
-  // Cron: переводит истёкшие активные объявления в архив. Возвращает число
-  // обработанных — для лога планировщика.
+  // Cron: переводит истёкшие активные объявления в архив и закрывает их активные
+  // предложения. Объявления с принятым предложением в 24ч-окне НЕ трогаем — их
+  // разрешает отдельный cron предложений. Возвращает число обработанных.
   async archiveExpired(now = new Date()): Promise<number> {
-    const result = await this.prisma.marketplaceListing.updateMany({
-      where: { status: "active", expiresAt: { lt: now } },
-      data: { status: "archived", archivedAt: now, archiveReason: "expired" },
+    const expiring = await this.prisma.marketplaceListing.findMany({
+      where: {
+        status: "active",
+        expiresAt: { lt: now },
+        offers: { none: { status: "accepted", dealResult: null } },
+      },
+      select: { id: true },
     });
-    return result.count;
+    if (expiring.length === 0) return 0;
+
+    const ids = expiring.map((listing) => listing.id);
+    await this.prisma.$transaction([
+      this.prisma.marketplaceListing.updateMany({
+        where: { id: { in: ids } },
+        data: { status: "archived", archivedAt: now, archiveReason: "expired" },
+      }),
+      this.prisma.offer.updateMany({
+        where: { listingId: { in: ids }, status: "active" },
+        data: { status: "declined", resolvedAt: now },
+      }),
+    ]);
+    return ids.length;
   }
 
   // ── Валидация ─────────────────────────────────────────────────────────────

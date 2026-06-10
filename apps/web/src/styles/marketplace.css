@@ -407,3 +407,87 @@
   gap: 8px;
   font-size: 14px;
 }
+
+/* ── Предложения (фаза 3) ─────────────────────────────────────────────────── */
+.mp-offer-active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.mp-offer-accepted {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.mp-offer-declined {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.mp-offer-withdrawn {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.mp-offer-form {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface, #fff);
+  max-width: 760px;
+}
+
+.mp-offer-form h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.mp-offer-positions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.mp-offers-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mp-offers-panel h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.mp-offer-card {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mp-offer-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mp-offer-prices {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+
+.mp-revealed {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  margin: 0;
+}

@@ -5,6 +5,7 @@ import { BillingNotificationsService } from "../billing/billing-notifications.se
 import { FilesService } from "../files/files.service";
 import { VideoTranscodeService } from "../files/video-transcode.service";
 import { MarketplaceListingsService } from "../marketplace/services/marketplace-listings.service";
+import { MarketplaceOffersService } from "../marketplace/services/marketplace-offers.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 const BILLING_HOURLY_LOCK_KEY = "cron:billing-hourly-check";
@@ -13,6 +14,7 @@ const ORPHAN_FILE_CLEANUP_LOCK_KEY = "cron:cleanup-orphan-files";
 const EMAIL_CHALLENGE_CLEANUP_LOCK_KEY = "cron:cleanup-email-challenges";
 const STALE_RECORD_CLEANUP_LOCK_KEY = "cron:cleanup-stale-records";
 const MARKETPLACE_ARCHIVE_LOCK_KEY = "cron:marketplace-archive-expired";
+const MARKETPLACE_OFFER_RESOLVE_LOCK_KEY = "cron:marketplace-resolve-offers";
 const CRON_LOCK_TRANSACTION_TIMEOUT_MS = 15 * 60 * 1000;
 // Регистрационный challenge хранит хэш пароля + ПДн (телефон, ФИО, тип компании)
 // до подтверждения кода. После истечения (TTL 15 минут) или успешной верификации
@@ -79,6 +81,7 @@ export class SchedulerService {
     private readonly files: FilesService,
     private readonly videoTranscode: VideoTranscodeService,
     private readonly marketplace: MarketplaceListingsService,
+    private readonly marketplaceOffers: MarketplaceOffersService,
   ) {}
 
   private get disabled(): boolean {
@@ -123,6 +126,23 @@ export class SchedulerService {
       });
     } catch (error) {
       this.logger.error("Marketplace listing auto-archive failed", error as Error);
+    }
+  }
+
+  // Авто-разрешение принятых предложений без решения за 24ч: объявление в архив
+  // (not_settled), предложения закрываются. Раз в час под advisory-lock.
+  @Cron(CronExpression.EVERY_HOUR, { name: "marketplace-resolve-offers" })
+  async handleOfferAutoResolve() {
+    if (this.disabled) return;
+    try {
+      await this.runWithPostgresAdvisoryLock(MARKETPLACE_OFFER_RESOLVE_LOCK_KEY, async () => {
+        const count = await this.marketplaceOffers.autoResolveExpiredAcceptances();
+        if (count > 0) {
+          this.logger.log(`Marketplace offer auto-resolve: resolved ${count} expired acceptances`);
+        }
+      });
+    } catch (error) {
+      this.logger.error("Marketplace offer auto-resolve failed", error as Error);
     }
   }
 

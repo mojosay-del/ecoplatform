@@ -28,6 +28,7 @@ export function MarketplaceView() {
   const coverIds = listings.map((listing) => listing.coverFileId).filter((id): id is string => Boolean(id));
   const assets = useFileAssetsByIds(coverIds);
   const isCollector = user?.company?.type === "collector";
+  const isBuyer = user?.company?.type === "trader" || user?.company?.type === "processor";
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Торговая площадка" />;
@@ -51,6 +52,12 @@ export function MarketplaceView() {
               </Link>
               <Link className="button" href="/marketplace/new">
                 Разместить объявление
+              </Link>
+            </div>
+          ) : isBuyer ? (
+            <div className="mp-toolbar-actions">
+              <Link className="button secondary" href="/marketplace/offers">
+                Мои предложения
               </Link>
             </div>
           ) : null}

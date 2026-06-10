@@ -10,9 +10,12 @@ import { useState } from "react";
 import type { MarketplaceListingDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { ApiError, api, preferredFileAssetImageUrl, preferredFileAssetMediaUrl } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AuthRequired, ErrorState, useApiQuery } from "../shared";
 import { LISTING_FORM_LABEL, ListingStatusBadge, formatWeight } from "./listing-ui";
+import { ListingOffersPanel } from "./ListingOffersPanel";
+import { MakeOfferForm } from "./MakeOfferForm";
 
 function formatDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString("ru-RU") : "—";
@@ -20,8 +23,10 @@ function formatDate(iso: string | null): string {
 
 export function ListingDetailView({ id }: { id: string }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const [refresh, setRefresh] = useState(0);
   const { data, setData, state, errorMessage } = useApiQuery(
-    `marketplace-listing-${id}`,
+    `marketplace-listing-${id}-${refresh}`,
     () => api.marketplace.get(id),
     null as MarketplaceListingDetail | null,
   );
@@ -51,6 +56,7 @@ export function ListingDetailView({ id }: { id: string }) {
   }
 
   const listing = data;
+  const isBuyer = user?.company?.type === "trader" || user?.company?.type === "processor";
   const photos = listing.media.filter((item) => item.kind === "photo");
   const videos = listing.media.filter((item) => item.kind === "video");
 
@@ -229,6 +235,17 @@ export function ListingDetailView({ id }: { id: string }) {
             {actionError ? <p className="mp-error">{actionError}</p> : null}
           </aside>
         </div>
+
+        {listing.isOwner ? (
+          <div style={{ marginTop: 28 }}>
+            <ListingOffersPanel listingId={listing.id} onChanged={() => setRefresh((value) => value + 1)} />
+          </div>
+        ) : null}
+        {!listing.isOwner && isBuyer && listing.status === "active" ? (
+          <div style={{ marginTop: 28 }}>
+            <MakeOfferForm listing={listing} onSubmitted={() => undefined} />
+          </div>
+        ) : null}
       </section>
     </AppShell>
   );

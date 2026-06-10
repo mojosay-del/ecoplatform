@@ -12,10 +12,13 @@ import type {
   CompanyType,
   ConsentSource,
   ContentStatus,
+  DealResult,
   LegalDocumentType,
   ListingPositionForm,
   ListingStatus,
+  OfferStatus,
   PlatformRole,
+  PriceCondition,
   SubscriptionPlan,
   UserGender,
   UserStatus,
@@ -721,4 +724,50 @@ export type MyMarketplaceListingItem = {
   photoCount: number;
   coverFileId: string | null;
   positions: MarketplaceListingPositionSummary[];
+};
+
+// ── Marketplace: предложения (фаза 3) ─────────────────────────────────────
+export type OfferPositionView = {
+  listingPositionId: string;
+  nomenclatureName: string;
+  pricePerKg: number | null; // null = «не интересует»
+};
+
+// Раскрытые контакты стороны сделки — приходят только после акцепта предложения.
+export type RevealedContact = {
+  companyName: string;
+  phone: string;
+  city: string | null;
+} | null;
+
+// Предложение глазами покупателя (кабинет «Мои предложения»). Контакты продавца
+// раскрыты только после акцепта.
+export type MyOfferItem = {
+  id: string;
+  listingId: string;
+  listingSummary: string;
+  status: OfferStatus;
+  priceCondition: PriceCondition;
+  city: string | null;
+  positions: OfferPositionView[];
+  createdAt: IsoDateString;
+  acceptedAt: IsoDateString | null;
+  dealResult: DealResult | null;
+  sellerContact: RevealedContact;
+};
+
+// Предложение глазами продавца (в карточке его объявления). Имя и контакты
+// покупателя скрыты до акцепта.
+export type ListingOfferItem = {
+  id: string;
+  status: OfferStatus;
+  priceCondition: PriceCondition;
+  city: string | null;
+  positions: OfferPositionView[];
+  buyerRating: number | null;
+  createdAt: IsoDateString;
+  acceptedAt: IsoDateString | null;
+  decisionDeadline: IsoDateString | null;
+  dealResult: DealResult | null;
+  buyerContact: RevealedContact;
 };

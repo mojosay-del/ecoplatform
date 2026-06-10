@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MarketplaceListingsService } from "./marketplace/services/marketplace-listings.service";
+import { MarketplaceOffersService } from "./marketplace/services/marketplace-offers.service";
 import { setupIntegrationContext } from "./test/integration-context";
 import { expectPaginatedEnvelope, withEnv } from "./test/integration-helpers";
 
@@ -63,6 +64,38 @@ async function registerTrader(suffix: string): Promise<string> {
     email: `trader${suffix}@test.local`,
     password: "User12345678",
   });
+}
+
+async function registerProcessor(suffix: string): Promise<string> {
+  return registerWithBody({
+    organizationName: `ООО Переработка ${suffix}`,
+    companyType: "processor",
+    firstName: "Семён",
+    lastName: "Переработкин",
+    gender: "male",
+    phone: `+7902${suffix}`,
+    email: `proc${suffix}@test.local`,
+    password: "User12345678",
+  });
+}
+
+async function createPublishedListing(sellerToken: string, nomenclatureId: string) {
+  const photos = await seedPhotos(4);
+  const draft = await ctx.http
+    .post("/api/marketplace/listings")
+    .set(bearer(sellerToken))
+    .send(listingPayload(nomenclatureId, photos));
+  await ctx.http.post(`/api/marketplace/listings/${draft.body.id}/publish`).set(bearer(sellerToken));
+  return { listingId: draft.body.id as string, positionId: draft.body.positions[0].id as string };
+}
+
+function offerPayload(listingPositionId: string, overrides: Record<string, unknown> = {}) {
+  return {
+    priceCondition: "from_place",
+    contactPhone: "+79995554433",
+    positions: [{ listingPositionId, pricePerKg: 12.5 }],
+    ...overrides,
+  };
 }
 
 describe("Marketplace — доступ за закрытыми дверьми", () => {
@@ -298,6 +331,193 @@ describe("Marketplace — объявления (фаза 1)", () => {
       const after = await ctx.prisma.marketplaceListing.findUnique({ where: { id: draft.body.id } });
       expect(after?.status).toBe("archived");
       expect(after?.archiveReason).toBe("expired");
+    });
+  });
+});
+
+describe("Marketplace — предложения и аукцион (фаза 3)", () => {
+  it("полный цикл: предложение → принятие (раскрытие контактов) → «Договорились» → продано", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009201");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyerToken = await registerTrader("0009201");
+
+      const offer = await ctx.http
+        .post(`/api/marketplace/listings/${listingId}/offers`)
+        .set(bearer(buyerToken))
+        .send(offerPayload(positionId));
+      expect(offer.status).toBe(201);
+      expect(offer.body.status).toBe("active");
+      // До акцепта контакты продавца скрыты от покупателя.
+      expect(offer.body.sellerContact).toBeNull();
+
+      // Продавец видит предложение, но контакты покупателя скрыты.
+      const sellerView = await ctx.http.get(`/api/marketplace/listings/${listingId}/offers`).set(bearer(sellerToken));
+      expect(sellerView.status).toBe(200);
+      expect(sellerView.body).toHaveLength(1);
+      expect(sellerView.body[0].buyerContact).toBeNull();
+
+      const accept = await ctx.http.post(`/api/marketplace/offers/${offer.body.id}/accept`).set(bearer(sellerToken));
+      expect(accept.status).toBe(201);
+      expect(accept.body.status).toBe("accepted");
+      // После акцепта продавец видит телефон покупателя.
+      expect(accept.body.buyerContact?.phone).toBe("+79995554433");
+
+      // А покупатель — телефон продавца (из объявления).
+      const myOffers = await ctx.http.get("/api/marketplace/my/offers").set(bearer(buyerToken));
+      expect(myOffers.body.items[0].sellerContact?.phone).toBe("+79991234567");
+
+      const deal = await ctx.http
+        .post(`/api/marketplace/offers/${offer.body.id}/deal`)
+        .set(bearer(sellerToken))
+        .send({ result: "agreed" });
+      expect(deal.status).toBe(201);
+      expect(deal.body.dealResult).toBe("agreed");
+
+      const listing = await ctx.prisma.marketplaceListing.findUnique({ where: { id: listingId } });
+      expect(listing?.status).toBe("archived");
+      expect(listing?.archiveReason).toBe("sold");
+    });
+  });
+
+  it("один активный оффер на покупателя+объявление; заготовитель не может предлагать", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009202");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyerToken = await registerTrader("0009202");
+
+      const first = await ctx.http
+        .post(`/api/marketplace/listings/${listingId}/offers`)
+        .set(bearer(buyerToken))
+        .send(offerPayload(positionId));
+      expect(first.status).toBe(201);
+
+      const second = await ctx.http
+        .post(`/api/marketplace/listings/${listingId}/offers`)
+        .set(bearer(buyerToken))
+        .send(offerPayload(positionId));
+      expect(second.status).toBe(400);
+
+      // Заготовитель (collector) не может делать предложения.
+      const otherCollector = (await registerCompany("0009212")).token;
+      const collectorOffer = await ctx.http
+        .post(`/api/marketplace/listings/${listingId}/offers`)
+        .set(bearer(otherCollector))
+        .send(offerPayload(positionId));
+      expect(collectorOffer.status).toBe(403);
+    });
+  });
+
+  it("«Не договорились» оставляет объявление активным и закрывает оффер", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009203");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyerToken = await registerProcessor("0009203");
+
+      const offer = (
+        await ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyerToken))
+          .send(offerPayload(positionId))
+      ).body;
+      await ctx.http.post(`/api/marketplace/offers/${offer.id}/accept`).set(bearer(sellerToken));
+
+      const deal = await ctx.http
+        .post(`/api/marketplace/offers/${offer.id}/deal`)
+        .set(bearer(sellerToken))
+        .send({ result: "not_agreed" });
+      expect(deal.body.status).toBe("declined");
+
+      const listing = await ctx.prisma.marketplaceListing.findUnique({ where: { id: listingId } });
+      expect(listing?.status).toBe("active");
+    });
+  });
+
+  it("«Договорились» отклоняет предложения конкурентов", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009204");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyer1 = await registerTrader("0009204");
+      const buyer2 = await registerProcessor("0009204");
+
+      const offer1 = (
+        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyer1)).send(offerPayload(positionId))
+      ).body;
+      const offer2 = (
+        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyer2)).send(offerPayload(positionId))
+      ).body;
+
+      await ctx.http.post(`/api/marketplace/offers/${offer1.id}/accept`).set(bearer(sellerToken));
+      await ctx.http.post(`/api/marketplace/offers/${offer1.id}/deal`).set(bearer(sellerToken)).send({ result: "agreed" });
+
+      const loser = await ctx.prisma.offer.findUnique({ where: { id: offer2.id } });
+      expect(loser?.status).toBe("declined");
+    });
+  });
+
+  it("чужой оффер нельзя отозвать или принять не своему объявлению", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009205");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyerA = await registerTrader("0009205");
+      const offerA = (
+        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyerA)).send(offerPayload(positionId))
+      ).body;
+
+      const buyerB = await registerTrader("0009215");
+      const withdraw = await ctx.http.post(`/api/marketplace/offers/${offerA.id}/withdraw`).set(bearer(buyerB));
+      expect(withdraw.status).toBe(404);
+
+      const otherSeller = (await registerCompany("0009225")).token;
+      const accept = await ctx.http.post(`/api/marketplace/offers/${offerA.id}/accept`).set(bearer(otherSeller));
+      expect(accept.status).toBe(403);
+    });
+  });
+
+  it("валидация: «на воротах» требует город; нужна цена хотя бы по одной позиции", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009206");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyerToken = await registerTrader("0009206");
+
+      const noCity = await ctx.http
+        .post(`/api/marketplace/listings/${listingId}/offers`)
+        .set(bearer(buyerToken))
+        .send(offerPayload(positionId, { priceCondition: "at_gate", city: null }));
+      expect(noCity.status).toBe(400);
+
+      const noPrice = await ctx.http
+        .post(`/api/marketplace/listings/${listingId}/offers`)
+        .set(bearer(buyerToken))
+        .send(offerPayload(positionId, { positions: [{ listingPositionId: positionId, pricePerKg: null }] }));
+      expect(noPrice.status).toBe(400);
+    });
+  });
+
+  it("cron авто-разрешает принятые предложения без решения за 24ч (объявление → not_settled)", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009207");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyerToken = await registerTrader("0009207");
+      const offer = (
+        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyerToken)).send(offerPayload(positionId))
+      ).body;
+      await ctx.http.post(`/api/marketplace/offers/${offer.id}/accept`).set(bearer(sellerToken));
+      await ctx.prisma.offer.update({ where: { id: offer.id }, data: { decisionDeadline: new Date(Date.now() - 1000) } });
+
+      const resolved = await ctx.app.get(MarketplaceOffersService).autoResolveExpiredAcceptances();
+      expect(resolved).toBeGreaterThanOrEqual(1);
+
+      const listing = await ctx.prisma.marketplaceListing.findUnique({ where: { id: listingId } });
+      expect(listing?.status).toBe("archived");
+      expect(listing?.archiveReason).toBe("not_settled");
     });
   });
 });

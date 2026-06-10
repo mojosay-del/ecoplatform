@@ -1,5 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { createListingDtoSchema, updateListingDtoSchema } from "@ecoplatform/shared";
+import {
+  createListingDtoSchema,
+  createOfferDtoSchema,
+  dealDecisionDtoSchema,
+  updateListingDtoSchema,
+} from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import type { RequestUser } from "../common/request-user";
@@ -7,6 +12,7 @@ import { parseBody } from "../common/zod";
 import { MarketplaceFeatureGuard } from "./marketplace-feature.guard";
 import { marketplaceListQuerySchema } from "./marketplace.schemas";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
+import { MarketplaceOffersService } from "./services/marketplace-offers.service";
 
 // Маршруты торговой площадки. Два гейта на контроллере: JwtAuthGuard (нужен
 // авторизованный пользователь) и MarketplaceFeatureGuard («за закрытыми
@@ -15,7 +21,10 @@ import { MarketplaceListingsService } from "./services/marketplace-listings.serv
 @UseGuards(JwtAuthGuard, MarketplaceFeatureGuard)
 @Controller()
 export class MarketplaceController {
-  constructor(private readonly listings: MarketplaceListingsService) {}
+  constructor(
+    private readonly listings: MarketplaceListingsService,
+    private readonly offers: MarketplaceOffersService,
+  ) {}
 
   @Get("marketplace/listings")
   async listListings(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
@@ -60,5 +69,42 @@ export class MarketplaceController {
   @Post("marketplace/listings/:id/republish")
   async republishListing(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.listings.republish(user, id);
+  }
+
+  // ── Предложения ───────────────────────────────────────────────────────────
+
+  @Get("marketplace/my/offers")
+  async myOffers(@CurrentUser() user: RequestUser, @Query() query: Record<string, unknown>) {
+    return this.offers.listMyOffers(user, parseBody(marketplaceListQuerySchema, query));
+  }
+
+  @Post("marketplace/listings/:id/offers")
+  async createOffer(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: unknown) {
+    return this.offers.createOffer(user, id, parseBody(createOfferDtoSchema, body));
+  }
+
+  @Get("marketplace/listings/:id/offers")
+  async listingOffers(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.offers.listListingOffers(user, id);
+  }
+
+  @Patch("marketplace/offers/:id")
+  async updateOffer(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: unknown) {
+    return this.offers.updateOffer(user, id, parseBody(createOfferDtoSchema, body));
+  }
+
+  @Post("marketplace/offers/:id/withdraw")
+  async withdrawOffer(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.offers.withdrawOffer(user, id);
+  }
+
+  @Post("marketplace/offers/:id/accept")
+  async acceptOffer(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.offers.acceptOffer(user, id);
+  }
+
+  @Post("marketplace/offers/:id/deal")
+  async recordDeal(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: unknown) {
+    return this.offers.recordDeal(user, id, parseBody(dealDecisionDtoSchema, body));
   }
 }

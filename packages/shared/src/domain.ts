@@ -99,3 +99,16 @@ export type ListingStatus = (typeof listingStatuses)[number];
 export const listingPositionForms = ["pressed", "loose"] as const;
 
 export type ListingPositionForm = (typeof listingPositionForms)[number];
+
+// Предложения (фаза 3): статус, условие цены, итог сделки.
+export const offerStatuses = ["active", "withdrawn", "accepted", "declined"] as const;
+
+export type OfferStatus = (typeof offerStatuses)[number];
+
+export const priceConditions = ["from_place", "at_gate"] as const;
+
+export type PriceCondition = (typeof priceConditions)[number];
+
+export const dealResults = ["agreed", "not_agreed"] as const;
+
+export type DealResult = (typeof dealResults)[number];

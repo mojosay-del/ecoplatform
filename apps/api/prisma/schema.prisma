@@ -359,6 +359,7 @@ model Company {
   payments                 Payment[]
   apiKeys                  ApiKey[]
   listings                 MarketplaceListing[] @relation("CompanyListings")
+  offers                   Offer[]              @relation("CompanyOffers")
   createdAt                DateTime             @default(now())
   updatedAt                DateTime             @updatedAt
 }
@@ -1208,9 +1209,8 @@ model ConsentRecord {
 //
 // Модуль строится по фазам. Здесь — слой ОБЪЯВЛЕНИЙ (этап 1): заготовитель
 // публикует объявление о продаже сырья с позициями, фото/видео и адресом.
-// Закрытые ценовые предложения (Offer*) и отзывы (MarketplaceReview*) добавятся
-// отдельными аддитивными миграциями на своих фазах — таблицы не заводим заранее,
-// чтобы каждая миграция была привязана к работающему коду.
+// Предложения (Offer*) — фаза 3 (ниже). Отзывы (MarketplaceReview*) — фаза 4,
+// отдельной аддитивной миграцией. Таблицы заводим по мере готовности кода фазы.
 //
 // Раздел скрыт за ролью admin + флагом MARKETPLACE_ENABLED до публичного запуска
 // (см. apps/api/src/marketplace/marketplace-feature.guard.ts). Модерация
@@ -1270,6 +1270,7 @@ model MarketplaceListing {
 
   positions ListingPosition[]
   media     ListingMedia[]
+  offers    Offer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1295,6 +1296,7 @@ model ListingPosition {
   // Влажность и засор в процентах (0–100), опциональны.
   moisturePct      Decimal?            @db.Decimal(5, 2)
   contaminationPct Decimal?            @db.Decimal(5, 2)
+  offerPositions   OfferPosition[]
   createdAt        DateTime            @default(now())
 
   @@unique([listingId, position])
@@ -1314,4 +1316,75 @@ model ListingMedia {
 
   @@unique([listingId, position])
   @@index([fileId])
+}
+
+// ── Предложения (фаза 3): закрытый аукцион ────────────────────────────────
+// Покупатель (трейдер/переработчик) шлёт закрытое ценовое предложение по
+// позициям объявления. Имена скрыты до акцепта; контакты раскрываются продавцу
+// и покупателю только после принятия. Принятие даёт 24ч на решение
+// «Договорились/Не договорились»; иначе cron архивирует объявление (not_settled).
+// Принятие/решение храним прямо на Offer (отдельной таблицы acceptance нет).
+
+enum OfferStatus {
+  active // подано, ждёт решения продавца
+  withdrawn // отозвано покупателем до акцепта
+  accepted // принято продавцом — контакты раскрыты, идёт 24ч-окно решения
+  declined // отклонено: «не договорились», выбран другой, или объявление снято
+}
+
+enum PriceCondition {
+  from_place // «цена с места» — покупатель вывозит сам
+  at_gate // «цена на воротах» — продавец доставляет в город покупателя
+}
+
+enum DealResult {
+  agreed // «Договорились» — сделка состоялась, объявление в архив (продано)
+  not_agreed // «Не договорились» — объявление остаётся активным
+}
+
+model Offer {
+  id             String             @id @default(cuid())
+  listingId      String
+  listing        MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerCompanyId String
+  buyerCompany   Company            @relation("CompanyOffers", fields: [buyerCompanyId], references: [id], onDelete: Cascade)
+  createdById    String
+  status         OfferStatus        @default(active)
+  priceCondition PriceCondition
+  // Город покупателя для «цена на воротах» (куда продавец везёт). Точный адрес —
+  // уже в переписке после акцепта.
+  city           String?
+  // Телефон покупателя; раскрывается продавцу только после акцепта.
+  contactPhone   String
+
+  // Принятие и решение (folded — отдельной таблицы acceptance нет). null пока не принято.
+  acceptedAt       DateTime?
+  decisionDeadline DateTime? // acceptedAt + 24ч; cron архивирует объявление, если решение не принято
+  dealResult       DealResult?
+  resolvedAt       DateTime? // когда зафиксировано решение или истёк дедлайн
+
+  positions OfferPosition[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Лента предложений по объявлению (продавцу) + проверка «активный/принятый на объявление».
+  @@index([listingId, status])
+  // «Мои предложения» покупателя.
+  @@index([buyerCompanyId, status, createdAt(sort: Desc)])
+  // Cron авто-разрешения: where status=accepted, dealResult=null, decisionDeadline < now.
+  @@index([status, decisionDeadline])
+}
+
+model OfferPosition {
+  id                String          @id @default(cuid())
+  offerId           String
+  offer             Offer           @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  listingPositionId String
+  listingPosition   ListingPosition @relation(fields: [listingPositionId], references: [id], onDelete: Cascade)
+  // Цена за кг (₽). null = «не интересует» эту позицию.
+  pricePerKg        Decimal?        @db.Decimal(12, 2)
+  createdAt         DateTime        @default(now())
+
+  @@unique([offerId, listingPositionId])
+  @@index([listingPositionId])
 }

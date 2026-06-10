@@ -1,0 +1,106 @@
+"use client";
+
+// Панель предложений на странице объявления — видна владельцу (продавцу). Имена
+// покупателей скрыты до акцепта; после «Принять» раскрываются контакты и
+// появляются кнопки «Договорились / Не договорились».
+
+import { useState } from "react";
+import type { ListingOfferItem } from "@ecoplatform/shared";
+import { ApiError, api } from "../../lib/api";
+import { useApiQuery } from "../shared";
+import { OfferStatusBadge, PRICE_CONDITION_LABEL, formatPrice } from "./offer-ui";
+
+export function ListingOffersPanel({ listingId, onChanged }: { listingId: string; onChanged?: () => void }) {
+  const [refresh, setRefresh] = useState(0);
+  const { data: offers, state } = useApiQuery(
+    `listing-offers-${listingId}-${refresh}`,
+    () => api.marketplace.offers.forListing(listingId),
+    [] as ListingOfferItem[],
+  );
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function act(id: string, fn: () => Promise<unknown>) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await fn();
+      setRefresh((value) => value + 1);
+      onChanged?.();
+    } catch (actionError) {
+      setError(actionError instanceof ApiError ? actionError.message : "Не удалось выполнить действие.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const pending = offers.filter((offer) => offer.status === "active" || offer.status === "accepted");
+
+  return (
+    <div className="mp-offers-panel">
+      <h3>Предложения{state === "ready" ? ` (${pending.length})` : ""}</h3>
+      {error ? <p className="mp-error">{error}</p> : null}
+      {state === "loading" ? <p className="mp-hint">Загрузка предложений…</p> : null}
+      {state === "ready" && offers.length === 0 ? <p className="mp-hint">Пока нет предложений.</p> : null}
+
+      {offers.map((offer) => (
+        <div className="mp-offer-card" key={offer.id}>
+          <div className="mp-offer-head">
+            <OfferStatusBadge status={offer.status} />
+            <span className="mp-hint">
+              {PRICE_CONDITION_LABEL[offer.priceCondition]}
+              {offer.city ? ` · ${offer.city}` : ""}
+            </span>
+          </div>
+          <ul className="mp-offer-prices">
+            {offer.positions.map((position) => (
+              <li key={position.listingPositionId}>
+                {position.nomenclatureName}: {formatPrice(position.pricePerKg)}
+              </li>
+            ))}
+          </ul>
+          {offer.buyerContact ? (
+            <p className="mp-revealed">
+              Покупатель: {offer.buyerContact.companyName}, тел. {offer.buyerContact.phone}
+              {offer.buyerContact.city ? `, ${offer.buyerContact.city}` : ""}
+            </p>
+          ) : (
+            <p className="mp-hint">Покупатель скрыт до принятия предложения.</p>
+          )}
+          <div className="mp-row-actions" style={{ justifyContent: "flex-start" }}>
+            {offer.status === "active" ? (
+              <button
+                className="button"
+                disabled={busyId === offer.id}
+                onClick={() => act(offer.id, () => api.marketplace.offers.accept(offer.id))}
+                type="button"
+              >
+                Принять
+              </button>
+            ) : null}
+            {offer.status === "accepted" && offer.dealResult === null ? (
+              <>
+                <button
+                  className="button"
+                  disabled={busyId === offer.id}
+                  onClick={() => act(offer.id, () => api.marketplace.offers.deal(offer.id, "agreed"))}
+                  type="button"
+                >
+                  Договорились
+                </button>
+                <button
+                  className="button secondary"
+                  disabled={busyId === offer.id}
+                  onClick={() => act(offer.id, () => api.marketplace.offers.deal(offer.id, "not_agreed"))}
+                  type="button"
+                >
+                  Не договорились
+                </button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
