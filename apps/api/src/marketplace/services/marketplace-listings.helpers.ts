@@ -125,7 +125,7 @@ function toCompanyAddress(address: ListingWithRelations["address"]): CompanyAddr
 // из-за чего админ/покупатель-после-акцепта видели «Редактировать».
 export function mapToDetail(
   listing: ListingWithRelations,
-  options: { canSeeContacts: boolean; isOwner: boolean; sellerGender?: string | null },
+  options: { canSeeContacts: boolean; isOwner: boolean; sellerAvatarUrl?: string | null },
 ): MarketplaceListingDetail {
   return {
     id: listing.id,
@@ -135,7 +135,9 @@ export function mapToDetail(
       name: listing.sellerCompany.organizationName,
       type: listing.sellerCompany.type,
       rating: companyRating(listing.sellerCompany.marketplaceRating),
-      avatarUrl: resolveSellerAvatarUrl(listing.sellerCompany.type, options.sellerGender),
+      // Аватар — загруженное создателем объявления фото (или null → нейтральная
+      // иконка на фронте). Пол больше не участвует в выборе аватара (приватность).
+      avatarUrl: options.sellerAvatarUrl ?? null,
     },
     city: listing.address.city,
     region: listing.address.region,
@@ -172,23 +174,6 @@ export function mapToDetail(
     isOwner: options.isOwner,
   };
 }
-
-function resolveSellerAvatarUrl(companyType: string, gender: string | null | undefined): string | null {
-  const companyPrefix = companyAvatarPrefixByType[companyType];
-  const suffix = gender ? avatarSuffixByGender[gender] : null;
-  return companyPrefix && suffix ? `/avatars/company/${companyPrefix}${suffix}.png` : null;
-}
-
-const companyAvatarPrefixByType: Record<string, string> = {
-  collector: "z",
-  trader: "t",
-  processor: "p",
-};
-
-const avatarSuffixByGender: Record<string, string> = {
-  male: "man",
-  female: "woman",
-};
 
 // Готовит данные Address для снимка адреса объявления. formatted собирается из
 // полей, если не передан явно (как в billing-company.helpers, но без upsert —

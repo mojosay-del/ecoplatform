@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { AuthMeUser } from "@ecoplatform/shared";
+import { publicUrl } from "../files/files-storage.helpers";
 import { PrismaService } from "../prisma/prisma.service";
 
 const ACCOUNT_DELETION_GRACE_DAYS = 30;
@@ -14,6 +15,7 @@ const authMeUserSelect = {
   status: true,
   companyId: true,
   deletionRequestedAt: true,
+  avatarFile: { select: { storageKey: true, accessLevel: true } },
   company: {
     select: {
       id: true,
@@ -48,7 +50,7 @@ export async function getAuthMeUser(deps: AuthProfileDeps, userId: string): Prom
     lastName: user.lastName,
     gender: user.gender,
     status: user.status,
-    avatarUrl: resolveProfileAvatarUrl(platformRoles, user.company?.type ?? null, user.gender),
+    avatarUrl: user.avatarFile ? publicUrl(user.avatarFile.storageKey, user.avatarFile.accessLevel) : null,
     companyId: user.companyId,
     company: user.company
       ? {
@@ -90,32 +92,3 @@ async function hasPendingRequiredConsent(deps: AuthProfileDeps, userId: string):
   });
   return acceptedCount < requiredActive.length;
 }
-
-function resolveProfileAvatarUrl(platformRoles: string[], companyType: string | null, gender: string): string | null {
-  const platformPrefix = platformRoles.includes("admin")
-    ? "a"
-    : platformRoles.includes("moderator") || platformRoles.includes("content_manager")
-      ? "m"
-      : null;
-  const suffix = avatarSuffixByGender[gender];
-
-  if (platformPrefix && suffix) {
-    return `/avatars/platform/${platformPrefix}${suffix}.png`;
-  }
-
-  const companyPrefix = companyType ? companyAvatarPrefixByType[companyType] : null;
-  if (!companyPrefix || !suffix) return null;
-
-  return `/avatars/company/${companyPrefix}${suffix}.png`;
-}
-
-const companyAvatarPrefixByType: Record<string, string> = {
-  collector: "z",
-  trader: "t",
-  processor: "p",
-};
-
-const avatarSuffixByGender: Record<string, string> = {
-  male: "man",
-  female: "woman",
-};

@@ -19,6 +19,7 @@ import {
   Scale,
   Star,
   Truck,
+  UserRound,
   Weight,
   X,
   type LucideIcon,
@@ -129,7 +130,7 @@ export function ListingModal({
                       {listing.seller.avatarUrl ? (
                         <img src={listing.seller.avatarUrl} alt="" />
                       ) : (
-                        listing.seller.name.slice(0, 1)
+                        <UserRound size={22} aria-hidden="true" />
                       )}
                     </span>
                     <div>

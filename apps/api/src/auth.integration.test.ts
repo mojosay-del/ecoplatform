@@ -149,19 +149,19 @@ describe("Auth", () => {
     expect(me.body.email).toBe("pending-code@test.local");
   });
 
-  it("системному администратору назначается аватар по роли и полу", async () => {
+  it("без загруженного фото аватар профиля пустой (нейтральная иконка на фронте)", async () => {
     const adminToken = await loginAdmin();
     const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
 
     expect(me.status).toBe(200);
     expect(me.body.gender).toBe("male");
-    expect(me.body.avatarUrl).toBe("/avatars/platform/aman.png");
+    expect(me.body.avatarUrl).toBeNull();
     expect(me.body.company).toBeNull();
     expect(me.body.companyId).toBeNull();
     expect(me.body.requiresReConsent).toBe(false);
   });
 
-  it("регистрация сохраняет тип компании и пол для аватара профиля", async () => {
+  it("регистрация сохраняет тип компании и пол", async () => {
     const token = await registerWithBody({
       organizationName: "ООО Трейд Жен",
       companyType: "trader",
@@ -178,7 +178,7 @@ describe("Auth", () => {
     expect(me.body.gender).toBe("female");
     expect(me.body.company.type).toBe("trader");
     expect(me.body.company.organizationName).toBe("ООО Трейд Жен");
-    expect(me.body.avatarUrl).toBe("/avatars/company/twoman.png");
+    expect(me.body.avatarUrl).toBeNull();
     const company = await ctx.prisma.company.findUniqueOrThrow({ where: { id: me.body.company.id } });
     expect(company.billingInn).toBeNull();
   });

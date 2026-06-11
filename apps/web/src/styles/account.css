@@ -548,6 +548,84 @@ body.account-password-modal-open {
   object-fit: cover;
 }
 
+/* Редактор аватара: кликабельный кружок с бейджем-камерой + действия. */
+.account-avatar-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-avatar-trigger {
+  position: relative;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.account-avatar-trigger:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.account-avatar-trigger:disabled {
+  cursor: progress;
+}
+
+.account-avatar-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--brand);
+  box-shadow: 0 4px 10px -3px rgb(var(--black-rgb) / 0.35);
+}
+
+.account-avatar-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--black-rgb) / 0.18);
+  border-top-color: var(--brand);
+  animation: account-avatar-spin 0.7s linear infinite;
+}
+
+@keyframes account-avatar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.account-avatar-remove {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgb(var(--white-rgb) / 0.92);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.account-avatar-remove:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.account-avatar-error {
+  max-width: 168px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--white);
+  text-align: center;
+}
+
 .account-welcome-info {
   min-width: 0;
 }

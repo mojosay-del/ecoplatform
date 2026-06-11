@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { User } from "../../lib/auth";
 import {
@@ -36,7 +36,6 @@ export function AccountMenu({
   const [open, setOpen] = useState(false);
   const sections = getAccountMenuSections(includeBusiness);
   const fullName = user ? `${user.firstName} ${user.lastName}` : "Аккаунт";
-  const initials = user ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() : "";
 
   useEffect(() => {
     setOpen(false);
@@ -77,8 +76,11 @@ export function AccountMenu({
         <div className="account-menu-popover" role="menu" aria-label="Меню аккаунта">
           <header className="account-menu-head">
             <span className={`avatar account-menu-head-avatar ${user?.avatarUrl ? "avatar-with-image" : ""}`}>
-              {user?.avatarUrl ? <Image alt="" src={user.avatarUrl} width={40} height={40} /> : null}
-              {!user?.avatarUrl ? <span className="account-menu-avatar-initials">{initials || "?"}</span> : null}
+              {user?.avatarUrl ? (
+                <Image alt="" src={user.avatarUrl} width={40} height={40} />
+              ) : (
+                <UserRound size={20} aria-hidden="true" />
+              )}
             </span>
             <span className="account-menu-head-text">
               <strong>{fullName}</strong>

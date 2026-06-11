@@ -1,9 +1,6 @@
 import type { AccountSectionId } from "../../components/app-shell-nav";
 import type { CompanyEditableField } from "./types";
 
-export const PROFILE_PHOTO_HINT =
-  "Фото профиля подбирается автоматически по типу компании. Загрузка своего фото появится в следующих обновлениях.";
-
 export const ACCOUNT_SETTINGS_SECTIONS: AccountSectionId[] = ["profile", "data-privacy"];
 export const ACCOUNT_BUSINESS_VIEW_SECTIONS: AccountSectionId[] = [];
 export const ACCOUNT_SCROLL_OFFSET = 124;

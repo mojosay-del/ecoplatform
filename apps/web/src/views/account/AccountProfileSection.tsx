@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { ArrowRight, Bell, Check, CreditCard, FileText, Smartphone } from "lucide-react";
 import type { BillingStatus } from "@ecoplatform/shared";
 import type { User } from "../../lib/auth";
@@ -8,7 +7,7 @@ import {
   PLATFORM_ROLE_LABELS,
   USER_GENDER_LABELS,
 } from "../../lib/display-labels";
-import { PROFILE_PHOTO_HINT } from "./constants";
+import { AccountAvatarEditor } from "./AccountAvatarEditor";
 import { describeSubscription } from "./format";
 import { AccountDetailList, AccountEditableValue, AccountPasswordValue, AccountScrollSection } from "./shared";
 import { CompanyProfileForm } from "./CompanyProfileForm";
@@ -43,7 +42,6 @@ export function AccountProfileSection({
   const subscription = describeSubscription(billing);
   const companyStatusLabel = billing?.status ? (COMPANY_STATUS_LABELS[billing.status] ?? billing.status) : null;
   const fullName = user ? `${user.firstName} ${user.lastName}` : "Не авторизован";
-  const initials = user ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() : "";
   const company = billing;
   const profileChecks: Array<{ label: string; done: boolean }> = [
     { label: "Подтверждённая почта", done: Boolean(user?.email) },
@@ -66,13 +64,7 @@ export function AccountProfileSection({
       {/* Обзор: приветствие, идентификация, кольцо заполнения профиля и
           мини-статистика. Раньше тут был статичный hero с аватаром 128px. */}
       <header className="account-welcome">
-        <div className="account-welcome-avatar" title={PROFILE_PHOTO_HINT}>
-          {user?.avatarUrl ? (
-            <Image alt="" src={user.avatarUrl} width={84} height={84} />
-          ) : (
-            <span>{initials || "?"}</span>
-          )}
-        </div>
+        <AccountAvatarEditor />
         <div className="account-welcome-info">
           <span className="account-welcome-hi">{greeting},</span>
           <h1 className="account-welcome-name">{fullName}</h1>

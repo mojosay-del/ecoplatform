@@ -259,6 +259,11 @@ model User {
   deletionRequestedAt        DateTime?
   companyId                  String?
   company                    Company?                     @relation(fields: [companyId], references: [id])
+  // Аватар пользователя — загруженное им публичное изображение (FileAsset).
+  // null → нейтральная иконка-заглушка на фронте. Пол (gender) больше НЕ
+  // участвует в выборе аватара: аватар либо свой, либо обезличенная иконка.
+  avatarFileId               String?
+  avatarFile                 FileAsset?                   @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
   // Роль внутри компании. По умолчанию `member` (минимум прав): владельцем
   // становится только тот, кто создаёт компанию при регистрации, и
   // приглашающий явно проставляет роль приглашённому. Существующие
@@ -286,6 +291,7 @@ model User {
   @@index([status])
   @@index([lockedUntil])
   @@index([deletionRequestedAt])
+  @@index([avatarFileId])
 }
 
 model EmailVerificationChallenge {
@@ -627,6 +633,8 @@ model FileAsset {
   uploadedById    String?
   createdAt       DateTime        @default(now())
   references      FileReference[]
+  // Пользователи, у которых этот файл выбран аватаром (см. User.avatarFile).
+  avatarUsers     User[]          @relation("UserAvatar")
 }
 
 // Полиморфная таблица «кто на какой файл ссылается». Заменяет старый

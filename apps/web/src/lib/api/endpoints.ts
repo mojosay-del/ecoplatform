@@ -8,6 +8,7 @@
 // здесь, а не 42 в views.
 
 import type {
+  AuthMeUser,
   BillingStatus,
   BillingSubscriptionActivationResponse,
   CompanyProfileUpdateDto,
@@ -124,6 +125,13 @@ export const api = {
       apiFetch<{ id: string }>(`/news/${enc(postId)}/comments`, { method: "POST", body }),
     likeComment: (commentId: string) =>
       apiFetch<LikeResult>(`/news/comments/${enc(commentId)}/like`, { method: "POST" }),
+  },
+
+  // ── Аккаунт ───────────────────────────────────────────────────────────────
+  account: {
+    // fileId — id уже загруженного через api.files.upload публичного изображения.
+    setAvatar: (fileId: string) => apiFetch<AuthMeUser>("/account/avatar", { method: "POST", body: { fileId } }),
+    removeAvatar: () => apiFetch<AuthMeUser>("/account/avatar", { method: "DELETE" }),
   },
 
   // ── Индексы цен ─────────────────────────────────────────────────────────

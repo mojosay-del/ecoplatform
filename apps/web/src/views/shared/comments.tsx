@@ -5,7 +5,7 @@
 // _shared.tsx; вынесено в отдельный модуль для наглядности.
 
 import Image from "next/image";
-import { type LucideIcon } from "lucide-react";
+import { UserRound, type LucideIcon } from "lucide-react";
 
 export type LikeResult = {
   liked: boolean;
@@ -38,11 +38,6 @@ export function getCommentAuthor(user: { firstName?: string; lastName?: string }
   return name || "Участник";
 }
 
-function getCommentInitials(user: { firstName?: string; lastName?: string } | null | undefined) {
-  const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("").toUpperCase();
-  return initials || "У";
-}
-
 export function CommentAvatar({
   user,
   current = false,
@@ -60,7 +55,7 @@ export function CommentAvatar({
       ) : current ? (
         "Вы"
       ) : (
-        getCommentInitials(user)
+        <UserRound size={22} aria-hidden="true" />
       )}
     </div>
   );

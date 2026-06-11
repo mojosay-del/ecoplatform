@@ -273,7 +273,7 @@ describe("Admin staff panel", () => {
     expect(login.status).toBe(201);
 
     const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${login.body.accessToken}`);
-    expect(me.body.avatarUrl).toBe("/avatars/platform/mwoman.png");
+    expect(me.body.avatarUrl).toBeNull();
   });
 
   it("отбивает создание с занятым email/phone", async () => {

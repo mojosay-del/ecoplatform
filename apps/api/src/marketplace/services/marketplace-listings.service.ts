@@ -21,6 +21,7 @@ import {
 import { ModuleAccessService } from "../../common/module-access.service";
 import { paginatedResponse, resolvePagination } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
+import { publicUrl } from "../../files/files-storage.helpers";
 import { FilesService } from "../../files/files.service";
 import { AddressGeocoderService } from "../../geo/address-geocoder.service";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -480,11 +481,17 @@ export class MarketplaceListingsService {
     listing: ListingWithRelations,
     options: { canSeeContacts: boolean; isOwner: boolean },
   ): Promise<MarketplaceListingDetail> {
+    // Аватар продавца — загруженное создателем объявления фото. Публичный файл →
+    // прямой URL; нет фото → null (фронт покажет нейтральную иконку). Пол больше
+    // не используется для аватара (приватность, A2).
     const sellerUser = await this.prisma.user.findUnique({
       where: { id: listing.createdById },
-      select: { gender: true },
+      select: { avatarFile: { select: { storageKey: true, accessLevel: true } } },
     });
-    return mapToDetail(listing, { ...options, sellerGender: sellerUser?.gender ?? null });
+    const sellerAvatarUrl = sellerUser?.avatarFile
+      ? publicUrl(sellerUser.avatarFile.storageKey, sellerUser.avatarFile.accessLevel)
+      : null;
+    return mapToDetail(listing, { ...options, sellerAvatarUrl });
   }
 
   private assertPublishable(listing: ListingWithRelations) {

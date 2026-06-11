@@ -95,7 +95,6 @@ export type NewsCommentAuthorPublic = {
   id: string;
   firstName: string;
   lastName: string;
-  gender: string;
   avatarUrl: string | null;
 };
 

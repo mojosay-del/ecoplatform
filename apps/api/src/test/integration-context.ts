@@ -169,7 +169,7 @@ export function setupIntegrationContext() {
 
     const me = await testApp.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
     expect(me.status).toBe(200);
-    expect(me.body.avatarUrl).toBe("/avatars/company/zman.png");
+    expect(me.body.avatarUrl).toBeNull();
     expect(me.body.companyId).toBe(me.body.company.id);
     expect(me.body.company.organizationName).toBe(`ООО Тест ${suffix}`);
     expect(me.body.company.billingInn).toBeUndefined();

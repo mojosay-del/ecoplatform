@@ -475,7 +475,7 @@ export class FilesService {
   }
 
   private async hasStructuredReference(fileId: string) {
-    const [newsCovers, learningCovers, lessonCovers, knowledgeCovers, lessonAttachments, commentAttachments] =
+    const [newsCovers, learningCovers, lessonCovers, knowledgeCovers, lessonAttachments, commentAttachments, avatars] =
       await Promise.all([
         this.prisma.newsPost.count({ where: { coverImageId: fileId } }),
         this.prisma.learningModule.count({ where: { coverImageId: fileId } }),
@@ -483,9 +483,13 @@ export class FilesService {
         this.prisma.knowledgeBaseArticle.count({ where: { coverImageId: fileId } }),
         this.prisma.lessonAttachment.count({ where: { fileId } }),
         this.prisma.commentAttachment.count({ where: { fileId } }),
+        this.prisma.user.count({ where: { avatarFileId: fileId } }),
       ]);
 
-    return newsCovers + learningCovers + lessonCovers + knowledgeCovers + lessonAttachments + commentAttachments > 0;
+    return (
+      newsCovers + learningCovers + lessonCovers + knowledgeCovers + lessonAttachments + commentAttachments + avatars >
+      0
+    );
   }
 
   private async hasBlockReference(fileId: string) {

@@ -1,22 +1,19 @@
-import { CommentStatus, DiscussionTargetType, Prisma } from "@prisma/client";
+import { CommentStatus, DiscussionTargetType, FileAccessLevel, Prisma } from "@prisma/client";
+import { publicUrl } from "../../files/files-storage.helpers";
 import type { PrismaService } from "../../prisma/prisma.service";
 
 export const newsCommentAuthorSelect = {
   id: true,
   firstName: true,
   lastName: true,
-  gender: true,
-  company: { select: { type: true } },
-  platformStaff: { select: { roles: true, isActive: true } },
+  avatarFile: { select: { storageKey: true, accessLevel: true } },
 } satisfies Prisma.UserSelect;
 
 type NewsCommentAuthor = {
   id: string;
   firstName: string;
   lastName: string;
-  gender: string;
-  company: { type: string } | null;
-  platformStaff: { roles: string[]; isActive: boolean } | null;
+  avatarFile: { storageKey: string; accessLevel: FileAccessLevel } | null;
 };
 
 type NewsCommentPayload = {
@@ -26,38 +23,13 @@ type NewsCommentPayload = {
   [key: string]: unknown;
 };
 
-const companyAvatarPrefixByType: Record<string, string> = {
-  collector: "z",
-  trader: "t",
-  processor: "p",
-};
-
-const avatarSuffixByGender: Record<string, string> = {
-  male: "man",
-  female: "woman",
-};
-
-function resolveProfileAvatarUrl(platformRoles: string[], companyType: string | null, gender: string): string | null {
-  const platformPrefix = platformRoles.includes("admin")
-    ? "a"
-    : platformRoles.includes("moderator") || platformRoles.includes("content_manager")
-      ? "m"
-      : null;
-  const suffix = avatarSuffixByGender[gender];
-  if (platformPrefix && suffix) {
-    return `/avatars/platform/${platformPrefix}${suffix}.png`;
-  }
-  const companyPrefix = companyType ? companyAvatarPrefixByType[companyType] : null;
-  if (!companyPrefix || !suffix) return null;
-  return `/avatars/company/${companyPrefix}${suffix}.png`;
-}
-
 function decorateCommentAuthor(user: NewsCommentAuthor) {
-  const { company, platformStaff, ...publicUser } = user;
-  const platformRoles = platformStaff?.isActive ? platformStaff.roles : [];
+  const { avatarFile, ...publicUser } = user;
   return {
     ...publicUser,
-    avatarUrl: resolveProfileAvatarUrl(platformRoles, company?.type ?? null, user.gender),
+    // Аватар — загруженное автором фото (или null → нейтральная иконка на фронте).
+    // Пол больше не раскрывается и не участвует в выборе аватара (приватность, A2).
+    avatarUrl: avatarFile ? publicUrl(avatarFile.storageKey, avatarFile.accessLevel) : null,
   };
 }
 

@@ -98,6 +98,7 @@ function referencePrisma(overrides: Record<string, unknown> = {}) {
     knowledgeBaseBlock: { findMany: vi.fn().mockResolvedValue([]) },
     fileReference: { count: vi.fn().mockResolvedValue(0) },
     user: {
+      count: vi.fn().mockResolvedValue(0),
       findUnique: vi.fn().mockResolvedValue({ companyId: null }),
       findMany: vi.fn().mockResolvedValue([]),
     },
