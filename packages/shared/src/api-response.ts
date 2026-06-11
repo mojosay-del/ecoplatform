@@ -675,7 +675,7 @@ export type MarketplaceListingPositionSummary = {
 
 // Элемент публичной ленты объявлений. Точный адрес скрыт — отдаётся только
 // город/регион и (на фазе карты) координаты центра круга 4 км. Рейтинг продавца
-// подключается на фазе отзывов; до первого отзыва — null («Рейтинг отсутствует»).
+// подключается на фазе отзывов; до первого отзыва — null («Новый участник»).
 export type MarketplaceListingListItem = {
   id: string;
   status: ListingStatus;
@@ -847,7 +847,7 @@ export type CompanyRatingCriterion = {
   count: number;
 };
 
-// overall = null → «Рейтинг отсутствует» (нет опубликованных отзывов).
+// overall = null → «Новый участник» (нет опубликованных отзывов).
 export type CompanyRatingSummary = {
   overall: number | null;
   reviewCount: number;

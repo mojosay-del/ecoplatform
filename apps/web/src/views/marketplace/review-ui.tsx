@@ -3,6 +3,12 @@
 // Примитивы отзывов: подписи критериев, звёзды (показ и ввод), бейдж рейтинга.
 
 import type { ReviewCriterion } from "@ecoplatform/shared";
+import {
+  EMPTY_RATING_ARIA_LABEL,
+  EMPTY_RATING_DESCRIPTION,
+  EMPTY_RATING_TITLE,
+  formatRatingValue,
+} from "./review-rating";
 
 export const REVIEW_CRITERION_LABEL: Record<ReviewCriterion, string> = {
   quality: "Качество / соответствие",
@@ -28,11 +34,16 @@ export function Stars({ value }: { value: number }) {
 
 export function RatingBadge({ overall, count }: { overall: number | null; count: number }) {
   if (overall == null) {
-    return <span className="mp-rating-empty">Рейтинг отсутствует</span>;
+    return (
+      <span className="mp-rating-empty" aria-label={EMPTY_RATING_ARIA_LABEL}>
+        <strong>{EMPTY_RATING_TITLE}</strong>
+        <span>{EMPTY_RATING_DESCRIPTION}</span>
+      </span>
+    );
   }
   return (
     <span className="mp-rating-badge">
-      <strong>{overall.toFixed(1)}</strong>
+      <strong>{formatRatingValue(overall)}</strong>
       <Stars value={overall} />
       <span className="mp-hint">({count})</span>
     </span>
