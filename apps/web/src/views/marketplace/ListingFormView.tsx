@@ -54,6 +54,7 @@ import {
   LISTING_MAX_PHOTOS,
   LISTING_MAX_VIDEOS,
   LISTING_MIN_PHOTOS,
+  LISTING_MIN_WEIGHT_KG,
   type ListingContaminationCondition,
   type ListingMoistureCondition,
 } from "@ecoplatform/shared";
@@ -73,7 +74,7 @@ import {
 import { useAuth } from "../../lib/auth";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
-import { useNomenclatureOptions } from "./listing-ui";
+import { formatWeight, useNomenclatureOptions } from "./listing-ui";
 
 const PACKAGING_OPTIONS = ["Без упаковки", "Палет", "Проложки", "Обмотка"] as const;
 const NO_PACKAGING = "Без упаковки";
@@ -230,6 +231,15 @@ function aggregatePositionPackaging(positions: PositionForm[]): string | null {
   return unique.length > 0 ? unique.join(", ") : null;
 }
 
+function positionWeightKg(position: PositionForm): number {
+  const weightTons = Number(position.weightTons);
+  return Number.isFinite(weightTons) && weightTons > 0 ? weightTons * 1000 : 0;
+}
+
+function totalPositionWeightKg(positions: PositionForm[]): number {
+  return positions.reduce((sum, position) => sum + positionWeightKg(position), 0);
+}
+
 function moistureConditionFromPct(value: number | null): ListingMoistureCondition | "" {
   if (value == null) return "";
   if (value <= 5) return "dry";
@@ -283,6 +293,9 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
   const categoryOptions = uniqueOptions(
     nomenclature.map((option) => ({ value: option.category, label: option.category })),
   );
+  const totalWeightKg = totalPositionWeightKg(positions);
+  const hasMinimumWeight = totalWeightKg >= LISTING_MIN_WEIGHT_KG;
+  const weightHintText = `Вес: ${formatWeight(totalWeightKg)} / минимум ${formatWeight(LISTING_MIN_WEIGHT_KG)} для публикации.`;
 
   function registerDraftUpload(fileId: string) {
     draftUploadFileIdsRef.current.add(fileId);
@@ -473,18 +486,21 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
     };
   }
 
-  function clientValidationError(): string | null {
+  function clientValidationError(publish: boolean): string | null {
     if (!city.trim()) return "Выберите адрес отгрузки из подсказки Яндекса.";
     if (!formatPhoneFull(getPhoneCountry(phoneCountry), phoneDigits)) return "Укажите контактный телефон полностью.";
     for (const position of positions) {
       if (!position.nomenclatureId) return "Выберите вид сырья во всех позициях.";
       if (!(Number(position.weightTons) > 0)) return "Укажите вес во всех позициях.";
     }
+    if (publish && totalWeightKg < LISTING_MIN_WEIGHT_KG) {
+      return `Суммарный вес объявления — минимум ${formatWeight(LISTING_MIN_WEIGHT_KG)} для публикации.`;
+    }
     return null;
   }
 
   async function save(publish: boolean) {
-    const validationError = clientValidationError();
+    const validationError = clientValidationError(publish);
     if (validationError) {
       setError(validationError);
       return;
@@ -670,6 +686,9 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
                 <Package size={16} strokeWidth={2.2} aria-hidden="true" />
                 Добавить позицию
               </button>
+              <p className={`mp-hint mp-weight-hint${hasMinimumWeight ? " is-ok" : " is-warning"}`} aria-live="polite">
+                {weightHintText}
+              </p>
             </div>
           </div>
 
