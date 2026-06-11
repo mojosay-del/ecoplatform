@@ -8,7 +8,24 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft,
   Check,
@@ -19,6 +36,7 @@ import {
   Droplets,
   FileText,
   Filter,
+  GripVertical,
   ImagePlus,
   Layers,
   MapPin,
@@ -119,6 +137,51 @@ function sectionTitle(Icon: LucideIcon, title: string) {
       </span>
       {title}
     </h2>
+  );
+}
+
+function SortableMediaTile({
+  item,
+  index,
+  url,
+  onRemove,
+}: {
+  item: MediaItem;
+  index: number;
+  url: string | null;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.fileId,
+  });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.72 : 1,
+    zIndex: isDragging ? 3 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`mp-media-tile mp-photo-tile${index === 0 ? " is-primary" : ""}${isDragging ? " is-dragging" : ""}`}
+    >
+      {url ? <img src={url} alt="" /> : <div className="mp-media-empty">Фото</div>}
+      {index === 0 ? <span className="mp-media-primary-badge">Главное фото</span> : null}
+      <button
+        className="mp-media-drag-handle"
+        type="button"
+        aria-label={`Перетащить фото ${index + 1}`}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical size={14} strokeWidth={2.4} aria-hidden="true" />
+      </button>
+      <button className="mp-media-remove" type="button" aria-label="Удалить фото" onClick={onRemove}>
+        <X size={14} />
+      </button>
+    </div>
   );
 }
 
@@ -445,28 +508,13 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
 
   return (
     <AppShell>
-      <section className="page mp-listing-editor-page">
+      <section
+        className="page mp-listing-editor-page"
+        aria-label={listingId ? "Редактирование объявления" : "Новое объявление"}
+      >
         <Link className="mp-form-back" href="/marketplace/my">
           <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" />К моим объявлениям
         </Link>
-
-        <header className="mp-form-hero">
-          <div>
-            <span className="mp-form-eyebrow">
-              <ClipboardList size={16} strokeWidth={2.2} aria-hidden="true" />
-              {listingId ? "Редактирование объявления" : "Новое объявление"}
-            </span>
-            <h1>{listingId ? "Редактирование объявления" : "Новое объявление"}</h1>
-            <p>
-              Заполните карточку так же, как её потом увидит покупатель: сначала сырьё и медиа, затем адрес, готовность
-              и условия.
-            </p>
-          </div>
-          <div className="mp-form-hero-status" aria-label="Порядок публикации">
-            <PackageCheck size={22} strokeWidth={2.1} aria-hidden="true" />
-            <span>Черновик можно сохранить, публикация пройдёт проверку фото, веса и контактов.</span>
-          </div>
-        </header>
 
         <div className="mp-form">
           <div className="mp-form-lead-grid">
@@ -1023,10 +1071,34 @@ function MediaUploader({
   const assets = useFileAssetsByIds(media.map((item) => item.fileId));
   const [uploadProgress, setUploadProgress] = useState<MediaUploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const photos = media.filter((item) => item.kind === "photo").length;
-  const videos = media.filter((item) => item.kind === "video").length;
+  const photoItems = media.filter((item) => item.kind === "photo");
+  const videoItems = media.filter((item) => item.kind === "video");
+  const photos = photoItems.length;
+  const videos = videoItems.length;
   const uploading = uploadProgress !== null;
   const uploadPercent = Math.round((uploadProgress?.fraction ?? 0) * 100);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function mergeMedia(nextPhotos: MediaItem[], nextVideos = videoItems): MediaItem[] {
+    return [...nextPhotos, ...nextVideos];
+  }
+
+  function removeMediaItem(fileId: string) {
+    onRemove?.(fileId);
+    onChange(media.filter((item) => item.fileId !== fileId));
+  }
+
+  function handlePhotoDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = photoItems.findIndex((item) => item.fileId === String(active.id));
+    const to = photoItems.findIndex((item) => item.fileId === String(over.id));
+    if (from === -1 || to === -1) return;
+    onChange(mergeMedia(arrayMove(photoItems, from, to)));
+  }
 
   async function addFiles(fileList: FileList | null, kind: "photo" | "video") {
     if (!fileList || !token) return;
@@ -1053,7 +1125,12 @@ function MediaUploader({
         onUploaded?.(asset.id);
         next.push({ fileId: asset.id, kind });
       }
-      onChange(next);
+      onChange(
+        mergeMedia(
+          next.filter((item) => item.kind === "photo"),
+          next.filter((item) => item.kind === "video"),
+        ),
+      );
     } catch (uploadError) {
       setError(uploadError instanceof ApiError ? uploadError.message : "Не удалось загрузить файл.");
     } finally {
@@ -1064,60 +1141,73 @@ function MediaUploader({
   return (
     <div>
       <div className="mp-media">
-        {media.map((item) => {
-          const asset = assets.get(item.fileId);
-          const url = item.kind === "video" ? preferredFileAssetMediaUrl(asset) : preferredFileAssetImageUrl(asset);
-          return (
-            <div className="mp-media-tile" key={item.fileId}>
-              {item.kind === "video" ? url ? <video src={url} muted /> : null : url ? <img src={url} alt="" /> : null}
-              <button
-                className="mp-media-remove"
-                type="button"
-                aria-label="Удалить"
-                onClick={() => {
-                  onRemove?.(item.fileId);
-                  onChange(media.filter((other) => other.fileId !== item.fileId));
-                }}
-              >
-                <X size={14} />
-              </button>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePhotoDragEnd}>
+          <SortableContext items={photoItems.map((item) => item.fileId)} strategy={rectSortingStrategy}>
+            <div className="mp-media-photos">
+              {photoItems.map((item, index) => (
+                <SortableMediaTile
+                  key={item.fileId}
+                  item={item}
+                  index={index}
+                  url={preferredFileAssetImageUrl(assets.get(item.fileId))}
+                  onRemove={() => removeMediaItem(item.fileId)}
+                />
+              ))}
+              {photos < LISTING_MAX_PHOTOS ? (
+                <label className={`mp-media-add${uploading ? " is-disabled" : ""}${photos === 0 ? " is-primary" : ""}`}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    disabled={uploading}
+                    onChange={(event) => addFiles(event.target.files, "photo")}
+                  />
+                  <ImagePlus size={20} strokeWidth={2.1} aria-hidden="true" />
+                  <span>Фото</span>
+                </label>
+              ) : null}
             </div>
-          );
-        })}
-        {photos < LISTING_MAX_PHOTOS ? (
-          <label className={`mp-media-add${uploading ? " is-disabled" : ""}`}>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              disabled={uploading}
-              onChange={(event) => addFiles(event.target.files, "photo")}
-            />
-            <ImagePlus size={20} strokeWidth={2.1} aria-hidden="true" />
-            <span>Фото</span>
-          </label>
-        ) : null}
-        {videos < LISTING_MAX_VIDEOS ? (
-          <label className={`mp-media-add${uploading ? " is-disabled" : ""}`}>
-            <input
-              type="file"
-              accept="video/*"
-              hidden
-              disabled={uploading}
-              onChange={(event) => addFiles(event.target.files, "video")}
-            />
-            <Video size={20} strokeWidth={2.1} aria-hidden="true" />
-            <span>Видео</span>
-          </label>
-        ) : null}
+          </SortableContext>
+        </DndContext>
+        <div className="mp-media-videos">
+          {videoItems.map((item) => {
+            const url = preferredFileAssetMediaUrl(assets.get(item.fileId));
+            return (
+              <div className="mp-media-tile mp-video-tile" key={item.fileId}>
+                {url ? <video src={url} muted preload="metadata" /> : <div className="mp-media-empty">Видео</div>}
+                <button
+                  className="mp-media-remove"
+                  type="button"
+                  aria-label="Удалить видео"
+                  onClick={() => removeMediaItem(item.fileId)}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            );
+          })}
+          {videos < LISTING_MAX_VIDEOS ? (
+            <label className={`mp-media-add mp-media-add-video${uploading ? " is-disabled" : ""}`}>
+              <input
+                type="file"
+                accept="video/*"
+                hidden
+                disabled={uploading}
+                onChange={(event) => addFiles(event.target.files, "video")}
+              />
+              <Video size={20} strokeWidth={2.1} aria-hidden="true" />
+              <span>Видео</span>
+            </label>
+          ) : null}
+        </div>
         {uploadProgress ? (
           <div className="mp-media-progress" role="status" aria-live="polite">
             <div className="mp-media-progress-head">
               <Upload size={18} className="mp-media-progress-spin" />
               <span className="mp-media-progress-name">{uploadProgress.fileName}</span>
               <span className="mp-media-progress-percent">
-                {uploadPercent >= 100 ? "Обработка…" : `${uploadPercent}%`}
+                {uploadPercent >= 100 ? "Сохраняем…" : `${uploadPercent}%`}
               </span>
             </div>
             <div className="mp-media-progress-track">
