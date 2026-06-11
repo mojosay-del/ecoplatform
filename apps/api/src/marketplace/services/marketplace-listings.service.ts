@@ -426,8 +426,6 @@ export class MarketplaceListingsService {
               packaging: position.packaging,
               moistureCondition: position.moistureCondition,
               contaminationCondition: position.contaminationCondition,
-              moisturePct: position.moisturePct,
-              contaminationPct: position.contaminationPct,
             })),
           },
           media: {
@@ -559,8 +557,6 @@ function positionCreateData(positions: ListingPositionInput[]) {
     packaging: optionalText(position.packaging),
     moistureCondition: position.moistureCondition ?? null,
     contaminationCondition: position.contaminationCondition ?? null,
-    moisturePct: position.moisturePct == null ? null : new Prisma.Decimal(position.moisturePct),
-    contaminationPct: position.contaminationPct == null ? null : new Prisma.Decimal(position.contaminationPct),
   }));
 }
 

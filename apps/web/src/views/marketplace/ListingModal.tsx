@@ -30,6 +30,7 @@ import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useApiQuery } from "../shared";
 import { CompanyReviews } from "./CompanyReviews";
 import { ListingOffersPanel } from "./ListingOffersPanel";
+import { contaminationLabel, moistureLabel } from "./listing-characteristics";
 import { compactPositionsTitle } from "./listing-title";
 import { LISTING_FORM_LABEL, ListingStatusBadge, formatLocation, formatWeight } from "./listing-ui";
 import { MakeOfferForm } from "./MakeOfferForm";
@@ -49,30 +50,6 @@ function tons(kg: number | null): string {
   if (kg == null) return "—";
   const value = kg / 1000;
   return `${Number.isInteger(value) ? value : value.toFixed(1)} т`;
-}
-
-const MOISTURE_CONDITION_LABEL = {
-  dry: "Сухое",
-  slightly_wet: "Немного влажное",
-  wet: "Влажное",
-} as const;
-
-const CONTAMINATION_CONDITION_LABEL = {
-  clean: "Без включений",
-  may_have_inclusions: "Могут быть иные включения",
-  has_inclusions: "Есть иные включения",
-} as const;
-
-function moistureLabel(position: MarketplaceListingDetail["positions"][number] | undefined): string | null {
-  if (!position) return null;
-  if (position.moistureCondition) return MOISTURE_CONDITION_LABEL[position.moistureCondition];
-  return position.moisturePct != null ? `до ${position.moisturePct}%` : null;
-}
-
-function contaminationLabel(position: MarketplaceListingDetail["positions"][number] | undefined): string | null {
-  if (!position) return null;
-  if (position.contaminationCondition) return CONTAMINATION_CONDITION_LABEL[position.contaminationCondition];
-  return position.contaminationPct != null ? `до ${position.contaminationPct}%` : null;
 }
 
 export function ListingModal({
@@ -131,13 +108,9 @@ export function ListingModal({
             const forms = [
               ...new Set(listing.positions.map((position) => LISTING_FORM_LABEL[position.form] ?? position.form)),
             ].join(", ");
-            const moisture = moistureLabel(
-              listing.positions.find((position) => position.moistureCondition || position.moisturePct != null),
-            );
+            const moisture = moistureLabel(listing.positions.find((position) => position.moistureCondition));
             const contamination = contaminationLabel(
-              listing.positions.find(
-                (position) => position.contaminationCondition || position.contaminationPct != null,
-              ),
+              listing.positions.find((position) => position.contaminationCondition),
             );
             const productFacts = [
               moisture ? { icon: Droplets, label: "Влажность", value: moisture } : null,

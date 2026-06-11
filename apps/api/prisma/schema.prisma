@@ -1300,9 +1300,6 @@ model ListingPosition {
   packaging              String?
   moistureCondition      String?
   contaminationCondition String?
-  // Влажность и засор в процентах (0–100), опциональны.
-  moisturePct            Decimal?            @db.Decimal(5, 2)
-  contaminationPct       Decimal?            @db.Decimal(5, 2)
   offerPositions         OfferPosition[]
   createdAt              DateTime            @default(now())
 

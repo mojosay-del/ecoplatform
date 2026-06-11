@@ -231,20 +231,6 @@ function totalPositionWeightKg(positions: PositionForm[]): number {
   return positions.reduce((sum, position) => sum + positionWeightKg(position), 0);
 }
 
-function moistureConditionFromPct(value: number | null): ListingMoistureCondition | "" {
-  if (value == null) return "";
-  if (value <= 5) return "dry";
-  if (value <= 20) return "slightly_wet";
-  return "wet";
-}
-
-function contaminationConditionFromPct(value: number | null): ListingContaminationCondition | "" {
-  if (value == null) return "";
-  if (value <= 0) return "clean";
-  if (value <= 5) return "may_have_inclusions";
-  return "has_inclusions";
-}
-
 export function ListingFormView({ listingId }: { listingId?: string }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -371,9 +357,8 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
             nomenclatureId: position.nomenclatureId,
             weightTons: String(position.weightKg / 1000),
             form: position.form,
-            moistureCondition: position.moistureCondition ?? moistureConditionFromPct(position.moisturePct),
-            contaminationCondition:
-              position.contaminationCondition ?? contaminationConditionFromPct(position.contaminationPct),
+            moistureCondition: position.moistureCondition ?? "",
+            contaminationCondition: position.contaminationCondition ?? "",
             packaging: parsePackaging(position.packaging),
           }))
         : [emptyPosition()],
@@ -452,8 +437,6 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
         nomenclatureId: position.nomenclatureId,
         weightKg: (Number(position.weightTons) || 0) * 1000,
         form: position.form,
-        moisturePct: null,
-        contaminationPct: null,
         moistureCondition: position.moistureCondition || null,
         contaminationCondition: position.contaminationCondition || null,
         packaging: serializePackaging(position.packaging),

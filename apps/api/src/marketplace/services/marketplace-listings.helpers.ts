@@ -158,8 +158,6 @@ export function mapToDetail(
       weightKg: Number(position.weightKg),
       form: position.form,
       packaging: position.packaging,
-      moisturePct: decimalToNumberOrNull(position.moisturePct),
-      contaminationPct: decimalToNumberOrNull(position.contaminationPct),
       moistureCondition:
         position.moistureCondition as MarketplaceListingDetail["positions"][number]["moistureCondition"],
       contaminationCondition:

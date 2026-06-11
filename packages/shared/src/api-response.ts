@@ -709,8 +709,6 @@ export type MarketplaceListingPositionDetail = {
   weightKg: number;
   form: ListingPositionForm;
   packaging: string | null;
-  moisturePct: number | null;
-  contaminationPct: number | null;
   moistureCondition: ListingMoistureCondition | null;
   contaminationCondition: ListingContaminationCondition | null;
 };

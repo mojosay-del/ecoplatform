@@ -207,6 +207,8 @@ describe("Marketplace — объявления (фаза 1)", () => {
       expect(draft.body.positions[0].packaging).toBe("Палет");
       expect(draft.body.positions[0].moistureCondition).toBe("slightly_wet");
       expect(draft.body.positions[0].contaminationCondition).toBe("may_have_inclusions");
+      expect(draft.body.positions[0]).not.toHaveProperty("moisturePct");
+      expect(draft.body.positions[0]).not.toHaveProperty("contaminationPct");
 
       const publish = await ctx.http.post(`/api/marketplace/listings/${draft.body.id}/publish`).set(bearer(token));
       expect(publish.status).toBe(201);

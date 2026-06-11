@@ -223,8 +223,6 @@ export const listingPositionInputSchema = z.object({
   // Вес позиции в кг. Минимум 100 кг — агрегатно по объявлению (проверяется в сервисе).
   weightKg: z.number().positive().max(100_000_000),
   form: z.enum(listingPositionForms).default("loose"),
-  moisturePct: z.number().min(0).max(100).nullish(),
-  contaminationPct: z.number().min(0).max(100).nullish(),
   moistureCondition: z.enum(listingMoistureConditions).nullish(),
   contaminationCondition: z.enum(listingContaminationConditions).nullish(),
   packaging: z.string().trim().max(200).nullish(),
