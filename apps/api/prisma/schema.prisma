@@ -1256,15 +1256,11 @@ model MarketplaceListing {
   // только после акцепта предложения.
   contactPhone  String
   description   String?
-  color         String?
   packaging     String?
   paymentTerms  String?
   // Типичный объём отгрузки в одну машину. Храним в кг (как weightKg позиций),
   // фронт вводит/показывает в тоннах. Опционально.
   typicalLoadKg Decimal?  @db.Decimal(12, 2)
-  // Условия погрузки: «С нашей погрузкой» / «Самовывоз» / «По договорённости».
-  // Строкой (ср. archiveReason/paymentTerms) — без enum.
-  loadingConditions String?
   // Готовность к отгрузке: «готово сейчас» либо дата в пределах 14 дней.
   readyNow      Boolean   @default(true)
   readinessDate DateTime?
@@ -1391,8 +1387,8 @@ model OfferPosition {
   offer             Offer           @relation(fields: [offerId], references: [id], onDelete: Cascade)
   listingPositionId String
   listingPosition   ListingPosition @relation(fields: [listingPositionId], references: [id], onDelete: Cascade)
-  // Цена за кг (₽). null = «не интересует» эту позицию.
-  pricePerKg        Decimal?        @db.Decimal(12, 2)
+  // Цена за тонну (₽). null = «не интересует» эту позицию.
+  pricePerTonRub    Int?
   createdAt         DateTime        @default(now())
 
   @@unique([offerId, listingPositionId])

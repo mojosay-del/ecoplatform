@@ -5,11 +5,18 @@
 // появляются кнопки «Договорились / Не договорились».
 
 import { useState } from "react";
-import type { ListingOfferItem } from "@ecoplatform/shared";
+import type { ListingOfferItem, PriceCondition } from "@ecoplatform/shared";
 import { ApiError, api } from "../../lib/api";
 import { useApiQuery } from "../shared";
-import { OfferStatusBadge, PRICE_CONDITION_LABEL, formatPrice } from "./offer-ui";
+import { OfferStatusBadge, formatPrice } from "./offer-ui";
 import { ReviewForm } from "./ReviewForm";
+
+function offerConditionText(condition: PriceCondition, city: string | null): string {
+  if (condition === "at_gate") {
+    return city ? `Доставка к покупателю: ${city}` : "Доставка к покупателю";
+  }
+  return "Покупатель забирает сырьё сам";
+}
 
 export function ListingOffersPanel({ listingId, onChanged }: { listingId: string; onChanged?: () => void }) {
   const [refresh, setRefresh] = useState(0);
@@ -45,86 +52,94 @@ export function ListingOffersPanel({ listingId, onChanged }: { listingId: string
       {state === "loading" ? <p className="mp-hint">Загрузка предложений…</p> : null}
       {state === "ready" && offers.length === 0 ? <p className="mp-hint">Пока нет предложений.</p> : null}
 
-      {offers.map((offer) => (
-        <div className="mp-offer-card" key={offer.id}>
-          <div className="mp-offer-head">
-            <OfferStatusBadge status={offer.status} />
-            <span className="mp-hint">
-              {PRICE_CONDITION_LABEL[offer.priceCondition]}
-              {offer.city ? ` · ${offer.city}` : ""}
-            </span>
+      {offers.map((offer) => {
+        const pricedPositions = offer.positions.filter((position) => position.pricePerTonRub != null);
+        return (
+          <div className="mp-offer-card" key={offer.id}>
+            <div className="mp-offer-top">
+              <div>
+                <p className="mp-offer-eyebrow">Предложение покупателя</p>
+                <h4>{offerConditionText(offer.priceCondition, offer.city)}</h4>
+              </div>
+              <OfferStatusBadge status={offer.status} />
+            </div>
+            <div className="mp-offer-price-list">
+              {pricedPositions.map((position) => (
+                <div key={position.listingPositionId}>
+                  <span>{position.nomenclatureName}</span>
+                  <strong>{formatPrice(position.pricePerTonRub)}</strong>
+                </div>
+              ))}
+            </div>
             {offer.buyerRating != null ? (
-              <span className="mp-hint">· рейтинг покупателя {offer.buyerRating.toFixed(1)} ★</span>
+              <p className="mp-hint">Рейтинг покупателя: {offer.buyerRating.toFixed(1)} из 5</p>
             ) : null}
-          </div>
-          <ul className="mp-offer-prices">
-            {offer.positions.map((position) => (
-              <li key={position.listingPositionId}>
-                {position.nomenclatureName}: {formatPrice(position.pricePerKg)}
-              </li>
-            ))}
-          </ul>
-          {offer.buyerContact ? (
-            <p className="mp-revealed">
-              Покупатель: {offer.buyerContact.companyName}, тел. {offer.buyerContact.phone}
-              {offer.buyerContact.city ? `, ${offer.buyerContact.city}` : ""}
-            </p>
-          ) : (
-            <p className="mp-hint">Покупатель скрыт до принятия предложения.</p>
-          )}
-          <div className="mp-row-actions" style={{ justifyContent: "flex-start" }}>
-            {offer.status === "active" ? (
-              <button
-                className="button"
-                disabled={busyId === offer.id}
-                onClick={() => act(offer.id, () => api.marketplace.offers.accept(offer.id))}
-                type="button"
-              >
-                Принять
-              </button>
-            ) : null}
-            {offer.status === "accepted" && offer.dealResult === null ? (
-              <>
+            {offer.buyerContact ? (
+              <div className="mp-offer-contact">
+                <span>Покупатель</span>
+                <strong>{offer.buyerContact.companyName}</strong>
+                <span>
+                  Телефон: {offer.buyerContact.phone}
+                  {offer.buyerContact.city ? ` · ${offer.buyerContact.city}` : ""}
+                </span>
+              </div>
+            ) : (
+              <p className="mp-offer-hidden">Покупатель и контакты откроются после принятия предложения.</p>
+            )}
+            <div className="mp-row-actions" style={{ justifyContent: "flex-start" }}>
+              {offer.status === "active" ? (
                 <button
                   className="button"
                   disabled={busyId === offer.id}
-                  onClick={() => act(offer.id, () => api.marketplace.offers.deal(offer.id, "agreed"))}
+                  onClick={() => act(offer.id, () => api.marketplace.offers.accept(offer.id))}
                   type="button"
                 >
-                  Договорились
+                  Принять
                 </button>
+              ) : null}
+              {offer.status === "accepted" && offer.dealResult === null ? (
+                <>
+                  <button
+                    className="button"
+                    disabled={busyId === offer.id}
+                    onClick={() => act(offer.id, () => api.marketplace.offers.deal(offer.id, "agreed"))}
+                    type="button"
+                  >
+                    Договорились
+                  </button>
+                  <button
+                    className="button secondary"
+                    disabled={busyId === offer.id}
+                    onClick={() => act(offer.id, () => api.marketplace.offers.deal(offer.id, "not_agreed"))}
+                    type="button"
+                  >
+                    Не договорились
+                  </button>
+                </>
+              ) : null}
+              {offer.canReview ? (
                 <button
-                  className="button secondary"
-                  disabled={busyId === offer.id}
-                  onClick={() => act(offer.id, () => api.marketplace.offers.deal(offer.id, "not_agreed"))}
+                  className="button"
                   type="button"
+                  onClick={() => setReviewingId(reviewingId === offer.id ? null : offer.id)}
                 >
-                  Не договорились
+                  Оставить отзыв
                 </button>
-              </>
-            ) : null}
-            {offer.canReview ? (
-              <button
-                className="button"
-                type="button"
-                onClick={() => setReviewingId(reviewingId === offer.id ? null : offer.id)}
-              >
-                Оставить отзыв
-              </button>
+              ) : null}
+            </div>
+            {reviewingId === offer.id ? (
+              <ReviewForm
+                offerId={offer.id}
+                direction="seller_to_buyer"
+                onDone={() => {
+                  setReviewingId(null);
+                  setRefresh((value) => value + 1);
+                }}
+              />
             ) : null}
           </div>
-          {reviewingId === offer.id ? (
-            <ReviewForm
-              offerId={offer.id}
-              direction="seller_to_buyer"
-              onDone={() => {
-                setReviewingId(null);
-                setRefresh((value) => value + 1);
-              }}
-            />
-          ) : null}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

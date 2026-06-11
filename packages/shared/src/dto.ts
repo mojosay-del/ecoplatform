@@ -242,17 +242,17 @@ export const createListingDtoSchema = z.object({
     .trim()
     .regex(/^\+?\d[\d\s()-]{6,30}$/, "Телефон в формате +7XXXXXXXXXX"),
   description: z.string().trim().max(2000).nullish(),
-  color: z.string().trim().max(120).nullish(),
   packaging: z.string().trim().max(200).nullish(),
   paymentTerms: z.string().trim().max(500).nullish(),
   // Типичный объём отгрузки в одну машину, в кг (фронт вводит тонны → ×1000).
   typicalLoadKg: z.number().positive().max(100000).nullish(),
-  // Условия погрузки: «С нашей погрузкой» / «Самовывоз» / «По договорённости».
-  loadingConditions: z.string().trim().max(120).nullish(),
   // Готовность: «готово сейчас» или конкретная дата (валидируется в сервисе ≤14 дней).
   readyNow: z.boolean().default(true),
   readinessDate: z.string().datetime().nullish(),
-  media: z.array(listingMediaInputSchema).max(LISTING_MAX_PHOTOS + LISTING_MAX_VIDEOS).default([]),
+  media: z
+    .array(listingMediaInputSchema)
+    .max(LISTING_MAX_PHOTOS + LISTING_MAX_VIDEOS)
+    .default([]),
 });
 
 export type CreateListingDto = z.infer<typeof createListingDtoSchema>;
@@ -264,8 +264,8 @@ export type UpdateListingDto = z.infer<typeof updateListingDtoSchema>;
 // ── Торговая площадка: предложения (фаза 3) ───────────────────────────────
 export const offerPositionInputSchema = z.object({
   listingPositionId: z.string().min(1),
-  // Цена за кг, ₽. null/опущено = «не интересует» эту позицию.
-  pricePerKg: z.number().positive().max(100_000_000).nullish(),
+  // Цена за тонну, ₽. null/опущено = «не интересует» эту позицию.
+  pricePerTonRub: z.number().int().positive().max(100_000_000).nullish(),
 });
 
 export type OfferPositionInput = z.infer<typeof offerPositionInputSchema>;

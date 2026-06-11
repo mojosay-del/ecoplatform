@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { NotificationCategory, Prisma } from "@prisma/client";
+import { NotificationCategory } from "@prisma/client";
 import {
   type CreateOfferDto,
   type DealDecisionDto,
@@ -75,14 +75,22 @@ export class MarketplaceOffersService {
     }
 
     const existing = await this.prisma.offer.findFirst({
-      where: { listingId, buyerCompanyId, status: { in: ["active", "accepted"] } },
+      where: {
+        listingId,
+        buyerCompanyId,
+        status: { in: ["active", "accepted"] },
+        positions: { some: { pricePerTonRub: { gt: 0 } } },
+      },
       select: { id: true },
     });
     if (existing) {
       throw new BadRequestException("У вас уже есть активное предложение по этому объявлению — измените его.");
     }
 
-    this.assertOfferPositions(dto, listing.positions.map((position) => position.id));
+    this.assertOfferPositions(
+      dto,
+      listing.positions.map((position) => position.id),
+    );
 
     const offer = await this.prisma.offer.create({
       data: {
@@ -115,7 +123,10 @@ export class MarketplaceOffersService {
     if (offer.status !== "active") {
       throw new BadRequestException("Изменить можно только активное предложение (до его принятия).");
     }
-    this.assertOfferPositions(dto, offer.listing.positions.map((position) => position.id));
+    this.assertOfferPositions(
+      dto,
+      offer.listing.positions.map((position) => position.id),
+    );
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.offerPosition.deleteMany({ where: { offerId } });
@@ -202,7 +213,11 @@ export class MarketplaceOffersService {
       throw new ForbiddenException("Это не ваше объявление.");
     }
     const offers = await this.prisma.offer.findMany({
-      where: { listingId, status: { in: ["active", "accepted", "declined"] } },
+      where: {
+        listingId,
+        status: { in: ["active", "accepted", "declined"] },
+        positions: { some: { pricePerTonRub: { gt: 0 } } },
+      },
       orderBy: { createdAt: "desc" },
       include: offerInclude,
     });
@@ -368,7 +383,7 @@ export class MarketplaceOffersService {
     if (!ids.every((id) => allowed.has(id))) {
       throw new BadRequestException("Позиция предложения не принадлежит этому объявлению.");
     }
-    if (!dto.positions.some((position) => position.pricePerKg != null && position.pricePerKg > 0)) {
+    if (!dto.positions.some((position) => position.pricePerTonRub != null && position.pricePerTonRub > 0)) {
       throw new BadRequestException("Укажите цену хотя бы по одной позиции.");
     }
     if (dto.priceCondition === "at_gate" && !dto.city?.trim()) {
@@ -386,6 +401,6 @@ export class MarketplaceOffersService {
 function offerPositionCreateData(dto: CreateOfferDto) {
   return dto.positions.map((position) => ({
     listingPositionId: position.listingPositionId,
-    pricePerKg: position.pricePerKg == null ? null : new Prisma.Decimal(position.pricePerKg),
+    pricePerTonRub: position.pricePerTonRub ?? null,
   }));
 }

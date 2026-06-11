@@ -34,7 +34,7 @@ function offerPositionViews(offer: OfferWithRelations): OfferPositionView[] {
     listingPositionId: position.listingPositionId,
     nomenclatureName: position.listingPosition.nomenclature.name,
     // null = «не интересует» эту позицию.
-    pricePerKg: position.pricePerKg === null ? null : Number(position.pricePerKg),
+    pricePerTonRub: position.pricePerTonRub,
   }));
 }
 

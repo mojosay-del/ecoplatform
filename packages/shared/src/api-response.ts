@@ -716,19 +716,16 @@ export type MarketplaceListingPositionDetail = {
 export type MarketplaceListingDetail = {
   id: string;
   status: ListingStatus;
-  seller: { companyId: string; name: string; type: CompanyType; rating: number | null };
+  seller: { companyId: string; name: string; type: CompanyType; rating: number | null; avatarUrl: string | null };
   city: string;
   region: string | null;
   address: CompanyAddress | null;
   contactPhone: string | null;
   description: string | null;
-  color: string | null;
   packaging: string | null;
   paymentTerms: string | null;
   // Типичный объём отгрузки в одну машину, в кг (фронт показывает в тоннах).
   typicalLoadKg: number | null;
-  // Условия погрузки: «С нашей погрузкой» / «Самовывоз» / «По договорённости».
-  loadingConditions: string | null;
   readyNow: boolean;
   readinessDate: IsoDateString | null;
   publishedAt: IsoDateString | null;
@@ -764,7 +761,7 @@ export type MyMarketplaceListingItem = {
 export type OfferPositionView = {
   listingPositionId: string;
   nomenclatureName: string;
-  pricePerKg: number | null; // null = «не интересует»
+  pricePerTonRub: number | null; // null = «не интересует»
 };
 
 // Раскрытые контакты стороны сделки — приходят только после акцепта предложения.

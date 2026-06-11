@@ -20,6 +20,6 @@ export function OfferStatusBadge({ status }: { status: OfferStatus }) {
   return <span className={`mp-badge mp-offer-${status}`}>{OFFER_STATUS_LABEL[status]}</span>;
 }
 
-export function formatPrice(pricePerKg: number | null): string {
-  return pricePerKg == null ? "не интересует" : `${pricePerKg} ₽/кг`;
+export function formatPrice(pricePerTonRub: number | null): string {
+  return pricePerTonRub == null ? "не интересует" : `${pricePerTonRub.toLocaleString("ru-RU")} ₽/т`;
 }

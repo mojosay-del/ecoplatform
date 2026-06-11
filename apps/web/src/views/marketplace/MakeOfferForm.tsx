@@ -5,10 +5,31 @@
 // «на воротах») и контактный телефон, который раскроется продавцу после акцепта.
 
 import Link from "next/link";
-import { useState } from "react";
-import type { CreateOfferDto, MarketplaceListingDetail } from "@ecoplatform/shared";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Check, ChevronDown } from "lucide-react";
+import type { CreateOfferDto, MarketplaceListingDetail, PriceCondition } from "@ecoplatform/shared";
+import { DEFAULT_PHONE_COUNTRY } from "../../components/auth/constants";
+import { PhoneInput } from "../../components/auth/phone-input";
+import type { PhoneCountryId } from "../../components/auth/types";
+import { formatPhoneFull, getPhoneCountry } from "../../components/auth/utils";
 import { ApiError, api } from "../../lib/api";
 import { formatWeight } from "./listing-ui";
+
+const PRICE_CONDITION_OPTIONS: Array<{ value: PriceCondition; label: string }> = [
+  { value: "from_place", label: "Цена с места (вывожу сам)" },
+  { value: "at_gate", label: "Цена на воротах (доставка ко мне)" },
+];
+
+function formatPricePerTonInput(value: string): string {
+  const digits = value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  return digits ? Number(digits).toLocaleString("ru-RU") : "";
+}
+
+function parsePricePerTon(value: string): number | null {
+  const digits = value.replace(/\s/g, "");
+  if (!digits) return null;
+  return /^\d+$/.test(digits) ? Number(digits) : null;
+}
 
 export function MakeOfferForm({
   listing,
@@ -17,19 +38,31 @@ export function MakeOfferForm({
   listing: MarketplaceListingDetail;
   onSubmitted: () => void;
 }) {
-  const [priceCondition, setPriceCondition] = useState<"from_place" | "at_gate">("from_place");
+  const [priceCondition, setPriceCondition] = useState<PriceCondition>("from_place");
   const [city, setCity] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState<PhoneCountryId>(DEFAULT_PHONE_COUNTRY.id as PhoneCountryId);
+  const [phoneDigits, setPhoneDigits] = useState("");
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [duplicate, setDuplicate] = useState(false);
 
+  function updatePrice(positionId: string, value: string) {
+    if (/[.,]/.test(value)) {
+      setError("Цена указывается целым числом рублей за тонну, например 12 200.");
+      return;
+    }
+    setError(null);
+    setPrices((prev) => ({ ...prev, [positionId]: formatPricePerTonInput(value) }));
+  }
+
   async function submit() {
     setError(null);
-    if (!contactPhone.trim()) {
-      setError("Укажите контактный телефон.");
+    setDuplicate(false);
+    const contactPhone = formatPhoneFull(getPhoneCountry(phoneCountry), phoneDigits);
+    if (!contactPhone) {
+      setError("Укажите контактный телефон полностью.");
       return;
     }
     if (priceCondition === "at_gate" && !city.trim()) {
@@ -38,9 +71,9 @@ export function MakeOfferForm({
     }
     const positions = listing.positions.map((position) => ({
       listingPositionId: position.id,
-      pricePerKg: prices[position.id]?.trim() ? Number(prices[position.id]) : null,
+      pricePerTonRub: parsePricePerTon(prices[position.id] ?? ""),
     }));
-    if (!positions.some((position) => position.pricePerKg != null && position.pricePerKg > 0)) {
+    if (!positions.some((position) => position.pricePerTonRub != null && position.pricePerTonRub > 0)) {
       setError("Укажите цену хотя бы по одной позиции.");
       return;
     }
@@ -50,7 +83,7 @@ export function MakeOfferForm({
       const dto: CreateOfferDto = {
         priceCondition,
         city: city.trim() || null,
-        contactPhone: contactPhone.trim(),
+        contactPhone,
         positions,
       };
       await api.marketplace.offers.create(listing.id, dto);
@@ -70,8 +103,7 @@ export function MakeOfferForm({
     return (
       <div className="mp-offer-form">
         <p className="mp-hint">
-          Предложение отправлено. Статус — в разделе{" "}
-          <Link href="/marketplace/offers">«Мои предложения»</Link>.
+          Предложение отправлено. Статус — в разделе <Link href="/marketplace/offers">«Мои предложения»</Link>.
         </p>
       </div>
     );
@@ -84,15 +116,15 @@ export function MakeOfferForm({
         {listing.positions.map((position) => (
           <div className="mp-field" key={position.id}>
             <label>
-              {position.nomenclatureName} ({formatWeight(position.weightKg)}) — ₽/кг
+              {position.nomenclatureName} ({formatWeight(position.weightKg)}) — ₽/т
             </label>
             <input
               className="mp-input"
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
               placeholder="не интересует"
               value={prices[position.id] ?? ""}
-              onChange={(event) => setPrices((prev) => ({ ...prev, [position.id]: event.target.value }))}
+              onChange={(event) => updatePrice(position.id, event.target.value)}
             />
           </div>
         ))}
@@ -100,14 +132,7 @@ export function MakeOfferForm({
       <div className="mp-grid-2">
         <div className="mp-field">
           <label>Условие цены</label>
-          <select
-            className="mp-select"
-            value={priceCondition}
-            onChange={(event) => setPriceCondition(event.target.value as "from_place" | "at_gate")}
-          >
-            <option value="from_place">Цена с места (вывожу сам)</option>
-            <option value="at_gate">Цена на воротах (доставка ко мне)</option>
-          </select>
+          <PriceConditionSelect value={priceCondition} onChange={setPriceCondition} />
         </div>
         {priceCondition === "at_gate" ? (
           <div className="mp-field">
@@ -117,11 +142,12 @@ export function MakeOfferForm({
         ) : null}
         <div className="mp-field">
           <label>Контактный телефон</label>
-          <input
-            className="mp-input"
-            value={contactPhone}
-            placeholder="+7 999 123-45-67"
-            onChange={(event) => setContactPhone(event.target.value)}
+          <PhoneInput
+            name="offerContactPhone"
+            countryId={phoneCountry}
+            digits={phoneDigits}
+            onCountryChange={setPhoneCountry}
+            onDigitsChange={setPhoneDigits}
           />
         </div>
       </div>
@@ -139,6 +165,78 @@ export function MakeOfferForm({
       <button className="button" type="button" disabled={saving} onClick={submit}>
         Отправить предложение
       </button>
+    </div>
+  );
+}
+
+function PriceConditionSelect({
+  value,
+  onChange,
+}: {
+  value: PriceCondition;
+  onChange: (value: PriceCondition) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = PRICE_CONDITION_OPTIONS.find((option) => option.value === value) ?? PRICE_CONDITION_OPTIONS[0]!;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  function choose(nextValue: PriceCondition) {
+    onChange(nextValue);
+    setOpen(false);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setOpen((prev) => !prev);
+    }
+  }
+
+  return (
+    <div className={`mp-popover-select${open ? " is-open" : ""}`} ref={rootRef}>
+      <button
+        className="mp-popover-select-trigger"
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        onKeyDown={onKeyDown}
+      >
+        <span>{selected.label}</span>
+        <ChevronDown size={18} strokeWidth={2} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className="mp-popover-select-list" role="listbox" aria-label="Условие цены">
+          {PRICE_CONDITION_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              className={`mp-popover-select-option${option.value === value ? " is-selected" : ""}`}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              onClick={() => choose(option.value)}
+            >
+              <span>{option.label}</span>
+              {option.value === value ? <Check size={16} strokeWidth={2.6} aria-hidden="true" /> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

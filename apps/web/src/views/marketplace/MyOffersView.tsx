@@ -84,8 +84,8 @@ export function MyOffersView() {
                     <span className="mp-row-sub">
                       {PRICE_CONDITION_LABEL[offer.priceCondition]} ·{" "}
                       {offer.positions
-                        .filter((position) => position.pricePerKg != null)
-                        .map((position) => `${position.nomenclatureName} ${formatPrice(position.pricePerKg)}`)
+                        .filter((position) => position.pricePerTonRub != null)
+                        .map((position) => `${position.nomenclatureName} ${formatPrice(position.pricePerTonRub)}`)
                         .join(", ")}
                     </span>
                     {offer.sellerContact ? (

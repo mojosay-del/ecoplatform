@@ -48,7 +48,6 @@ function listingPayload(nomenclatureId: string, photoIds: string[], overrides: R
     address: { city: "Москва", region: "Москва" },
     contactPhone: "+79991234567",
     typicalLoadKg: 20000,
-    loadingConditions: "С нашей погрузкой",
     readyNow: true,
     media: photoIds.map((fileId) => ({ fileId, kind: "photo" })),
     ...overrides,
@@ -95,7 +94,7 @@ function offerPayload(listingPositionId: string, overrides: Record<string, unkno
   return {
     priceCondition: "from_place",
     contactPhone: "+79995554433",
-    positions: [{ listingPositionId, pricePerKg: 12.5 }],
+    positions: [{ listingPositionId, pricePerTonRub: 12_500 }],
     ...overrides,
   };
 }
@@ -215,7 +214,7 @@ describe("Marketplace — объявления (фаза 1)", () => {
     });
   });
 
-  it("categorySlug в ленте + объём в машину и условия погрузки в детали (UI-батч)", async () => {
+  it("categorySlug в ленте + объём в машину в детали (UI-батч)", async () => {
     await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
       const seller = await registerCompany("0009110");
       const nomenclatureId = await seedNomenclature();
@@ -224,7 +223,6 @@ describe("Marketplace — объявления (фаза 1)", () => {
       const detail = await ctx.http.get(`/api/marketplace/listings/${listingId}`).set(bearer(seller.token));
       expect(detail.status).toBe(200);
       expect(detail.body.typicalLoadKg).toBe(20000);
-      expect(detail.body.loadingConditions).toBe("С нашей погрузкой");
       expect(detail.body.positions[0].categorySlug).toBe("makulatura");
 
       const feed = await ctx.http.get("/api/marketplace/listings").set(bearer(seller.token));
@@ -426,6 +424,7 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
         .send(offerPayload(positionId));
       expect(offer.status).toBe(201);
       expect(offer.body.status).toBe("active");
+      expect(offer.body.positions[0].pricePerTonRub).toBe(12_500);
       // До акцепта контакты продавца скрыты от покупателя.
       expect(offer.body.sellerContact).toBeNull();
 
@@ -522,14 +521,23 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
       const buyer2 = await registerProcessor("0009204");
 
       const offer1 = (
-        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyer1)).send(offerPayload(positionId))
+        await ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyer1))
+          .send(offerPayload(positionId))
       ).body;
       const offer2 = (
-        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyer2)).send(offerPayload(positionId))
+        await ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyer2))
+          .send(offerPayload(positionId))
       ).body;
 
       await ctx.http.post(`/api/marketplace/offers/${offer1.id}/accept`).set(bearer(sellerToken));
-      await ctx.http.post(`/api/marketplace/offers/${offer1.id}/deal`).set(bearer(sellerToken)).send({ result: "agreed" });
+      await ctx.http
+        .post(`/api/marketplace/offers/${offer1.id}/deal`)
+        .set(bearer(sellerToken))
+        .send({ result: "agreed" });
 
       const loser = await ctx.prisma.offer.findUnique({ where: { id: offer2.id } });
       expect(loser?.status).toBe("declined");
@@ -543,7 +551,10 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
       const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
       const buyerA = await registerTrader("0009205");
       const offerA = (
-        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyerA)).send(offerPayload(positionId))
+        await ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyerA))
+          .send(offerPayload(positionId))
       ).body;
 
       const buyerB = await registerTrader("0009215");
@@ -572,7 +583,7 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
       const noPrice = await ctx.http
         .post(`/api/marketplace/listings/${listingId}/offers`)
         .set(bearer(buyerToken))
-        .send(offerPayload(positionId, { positions: [{ listingPositionId: positionId, pricePerKg: null }] }));
+        .send(offerPayload(positionId, { positions: [{ listingPositionId: positionId, pricePerTonRub: null }] }));
       expect(noPrice.status).toBe(400);
     });
   });
@@ -584,10 +595,16 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
       const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
       const buyerToken = await registerTrader("0009207");
       const offer = (
-        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyerToken)).send(offerPayload(positionId))
+        await ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyerToken))
+          .send(offerPayload(positionId))
       ).body;
       await ctx.http.post(`/api/marketplace/offers/${offer.id}/accept`).set(bearer(sellerToken));
-      await ctx.prisma.offer.update({ where: { id: offer.id }, data: { decisionDeadline: new Date(Date.now() - 1000) } });
+      await ctx.prisma.offer.update({
+        where: { id: offer.id },
+        data: { decisionDeadline: new Date(Date.now() - 1000) },
+      });
 
       const resolved = await ctx.app.get(MarketplaceOffersService).autoResolveExpiredAcceptances();
       expect(resolved).toBeGreaterThanOrEqual(1);
@@ -630,7 +647,10 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
   it("обе стороны оценивают друг друга по своим критериям", async () => {
     await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
       const deal = await agreedDeal("0009302", "0009302");
-      await ctx.http.post(`/api/marketplace/offers/${deal.offerId}/reviews`).set(bearer(deal.buyerToken)).send({ scores: buyerScores(5) });
+      await ctx.http
+        .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+        .set(bearer(deal.buyerToken))
+        .send({ scores: buyerScores(5) });
 
       const sellerReview = await ctx.http
         .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
@@ -675,7 +695,10 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
       const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
       const buyerToken = await registerTrader("0009304");
       const offer = (
-        await ctx.http.post(`/api/marketplace/listings/${listingId}/offers`).set(bearer(buyerToken)).send(offerPayload(positionId))
+        await ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyerToken))
+          .send(offerPayload(positionId))
       ).body;
 
       const review = await ctx.http
@@ -690,7 +713,10 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
     await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
       const deal = await agreedDeal("0009305", "0009305");
       const review = (
-        await ctx.http.post(`/api/marketplace/offers/${deal.offerId}/reviews`).set(bearer(deal.buyerToken)).send({ scores: buyerScores(4) })
+        await ctx.http
+          .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+          .set(bearer(deal.buyerToken))
+          .send({ scores: buyerScores(4) })
       ).body;
 
       const authorResponse = await ctx.http
@@ -718,7 +744,10 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
     await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
       const deal = await agreedDeal("0009306", "0009306");
       const review = (
-        await ctx.http.post(`/api/marketplace/offers/${deal.offerId}/reviews`).set(bearer(deal.buyerToken)).send({ scores: buyerScores(5) })
+        await ctx.http
+          .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+          .set(bearer(deal.buyerToken))
+          .send({ scores: buyerScores(5) })
       ).body;
 
       const del = await ctx.http.delete(`/api/marketplace/reviews/${review.id}`).set(bearer(deal.buyerToken));
@@ -739,7 +768,10 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
       const before = await ctx.http.get("/api/marketplace/my/offers").set(bearer(deal.buyerToken));
       expect(before.body.items[0].canReview).toBe(true);
 
-      await ctx.http.post(`/api/marketplace/offers/${deal.offerId}/reviews`).set(bearer(deal.buyerToken)).send({ scores: buyerScores(5) });
+      await ctx.http
+        .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+        .set(bearer(deal.buyerToken))
+        .send({ scores: buyerScores(5) });
 
       const after = await ctx.http.get("/api/marketplace/my/offers").set(bearer(deal.buyerToken));
       expect(after.body.items[0].canReview).toBe(false);

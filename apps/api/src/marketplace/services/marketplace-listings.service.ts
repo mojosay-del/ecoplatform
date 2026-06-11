@@ -164,7 +164,7 @@ export class MarketplaceListingsService {
       throw new NotFoundException("Объявление не найдено.");
     }
 
-    return mapToDetail(listing, { canSeeContacts: isOwner || isAdmin, isOwner });
+    return this.mapDetail(listing, { canSeeContacts: isOwner || isAdmin, isOwner });
   }
 
   // Справочник активной номенклатуры для селектов в форме объявления.
@@ -223,11 +223,9 @@ export class MarketplaceListingsService {
           circleLon: geo.circleLon,
           contactPhone: dto.contactPhone.trim(),
           description: optionalText(dto.description),
-          color: optionalText(dto.color),
           packaging: optionalText(dto.packaging),
           paymentTerms: optionalText(dto.paymentTerms),
           typicalLoadKg: dto.typicalLoadKg ?? null,
-          loadingConditions: optionalText(dto.loadingConditions),
           readyNow: dto.readyNow,
           readinessDate: dto.readinessDate ? new Date(dto.readinessDate) : null,
           positions: { create: positionCreateData(dto.positions) },
@@ -242,7 +240,7 @@ export class MarketplaceListingsService {
       listing.id,
       dto.media.map((item) => item.fileId),
     );
-    return mapToDetail(listing, { canSeeContacts: true, isOwner: true });
+    return this.mapDetail(listing, { canSeeContacts: true, isOwner: true });
   }
 
   async update(user: RequestUser, id: string, dto: UpdateListingDto): Promise<MarketplaceListingDetail> {
@@ -282,11 +280,9 @@ export class MarketplaceListingsService {
         data: {
           contactPhone: dto.contactPhone?.trim(),
           description: patchOptionalText(dto.description),
-          color: patchOptionalText(dto.color),
           packaging: patchOptionalText(dto.packaging),
           paymentTerms: patchOptionalText(dto.paymentTerms),
           typicalLoadKg: dto.typicalLoadKg === undefined ? undefined : (dto.typicalLoadKg ?? null),
-          loadingConditions: patchOptionalText(dto.loadingConditions),
           readyNow: dto.readyNow,
           readinessDate:
             dto.readinessDate === undefined ? undefined : dto.readinessDate ? new Date(dto.readinessDate) : null,
@@ -304,7 +300,7 @@ export class MarketplaceListingsService {
         dto.media.map((item) => item.fileId),
       );
     }
-    return mapToDetail(updated, { canSeeContacts: true, isOwner: true });
+    return this.mapDetail(updated, { canSeeContacts: true, isOwner: true });
   }
 
   async publish(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {
@@ -312,7 +308,7 @@ export class MarketplaceListingsService {
     await this.moduleAccess.assertModuleAccess(user.id, "marketplace");
     const listing = await this.findOwnedOr404(companyId, id);
     if (listing.status === "active") {
-      return mapToDetail(listing, { canSeeContacts: true, isOwner: true });
+      return this.mapDetail(listing, { canSeeContacts: true, isOwner: true });
     }
     if (listing.status === "archived") {
       throw new BadRequestException("Архивное объявление нельзя опубликовать — используйте переподачу.");
@@ -339,14 +335,14 @@ export class MarketplaceListingsService {
       },
       include: listingInclude,
     });
-    return mapToDetail(updated, { canSeeContacts: true, isOwner: true });
+    return this.mapDetail(updated, { canSeeContacts: true, isOwner: true });
   }
 
   async archive(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {
     const companyId = this.assertSeller(user);
     const listing = await this.findOwnedOr404(companyId, id);
     if (listing.status === "archived") {
-      return mapToDetail(listing, { canSeeContacts: true, isOwner: true });
+      return this.mapDetail(listing, { canSeeContacts: true, isOwner: true });
     }
 
     const now = new Date();
@@ -363,7 +359,7 @@ export class MarketplaceListingsService {
       });
       return result;
     });
-    return mapToDetail(updated, { canSeeContacts: true, isOwner: true });
+    return this.mapDetail(updated, { canSeeContacts: true, isOwner: true });
   }
 
   async republish(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {
@@ -411,9 +407,9 @@ export class MarketplaceListingsService {
           circleLon: circle ? new Prisma.Decimal(circle.lon) : null,
           contactPhone: source.contactPhone,
           description: source.description,
-          color: source.color,
           packaging: source.packaging,
           paymentTerms: source.paymentTerms,
+          typicalLoadKg: source.typicalLoadKg,
           readyNow: source.readyNow,
           readinessDate: source.readinessDate,
           positions: {
@@ -439,7 +435,7 @@ export class MarketplaceListingsService {
       created.id,
       created.media.map((item) => item.fileId),
     );
-    return mapToDetail(created, { canSeeContacts: true, isOwner: true });
+    return this.mapDetail(created, { canSeeContacts: true, isOwner: true });
   }
 
   // Cron: переводит истёкшие активные объявления в архив и закрывает их активные
@@ -471,6 +467,17 @@ export class MarketplaceListingsService {
   }
 
   // ── Валидация ─────────────────────────────────────────────────────────────
+
+  private async mapDetail(
+    listing: ListingWithRelations,
+    options: { canSeeContacts: boolean; isOwner: boolean },
+  ): Promise<MarketplaceListingDetail> {
+    const sellerUser = await this.prisma.user.findUnique({
+      where: { id: listing.createdById },
+      select: { gender: true },
+    });
+    return mapToDetail(listing, { ...options, sellerGender: sellerUser?.gender ?? null });
+  }
 
   private assertPublishable(listing: ListingWithRelations) {
     const totalWeight = listing.positions.reduce((sum, position) => sum + Number(position.weightKg), 0);

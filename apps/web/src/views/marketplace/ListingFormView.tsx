@@ -2,8 +2,8 @@
 
 // Форма создания/редактирования объявления: позиции (сырьё/вес в тоннах/форма/
 // влажность/засор), адрес с подсказками Яндекса, телефон (как в регистрации),
-// упаковка (мультивыбор), объём в машину, условия погрузки, медиа. Сохранение —
-// черновик; «Опубликовать» сохраняет и публикует (бэк проверит 4–10 фото, ≥100 кг).
+// упаковка (мультивыбор), объём в машину и медиа. Сохранение — черновик;
+// «Опубликовать» сохраняет и публикует (бэк проверит 4–10 фото, ≥100 кг).
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -31,7 +31,6 @@ import { loadYmaps, YANDEX_KEY, type YmapsGeoResult } from "./yandex-loader";
 
 const PACKAGING_OPTIONS = ["Без упаковки", "Палет", "Проложки", "Обмотка"] as const;
 const NO_PACKAGING = "Без упаковки";
-const LOADING_OPTIONS = ["С нашей погрузкой", "Самовывоз", "По договорённости"] as const;
 const ADDRESS_SEARCH_ID = "mp-address-search";
 
 type PositionForm = {
@@ -62,10 +61,11 @@ function parsePhone(full: string): { countryId: PhoneCountryId; digits: string }
 }
 
 function parsePackaging(value: string | null): string[] {
+  const allowed = new Set<string>(PACKAGING_OPTIONS);
   const parts = (value ?? "")
     .split(",")
     .map((part) => part.trim())
-    .filter(Boolean);
+    .filter((part) => part && part !== "Тюки" && allowed.has(part));
   return parts.length > 0 ? parts : [NO_PACKAGING];
 }
 
@@ -92,11 +92,9 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
   const [readyNow, setReadyNow] = useState(true);
   const [readinessDate, setReadinessDate] = useState("");
   const [description, setDescription] = useState("");
-  const [color, setColor] = useState("");
   const [packaging, setPackaging] = useState<string[]>([NO_PACKAGING]);
   const [paymentTerms, setPaymentTerms] = useState("");
   const [typicalLoadTons, setTypicalLoadTons] = useState("");
-  const [loadingConditions, setLoadingConditions] = useState<string>(LOADING_OPTIONS[0]);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [prefilled, setPrefilled] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -175,11 +173,9 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
     setReadyNow(existing.readyNow);
     setReadinessDate(existing.readinessDate ? existing.readinessDate.slice(0, 10) : "");
     setDescription(existing.description ?? "");
-    setColor(existing.color ?? "");
     setPackaging(parsePackaging(existing.packaging));
     setPaymentTerms(existing.paymentTerms ?? "");
     setTypicalLoadTons(existing.typicalLoadKg == null ? "" : String(existing.typicalLoadKg / 1000));
-    setLoadingConditions(existing.loadingConditions ?? LOADING_OPTIONS[0]);
     setMedia(existing.media.map((item) => ({ fileId: item.fileId, kind: item.kind === "video" ? "video" : "photo" })));
     setPrefilled(true);
   }, [existing, prefilled]);
@@ -228,11 +224,9 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
       },
       contactPhone: formatPhoneFull(getPhoneCountry(phoneCountry), phoneDigits),
       description: description.trim() || null,
-      color: color.trim() || null,
       packaging: packaging.join(", ") || null,
       paymentTerms: paymentTerms.trim() || null,
       typicalLoadKg: typicalLoadTons.trim() === "" ? null : (Number(typicalLoadTons) || 0) * 1000,
-      loadingConditions: loadingConditions || null,
       readyNow,
       readinessDate: readyNow ? null : readinessDate ? new Date(readinessDate).toISOString() : null,
       media,
@@ -357,7 +351,11 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
                 </div>
               </div>
             ))}
-            <button className="button secondary" type="button" onClick={() => setPositions((prev) => [...prev, emptyPosition()])}>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => setPositions((prev) => [...prev, emptyPosition()])}
+            >
               + позиция
             </button>
           </div>
@@ -379,7 +377,9 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
                   placeholder="Начните вводить адрес и выберите вариант…"
                   autoComplete="off"
                 />
-                <p className="mp-hint">Выберите подсказку — поля ниже заполнятся автоматически. Можно править вручную.</p>
+                <p className="mp-hint">
+                  Выберите подсказку — поля ниже заполнятся автоматически. Можно править вручную.
+                </p>
               </div>
             ) : null}
             <div className="mp-grid-2">
@@ -449,12 +449,12 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
             </div>
             <div className="mp-grid-2">
               <div className="mp-field">
-                <label>Цвет / сорт</label>
-                <input className="mp-input" value={color} onChange={(event) => setColor(event.target.value)} />
-              </div>
-              <div className="mp-field">
                 <label>Условия оплаты</label>
-                <input className="mp-input" value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} />
+                <input
+                  className="mp-input"
+                  value={paymentTerms}
+                  onChange={(event) => setPaymentTerms(event.target.value)}
+                />
               </div>
               <div className="mp-field">
                 <label>Обычно гружу в машину, т</label>
@@ -466,20 +466,6 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
                   value={typicalLoadTons}
                   onChange={(event) => setTypicalLoadTons(event.target.value)}
                 />
-              </div>
-              <div className="mp-field">
-                <label>Условия погрузки</label>
-                <select
-                  className="mp-select"
-                  value={loadingConditions}
-                  onChange={(event) => setLoadingConditions(event.target.value)}
-                >
-                  {LOADING_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
             <div className="mp-field">
@@ -553,11 +539,7 @@ function MediaUploader({ media, onChange }: { media: MediaItem[]; onChange: (med
           const url = item.kind === "video" ? preferredFileAssetMediaUrl(asset) : preferredFileAssetImageUrl(asset);
           return (
             <div className="mp-media-tile" key={item.fileId}>
-              {item.kind === "video" ? (
-                url ? <video src={url} muted /> : null
-              ) : url ? (
-                <img src={url} alt="" />
-              ) : null}
+              {item.kind === "video" ? url ? <video src={url} muted /> : null : url ? <img src={url} alt="" /> : null}
               <button
                 className="mp-media-remove"
                 type="button"
@@ -571,7 +553,13 @@ function MediaUploader({ media, onChange }: { media: MediaItem[]; onChange: (med
         })}
         {photos < LISTING_MAX_PHOTOS ? (
           <label className="mp-media-add">
-            <input type="file" accept="image/*" multiple hidden onChange={(event) => addFiles(event.target.files, "photo")} />
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(event) => addFiles(event.target.files, "photo")}
+            />
             <span>+ фото</span>
           </label>
         ) : null}
@@ -583,7 +571,8 @@ function MediaUploader({ media, onChange }: { media: MediaItem[]; onChange: (med
         ) : null}
       </div>
       <p className="mp-hint">
-        Фото: {photos}/{LISTING_MAX_PHOTOS} (минимум {LISTING_MIN_PHOTOS} для публикации). Видео: {videos}/{LISTING_MAX_VIDEOS}.
+        Фото: {photos}/{LISTING_MAX_PHOTOS} (минимум {LISTING_MIN_PHOTOS} для публикации). Видео: {videos}/
+        {LISTING_MAX_VIDEOS}.
       </p>
       {uploading ? <p className="mp-hint">Загрузка файла…</p> : null}
       {error ? <p className="mp-error">{error}</p> : null}

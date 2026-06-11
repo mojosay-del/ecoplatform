@@ -38,7 +38,7 @@ export function formatWeight(kg: number): string {
 }
 
 export function formatLocation(city: string, region: string | null): string {
-  return region && region !== city ? `${city}, ${region}` : city;
+  return region && region !== city ? `${region}, ${city}` : city;
 }
 
 export function positionsSummaryText(positions: MarketplaceListingPositionSummary[]): string {

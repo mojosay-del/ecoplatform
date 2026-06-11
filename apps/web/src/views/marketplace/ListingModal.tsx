@@ -2,21 +2,34 @@
 
 // Просмотр объявления — модальное окно (по макету владельца, в стиле Ecoplatform):
 // шапка с продавцом/рейтингом/городом, галерея, характеристики, «О товаре» и
-// колонка действий (предложение покупателя / действия владельца). Открывается из
+// колонка действий для покупателя. Открывается из
 // ленты по клику на карточку или круг/булавку карты; та же модалка — за deep-link
 // /marketplace/[id]. Цену продавец не ставит (закрытый аукцион), мини-карты нет.
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BadgeCheck, MapPin, Package, Recycle, Scale, Star, Truck, X } from "lucide-react";
+import {
+  CalendarDays,
+  CreditCard,
+  Droplets,
+  Filter,
+  Layers,
+  MapPin,
+  Package,
+  Scale,
+  Star,
+  Truck,
+  Weight,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import type { MarketplaceListingDetail } from "@ecoplatform/shared";
-import { ApiError, api, preferredFileAssetImageUrl, preferredFileAssetMediaUrl } from "../../lib/api";
+import { api, preferredFileAssetImageUrl, preferredFileAssetMediaUrl } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useApiQuery } from "../shared";
 import { CompanyReviews } from "./CompanyReviews";
 import { ListingOffersPanel } from "./ListingOffersPanel";
-import { LISTING_FORM_LABEL, ListingStatusBadge, formatWeight } from "./listing-ui";
+import { LISTING_FORM_LABEL, ListingStatusBadge, formatLocation, formatWeight } from "./listing-ui";
 import { MakeOfferForm } from "./MakeOfferForm";
 import { ReportControl } from "./ReportControl";
 
@@ -39,7 +52,6 @@ function tons(kg: number | null): string {
 export function ListingModal({
   listingId,
   onClose,
-  onChanged,
 }: {
   listingId: string;
   onClose: () => void;
@@ -47,13 +59,11 @@ export function ListingModal({
 }) {
   const { user } = useAuth();
   const [refresh, setRefresh] = useState(0);
-  const { data, setData, state, errorMessage } = useApiQuery(
+  const { data, state, errorMessage } = useApiQuery(
     `marketplace-listing-${listingId}-${refresh}`,
     () => api.marketplace.get(listingId),
     null as MarketplaceListingDetail | null,
   );
-  const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [activePhoto, setActivePhoto] = useState(0);
 
   const assets = useFileAssetsByIds((data?.media ?? []).map((item) => item.fileId));
@@ -65,19 +75,6 @@ export function ListingModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  async function runAction(action: () => Promise<MarketplaceListingDetail>) {
-    setBusy(true);
-    setActionError(null);
-    try {
-      setData(await action());
-      onChanged?.();
-    } catch (error) {
-      setActionError(error instanceof ApiError ? error.message : "Не удалось выполнить действие.");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   const isBuyer = user?.company?.type === "trader" || user?.company?.type === "processor";
 
@@ -99,33 +96,44 @@ export function ListingModal({
             const videos = listing.media.filter((item) => item.kind === "video");
             const activeUrl = preferredFileAssetImageUrl(assets.get(photos[activePhoto]?.fileId ?? ""));
             const totalWeight = listing.positions.reduce((sum, position) => sum + position.weightKg, 0);
-            const forms = [...new Set(listing.positions.map((position) => LISTING_FORM_LABEL[position.form] ?? position.form))].join(", ");
-            const firstMoisture = listing.positions.find((position) => position.moisturePct != null)?.moisturePct ?? null;
-            const firstContamination = listing.positions.find((position) => position.contaminationPct != null)?.contaminationPct ?? null;
-            const location =
-              listing.region && listing.region !== listing.city ? `${listing.city}, ${listing.region}` : listing.city;
+            const forms = [
+              ...new Set(listing.positions.map((position) => LISTING_FORM_LABEL[position.form] ?? position.form)),
+            ].join(", ");
+            const firstMoisture =
+              listing.positions.find((position) => position.moisturePct != null)?.moisturePct ?? null;
+            const firstContamination =
+              listing.positions.find((position) => position.contaminationPct != null)?.contaminationPct ?? null;
+            const productFacts = [
+              firstMoisture != null ? { icon: Droplets, label: "Влажность", value: `до ${firstMoisture}%` } : null,
+              firstContamination != null ? { icon: Filter, label: "Засор", value: `до ${firstContamination}%` } : null,
+              listing.paymentTerms ? { icon: CreditCard, label: "Оплата", value: listing.paymentTerms } : null,
+              listing.typicalLoadKg != null
+                ? { icon: Weight, label: "Обычно гружу в машину", value: tons(listing.typicalLoadKg) }
+                : null,
+            ].filter((item): item is { icon: LucideIcon; label: string; value: string } => Boolean(item));
 
             return (
               <>
                 <div className="mp-modal-header">
                   <div className="mp-modal-seller">
-                    <span className="mp-modal-avatar">
-                      <Recycle size={22} aria-hidden="true" />
+                    <span className={`mp-modal-avatar${listing.seller.avatarUrl ? " has-image" : ""}`}>
+                      {listing.seller.avatarUrl ? (
+                        <img src={listing.seller.avatarUrl} alt="" />
+                      ) : (
+                        listing.seller.name.slice(0, 1)
+                      )}
                     </span>
                     <div>
-                      <div className="mp-modal-seller-name">
-                        {listing.seller.name}
-                        <BadgeCheck className="mp-modal-verified" size={16} aria-label="Зарегистрированная компания" />
-                      </div>
+                      <div className="mp-modal-seller-name">{listing.seller.name}</div>
                       <div className="mp-modal-seller-meta">
-                        <MapPin size={13} aria-hidden="true" /> {location}
+                        <span>
+                          <MapPin size={13} aria-hidden="true" /> {formatLocation(listing.city, listing.region)}
+                        </span>
                         {listing.seller.rating != null ? (
                           <span className="mp-modal-rating">
                             <Star size={13} aria-hidden="true" /> {listing.seller.rating.toFixed(1)}
                           </span>
-                        ) : (
-                          <span className="mp-modal-rating mp-modal-rating-empty">Нет отзывов</span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -163,45 +171,58 @@ export function ListingModal({
                     <h2 className="mp-modal-title">
                       {listing.positions.map((position) => position.nomenclatureName).join(", ") || "Объявление"}
                     </h2>
-                    <div className="mp-modal-pills">
-                      {listing.positions.map((position) => (
-                        <span className="mp-modal-pill" key={position.id}>
-                          {position.nomenclatureName} · {formatWeight(position.weightKg)}
-                        </span>
-                      ))}
+                    <div className="mp-modal-fact-columns">
+                      <dl className="mp-fact-stack">
+                        <div>
+                          <Scale size={15} aria-hidden="true" />
+                          <dt>В наличии сырья</dt>
+                          <dd>{formatWeight(totalWeight)}</dd>
+                        </div>
+                        <div>
+                          <Truck size={15} aria-hidden="true" />
+                          <dt>Готовность к отгрузке</dt>
+                          <dd>
+                            {listing.readyNow ? "Готово сейчас" : formatDateTime(listing.readinessDate).split(",")[0]}
+                          </dd>
+                        </div>
+                        <div>
+                          <Package size={15} aria-hidden="true" />
+                          <dt>Форма поставки</dt>
+                          <dd>{forms || "—"}</dd>
+                        </div>
+                        {listing.packaging ? (
+                          <div>
+                            <Layers size={15} aria-hidden="true" />
+                            <dt>Упаковка</dt>
+                            <dd>{listing.packaging}</dd>
+                          </div>
+                        ) : null}
+                        <div>
+                          <CalendarDays size={15} aria-hidden="true" />
+                          <dt>Размещено</dt>
+                          <dd>{formatDateTime(listing.publishedAt)}</dd>
+                        </div>
+                      </dl>
+                      {productFacts.length > 0 ? (
+                        <dl className="mp-modal-spec-grid">
+                          {productFacts.map((item) => (
+                            <div key={item.label}>
+                              <item.icon size={15} aria-hidden="true" />
+                              <dt>{item.label}</dt>
+                              <dd>{item.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      ) : null}
                     </div>
-                    <dl className="mp-fact-grid">
-                      <div>
-                        <Scale size={15} aria-hidden="true" />
-                        <dt>Доступно сейчас</dt>
-                        <dd>{formatWeight(totalWeight)}</dd>
-                      </div>
-                      {listing.typicalLoadKg != null ? (
-                        <div>
-                          <Truck size={15} aria-hidden="true" />
-                          <dt>Обычно гружу в машину</dt>
-                          <dd>{tons(listing.typicalLoadKg)}</dd>
-                        </div>
-                      ) : null}
-                      <div>
-                        <Package size={15} aria-hidden="true" />
-                        <dt>Форма поставки</dt>
-                        <dd>{forms || "—"}</dd>
-                      </div>
-                      {listing.loadingConditions ? (
-                        <div>
-                          <Truck size={15} aria-hidden="true" />
-                          <dt>Условия погрузки</dt>
-                          <dd>{listing.loadingConditions}</dd>
-                        </div>
-                      ) : null}
-                      <div>
-                        <MapPin size={15} aria-hidden="true" />
-                        <dt>Готовность</dt>
-                        <dd>{listing.readyNow ? "Готово сейчас" : formatDateTime(listing.readinessDate).split(",")[0]}</dd>
-                      </div>
-                    </dl>
-                    <p className="mp-modal-meta">Размещено {formatDateTime(listing.publishedAt)}</p>
+                    <div className="mp-modal-about-inline">
+                      <h3>О товаре</h3>
+                      {listing.description ? (
+                        <p>{listing.description}</p>
+                      ) : (
+                        <p className="mp-hint">Описание не указано.</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -214,125 +235,45 @@ export function ListingModal({
                   </div>
                 ) : null}
 
-                <div className="mp-modal-columns">
-                  <div className="mp-modal-about">
-                    <h3>О товаре</h3>
-                    {listing.description ? <p>{listing.description}</p> : null}
-                    <ul className="mp-spec-list">
-                      {listing.color ? (
-                        <li>
-                          <span>Цвет / сорт</span>
-                          <span>{listing.color}</span>
-                        </li>
-                      ) : null}
-                      {firstMoisture != null ? (
-                        <li>
-                          <span>Влажность</span>
-                          <span>до {firstMoisture}%</span>
-                        </li>
-                      ) : null}
-                      {firstContamination != null ? (
-                        <li>
-                          <span>Засор</span>
-                          <span>до {firstContamination}%</span>
-                        </li>
-                      ) : null}
-                      {listing.packaging ? (
-                        <li>
-                          <span>Упаковка</span>
-                          <span>{listing.packaging}</span>
-                        </li>
-                      ) : null}
-                      {listing.paymentTerms ? (
-                        <li>
-                          <span>Оплата</span>
-                          <span>{listing.paymentTerms}</span>
-                        </li>
-                      ) : null}
-                    </ul>
-                    {listing.contactPhone ? (
-                      <div className="mp-modal-contacts">
-                        <strong>Контакты продавца</strong>
-                        <p>Телефон: {listing.contactPhone}</p>
-                        {listing.address?.formatted ? <p>Адрес: {listing.address.formatted}</p> : null}
-                      </div>
-                    ) : (
-                      <p className="mp-hint">Точный адрес и телефон раскрываются после принятия предложения.</p>
-                    )}
-                  </div>
-
-                  <div className="mp-modal-action">
-                    {listing.isOwner ? (
-                      <div className="mp-owner-panel">
-                        <h3>Управление</h3>
-                        <div className="mp-row-actions" style={{ justifyContent: "flex-start" }}>
-                          {listing.status !== "archived" ? (
-                            <Link className="button secondary" href={`/marketplace/${listing.id}/edit`}>
-                              Редактировать
-                            </Link>
-                          ) : null}
-                          {listing.status === "draft" ? (
-                            <button
-                              className="button"
-                              type="button"
-                              disabled={busy}
-                              onClick={() => runAction(() => api.marketplace.publish(listing.id))}
-                            >
-                              Опубликовать
-                            </button>
-                          ) : null}
-                          {listing.status !== "archived" ? (
-                            <button
-                              className="button secondary"
-                              type="button"
-                              disabled={busy}
-                              onClick={() => runAction(() => api.marketplace.archive(listing.id))}
-                            >
-                              Снять
-                            </button>
-                          ) : (
-                            <button
-                              className="button"
-                              type="button"
-                              disabled={busy}
-                              onClick={() => runAction(() => api.marketplace.republish(listing.id))}
-                            >
-                              Переподать
-                            </button>
-                          )}
-                        </div>
-                        {actionError ? <p className="mp-error">{actionError}</p> : null}
-                      </div>
-                    ) : isBuyer && listing.status === "active" ? (
-                      <>
-                        <MakeOfferForm listing={listing} onSubmitted={() => setRefresh((value) => value + 1)} />
-                        <p className="mp-modal-reveal">
-                          После отправки предложения ваш телефон станет доступен заготовителю только после его согласия.
+                {!listing.isOwner ? (
+                  <div className="mp-modal-columns">
+                    <div className="mp-modal-action">
+                      {isBuyer && listing.status === "active" ? (
+                        <>
+                          <MakeOfferForm listing={listing} onSubmitted={() => setRefresh((value) => value + 1)} />
+                          <p className="mp-modal-reveal">
+                            После отправки предложения ваш телефон станет доступен заготовителю только после его
+                            согласия.
+                          </p>
+                        </>
+                      ) : (
+                        <p className="mp-hint">
+                          {listing.status === "active"
+                            ? "Предложения отправляют покупатели — трейдеры и переработчики."
+                            : "Объявление сейчас неактивно."}
                         </p>
-                      </>
-                    ) : (
-                      <p className="mp-hint">
-                        {listing.status === "active"
-                          ? "Предложения отправляют покупатели — трейдеры и переработчики."
-                          : "Объявление сейчас неактивно."}
-                      </p>
-                    )}
+                      )}
 
-                    {!listing.isOwner && listing.status === "active" ? (
-                      <ReportControl entityType="marketplace_listing" entityId={listing.id} label="Пожаловаться на объявление" />
-                    ) : null}
+                      {listing.status === "active" ? (
+                        <ReportControl
+                          entityType="marketplace_listing"
+                          entityId={listing.id}
+                          label="Пожаловаться на объявление"
+                        />
+                      ) : null}
+                    </div>
+
+                    <aside className="mp-modal-reviews" aria-label="Рейтинг и отзывы продавца">
+                      <CompanyReviews companyId={listing.seller.companyId} />
+                    </aside>
                   </div>
-                </div>
+                ) : null}
 
                 {listing.isOwner ? (
                   <div className="mp-modal-section">
                     <ListingOffersPanel listingId={listing.id} onChanged={() => setRefresh((value) => value + 1)} />
                   </div>
                 ) : null}
-
-                <div className="mp-modal-section">
-                  <CompanyReviews companyId={listing.seller.companyId} />
-                </div>
               </>
             );
           })()
