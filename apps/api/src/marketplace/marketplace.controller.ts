@@ -12,9 +12,9 @@ import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
+import { AddressGeocoderService } from "../geo/address-geocoder.service";
 import { MarketplaceFeatureGuard } from "./marketplace-feature.guard";
 import { marketplaceListQuerySchema } from "./marketplace.schemas";
-import { MarketplaceGeocoderService } from "./services/marketplace-geocoder.service";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
 import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
@@ -34,7 +34,7 @@ export class MarketplaceController {
     private readonly listings: MarketplaceListingsService,
     private readonly offers: MarketplaceOffersService,
     private readonly reviews: MarketplaceReviewsService,
-    private readonly geocoder: MarketplaceGeocoderService,
+    private readonly geocoder: AddressGeocoderService,
   ) {}
 
   @Get("marketplace/listings")

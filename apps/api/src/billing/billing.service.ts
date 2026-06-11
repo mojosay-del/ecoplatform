@@ -1,9 +1,15 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { CompanyStatus, NotificationCategory, Prisma, SubscriptionStatus } from "@prisma/client";
-import type { CompanyProfileUpdateDto, ManualSubscriptionDto, SelfSubscriptionDto } from "@ecoplatform/shared";
+import type {
+  AddressDto,
+  CompanyProfileUpdateDto,
+  ManualSubscriptionDto,
+  SelfSubscriptionDto,
+} from "@ecoplatform/shared";
 import { computeDiff } from "../common/admin-action-log.service";
 import { paginatedResponse, resolvePagination, type PaginationInput } from "../common/pagination";
 import { swallowAndLog } from "../common/silent-catch";
+import { AddressGeocoderService } from "../geo/address-geocoder.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
@@ -19,7 +25,12 @@ import {
   serializeSubscription,
   type ManualSubscriptionResponse,
 } from "./billing-subscription.helpers";
-import { composeFormattedAddress, normaliseOptionalString, upsertCompanyAddress } from "./billing-company.helpers";
+import {
+  composeFormattedAddress,
+  normaliseOptionalString,
+  upsertCompanyAddress,
+  type CompanyAddressGeo,
+} from "./billing-company.helpers";
 
 const MANUAL_SUBSCRIPTION_ENDPOINT = "POST /api/admin/billing/manual-subscriptions";
 const MANUAL_SUBSCRIPTION_ACTION = "manual_subscription_activation";
@@ -33,7 +44,22 @@ export class BillingService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly sessionCache: SessionCacheService,
+    private readonly geocoder: AddressGeocoderService,
   ) {}
+
+  private async resolveCompanyAddressGeo(address: AddressDto): Promise<CompanyAddressGeo | null> {
+    const formatted = address.formatted?.trim() || composeFormattedAddress(address);
+    const result = await this.geocoder.geocode(formatted);
+    if (!result) {
+      return null;
+    }
+
+    return {
+      latitude: new Prisma.Decimal(result.lat),
+      longitude: new Prisma.Decimal(result.lon),
+      region: address.region?.trim() || result.region,
+    };
+  }
 
   async getOwnStatus(companyId: string) {
     const company = await this.prisma.company.findUnique({
@@ -68,6 +94,8 @@ export class BillingService {
       throw new NotFoundException("Компания не найдена.");
     }
 
+    const factualAddressGeo = input.factualAddress ? await this.resolveCompanyAddressGeo(input.factualAddress) : null;
+
     return this.prisma.$transaction(async (tx) => {
       const data: Prisma.CompanyUpdateInput = {};
 
@@ -92,7 +120,12 @@ export class BillingService {
       }
 
       if (input.factualAddress !== undefined) {
-        const addressId = await upsertCompanyAddress(tx, existing.factualAddressId, input.factualAddress);
+        const addressId = await upsertCompanyAddress(
+          tx,
+          existing.factualAddressId,
+          input.factualAddress,
+          factualAddressGeo,
+        );
         data.factualAddress = addressId ? { connect: { id: addressId } } : { disconnect: true };
       }
       if (input.structuredLegalAddress !== undefined) {

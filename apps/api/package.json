@@ -15,6 +15,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts",
+    "backfill:company-address-geocodes": "ts-node scripts/backfill-company-address-geocodes.ts",
     "migrate:attachments-private": "ts-node scripts/migrate-lesson-attachments-to-private.ts"
   },
   "dependencies": {

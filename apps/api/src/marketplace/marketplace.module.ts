@@ -2,9 +2,9 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { ModuleAccessService } from "../common/module-access.service";
 import { FilesModule } from "../files/files.module";
+import { GeocodingModule } from "../geo/geocoding.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { MarketplaceController } from "./marketplace.controller";
-import { MarketplaceGeocoderService } from "./services/marketplace-geocoder.service";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
 import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
@@ -15,15 +15,9 @@ import { MarketplaceReviewsService } from "./services/marketplace-reviews.servic
 // планировщик использует их cron-методы (авто-архив объявлений, авто-разрешение
 // принятых предложений).
 @Module({
-  imports: [AuthModule, FilesModule, NotificationsModule],
+  imports: [AuthModule, FilesModule, GeocodingModule, NotificationsModule],
   controllers: [MarketplaceController],
-  providers: [
-    ModuleAccessService,
-    MarketplaceGeocoderService,
-    MarketplaceListingsService,
-    MarketplaceOffersService,
-    MarketplaceReviewsService,
-  ],
+  providers: [ModuleAccessService, MarketplaceListingsService, MarketplaceOffersService, MarketplaceReviewsService],
   exports: [MarketplaceListingsService, MarketplaceOffersService, MarketplaceReviewsService],
 })
 export class MarketplaceModule {}

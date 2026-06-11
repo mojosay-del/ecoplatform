@@ -22,9 +22,9 @@ import { ModuleAccessService } from "../../common/module-access.service";
 import { paginatedResponse, resolvePagination } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import { FilesService } from "../../files/files.service";
+import { AddressGeocoderService } from "../../geo/address-geocoder.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { generateCircleCenter } from "./marketplace-geo.helpers";
-import { MarketplaceGeocoderService } from "./marketplace-geocoder.service";
 import {
   type ListingWithRelations,
   buildAddressCreateData,
@@ -55,7 +55,7 @@ export class MarketplaceListingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
-    private readonly geocoder: MarketplaceGeocoderService,
+    private readonly geocoder: AddressGeocoderService,
     private readonly moduleAccess: ModuleAccessService,
   ) {}
 

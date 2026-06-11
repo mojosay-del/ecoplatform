@@ -12,6 +12,7 @@ process.env.THROTTLER_DISABLED = "1";
 process.env.PWNED_PASSWORDS_CHECK_ENABLED = "0";
 process.env.EMAIL_DELIVERY_DISABLED = "1";
 process.env.EMAIL_VERIFICATION_TEST_CODE = "1234";
+delete process.env.YANDEX_GEOCODER_API_KEY;
 
 // DATABASE_URL приходит из globalSetup (process.env уже изменён в parent-процессе vitest).
 if (!process.env.DATABASE_URL?.includes("_test")) {

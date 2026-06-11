@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "http";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { hash } from "bcryptjs";
 import {
   CommentStatus,
@@ -389,6 +389,69 @@ describe("Company profile (Волна 7.2/7.3 — Address, расширенны�
       include: { factualAddress: true },
     });
     expect(company?.factualAddress?.city).toBe("Подольск");
+  });
+
+  it("PATCH /billing/company геокодит factualAddress для сортировки площадки по расстоянию", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        response: {
+          GeoObjectCollection: {
+            featureMember: [
+              {
+                GeoObject: {
+                  Point: { pos: "37.617698 55.755864" },
+                  metaDataProperty: {
+                    GeocoderMetaData: {
+                      Address: {
+                        Components: [
+                          { kind: "country", name: "Россия" },
+                          { kind: "province", name: "Москва" },
+                          { kind: "locality", name: "Москва" },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      }),
+    });
+
+    try {
+      vi.stubGlobal("fetch", fetchMock);
+      await withEnv({ YANDEX_GEOCODER_API_KEY: "test-key" }, async () => {
+        const { token, companyId } = await registerCompany("0700103");
+
+        const res = await ctx.http
+          .patch("/api/billing/company")
+          .set("Authorization", `Bearer ${token}`)
+          .send({
+            factualAddress: {
+              country: "Россия",
+              city: "Москва",
+              street: "Тверская",
+              building: "1",
+              postcode: "125009",
+            },
+          });
+
+        expect(res.status).toBe(200);
+        expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("geocode=125009"), expect.any(Object));
+
+        const company = await ctx.prisma.company.findUniqueOrThrow({
+          where: { id: companyId },
+          include: { factualAddress: true },
+        });
+        expect(company.factualAddress?.latitude?.toString()).toBe("55.755864");
+        expect(company.factualAddress?.longitude?.toString()).toBe("37.617698");
+        expect(company.factualAddress?.region).toBe("Москва");
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("повторный PATCH с factualAddress обновляет ту же строку Address, не создаёт новую", async () => {

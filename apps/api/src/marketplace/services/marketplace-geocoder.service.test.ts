@@ -46,7 +46,7 @@ describe("MarketplaceGeocoderService", () => {
 
     const suggestions = await new MarketplaceGeocoderService().suggest("москва тверская", 6);
 
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("results=6"));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("results=6"), expect.any(Object));
     expect(suggestions).toEqual([
       {
         value: "Россия, Москва, Тверская улица, 1",

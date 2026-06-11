@@ -1,6 +1,12 @@
 import { Prisma } from "@prisma/client";
 import type { AddressDto } from "@ecoplatform/shared";
 
+export type CompanyAddressGeo = {
+  latitude: Prisma.Decimal;
+  longitude: Prisma.Decimal;
+  region: string | null;
+};
+
 // Пустую строку из формы трактуем как «очистить». Trim'аем заранее в Zod-схеме,
 // поэтому здесь только пробрасываем undefined/null/непустую строку.
 export function normaliseOptionalString(value: string | null | undefined): string | null {
@@ -18,20 +24,24 @@ export async function upsertCompanyAddress(
   tx: Prisma.TransactionClient,
   existingAddressId: string | null,
   address: AddressDto | null | undefined,
+  geo: CompanyAddressGeo | null = null,
 ): Promise<string | null> {
   if (!address) {
     return null;
   }
 
   const formatted = address.formatted?.trim() || composeFormattedAddress(address);
+  const region = geo?.region ?? address.region?.trim() ?? null;
   const data = {
     country: address.country?.trim() || "Россия",
-    region: address.region?.trim() || null,
+    region,
     city: address.city.trim(),
     street: address.street?.trim() || null,
     building: address.building?.trim() || null,
     apartment: address.apartment?.trim() || null,
     postcode: address.postcode?.trim() || null,
+    latitude: geo?.latitude ?? null,
+    longitude: geo?.longitude ?? null,
     formatted,
     source: "manual",
   };
