@@ -47,6 +47,8 @@ function listingPayload(nomenclatureId: string, photoIds: string[], overrides: R
     positions: [{ nomenclatureId, weightKg: 1500, form: "pressed" }],
     address: { city: "Москва", region: "Москва" },
     contactPhone: "+79991234567",
+    typicalLoadKg: 20000,
+    loadingConditions: "С нашей погрузкой",
     readyNow: true,
     media: photoIds.map((fileId) => ({ fileId, kind: "photo" })),
     ...overrides,
@@ -210,6 +212,23 @@ describe("Marketplace — объявления (фаза 1)", () => {
       const mine = await ctx.http.get("/api/marketplace/my/listings").set(bearer(token));
       expect(mine.body.items).toHaveLength(1);
       expect(mine.body.items[0].status).toBe("active");
+    });
+  });
+
+  it("categorySlug в ленте + объём в машину и условия погрузки в детали (UI-батч)", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const seller = await registerCompany("0009110");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId } = await createPublishedListing(seller.token, nomenclatureId);
+
+      const detail = await ctx.http.get(`/api/marketplace/listings/${listingId}`).set(bearer(seller.token));
+      expect(detail.status).toBe(200);
+      expect(detail.body.typicalLoadKg).toBe(20000);
+      expect(detail.body.loadingConditions).toBe("С нашей погрузкой");
+      expect(detail.body.positions[0].categorySlug).toBe("makulatura");
+
+      const feed = await ctx.http.get("/api/marketplace/listings").set(bearer(seller.token));
+      expect(feed.body.items[0].positions[0].categorySlug).toBe("makulatura");
     });
   });
 

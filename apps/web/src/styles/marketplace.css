@@ -699,9 +699,15 @@
   font-weight: 600;
 }
 
+/* Лента площадки тянется на всю ширину рабочей области (а не до 1440px), чтобы
+   карта расширялась при сворачивании сайдбара. Только для ленты площадки. */
+.mp-page-wide {
+  max-width: none;
+}
+
 .mp-map {
   width: 100%;
-  height: 420px;
+  height: 460px;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--border, #e5e7eb);
@@ -775,4 +781,319 @@
   margin-top: 12px;
   color: #15803d;
   font-size: 13px;
+}
+
+/* Упаковка — мультивыбор чипами (форма объявления). */
+.mp-checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mp-chip-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 999px;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mp-chip-check:has(input:checked) {
+  border-color: var(--accent, #1f8a4c);
+  color: var(--accent, #1f8a4c);
+  background: #1f8a4c14;
+}
+
+/* ── Модалка просмотра объявления (по макету, в стиле Ecoplatform) ─────────── */
+.mp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 16px;
+  overflow-y: auto;
+}
+
+.mp-modal {
+  position: relative;
+  width: 100%;
+  max-width: 880px;
+  background: var(--surface, #fff);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+.mp-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg, #f1f5f9);
+  color: #475569;
+  cursor: pointer;
+}
+
+.mp-modal-close:hover {
+  background: #e2e8f0;
+}
+
+.mp-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 40px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.mp-modal-seller {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mp-modal-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #1f8a4c1a;
+  color: var(--accent, #1f8a4c);
+  flex: none;
+}
+
+.mp-modal-seller-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.mp-modal-verified {
+  color: var(--accent, #1f8a4c);
+}
+
+.mp-modal-seller-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.mp-modal-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #b8860b;
+  font-weight: 600;
+}
+
+.mp-modal-rating-empty {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.mp-modal-main {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: 22px;
+  padding: 20px 0;
+}
+
+.mp-modal-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 14px;
+  background: #f1f5f9;
+}
+
+div.mp-modal-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+}
+
+.mp-modal-thumbs {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.mp-modal-thumb {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f1f5f9;
+}
+
+.mp-modal-thumb.active {
+  border-color: var(--accent, #1f8a4c);
+}
+
+.mp-modal-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mp-modal-title {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+.mp-modal-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.mp-modal-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg, #f1f5f9);
+  font-size: 13px;
+  color: #475569;
+}
+
+.mp-fact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 18px;
+  margin: 0;
+}
+
+.mp-fact-grid > div {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  column-gap: 8px;
+  align-items: start;
+}
+
+.mp-fact-grid svg {
+  grid-row: span 2;
+  margin-top: 2px;
+  color: var(--accent, #1f8a4c);
+}
+
+.mp-fact-grid dt {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.mp-fact-grid dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.mp-modal-meta {
+  margin: 16px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.mp-modal-videos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.mp-modal-videos video {
+  width: 100%;
+  border-radius: 12px;
+}
+
+.mp-modal-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.mp-modal-about h3,
+.mp-modal-action h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.mp-spec-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mp-spec-list li {
+  font-size: 14px;
+  color: #334155;
+}
+
+.mp-modal-contacts {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #1f8a4c10;
+  font-size: 14px;
+}
+
+.mp-modal-contacts p {
+  margin: 4px 0 0;
+}
+
+.mp-modal-reveal {
+  margin-top: 10px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.mp-modal-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.mp-owner-panel h3 {
+  margin: 0 0 10px;
+}
+
+@media (max-width: 760px) {
+  .mp-modal-main,
+  .mp-modal-columns,
+  .mp-fact-grid {
+    grid-template-columns: 1fr;
+  }
 }

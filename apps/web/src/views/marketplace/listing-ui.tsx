@@ -74,12 +74,27 @@ export function useNomenclatureOptions(): MarketplaceNomenclatureOption[] {
 export function ListingCard({
   listing,
   coverUrl,
+  onOpen,
 }: {
   listing: MarketplaceListingListItem;
   coverUrl: string | null;
+  // Если задан — клик открывает модалку (без навигации), но href остаётся для
+  // deep-link/доступности и открытия в новой вкладке.
+  onOpen?: (id: string) => void;
 }) {
   return (
-    <Link className="mp-card" href={`/marketplace/${listing.id}`}>
+    <Link
+      className="mp-card"
+      href={`/marketplace/${listing.id}`}
+      onClick={
+        onOpen
+          ? (event) => {
+              event.preventDefault();
+              onOpen(listing.id);
+            }
+          : undefined
+      }
+    >
       <div className="mp-card-cover">
         {coverUrl ? <img alt="" src={coverUrl} /> : <div className="mp-card-cover-empty">Нет фото</div>}
         {listing.photoCount > 1 ? <span className="mp-card-photos">{listing.photoCount} фото</span> : null}

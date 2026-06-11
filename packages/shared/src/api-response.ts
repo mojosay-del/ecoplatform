@@ -665,6 +665,8 @@ export type ModerationCaseDetail = ModerationCaseListItem;
 export type MarketplaceListingPositionSummary = {
   nomenclatureId: string;
   nomenclatureName: string;
+  // Slug категории номенклатуры (makulatura/plenki/plastiki) — для цвета на карте.
+  categorySlug: string;
   weightKg: number;
   form: ListingPositionForm;
 };
@@ -701,6 +703,7 @@ export type MarketplaceListingPositionDetail = {
   id: string;
   nomenclatureId: string;
   nomenclatureName: string;
+  categorySlug: string;
   weightKg: number;
   form: ListingPositionForm;
   moisturePct: number | null;
@@ -713,7 +716,7 @@ export type MarketplaceListingPositionDetail = {
 export type MarketplaceListingDetail = {
   id: string;
   status: ListingStatus;
-  seller: { companyId: string; type: CompanyType; rating: number | null };
+  seller: { companyId: string; name: string; type: CompanyType; rating: number | null };
   city: string;
   region: string | null;
   address: CompanyAddress | null;
@@ -722,6 +725,10 @@ export type MarketplaceListingDetail = {
   color: string | null;
   packaging: string | null;
   paymentTerms: string | null;
+  // Типичный объём отгрузки в одну машину, в кг (фронт показывает в тоннах).
+  typicalLoadKg: number | null;
+  // Условия погрузки: «С нашей погрузкой» / «Самовывоз» / «По договорённости».
+  loadingConditions: string | null;
   readyNow: boolean;
   readinessDate: IsoDateString | null;
   publishedAt: IsoDateString | null;

@@ -1,16 +1,21 @@
 "use client";
 
-// Форма создания/редактирования объявления: позиции (сырьё/вес/форма/влажность/
-// засор), адрес, контактный телефон, готовность, медиа (фото/видео). Сохранение —
+// Форма создания/редактирования объявления: позиции (сырьё/вес в тоннах/форма/
+// влажность/засор), адрес с подсказками Яндекса, телефон (как в регистрации),
+// упаковка (мультивыбор), объём в машину, условия погрузки, медиа. Сохранение —
 // черновик; «Опубликовать» сохраняет и публикует (бэк проверит 4–10 фото, ≥100 кг).
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { CreateListingDto, MarketplaceListingDetail } from "@ecoplatform/shared";
 import { LISTING_MAX_PHOTOS, LISTING_MAX_VIDEOS, LISTING_MIN_PHOTOS } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
+import { PHONE_COUNTRIES } from "../../components/auth/constants";
+import { PhoneInput } from "../../components/auth/phone-input";
+import type { PhoneCountryId } from "../../components/auth/types";
+import { formatPhoneFull, getPhoneCountry, normalizePhoneDigits } from "../../components/auth/utils";
 import {
   ApiError,
   api,
@@ -22,10 +27,16 @@ import { useAuth } from "../../lib/auth";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
 import { useNomenclatureOptions } from "./listing-ui";
+import { loadYmaps, YANDEX_KEY, type YmapsGeoResult } from "./yandex-loader";
+
+const PACKAGING_OPTIONS = ["Без упаковки", "Палет", "Проложки", "Обмотка"] as const;
+const NO_PACKAGING = "Без упаковки";
+const LOADING_OPTIONS = ["С нашей погрузкой", "Самовывоз", "По договорённости"] as const;
+const ADDRESS_SEARCH_ID = "mp-address-search";
 
 type PositionForm = {
   nomenclatureId: string;
-  weightKg: string;
+  weightTons: string;
   form: "pressed" | "loose";
   moisturePct: string;
   contaminationPct: string;
@@ -34,7 +45,28 @@ type PositionForm = {
 type MediaItem = { fileId: string; kind: "photo" | "video" };
 
 function emptyPosition(): PositionForm {
-  return { nomenclatureId: "", weightKg: "", form: "loose", moisturePct: "", contaminationPct: "" };
+  return { nomenclatureId: "", weightTons: "", form: "loose", moisturePct: "", contaminationPct: "" };
+}
+
+// Разбор полного номера в страну + национальные цифры (для префилла при правке).
+function parsePhone(full: string): { countryId: PhoneCountryId; digits: string } {
+  const digitsOnly = full.replace(/\D/g, "");
+  for (const country of PHONE_COUNTRIES) {
+    const dial = country.dialCode.replace(/\D/g, "");
+    if (digitsOnly.startsWith(dial)) {
+      const local = normalizePhoneDigits(full, country);
+      if (local.length === country.nationalLength) return { countryId: country.id as PhoneCountryId, digits: local };
+    }
+  }
+  return { countryId: "ru", digits: normalizePhoneDigits(full, getPhoneCountry("ru")) };
+}
+
+function parsePackaging(value: string | null): string[] {
+  const parts = (value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : [NO_PACKAGING];
 }
 
 export function ListingFormView({ listingId }: { listingId?: string }) {
@@ -55,17 +87,68 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
   const [street, setStreet] = useState("");
   const [building, setBuilding] = useState("");
   const [postcode, setPostcode] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState<PhoneCountryId>("ru");
+  const [phoneDigits, setPhoneDigits] = useState("");
   const [readyNow, setReadyNow] = useState(true);
   const [readinessDate, setReadinessDate] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("");
-  const [packaging, setPackaging] = useState("");
+  const [packaging, setPackaging] = useState<string[]>([NO_PACKAGING]);
   const [paymentTerms, setPaymentTerms] = useState("");
+  const [typicalLoadTons, setTypicalLoadTons] = useState("");
+  const [loadingConditions, setLoadingConditions] = useState<string>(LOADING_OPTIONS[0]);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [prefilled, setPrefilled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const addressSearchRef = useRef<HTMLInputElement>(null);
+
+  // Подсказки адреса Яндекса. На выборе варианта геокодим его и раскладываем
+  // по структурным полям (город/регион/улица/дом/индекс) — чтобы не было разнобоя.
+  useEffect(() => {
+    if (!YANDEX_KEY) return;
+    let view: { destroy: () => void } | null = null;
+    let cancelled = false;
+    loadYmaps()
+      .then(() => {
+        const ymaps = window.ymaps;
+        if (cancelled || !ymaps || !addressSearchRef.current) return;
+        ymaps.ready(() => {
+          if (cancelled || !addressSearchRef.current) return;
+          const suggest = new ymaps.SuggestView(ADDRESS_SEARCH_ID, { results: 6 });
+          view = suggest;
+          suggest.events.add("select", (event) => {
+            const item = event.get("item") as { value?: string } | undefined;
+            if (item?.value) void fillFromAddress(item.value);
+          });
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      view?.destroy();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function fillFromAddress(value: string) {
+    const ymaps = window.ymaps;
+    if (!ymaps) return;
+    try {
+      const result: YmapsGeoResult = await ymaps.geocode(value, { results: 1 });
+      const object = result.geoObjects.get(0);
+      if (!object) return;
+      setRegion(object.getAdministrativeAreas()[0] ?? "");
+      setCity(object.getLocalities()[0] ?? object.getAdministrativeAreas()[0] ?? "");
+      setStreet(object.getThoroughfare() ?? "");
+      setBuilding(object.getPremiseNumber() ?? "");
+      const postal = object.properties.get("metaDataProperty.GeocoderMetaData.Address.postal_code", "");
+      setPostcode(typeof postal === "string" ? postal : "");
+    } catch {
+      // геокодер недоступен — оставляем ручной ввод полей ниже
+    }
+  }
 
   // Префилл при редактировании — один раз, когда подгрузилось объявление.
   useEffect(() => {
@@ -74,7 +157,7 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
       existing.positions.length > 0
         ? existing.positions.map((position) => ({
             nomenclatureId: position.nomenclatureId,
-            weightKg: String(position.weightKg),
+            weightTons: String(position.weightKg / 1000),
             form: position.form,
             moisturePct: position.moisturePct == null ? "" : String(position.moisturePct),
             contaminationPct: position.contaminationPct == null ? "" : String(position.contaminationPct),
@@ -86,13 +169,17 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
     setStreet(existing.address?.street ?? "");
     setBuilding(existing.address?.building ?? "");
     setPostcode(existing.address?.postcode ?? "");
-    setContactPhone(existing.contactPhone ?? "");
+    const parsedPhone = parsePhone(existing.contactPhone ?? "");
+    setPhoneCountry(parsedPhone.countryId);
+    setPhoneDigits(parsedPhone.digits);
     setReadyNow(existing.readyNow);
     setReadinessDate(existing.readinessDate ? existing.readinessDate.slice(0, 10) : "");
     setDescription(existing.description ?? "");
     setColor(existing.color ?? "");
-    setPackaging(existing.packaging ?? "");
+    setPackaging(parsePackaging(existing.packaging));
     setPaymentTerms(existing.paymentTerms ?? "");
+    setTypicalLoadTons(existing.typicalLoadKg == null ? "" : String(existing.typicalLoadKg / 1000));
+    setLoadingConditions(existing.loadingConditions ?? LOADING_OPTIONS[0]);
     setMedia(existing.media.map((item) => ({ fileId: item.fileId, kind: item.kind === "video" ? "video" : "photo" })));
     setPrefilled(true);
   }, [existing, prefilled]);
@@ -111,11 +198,22 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
     setPositions((prev) => prev.map((position, i) => (i === index ? { ...position, ...patch } : position)));
   }
 
+  function togglePackaging(option: string) {
+    setPackaging((prev) => {
+      if (option === NO_PACKAGING) return [NO_PACKAGING];
+      const withoutNone = prev.filter((value) => value !== NO_PACKAGING);
+      const next = withoutNone.includes(option)
+        ? withoutNone.filter((value) => value !== option)
+        : [...withoutNone, option];
+      return next.length > 0 ? next : [NO_PACKAGING];
+    });
+  }
+
   function buildDto(): CreateListingDto {
     return {
       positions: positions.map((position) => ({
         nomenclatureId: position.nomenclatureId,
-        weightKg: Number(position.weightKg) || 0,
+        weightKg: (Number(position.weightTons) || 0) * 1000,
         form: position.form,
         moisturePct: position.moisturePct.trim() === "" ? null : Number(position.moisturePct),
         contaminationPct: position.contaminationPct.trim() === "" ? null : Number(position.contaminationPct),
@@ -128,11 +226,13 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
         building: building.trim() || null,
         postcode: postcode.trim() || null,
       },
-      contactPhone: contactPhone.trim(),
+      contactPhone: formatPhoneFull(getPhoneCountry(phoneCountry), phoneDigits),
       description: description.trim() || null,
       color: color.trim() || null,
-      packaging: packaging.trim() || null,
+      packaging: packaging.join(", ") || null,
       paymentTerms: paymentTerms.trim() || null,
+      typicalLoadKg: typicalLoadTons.trim() === "" ? null : (Number(typicalLoadTons) || 0) * 1000,
+      loadingConditions: loadingConditions || null,
       readyNow,
       readinessDate: readyNow ? null : readinessDate ? new Date(readinessDate).toISOString() : null,
       media,
@@ -141,10 +241,10 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
 
   function clientValidationError(): string | null {
     if (!city.trim()) return "Укажите город.";
-    if (!contactPhone.trim()) return "Укажите контактный телефон.";
+    if (!formatPhoneFull(getPhoneCountry(phoneCountry), phoneDigits)) return "Укажите контактный телефон полностью.";
     for (const position of positions) {
       if (!position.nomenclatureId) return "Выберите вид сырья во всех позициях.";
-      if (!(Number(position.weightKg) > 0)) return "Укажите вес во всех позициях.";
+      if (!(Number(position.weightTons) > 0)) return "Укажите вес во всех позициях.";
     }
     return null;
   }
@@ -203,13 +303,14 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
                   <div className="mp-field" style={{ flex: "1 1 110px" }}>
-                    <label>Вес, кг</label>
+                    <label>Вес, т</label>
                     <input
                       className="mp-input"
                       type="number"
                       min="0"
-                      value={position.weightKg}
-                      onChange={(event) => updatePosition(index, { weightKg: event.target.value })}
+                      step="0.1"
+                      value={position.weightTons}
+                      onChange={(event) => updatePosition(index, { weightTons: event.target.value })}
                     />
                   </div>
                   <div className="mp-field" style={{ flex: "1 1 110px" }}>
@@ -268,6 +369,19 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
 
           <div className="mp-fieldset">
             <h2>Адрес отгрузки</h2>
+            {YANDEX_KEY ? (
+              <div className="mp-field">
+                <label>Поиск адреса (Яндекс)</label>
+                <input
+                  ref={addressSearchRef}
+                  id={ADDRESS_SEARCH_ID}
+                  className="mp-input"
+                  placeholder="Начните вводить адрес и выберите вариант…"
+                  autoComplete="off"
+                />
+                <p className="mp-hint">Выберите подсказку — поля ниже заполнятся автоматически. Можно править вручную.</p>
+              </div>
+            ) : null}
             <div className="mp-grid-2">
               <div className="mp-field">
                 <label>Город *</label>
@@ -312,11 +426,12 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
             ) : null}
             <div className="mp-field">
               <label>Контактный телефон *</label>
-              <input
-                className="mp-input"
-                value={contactPhone}
-                placeholder="+7 999 123-45-67"
-                onChange={(event) => setContactPhone(event.target.value)}
+              <PhoneInput
+                name="contactPhone"
+                countryId={phoneCountry}
+                digits={phoneDigits}
+                onCountryChange={setPhoneCountry}
+                onDigitsChange={setPhoneDigits}
               />
             </div>
           </div>
@@ -338,12 +453,48 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
                 <input className="mp-input" value={color} onChange={(event) => setColor(event.target.value)} />
               </div>
               <div className="mp-field">
-                <label>Упаковка</label>
-                <input className="mp-input" value={packaging} onChange={(event) => setPackaging(event.target.value)} />
-              </div>
-              <div className="mp-field">
                 <label>Условия оплаты</label>
                 <input className="mp-input" value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} />
+              </div>
+              <div className="mp-field">
+                <label>Обычно гружу в машину, т</label>
+                <input
+                  className="mp-input"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={typicalLoadTons}
+                  onChange={(event) => setTypicalLoadTons(event.target.value)}
+                />
+              </div>
+              <div className="mp-field">
+                <label>Условия погрузки</label>
+                <select
+                  className="mp-select"
+                  value={loadingConditions}
+                  onChange={(event) => setLoadingConditions(event.target.value)}
+                >
+                  {LOADING_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mp-field">
+              <label>Упаковка</label>
+              <div className="mp-checkbox-row">
+                {PACKAGING_OPTIONS.map((option) => (
+                  <label key={option} className="mp-chip-check">
+                    <input
+                      type="checkbox"
+                      checked={packaging.includes(option)}
+                      onChange={() => togglePackaging(option)}
+                    />
+                    {option}
+                  </label>
+                ))}
               </div>
             </div>
           </div>

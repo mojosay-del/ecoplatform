@@ -15,11 +15,16 @@ export const listingInclude = {
   address: true,
   positions: {
     orderBy: { position: "asc" },
-    include: { nomenclature: { select: { name: true } } },
+    include: { nomenclature: { select: { name: true, category: { select: { slug: true } } } } },
   },
   media: { orderBy: { position: "asc" } },
   sellerCompany: {
-    select: { id: true, type: true, marketplaceRating: { select: { overall: true, reviewCount: true } } },
+    select: {
+      id: true,
+      type: true,
+      organizationName: true,
+      marketplaceRating: { select: { overall: true, reviewCount: true } },
+    },
   },
 } satisfies Prisma.MarketplaceListingInclude;
 
@@ -47,6 +52,7 @@ function positionSummaries(listing: ListingWithRelations): MarketplaceListingPos
   return listing.positions.map((position) => ({
     nomenclatureId: position.nomenclatureId,
     nomenclatureName: position.nomenclature.name,
+    categorySlug: position.nomenclature.category.slug,
     weightKg: Number(position.weightKg),
     form: position.form,
   }));
@@ -110,6 +116,7 @@ export function mapToDetail(listing: ListingWithRelations, options: { canSeeCont
     status: listing.status,
     seller: {
       companyId: listing.sellerCompany.id,
+      name: listing.sellerCompany.organizationName,
       type: listing.sellerCompany.type,
       rating: companyRating(listing.sellerCompany.marketplaceRating),
     },
@@ -121,6 +128,8 @@ export function mapToDetail(listing: ListingWithRelations, options: { canSeeCont
     color: listing.color,
     packaging: listing.packaging,
     paymentTerms: listing.paymentTerms,
+    typicalLoadKg: decimalToNumberOrNull(listing.typicalLoadKg),
+    loadingConditions: listing.loadingConditions,
     readyNow: listing.readyNow,
     readinessDate: listing.readinessDate?.toISOString() ?? null,
     publishedAt: listing.publishedAt?.toISOString() ?? null,
@@ -130,6 +139,7 @@ export function mapToDetail(listing: ListingWithRelations, options: { canSeeCont
       id: position.id,
       nomenclatureId: position.nomenclatureId,
       nomenclatureName: position.nomenclature.name,
+      categorySlug: position.nomenclature.category.slug,
       weightKg: Number(position.weightKg),
       form: position.form,
       moisturePct: decimalToNumberOrNull(position.moisturePct),

@@ -226,6 +226,8 @@ export class MarketplaceListingsService {
           color: optionalText(dto.color),
           packaging: optionalText(dto.packaging),
           paymentTerms: optionalText(dto.paymentTerms),
+          typicalLoadKg: dto.typicalLoadKg ?? null,
+          loadingConditions: optionalText(dto.loadingConditions),
           readyNow: dto.readyNow,
           readinessDate: dto.readinessDate ? new Date(dto.readinessDate) : null,
           positions: { create: positionCreateData(dto.positions) },
@@ -283,6 +285,8 @@ export class MarketplaceListingsService {
           color: patchOptionalText(dto.color),
           packaging: patchOptionalText(dto.packaging),
           paymentTerms: patchOptionalText(dto.paymentTerms),
+          typicalLoadKg: dto.typicalLoadKg === undefined ? undefined : (dto.typicalLoadKg ?? null),
+          loadingConditions: patchOptionalText(dto.loadingConditions),
           readyNow: dto.readyNow,
           readinessDate:
             dto.readinessDate === undefined ? undefined : dto.readinessDate ? new Date(dto.readinessDate) : null,

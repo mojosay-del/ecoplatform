@@ -14,6 +14,7 @@ import { useAuth } from "../../lib/auth";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
 import { ListingCard, useNomenclatureOptions } from "./listing-ui";
+import { ListingModal } from "./ListingModal";
 import { YandexMap } from "./YandexMap";
 
 function toggle(list: string[], value: string): string[] {
@@ -31,6 +32,8 @@ export function MarketplaceView() {
   const [selectedNomenclature, setSelectedNomenclature] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<"date" | "distance">("date");
   const [companyPoint, setCompanyPoint] = useState<{ lat: number; lon: number } | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [feedRefresh, setFeedRefresh] = useState(0);
 
   useEffect(() => {
     api.marketplace
@@ -55,7 +58,7 @@ export function MarketplaceView() {
     state,
     errorMessage,
   } = useApiQuery(
-    `marketplace-listings-${filterKey}`,
+    `marketplace-listings-${filterKey}-${feedRefresh}`,
     () => api.marketplace.listings({ region: selectedRegions, nomenclatureId: selectedNomenclature, limit: 200 }),
     { items: [], total: 0, hasMore: false } as PaginatedResponse<MarketplaceListingListItem>,
   );
@@ -87,7 +90,7 @@ export function MarketplaceView() {
 
   return (
     <AppShell>
-      <section className="page">
+      <section className="page mp-page-wide">
         <div className="mp-toolbar">
           <PageHeader title="Торговая площадка" subtitle="Объявления о продаже вторсырья от заготовителей." />
           {isCollector ? (
@@ -182,18 +185,27 @@ export function MarketplaceView() {
           </p>
         ) : (
           <>
-            <YandexMap listings={listings} />
+            <YandexMap listings={listings} onSelect={setSelectedId} />
             <div className="mp-grid" style={{ marginTop: 18 }}>
               {listings.map((listing) => (
                 <ListingCard
                   key={listing.id}
                   listing={listing}
                   coverUrl={listing.coverFileId ? preferredFileAssetImageUrl(assets.get(listing.coverFileId)) : null}
+                  onOpen={setSelectedId}
                 />
               ))}
             </div>
           </>
         )}
+
+        {selectedId ? (
+          <ListingModal
+            listingId={selectedId}
+            onClose={() => setSelectedId(null)}
+            onChanged={() => setFeedRefresh((value) => value + 1)}
+          />
+        ) : null}
       </section>
     </AppShell>
   );

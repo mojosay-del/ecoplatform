@@ -245,6 +245,10 @@ export const createListingDtoSchema = z.object({
   color: z.string().trim().max(120).nullish(),
   packaging: z.string().trim().max(200).nullish(),
   paymentTerms: z.string().trim().max(500).nullish(),
+  // Типичный объём отгрузки в одну машину, в кг (фронт вводит тонны → ×1000).
+  typicalLoadKg: z.number().positive().max(100000).nullish(),
+  // Условия погрузки: «С нашей погрузкой» / «Самовывоз» / «По договорённости».
+  loadingConditions: z.string().trim().max(120).nullish(),
   // Готовность: «готово сейчас» или конкретная дата (валидируется в сервисе ≤14 дней).
   readyNow: z.boolean().default(true),
   readinessDate: z.string().datetime().nullish(),
