@@ -25,6 +25,14 @@ describe("AppShell future navigation teasers", () => {
     }
   });
 
+  it("shows marketplace listings to regular users", () => {
+    const labels = appNavSections.flatMap((section) =>
+      filterVisibleItems(section.items, { roles: [], companyType: "trader" }).map((item) => item.label),
+    );
+
+    expect(labels).toContain("Объявления");
+  });
+
   it("keeps admin routes behind one panel entry in the sidebar", () => {
     const serviceSection = appNavSections.find((section) => section.title === "Служебное");
 

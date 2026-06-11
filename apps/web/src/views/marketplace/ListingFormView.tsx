@@ -7,10 +7,38 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
-import type { CreateListingDto, MarketplaceListingDetail } from "@ecoplatform/shared";
-import { LISTING_MAX_PHOTOS, LISTING_MAX_VIDEOS, LISTING_MIN_PHOTOS } from "@ecoplatform/shared";
+import { useEffect, useId, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  CircleDot,
+  ClipboardList,
+  CreditCard,
+  Droplets,
+  FileText,
+  Filter,
+  ImagePlus,
+  Layers,
+  MapPin,
+  Package,
+  PackageCheck,
+  Scale,
+  Truck,
+  Upload,
+  Video,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import type { CreateListingDto, MarketplaceAddressSuggestion, MarketplaceListingDetail } from "@ecoplatform/shared";
+import {
+  LISTING_MAX_PHOTOS,
+  LISTING_MAX_VIDEOS,
+  LISTING_MIN_PHOTOS,
+  type ListingContaminationCondition,
+  type ListingMoistureCondition,
+} from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { PHONE_COUNTRIES } from "../../components/auth/constants";
 import { PhoneInput } from "../../components/auth/phone-input";
@@ -19,32 +47,88 @@ import { formatPhoneFull, getPhoneCountry, normalizePhoneDigits } from "../../co
 import {
   ApiError,
   api,
+  apiDeleteFile,
   apiUploadFileWithProgress,
   preferredFileAssetImageUrl,
   preferredFileAssetMediaUrl,
 } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
+import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
 import { useNomenclatureOptions } from "./listing-ui";
-import { loadYmaps, YANDEX_KEY, type YmapsGeoResult } from "./yandex-loader";
 
 const PACKAGING_OPTIONS = ["Без упаковки", "Палет", "Проложки", "Обмотка"] as const;
 const NO_PACKAGING = "Без упаковки";
+const MOISTURE_OPTIONS: Array<SelectOption & { value: ListingMoistureCondition }> = [
+  { value: "dry", label: "Сухое" },
+  { value: "slightly_wet", label: "Немного влажное" },
+  { value: "wet", label: "Влажное" },
+];
+const CONTAMINATION_OPTIONS: Array<SelectOption & { value: ListingContaminationCondition }> = [
+  { value: "clean", label: "Без включений" },
+  { value: "may_have_inclusions", label: "Могут быть иные включения" },
+  { value: "has_inclusions", label: "Есть иные включения" },
+];
 const ADDRESS_SEARCH_ID = "mp-address-search";
+const ADDRESS_SUGGEST_MIN_LENGTH = 3;
+const ADDRESS_SUGGEST_DEBOUNCE_MS = 300;
+
+type AddressSuggestState = "idle" | "loading" | "open" | "empty" | "failed";
 
 type PositionForm = {
+  category: string;
   nomenclatureId: string;
   weightTons: string;
   form: "pressed" | "loose";
-  moisturePct: string;
-  contaminationPct: string;
+  moistureCondition: ListingMoistureCondition | "";
+  contaminationCondition: ListingContaminationCondition | "";
+  packaging: string[];
 };
 
 type MediaItem = { fileId: string; kind: "photo" | "video" };
+type SelectOption = { value: string; label: string };
+type MediaUploadProgress = {
+  fileName: string;
+  fraction: number;
+  index: number;
+  total: number;
+  kind: "photo" | "video";
+};
 
 function emptyPosition(): PositionForm {
-  return { nomenclatureId: "", weightTons: "", form: "loose", moisturePct: "", contaminationPct: "" };
+  return {
+    category: "",
+    nomenclatureId: "",
+    weightTons: "",
+    form: "loose",
+    moistureCondition: "",
+    contaminationCondition: "",
+    packaging: [NO_PACKAGING],
+  };
+}
+
+function fieldClass(value: string | boolean | null | undefined): string {
+  return `mp-field${value ? " is-filled" : ""}`;
+}
+
+function sectionTitle(Icon: LucideIcon, title: string) {
+  return (
+    <h2>
+      <span className="mp-section-icon">
+        <Icon size={17} strokeWidth={2.2} aria-hidden="true" />
+      </span>
+      {title}
+    </h2>
+  );
+}
+
+function uniqueOptions(options: SelectOption[]): SelectOption[] {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    if (seen.has(option.value)) return false;
+    seen.add(option.value);
+    return true;
+  });
 }
 
 // Разбор полного номера в страну + национальные цифры (для префилла при правке).
@@ -67,6 +151,34 @@ function parsePackaging(value: string | null): string[] {
     .map((part) => part.trim())
     .filter((part) => part && part !== "Тюки" && allowed.has(part));
   return parts.length > 0 ? parts : [NO_PACKAGING];
+}
+
+function serializePackaging(value: string[]): string | null {
+  const cleaned = value.map((part) => part.trim()).filter(Boolean);
+  return cleaned.length > 0 ? cleaned.join(", ") : null;
+}
+
+function aggregatePositionPackaging(positions: PositionForm[]): string | null {
+  const items = positions
+    .flatMap((position) => position.packaging)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const unique = Array.from(new Set(items));
+  return unique.length > 0 ? unique.join(", ") : null;
+}
+
+function moistureConditionFromPct(value: number | null): ListingMoistureCondition | "" {
+  if (value == null) return "";
+  if (value <= 5) return "dry";
+  if (value <= 20) return "slightly_wet";
+  return "wet";
+}
+
+function contaminationConditionFromPct(value: number | null): ListingContaminationCondition | "" {
+  if (value == null) return "";
+  if (value <= 0) return "clean";
+  if (value <= 5) return "may_have_inclusions";
+  return "has_inclusions";
 }
 
 export function ListingFormView({ listingId }: { listingId?: string }) {
@@ -92,60 +204,94 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
   const [readyNow, setReadyNow] = useState(true);
   const [readinessDate, setReadinessDate] = useState("");
   const [description, setDescription] = useState("");
-  const [packaging, setPackaging] = useState<string[]>([NO_PACKAGING]);
   const [paymentTerms, setPaymentTerms] = useState("");
   const [typicalLoadTons, setTypicalLoadTons] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [prefilled, setPrefilled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addressQuery, setAddressQuery] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<MarketplaceAddressSuggestion[]>([]);
+  const [addressSuggestState, setAddressSuggestState] = useState<AddressSuggestState>("idle");
 
-  const addressSearchRef = useRef<HTMLInputElement>(null);
+  const addressSuggestRequestRef = useRef(0);
+  const draftUploadFileIdsRef = useRef<Set<string>>(new Set());
+  const cleanupDraftUploadsRef = useRef(true);
+  const categoryOptions = uniqueOptions(
+    nomenclature.map((option) => ({ value: option.category, label: option.category })),
+  );
 
-  // Подсказки адреса Яндекса. На выборе варианта геокодим его и раскладываем
-  // по структурным полям (город/регион/улица/дом/индекс) — чтобы не было разнобоя.
+  function registerDraftUpload(fileId: string) {
+    draftUploadFileIdsRef.current.add(fileId);
+  }
+
+  async function cleanupDraftUpload(fileId: string) {
+    if (!draftUploadFileIdsRef.current.has(fileId)) return;
+    draftUploadFileIdsRef.current.delete(fileId);
+    try {
+      await apiDeleteFile(fileId);
+    } catch {
+      // Если файл уже привязан к сущности или сеть оборвалась, его подхватит
+      // ночная orphan-cleanup; пользователю это действие не должно мешать.
+    }
+  }
+
   useEffect(() => {
-    if (!YANDEX_KEY) return;
-    let view: { destroy: () => void } | null = null;
-    let cancelled = false;
-    loadYmaps()
-      .then(() => {
-        const ymaps = window.ymaps;
-        if (cancelled || !ymaps || !addressSearchRef.current) return;
-        ymaps.ready(() => {
-          if (cancelled || !addressSearchRef.current) return;
-          const suggest = new ymaps.SuggestView(ADDRESS_SEARCH_ID, { results: 6 });
-          view = suggest;
-          suggest.events.add("select", (event) => {
-            const item = event.get("item") as { value?: string } | undefined;
-            if (item?.value) void fillFromAddress(item.value);
-          });
-        });
-      })
-      .catch(() => undefined);
     return () => {
-      cancelled = true;
-      view?.destroy();
+      if (!cleanupDraftUploadsRef.current) return;
+      const fileIds = Array.from(draftUploadFileIdsRef.current);
+      draftUploadFileIdsRef.current.clear();
+      fileIds.forEach((fileId) => {
+        void apiDeleteFile(fileId).catch(() => undefined);
+      });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function fillFromAddress(value: string) {
-    const ymaps = window.ymaps;
-    if (!ymaps) return;
-    try {
-      const result: YmapsGeoResult = await ymaps.geocode(value, { results: 1 });
-      const object = result.geoObjects.get(0);
-      if (!object) return;
-      setRegion(object.getAdministrativeAreas()[0] ?? "");
-      setCity(object.getLocalities()[0] ?? object.getAdministrativeAreas()[0] ?? "");
-      setStreet(object.getThoroughfare() ?? "");
-      setBuilding(object.getPremiseNumber() ?? "");
-      const postal = object.properties.get("metaDataProperty.GeocoderMetaData.Address.postal_code", "");
-      setPostcode(typeof postal === "string" ? postal : "");
-    } catch {
-      // геокодер недоступен — оставляем ручной ввод полей ниже
+  // Подсказки адреса идут через backend-геокодер: закрытый ключ Яндекса не
+  // попадает в браузер, а форма не зависит от загрузки внешнего JS-виджета.
+  useEffect(() => {
+    const query = addressQuery.trim();
+    const requestId = addressSuggestRequestRef.current + 1;
+    addressSuggestRequestRef.current = requestId;
+
+    if (query.length < ADDRESS_SUGGEST_MIN_LENGTH) {
+      setAddressSuggestions([]);
+      setAddressSuggestState("idle");
+      return;
     }
+
+    let cancelled = false;
+    setAddressSuggestState("loading");
+    const timer = window.setTimeout(() => {
+      api.marketplace
+        .addressSuggest(query)
+        .then((suggestions) => {
+          if (cancelled || addressSuggestRequestRef.current !== requestId) return;
+          setAddressSuggestions(suggestions);
+          setAddressSuggestState(suggestions.length > 0 ? "open" : "empty");
+        })
+        .catch(() => {
+          if (cancelled || addressSuggestRequestRef.current !== requestId) return;
+          setAddressSuggestions([]);
+          setAddressSuggestState("failed");
+        });
+    }, ADDRESS_SUGGEST_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [addressQuery]);
+
+  function applyAddressSuggestion(suggestion: MarketplaceAddressSuggestion) {
+    setAddressQuery(suggestion.value);
+    setAddressSuggestions([]);
+    setAddressSuggestState("idle");
+    setRegion(suggestion.address.region ?? "");
+    setCity(suggestion.address.city);
+    setStreet(suggestion.address.street ?? "");
+    setBuilding(suggestion.address.building ?? "");
+    setPostcode(suggestion.address.postcode ?? "");
   }
 
   // Префилл при редактировании — один раз, когда подгрузилось объявление.
@@ -154,11 +300,14 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
     setPositions(
       existing.positions.length > 0
         ? existing.positions.map((position) => ({
+            category: "",
             nomenclatureId: position.nomenclatureId,
             weightTons: String(position.weightKg / 1000),
             form: position.form,
-            moisturePct: position.moisturePct == null ? "" : String(position.moisturePct),
-            contaminationPct: position.contaminationPct == null ? "" : String(position.contaminationPct),
+            moistureCondition: position.moistureCondition ?? moistureConditionFromPct(position.moisturePct),
+            contaminationCondition:
+              position.contaminationCondition ?? contaminationConditionFromPct(position.contaminationPct),
+            packaging: parsePackaging(position.packaging ?? existing.packaging),
           }))
         : [emptyPosition()],
     );
@@ -167,13 +316,13 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
     setStreet(existing.address?.street ?? "");
     setBuilding(existing.address?.building ?? "");
     setPostcode(existing.address?.postcode ?? "");
+    setAddressQuery(existing.address?.formatted ?? "");
     const parsedPhone = parsePhone(existing.contactPhone ?? "");
     setPhoneCountry(parsedPhone.countryId);
     setPhoneDigits(parsedPhone.digits);
     setReadyNow(existing.readyNow);
     setReadinessDate(existing.readinessDate ? existing.readinessDate.slice(0, 10) : "");
     setDescription(existing.description ?? "");
-    setPackaging(parsePackaging(existing.packaging));
     setPaymentTerms(existing.paymentTerms ?? "");
     setTypicalLoadTons(existing.typicalLoadKg == null ? "" : String(existing.typicalLoadKg / 1000));
     setMedia(existing.media.map((item) => ({ fileId: item.fileId, kind: item.kind === "video" ? "video" : "photo" })));
@@ -194,15 +343,40 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
     setPositions((prev) => prev.map((position, i) => (i === index ? { ...position, ...patch } : position)));
   }
 
-  function togglePackaging(option: string) {
-    setPackaging((prev) => {
-      if (option === NO_PACKAGING) return [NO_PACKAGING];
-      const withoutNone = prev.filter((value) => value !== NO_PACKAGING);
-      const next = withoutNone.includes(option)
-        ? withoutNone.filter((value) => value !== option)
-        : [...withoutNone, option];
-      return next.length > 0 ? next : [NO_PACKAGING];
-    });
+  function selectedNomenclatureOption(position: PositionForm) {
+    return nomenclature.find((option) => option.id === position.nomenclatureId) ?? null;
+  }
+
+  function selectedCategory(position: PositionForm) {
+    return position.category || selectedNomenclatureOption(position)?.category || "";
+  }
+
+  function changePositionCategory(index: number, category: string) {
+    setPositions((prev) =>
+      prev.map((position, i) => {
+        if (i !== index) return position;
+        const option = selectedNomenclatureOption(position);
+        return {
+          ...position,
+          category,
+          nomenclatureId: option?.category === category ? position.nomenclatureId : "",
+        };
+      }),
+    );
+  }
+
+  function togglePositionPackaging(index: number, option: string) {
+    setPositions((prev) =>
+      prev.map((position, positionIndex) => {
+        if (positionIndex !== index) return position;
+        if (option === NO_PACKAGING) return { ...position, packaging: [NO_PACKAGING] };
+        const withoutNone = position.packaging.filter((value) => value !== NO_PACKAGING);
+        const next = withoutNone.includes(option)
+          ? withoutNone.filter((value) => value !== option)
+          : [...withoutNone, option];
+        return { ...position, packaging: next.length > 0 ? next : [NO_PACKAGING] };
+      }),
+    );
   }
 
   function buildDto(): CreateListingDto {
@@ -211,8 +385,11 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
         nomenclatureId: position.nomenclatureId,
         weightKg: (Number(position.weightTons) || 0) * 1000,
         form: position.form,
-        moisturePct: position.moisturePct.trim() === "" ? null : Number(position.moisturePct),
-        contaminationPct: position.contaminationPct.trim() === "" ? null : Number(position.contaminationPct),
+        moisturePct: null,
+        contaminationPct: null,
+        moistureCondition: position.moistureCondition || null,
+        contaminationCondition: position.contaminationCondition || null,
+        packaging: serializePackaging(position.packaging),
       })),
       address: {
         country: "Россия",
@@ -224,7 +401,7 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
       },
       contactPhone: formatPhoneFull(getPhoneCountry(phoneCountry), phoneDigits),
       description: description.trim() || null,
-      packaging: packaging.join(", ") || null,
+      packaging: aggregatePositionPackaging(positions),
       paymentTerms: paymentTerms.trim() || null,
       typicalLoadKg: typicalLoadTons.trim() === "" ? null : (Number(typicalLoadTons) || 0) * 1000,
       readyNow,
@@ -234,7 +411,7 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
   }
 
   function clientValidationError(): string | null {
-    if (!city.trim()) return "Укажите город.";
+    if (!city.trim()) return "Выберите адрес отгрузки из подсказки Яндекса.";
     if (!formatPhoneFull(getPhoneCountry(phoneCountry), phoneDigits)) return "Укажите контактный телефон полностью.";
     for (const position of positions) {
       if (!position.nomenclatureId) return "Выберите вид сырья во всех позициях.";
@@ -254,6 +431,8 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
     try {
       const dto = buildDto();
       const saved = listingId ? await api.marketplace.update(listingId, dto) : await api.marketplace.create(dto);
+      cleanupDraftUploadsRef.current = false;
+      draftUploadFileIdsRef.current.clear();
       if (publish) {
         await api.marketplace.publish(saved.id);
       }
@@ -266,155 +445,260 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
 
   return (
     <AppShell>
-      <section className="page">
-        <Link className="button ghost" href="/marketplace/my" style={{ marginBottom: 16, alignSelf: "flex-start" }}>
-          ← К моим объявлениям
+      <section className="page mp-listing-editor-page">
+        <Link className="mp-form-back" href="/marketplace/my">
+          <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" />К моим объявлениям
         </Link>
-        <PageHeader
-          title={listingId ? "Редактирование объявления" : "Новое объявление"}
-          subtitle="Опишите сырьё, укажите адрес отгрузки и контакты. Точный адрес и телефон видят только после принятия предложения."
-        />
+
+        <header className="mp-form-hero">
+          <div>
+            <span className="mp-form-eyebrow">
+              <ClipboardList size={16} strokeWidth={2.2} aria-hidden="true" />
+              {listingId ? "Редактирование объявления" : "Новое объявление"}
+            </span>
+            <h1>{listingId ? "Редактирование объявления" : "Новое объявление"}</h1>
+            <p>
+              Заполните карточку так же, как её потом увидит покупатель: сначала сырьё и медиа, затем адрес, готовность
+              и условия.
+            </p>
+          </div>
+          <div className="mp-form-hero-status" aria-label="Порядок публикации">
+            <PackageCheck size={22} strokeWidth={2.1} aria-hidden="true" />
+            <span>Черновик можно сохранить, публикация пройдёт проверку фото, веса и контактов.</span>
+          </div>
+        </header>
 
         <div className="mp-form">
-          <div className="mp-fieldset">
-            <h2>Позиции</h2>
-            {positions.map((position, index) => (
-              <div className="mp-position-row" key={index} style={{ gridTemplateColumns: "1fr" }}>
-                <div className="mp-field">
-                  <label>Вид сырья</label>
-                  <select
-                    className="mp-select"
-                    value={position.nomenclatureId}
-                    onChange={(event) => updatePosition(index, { nomenclatureId: event.target.value })}
-                  >
-                    <option value="">— выберите —</option>
-                    {nomenclature.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name} ({option.category})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-                  <div className="mp-field" style={{ flex: "1 1 110px" }}>
-                    <label>Вес, т</label>
-                    <input
-                      className="mp-input"
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      value={position.weightTons}
-                      onChange={(event) => updatePosition(index, { weightTons: event.target.value })}
-                    />
+          <div className="mp-form-lead-grid">
+            <div className="mp-fieldset mp-fieldset-media">
+              {sectionTitle(ImagePlus, "Фото и видео")}
+              <MediaUploader
+                media={media}
+                onChange={setMedia}
+                onUploaded={registerDraftUpload}
+                onRemove={(fileId) => {
+                  void cleanupDraftUpload(fileId);
+                }}
+              />
+            </div>
+
+            <div className="mp-fieldset">
+              {sectionTitle(ClipboardList, "Позиции")}
+              {positions.map((position, index) => {
+                const category = selectedCategory(position);
+                const positionOptions = nomenclature
+                  .filter((option) => !category || option.category === category)
+                  .map((option) => ({ value: option.id, label: option.name }));
+                return (
+                  <div className="mp-position-row" key={index}>
+                    <div className="mp-position-header">
+                      <span>Позиция {index + 1}</span>
+                      <button
+                        className="mp-icon-action"
+                        type="button"
+                        disabled={positions.length === 1}
+                        onClick={() => setPositions((prev) => prev.filter((_, i) => i !== index))}
+                        aria-label="Удалить позицию"
+                        title="Удалить позицию"
+                      >
+                        <X size={16} strokeWidth={2.4} aria-hidden="true" />
+                      </button>
+                    </div>
+
+                    <div className="mp-position-pickers">
+                      <div className={fieldClass(category)}>
+                        <label>Категория</label>
+                        <FormSelect
+                          icon={Layers}
+                          label="Категория сырья"
+                          value={category}
+                          placeholder="Выберите категорию"
+                          options={categoryOptions}
+                          disabled={categoryOptions.length === 0}
+                          onChange={(value) => changePositionCategory(index, value)}
+                        />
+                      </div>
+                      <div className={fieldClass(position.nomenclatureId)}>
+                        <label>Позиция</label>
+                        <FormSelect
+                          icon={Package}
+                          label="Позиция сырья"
+                          value={position.nomenclatureId}
+                          placeholder={category ? "Выберите позицию" : "Сначала категория"}
+                          options={positionOptions}
+                          disabled={!category || positionOptions.length === 0}
+                          onChange={(value) => updatePosition(index, { nomenclatureId: value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mp-position-details">
+                      <div className={fieldClass(position.weightTons)}>
+                        <label>
+                          <Scale size={14} strokeWidth={2.1} aria-hidden="true" />
+                          Вес, т
+                        </label>
+                        <div className={`mp-unit-input${position.weightTons ? " is-filled" : ""}`}>
+                          <input
+                            className="mp-input"
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={position.weightTons}
+                            onChange={(event) => updatePosition(index, { weightTons: event.target.value })}
+                          />
+                          <span aria-hidden="true">тонн</span>
+                        </div>
+                      </div>
+                      <div className={fieldClass(position.form)}>
+                        <label>
+                          <PackageCheck size={14} strokeWidth={2.1} aria-hidden="true" />
+                          Форма
+                        </label>
+                        <FormSelect
+                          icon={CircleDot}
+                          label="Форма сырья"
+                          value={position.form}
+                          options={[
+                            { value: "loose", label: "Россыпь" },
+                            { value: "pressed", label: "Тюки" },
+                          ]}
+                          onChange={(value) => updatePosition(index, { form: value as "pressed" | "loose" })}
+                        />
+                      </div>
+                      <div className={fieldClass(position.moistureCondition)}>
+                        <label>
+                          <Droplets size={14} strokeWidth={2.1} aria-hidden="true" />
+                          Влажность
+                        </label>
+                        <FormSelect
+                          icon={Droplets}
+                          label="Влажность сырья"
+                          value={position.moistureCondition}
+                          placeholder="Выберите влажность"
+                          options={MOISTURE_OPTIONS}
+                          onChange={(value) =>
+                            updatePosition(index, { moistureCondition: value as ListingMoistureCondition })
+                          }
+                        />
+                      </div>
+                      <div className={fieldClass(position.contaminationCondition)}>
+                        <label>
+                          <Filter size={14} strokeWidth={2.1} aria-hidden="true" />
+                          Иные включения
+                        </label>
+                        <FormSelect
+                          icon={Filter}
+                          label="Иные включения"
+                          value={position.contaminationCondition}
+                          placeholder="Выберите состояние"
+                          options={CONTAMINATION_OPTIONS}
+                          onChange={(value) =>
+                            updatePosition(index, {
+                              contaminationCondition: value as ListingContaminationCondition,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className={`${fieldClass(position.packaging.join(""))} mp-position-packaging`}>
+                        <label>
+                          <Layers size={14} strokeWidth={2.1} aria-hidden="true" />
+                          Упаковка
+                        </label>
+                        <PackagingSelect
+                          value={position.packaging}
+                          onToggle={(option) => togglePositionPackaging(index, option)}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="mp-field" style={{ flex: "1 1 110px" }}>
-                    <label>Форма</label>
-                    <select
-                      className="mp-select"
-                      value={position.form}
-                      onChange={(event) => updatePosition(index, { form: event.target.value as "pressed" | "loose" })}
-                    >
-                      <option value="loose">Россыпь</option>
-                      <option value="pressed">Тюки</option>
-                    </select>
-                  </div>
-                  <div className="mp-field" style={{ flex: "1 1 100px" }}>
-                    <label>Влажность, %</label>
-                    <input
-                      className="mp-input"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={position.moisturePct}
-                      onChange={(event) => updatePosition(index, { moisturePct: event.target.value })}
-                    />
-                  </div>
-                  <div className="mp-field" style={{ flex: "1 1 100px" }}>
-                    <label>Засор, %</label>
-                    <input
-                      className="mp-input"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={position.contaminationPct}
-                      onChange={(event) => updatePosition(index, { contaminationPct: event.target.value })}
-                    />
-                  </div>
-                  <button
-                    className="button secondary"
-                    type="button"
-                    disabled={positions.length === 1}
-                    onClick={() => setPositions((prev) => prev.filter((_, i) => i !== index))}
-                  >
-                    Удалить
-                  </button>
-                </div>
-              </div>
-            ))}
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => setPositions((prev) => [...prev, emptyPosition()])}
-            >
-              + позиция
-            </button>
+                );
+              })}
+              <button
+                className="mp-add-row-button"
+                type="button"
+                onClick={() => setPositions((prev) => [...prev, emptyPosition()])}
+              >
+                <Package size={16} strokeWidth={2.2} aria-hidden="true" />
+                Добавить позицию
+              </button>
+            </div>
           </div>
 
           <div className="mp-fieldset">
-            <h2>Фото и видео</h2>
-            <MediaUploader media={media} onChange={setMedia} />
-          </div>
-
-          <div className="mp-fieldset">
-            <h2>Адрес отгрузки</h2>
-            {YANDEX_KEY ? (
-              <div className="mp-field">
-                <label>Поиск адреса (Яндекс)</label>
+            {sectionTitle(MapPin, "Адрес отгрузки")}
+            <div className={fieldClass(addressQuery)}>
+              <label>Поиск адреса (Яндекс)</label>
+              <div className="mp-address-search">
                 <input
-                  ref={addressSearchRef}
                   id={ADDRESS_SEARCH_ID}
                   className="mp-input"
                   placeholder="Начните вводить адрес и выберите вариант…"
                   autoComplete="off"
+                  value={addressQuery}
+                  aria-expanded={addressSuggestState === "open"}
+                  aria-controls="mp-address-suggestions"
+                  onChange={(event) => setAddressQuery(event.target.value)}
+                  onFocus={() => {
+                    if (addressSuggestions.length > 0) setAddressSuggestState("open");
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => {
+                      setAddressSuggestState((prev) => (prev === "open" || prev === "empty" ? "idle" : prev));
+                    }, 120);
+                  }}
                 />
-                <p className="mp-hint">
-                  Выберите подсказку — поля ниже заполнятся автоматически. Можно править вручную.
+                {addressSuggestState === "open" ? (
+                  <div className="mp-address-suggestions" id="mp-address-suggestions" role="listbox">
+                    {addressSuggestions.map((suggestion, index) => (
+                      <button
+                        type="button"
+                        role="option"
+                        key={`${suggestion.value}-${index}`}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          applyAddressSuggestion(suggestion);
+                        }}
+                      >
+                        {suggestion.value}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              {addressSuggestState === "loading" ? <p className="mp-hint">Ищем варианты…</p> : null}
+              {addressSuggestState === "empty" ? (
+                <p className="mp-hint">Варианты не найдены. Уточните адрес в строке поиска.</p>
+              ) : null}
+              {addressSuggestState === "failed" ? (
+                <p className="mp-error">Подсказки временно недоступны. Попробуйте ещё раз чуть позже.</p>
+              ) : null}
+              {addressSuggestState === "idle" ? (
+                <p className="mp-hint">Выберите подсказку — адрес сохранится в объявлении автоматически.</p>
+              ) : null}
+            </div>
+            <div className={`mp-address-preview${city ? " is-filled" : ""}`}>
+              <MapPin size={17} strokeWidth={2.1} aria-hidden="true" />
+              <div>
+                <span>{city ? [region, city].filter(Boolean).join(", ") : "Адрес пока не выбран"}</span>
+                <p>
+                  {city
+                    ? [street, building, postcode].filter(Boolean).join(", ") || "Точный адрес сохранён из подсказки."
+                    : "Начните вводить адрес и выберите подходящую подсказку Яндекса."}
                 </p>
-              </div>
-            ) : null}
-            <div className="mp-grid-2">
-              <div className="mp-field">
-                <label>Город *</label>
-                <input className="mp-input" value={city} onChange={(event) => setCity(event.target.value)} />
-              </div>
-              <div className="mp-field">
-                <label>Регион</label>
-                <input className="mp-input" value={region} onChange={(event) => setRegion(event.target.value)} />
-              </div>
-              <div className="mp-field">
-                <label>Улица</label>
-                <input className="mp-input" value={street} onChange={(event) => setStreet(event.target.value)} />
-              </div>
-              <div className="mp-field">
-                <label>Дом</label>
-                <input className="mp-input" value={building} onChange={(event) => setBuilding(event.target.value)} />
-              </div>
-              <div className="mp-field">
-                <label>Индекс</label>
-                <input className="mp-input" value={postcode} onChange={(event) => setPostcode(event.target.value)} />
               </div>
             </div>
             <p className="mp-hint">Точный адрес скрыт от покупателей до принятия предложения.</p>
           </div>
 
           <div className="mp-fieldset">
-            <h2>Готовность и контакты</h2>
+            {sectionTitle(Truck, "Готовность и контакты")}
             <label className="mp-checkbox">
               <input type="checkbox" checked={readyNow} onChange={(event) => setReadyNow(event.target.checked)} />
               Готово к отгрузке сейчас
             </label>
             {!readyNow ? (
-              <div className="mp-field">
+              <div className={fieldClass(readinessDate)}>
                 <label>Дата готовности</label>
                 <input
                   className="mp-input"
@@ -424,7 +708,7 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
                 />
               </div>
             ) : null}
-            <div className="mp-field">
+            <div className={fieldClass(phoneDigits)}>
               <label>Контактный телефон *</label>
               <PhoneInput
                 name="contactPhone"
@@ -437,9 +721,12 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
           </div>
 
           <div className="mp-fieldset">
-            <h2>Дополнительно</h2>
-            <div className="mp-field">
-              <label>Описание</label>
+            {sectionTitle(FileText, "Дополнительно")}
+            <div className={fieldClass(description)}>
+              <label>
+                <FileText size={14} strokeWidth={2.1} aria-hidden="true" />
+                Описание
+              </label>
               <textarea
                 className="mp-input"
                 rows={3}
@@ -448,16 +735,22 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
               />
             </div>
             <div className="mp-grid-2">
-              <div className="mp-field">
-                <label>Условия оплаты</label>
+              <div className={fieldClass(paymentTerms)}>
+                <label>
+                  <CreditCard size={14} strokeWidth={2.1} aria-hidden="true" />
+                  Условия оплаты
+                </label>
                 <input
                   className="mp-input"
                   value={paymentTerms}
                   onChange={(event) => setPaymentTerms(event.target.value)}
                 />
               </div>
-              <div className="mp-field">
-                <label>Обычно гружу в машину, т</label>
+              <div className={fieldClass(typicalLoadTons)}>
+                <label>
+                  <Truck size={14} strokeWidth={2.1} aria-hidden="true" />
+                  Обычно гружу в машину, т
+                </label>
                 <input
                   className="mp-input"
                   type="number"
@@ -468,30 +761,17 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
                 />
               </div>
             </div>
-            <div className="mp-field">
-              <label>Упаковка</label>
-              <div className="mp-checkbox-row">
-                {PACKAGING_OPTIONS.map((option) => (
-                  <label key={option} className="mp-chip-check">
-                    <input
-                      type="checkbox"
-                      checked={packaging.includes(option)}
-                      onChange={() => togglePackaging(option)}
-                    />
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
           </div>
 
           {error ? <p className="mp-error">{error}</p> : null}
 
           <div className="mp-form-actions">
             <button className="button secondary" type="button" disabled={saving} onClick={() => save(false)}>
+              <FileText size={16} strokeWidth={2.2} aria-hidden="true" />
               Сохранить черновик
             </button>
             <button className="button" type="button" disabled={saving} onClick={() => save(true)}>
+              <PackageCheck size={16} strokeWidth={2.2} aria-hidden="true" />
               Опубликовать
             </button>
           </div>
@@ -501,33 +781,283 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
   );
 }
 
-function MediaUploader({ media, onChange }: { media: MediaItem[]; onChange: (media: MediaItem[]) => void }) {
+function FormSelect({
+  icon: Icon,
+  label,
+  value,
+  placeholder = "Выберите",
+  options,
+  disabled = false,
+  onChange,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  placeholder?: string;
+  options: SelectOption[];
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
+  const [activeIndex, setActiveIndex] = useState(selectedIndex);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
+  const selected = options.find((option) => option.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setActiveIndex(selectedIndex);
+  }, [open, selectedIndex]);
+
+  function choose(index: number) {
+    const option = options[index];
+    if (!option) return;
+    onChange(option.value);
+    setOpen(false);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (disabled) return;
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        if (!open) setOpen(true);
+        else setActiveIndex((index) => Math.min(options.length - 1, index + 1));
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        if (!open) setOpen(true);
+        else setActiveIndex((index) => Math.max(0, index - 1));
+        break;
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        if (open) choose(activeIndex);
+        else setOpen(true);
+        break;
+      case "Escape":
+        setOpen(false);
+        break;
+      case "Home":
+        if (open) {
+          event.preventDefault();
+          setActiveIndex(0);
+        }
+        break;
+      case "End":
+        if (open) {
+          event.preventDefault();
+          setActiveIndex(options.length - 1);
+        }
+        break;
+      case "Tab":
+        setOpen(false);
+        break;
+      default:
+        break;
+    }
+  }
+
+  return (
+    <div className={`mp-form-select${open ? " is-open" : ""}${disabled ? " is-disabled" : ""}`} ref={rootRef}>
+      <button
+        className="mp-form-select-trigger"
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        onKeyDown={onKeyDown}
+      >
+        <Icon className="mp-form-select-leading" size={17} strokeWidth={2.1} aria-hidden="true" />
+        <span className={selected ? "" : "mp-form-select-placeholder"}>{selected?.label ?? placeholder}</span>
+        <ChevronDown className="mp-form-select-chevron" size={18} strokeWidth={2} aria-hidden="true" />
+      </button>
+      {open ? (
+        <ul className="mp-form-select-list" role="listbox" id={listboxId} aria-label={label}>
+          {options.map((option, index) => {
+            const isSelected = option.value === value;
+            const isActive = index === activeIndex;
+            return (
+              <li
+                key={option.value}
+                role="option"
+                aria-selected={isSelected}
+                className={`mp-form-select-option${isActive ? " is-active" : ""}${isSelected ? " is-selected" : ""}`}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => choose(index)}
+              >
+                <span>{option.label}</span>
+                {isSelected ? <Check size={16} strokeWidth={2.6} aria-hidden="true" /> : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function PackagingSelect({ value, onToggle }: { value: string[]; onToggle: (option: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
+  const label = value.join(", ") || NO_PACKAGING;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  function toggle(index: number) {
+    const option = PACKAGING_OPTIONS[index];
+    if (!option) return;
+    onToggle(option);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        if (!open) setOpen(true);
+        else setActiveIndex((index) => Math.min(PACKAGING_OPTIONS.length - 1, index + 1));
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        if (!open) setOpen(true);
+        else setActiveIndex((index) => Math.max(0, index - 1));
+        break;
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        if (open) toggle(activeIndex);
+        else setOpen(true);
+        break;
+      case "Escape":
+        setOpen(false);
+        break;
+      case "Tab":
+        setOpen(false);
+        break;
+      default:
+        break;
+    }
+  }
+
+  return (
+    <div className={`mp-form-select${open ? " is-open" : ""}`} ref={rootRef}>
+      <button
+        className="mp-form-select-trigger"
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        aria-label="Упаковка"
+        onClick={() => setOpen((prev) => !prev)}
+        onKeyDown={onKeyDown}
+      >
+        <Layers className="mp-form-select-leading" size={17} strokeWidth={2.1} aria-hidden="true" />
+        <span>{label}</span>
+        <ChevronDown className="mp-form-select-chevron" size={18} strokeWidth={2} aria-hidden="true" />
+      </button>
+      {open ? (
+        <ul className="mp-form-select-list" role="listbox" id={listboxId} aria-label="Упаковка" aria-multiselectable>
+          {PACKAGING_OPTIONS.map((option, index) => {
+            const isSelected = value.includes(option);
+            const isActive = index === activeIndex;
+            return (
+              <li
+                key={option}
+                role="option"
+                aria-selected={isSelected}
+                className={`mp-form-select-option${isActive ? " is-active" : ""}${isSelected ? " is-selected" : ""}`}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => toggle(index)}
+              >
+                <span>{option}</span>
+                {isSelected ? <Check size={16} strokeWidth={2.6} aria-hidden="true" /> : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function MediaUploader({
+  media,
+  onChange,
+  onUploaded,
+  onRemove,
+}: {
+  media: MediaItem[];
+  onChange: (media: MediaItem[]) => void;
+  onUploaded?: (fileId: string) => void;
+  onRemove?: (fileId: string) => void;
+}) {
   const { token } = useAuth();
   const assets = useFileAssetsByIds(media.map((item) => item.fileId));
-  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<MediaUploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const photos = media.filter((item) => item.kind === "photo").length;
   const videos = media.filter((item) => item.kind === "video").length;
+  const uploading = uploadProgress !== null;
+  const uploadPercent = Math.round((uploadProgress?.fraction ?? 0) * 100);
 
   async function addFiles(fileList: FileList | null, kind: "photo" | "video") {
     if (!fileList || !token) return;
+    const remainingSlots = kind === "photo" ? LISTING_MAX_PHOTOS - photos : LISTING_MAX_VIDEOS - videos;
+    const files = Array.from(fileList).slice(0, Math.max(0, remainingSlots));
+    if (files.length === 0) return;
+
     setError(null);
-    setUploading(true);
     try {
       const next = [...media];
-      for (const file of Array.from(fileList)) {
+      for (const [index, file] of files.entries()) {
         const currentPhotos = next.filter((item) => item.kind === "photo").length;
         const currentVideos = next.filter((item) => item.kind === "video").length;
         if (kind === "photo" && currentPhotos >= LISTING_MAX_PHOTOS) break;
         if (kind === "video" && currentVideos >= LISTING_MAX_VIDEOS) break;
-        const asset = await apiUploadFileWithProgress(file, { token, accessLevel: "public" });
+        setUploadProgress({ fileName: file.name, fraction: 0, index: index + 1, total: files.length, kind });
+        const asset = await apiUploadFileWithProgress(file, {
+          token,
+          accessLevel: "public",
+          onProgress: (fraction) => {
+            setUploadProgress({ fileName: file.name, fraction, index: index + 1, total: files.length, kind });
+          },
+        });
+        onUploaded?.(asset.id);
         next.push({ fileId: asset.id, kind });
       }
       onChange(next);
     } catch (uploadError) {
       setError(uploadError instanceof ApiError ? uploadError.message : "Не удалось загрузить файл.");
     } finally {
-      setUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -544,7 +1074,10 @@ function MediaUploader({ media, onChange }: { media: MediaItem[]; onChange: (med
                 className="mp-media-remove"
                 type="button"
                 aria-label="Удалить"
-                onClick={() => onChange(media.filter((other) => other.fileId !== item.fileId))}
+                onClick={() => {
+                  onRemove?.(item.fileId);
+                  onChange(media.filter((other) => other.fileId !== item.fileId));
+                }}
               >
                 <X size={14} />
               </button>
@@ -552,29 +1085,57 @@ function MediaUploader({ media, onChange }: { media: MediaItem[]; onChange: (med
           );
         })}
         {photos < LISTING_MAX_PHOTOS ? (
-          <label className="mp-media-add">
+          <label className={`mp-media-add${uploading ? " is-disabled" : ""}`}>
             <input
               type="file"
               accept="image/*"
               multiple
               hidden
+              disabled={uploading}
               onChange={(event) => addFiles(event.target.files, "photo")}
             />
-            <span>+ фото</span>
+            <ImagePlus size={20} strokeWidth={2.1} aria-hidden="true" />
+            <span>Фото</span>
           </label>
         ) : null}
         {videos < LISTING_MAX_VIDEOS ? (
-          <label className="mp-media-add">
-            <input type="file" accept="video/*" hidden onChange={(event) => addFiles(event.target.files, "video")} />
-            <span>+ видео</span>
+          <label className={`mp-media-add${uploading ? " is-disabled" : ""}`}>
+            <input
+              type="file"
+              accept="video/*"
+              hidden
+              disabled={uploading}
+              onChange={(event) => addFiles(event.target.files, "video")}
+            />
+            <Video size={20} strokeWidth={2.1} aria-hidden="true" />
+            <span>Видео</span>
           </label>
+        ) : null}
+        {uploadProgress ? (
+          <div className="mp-media-progress" role="status" aria-live="polite">
+            <div className="mp-media-progress-head">
+              <Upload size={18} className="mp-media-progress-spin" />
+              <span className="mp-media-progress-name">{uploadProgress.fileName}</span>
+              <span className="mp-media-progress-percent">
+                {uploadPercent >= 100 ? "Обработка…" : `${uploadPercent}%`}
+              </span>
+            </div>
+            <div className="mp-media-progress-track">
+              <div
+                className={`mp-media-progress-fill${uploadPercent >= 100 ? " is-indeterminate" : ""}`}
+                style={{ width: `${uploadPercent}%` }}
+              />
+            </div>
+            <small>
+              {uploadProgress.kind === "photo" ? "Фото" : "Видео"} {uploadProgress.index}/{uploadProgress.total}
+            </small>
+          </div>
         ) : null}
       </div>
       <p className="mp-hint">
         Фото: {photos}/{LISTING_MAX_PHOTOS} (минимум {LISTING_MIN_PHOTOS} для публикации). Видео: {videos}/
         {LISTING_MAX_VIDEOS}.
       </p>
-      {uploading ? <p className="mp-hint">Загрузка файла…</p> : null}
       {error ? <p className="mp-error">{error}</p> : null}
     </div>
   );

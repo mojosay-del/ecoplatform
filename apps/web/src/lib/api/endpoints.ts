@@ -30,6 +30,7 @@ import type {
   ListingOfferItem,
   MarketplaceListingDetail,
   MarketplaceListingListItem,
+  MarketplaceAddressSuggestion,
   MarketplaceNomenclatureOption,
   MyMarketplaceListingItem,
   MyOfferItem,
@@ -136,6 +137,7 @@ export const api = {
     listings: (input: MarketplaceFeedInput = {}) =>
       apiFetch<PaginatedResponse<MarketplaceListingListItem>>(`/marketplace/listings${marketplaceFeedSuffix(input)}`),
     regions: () => apiFetch<string[]>("/marketplace/regions"),
+    addressSuggest: (q: string) => apiFetch<MarketplaceAddressSuggestion[]>(`/marketplace/address-suggest?q=${enc(q)}`),
     myListings: (pagination: PaginationInput = {}) =>
       apiFetch<PaginatedResponse<MyMarketplaceListingItem>>(`/marketplace/my/listings${paginationSuffix(pagination)}`),
     nomenclature: () => apiFetch<MarketplaceNomenclatureOption[]>("/marketplace/nomenclature"),
@@ -155,8 +157,7 @@ export const api = {
         apiFetch<PaginatedResponse<MyOfferItem>>(`/marketplace/my/offers${paginationSuffix(pagination)}`),
       create: (listingId: string, body: CreateOfferDto) =>
         apiFetch<MyOfferItem>(`/marketplace/listings/${enc(listingId)}/offers`, { method: "POST", body }),
-      forListing: (listingId: string) =>
-        apiFetch<ListingOfferItem[]>(`/marketplace/listings/${enc(listingId)}/offers`),
+      forListing: (listingId: string) => apiFetch<ListingOfferItem[]>(`/marketplace/listings/${enc(listingId)}/offers`),
       update: (offerId: string, body: CreateOfferDto) =>
         apiFetch<MyOfferItem>(`/marketplace/offers/${enc(offerId)}`, { method: "PATCH", body }),
       withdraw: (offerId: string) =>
@@ -167,10 +168,8 @@ export const api = {
         apiFetch<ListingOfferItem>(`/marketplace/offers/${enc(offerId)}/deal`, { method: "POST", body: { result } }),
     },
     reviews: {
-      forCompany: (companyId: string) =>
-        apiFetch<ReviewItem[]>(`/marketplace/companies/${enc(companyId)}/reviews`),
-      rating: (companyId: string) =>
-        apiFetch<CompanyRatingSummary>(`/marketplace/companies/${enc(companyId)}/rating`),
+      forCompany: (companyId: string) => apiFetch<ReviewItem[]>(`/marketplace/companies/${enc(companyId)}/reviews`),
+      rating: (companyId: string) => apiFetch<CompanyRatingSummary>(`/marketplace/companies/${enc(companyId)}/rating`),
       create: (offerId: string, body: CreateReviewDto) =>
         apiFetch<ReviewItem>(`/marketplace/offers/${enc(offerId)}/reviews`, { method: "POST", body }),
       remove: (reviewId: string) =>
@@ -339,7 +338,12 @@ export const api = {
   // ── Жалобы (модерация со стороны пользователя) ─────────────────────────
   moderation: {
     createComplaint: (body: {
-      entityType: "news_comment" | "news_post" | "knowledge_base_article" | "marketplace_listing" | "marketplace_review";
+      entityType:
+        | "news_comment"
+        | "news_post"
+        | "knowledge_base_article"
+        | "marketplace_listing"
+        | "marketplace_review";
       entityId: string;
       reasonCode: string;
       comment?: string;

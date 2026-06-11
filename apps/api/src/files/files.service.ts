@@ -46,11 +46,7 @@ import {
   type FileAssetResponse,
   type FileAssetVideoSource,
 } from "./files-response.helpers";
-import {
-  isVideoMime,
-  parseVideoRenditions,
-  serializeVideoRenditions,
-} from "./video-renditions";
+import { isVideoMime, parseVideoRenditions, serializeVideoRenditions } from "./video-renditions";
 import { VideoTranscodeService } from "./video-transcode.service";
 
 export type { FileAssetResponse } from "./files-response.helpers";
@@ -61,6 +57,7 @@ export type UploadedMemoryFile = {
   size: number;
   buffer: Buffer;
 };
+export type FileUploadRestriction = "media_only";
 
 type FileReferenceBlock = { payload: unknown };
 
@@ -163,7 +160,10 @@ export class FilesService {
     }
   }
 
-  private async validateUpload(file: UploadedMemoryFile, input: { imagePreset?: "cover" }): Promise<ValidatedUpload> {
+  private async validateUpload(
+    file: UploadedMemoryFile,
+    input: { imagePreset?: "cover"; restriction?: FileUploadRestriction },
+  ): Promise<ValidatedUpload> {
     const declaredMime = normalizeMimeType(file.mimetype);
     if (BLOCKED_UPLOAD_MIME_TYPES.has(declaredMime) || hasBlockedExtension(file.originalname)) {
       throw new BadRequestException("Формат файла не поддерживается.");
@@ -178,6 +178,14 @@ export class FilesService {
     }
     if (!isDeclaredMimeCompatible(declaredMime, detectedMime)) {
       throw new BadRequestException("Тип файла не совпадает с его содержимым.");
+    }
+
+    if (
+      input.restriction === "media_only" &&
+      !detectedMime.startsWith("image/") &&
+      !detectedMime.startsWith("video/")
+    ) {
+      throw new BadRequestException("Можно загрузить только изображение или видео.");
     }
 
     if (input.imagePreset === "cover") {
@@ -273,7 +281,7 @@ export class FilesService {
 
   async upload(
     file: UploadedMemoryFile | undefined,
-    input: { accessLevel?: FileAccessLevel; imagePreset?: "cover" },
+    input: { accessLevel?: FileAccessLevel; imagePreset?: "cover"; restriction?: FileUploadRestriction },
     userId: string,
   ) {
     if (!file) {

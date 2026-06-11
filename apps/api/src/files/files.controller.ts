@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -20,7 +21,7 @@ import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
 import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
-import { FilesService, type UploadedMemoryFile } from "./files.service";
+import { FilesService, type FileUploadRestriction, type UploadedMemoryFile } from "./files.service";
 
 const fileMetadataSchema = z.object({
   originalName: z.string().trim().min(1).max(255),
@@ -36,6 +37,35 @@ const FILE_UPLOAD_THROTTLE = {
   short: { limit: 20, ttl: 60_000 },
   long: { limit: 20, ttl: 60_000 },
 };
+const fileUploadSchema = z.object({
+  accessLevel: z.nativeEnum(FileAccessLevel).optional(),
+  imagePreset: z.literal("cover").optional(),
+});
+type FileUploadInput = z.infer<typeof fileUploadSchema>;
+type AuthorizedUploadInput = FileUploadInput & { restriction?: FileUploadRestriction };
+
+function canManageFiles(user: RequestUser): boolean {
+  return user.platformRoles.includes("admin") || user.platformRoles.includes("content_manager");
+}
+
+function canUploadCompanyMedia(user: RequestUser): boolean {
+  return Boolean(user.companyId);
+}
+
+function authorizeUpload(input: FileUploadInput, user: RequestUser): AuthorizedUploadInput {
+  if (canManageFiles(user)) {
+    return input;
+  }
+
+  if (!canUploadCompanyMedia(user)) {
+    throw new ForbiddenException("Недостаточно прав для этого раздела.");
+  }
+
+  return {
+    ...input,
+    restriction: "media_only",
+  };
+}
 
 @UseGuards(JwtAuthGuard)
 @Controller("files")
@@ -61,8 +91,6 @@ export class FilesController {
     return this.files.createMetadata(input, user.id);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles("admin", "content_manager")
   @Post("upload")
   @Throttle(FILE_UPLOAD_THROTTLE)
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 100 * 1024 * 1024 } }))
@@ -71,18 +99,10 @@ export class FilesController {
     @Body() body: unknown,
     @CurrentUser() user: RequestUser,
   ) {
-    const input = parseBody(
-      z.object({
-        accessLevel: z.nativeEnum(FileAccessLevel).optional(),
-        imagePreset: z.literal("cover").optional(),
-      }),
-      body,
-    );
+    const input = authorizeUpload(parseBody(fileUploadSchema, body), user);
     return this.files.upload(file, input, user.id);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles("admin", "content_manager")
   @Delete(":id")
   async deleteIfUnreferenced(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     await this.files.deleteIfUnreferenced([id], user);

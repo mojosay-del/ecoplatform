@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { z } from "zod";
 import {
   createListingDtoSchema,
   createOfferDtoSchema,
@@ -13,14 +14,19 @@ import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
 import { MarketplaceFeatureGuard } from "./marketplace-feature.guard";
 import { marketplaceListQuerySchema } from "./marketplace.schemas";
+import { MarketplaceGeocoderService } from "./services/marketplace-geocoder.service";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
 import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
 
+const addressSuggestQuerySchema = z.object({
+  q: z.string().trim().min(3).max(200),
+});
+
 // Маршруты торговой площадки. Два гейта на контроллере: JwtAuthGuard (нужен
-// авторизованный пользователь) и MarketplaceFeatureGuard («за закрытыми
-// дверьми»: пока только админы, либо все при MARKETPLACE_ENABLED=1). Доступ по
-// подписке и роли заготовителя проверяет уже сервис.
+// авторизованный пользователь) и MarketplaceFeatureGuard (публичный запуск через
+// MARKETPLACE_ENABLED=1, иначе только админы). Доступ по подписке и роли
+// заготовителя проверяет уже сервис.
 @UseGuards(JwtAuthGuard, MarketplaceFeatureGuard)
 @Controller()
 export class MarketplaceController {
@@ -28,6 +34,7 @@ export class MarketplaceController {
     private readonly listings: MarketplaceListingsService,
     private readonly offers: MarketplaceOffersService,
     private readonly reviews: MarketplaceReviewsService,
+    private readonly geocoder: MarketplaceGeocoderService,
   ) {}
 
   @Get("marketplace/listings")
@@ -48,6 +55,12 @@ export class MarketplaceController {
   @Get("marketplace/regions")
   async regions(@CurrentUser() user: RequestUser) {
     return this.listings.listRegions(user);
+  }
+
+  @Get("marketplace/address-suggest")
+  async addressSuggest(@Query() query: Record<string, unknown>) {
+    const input = parseBody(addressSuggestQuerySchema, query);
+    return this.geocoder.suggest(input.q);
   }
 
   @Get("marketplace/listings/:id")

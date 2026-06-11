@@ -433,7 +433,36 @@ describe("FilesService upload validation", () => {
     expect(result.mimeType).toBe("application/pdf");
   });
 
-  it("для cover-upload сохраняет WebP и AVIF варианты в S3 и метаданных", async () => {
+  it("отклоняет PDF в режиме загрузки медиа пользователем компании", async () => {
+    const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
+        create: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      service.upload(
+        {
+          originalname: "report.pdf",
+          mimetype: "application/pdf",
+          size: pdf.length,
+          buffer: pdf,
+        },
+        { restriction: "media_only" },
+        "user-1",
+      ),
+    ).rejects.toThrow("Можно загрузить только изображение или видео.");
+
+    expect(s3Send).not.toHaveBeenCalled();
+    expect(prisma.fileAsset.create).not.toHaveBeenCalled();
+  });
+
+  it("для cover-upload пользователя компании сохраняет WebP и AVIF варианты в S3 и метаданных", async () => {
     const source = await sharp({
       create: {
         width: 1400,
@@ -469,7 +498,7 @@ describe("FilesService upload validation", () => {
           size: source.length,
           buffer: source,
         },
-        { imagePreset: "cover", accessLevel: FileAccessLevel.public },
+        { imagePreset: "cover", accessLevel: FileAccessLevel.public, restriction: "media_only" },
         "user-1",
       ),
     );
@@ -681,9 +710,11 @@ describe("FilesService приватный бакет + signed URL", () => {
     expect(result[0]?.downloadUrl).toBe("https://signed.example/private-bucket/uploads/2026-06-06/lesson.mp4");
 
     // Для inline-ссылки presign идёт БЕЗ ResponseContentDisposition, для скачивания — С ним.
-    const dispositions = vi.mocked(getSignedUrl).mock.calls.map(
-      ([, command]) => (command as { input?: Record<string, unknown> }).input?.ResponseContentDisposition,
-    );
+    const dispositions = vi
+      .mocked(getSignedUrl)
+      .mock.calls.map(
+        ([, command]) => (command as { input?: Record<string, unknown> }).input?.ResponseContentDisposition,
+      );
     expect(dispositions).toContain(undefined);
     expect(dispositions.some((value) => typeof value === "string")).toBe(true);
   });

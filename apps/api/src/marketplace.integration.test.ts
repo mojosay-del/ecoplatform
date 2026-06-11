@@ -4,10 +4,9 @@ import { MarketplaceOffersService } from "./marketplace/services/marketplace-off
 import { setupIntegrationContext } from "./test/integration-context";
 import { expectPaginatedEnvelope, withEnv } from "./test/integration-helpers";
 
-// Торговая площадка строится «за закрытыми дверьми»: до публичного запуска
-// раздел доступен только платформенным админам (дог-фуд на проде), а при
-// MARKETPLACE_ENABLED=1 открывается всем авторизованным пользователям.
-// На этапе фундамента проверяем именно этот гейт + пустую публичную ленту.
+// MARKETPLACE_ENABLED=1 открывает торговую площадку всем авторизованным
+// пользователям. Если флаг выключен, раздел остаётся доступен только админам
+// для служебной проверки.
 const ctx = setupIntegrationContext();
 const { loginAdmin, registerCompany, registerWithBody } = ctx;
 
@@ -44,7 +43,16 @@ async function seedPhotos(count: number): Promise<string[]> {
 
 function listingPayload(nomenclatureId: string, photoIds: string[], overrides: Record<string, unknown> = {}) {
   return {
-    positions: [{ nomenclatureId, weightKg: 1500, form: "pressed" }],
+    positions: [
+      {
+        nomenclatureId,
+        weightKg: 1500,
+        form: "pressed",
+        packaging: "Палет",
+        moistureCondition: "slightly_wet",
+        contaminationCondition: "may_have_inclusions",
+      },
+    ],
     address: { city: "Москва", region: "Москва" },
     contactPhone: "+79991234567",
     typicalLoadKg: 20000,
@@ -141,7 +149,7 @@ async function agreedDeal(sellerSuffix: string, buyerSuffix: string) {
   };
 }
 
-describe("Marketplace — доступ за закрытыми дверьми", () => {
+describe("Marketplace — публичный доступ", () => {
   it("требует авторизацию", async () => {
     const res = await ctx.http.get("/api/marketplace/listings");
     expect(res.status).toBe(401);
@@ -195,6 +203,10 @@ describe("Marketplace — объявления (фаза 1)", () => {
       expect(draft.body.contactPhone).toBe("+79991234567");
       expect(draft.body.address?.city).toBe("Москва");
       expect(draft.body.positions).toHaveLength(1);
+      expect(draft.body.packaging).toBe("Палет");
+      expect(draft.body.positions[0].packaging).toBe("Палет");
+      expect(draft.body.positions[0].moistureCondition).toBe("slightly_wet");
+      expect(draft.body.positions[0].contaminationCondition).toBe("may_have_inclusions");
 
       const publish = await ctx.http.post(`/api/marketplace/listings/${draft.body.id}/publish`).set(bearer(token));
       expect(publish.status).toBe(201);
@@ -780,6 +792,17 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
 });
 
 describe("Marketplace — карта и фильтры (фаза 2)", () => {
+  it("адресные подсказки без ключа геокодера мягко возвращают пустой список", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1", YANDEX_GEOCODER_API_KEY: undefined }, async () => {
+      const { token } = await registerCompany("0009399");
+
+      const res = await ctx.http.get("/api/marketplace/address-suggest?q=Москва").set(bearer(token));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+  });
+
   it("фильтры по региону/сырью + список регионов; без ключа геокодера круг пуст", async () => {
     await withEnv({ MARKETPLACE_ENABLED: "1", YANDEX_GEOCODER_API_KEY: undefined }, async () => {
       const { token } = await registerCompany("0009401");

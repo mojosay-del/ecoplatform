@@ -223,7 +223,7 @@ export class MarketplaceListingsService {
           circleLon: geo.circleLon,
           contactPhone: dto.contactPhone.trim(),
           description: optionalText(dto.description),
-          packaging: optionalText(dto.packaging),
+          packaging: listingPackagingForCreate(dto.packaging, dto.positions),
           paymentTerms: optionalText(dto.paymentTerms),
           typicalLoadKg: dto.typicalLoadKg ?? null,
           readyNow: dto.readyNow,
@@ -280,7 +280,7 @@ export class MarketplaceListingsService {
         data: {
           contactPhone: dto.contactPhone?.trim(),
           description: patchOptionalText(dto.description),
-          packaging: patchOptionalText(dto.packaging),
+          packaging: listingPackagingForUpdate(dto.packaging, dto.positions),
           paymentTerms: patchOptionalText(dto.paymentTerms),
           typicalLoadKg: dto.typicalLoadKg === undefined ? undefined : (dto.typicalLoadKg ?? null),
           readyNow: dto.readyNow,
@@ -418,6 +418,9 @@ export class MarketplaceListingsService {
               position: position.position,
               weightKg: position.weightKg,
               form: position.form,
+              packaging: position.packaging,
+              moistureCondition: position.moistureCondition,
+              contaminationCondition: position.contaminationCondition,
               moisturePct: position.moisturePct,
               contaminationPct: position.contaminationPct,
             })),
@@ -542,12 +545,38 @@ function patchOptionalText(value: string | null | undefined): string | null | un
   return optionalText(value);
 }
 
+function aggregatePositionPackaging(positions: ListingPositionInput[]): string | null {
+  const items = positions
+    .flatMap((position) => (position.packaging ?? "").split(","))
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const unique = Array.from(new Set(items));
+  return unique.length > 0 ? unique.join(", ") : null;
+}
+
+function listingPackagingForCreate(packaging: string | null | undefined, positions: ListingPositionInput[]) {
+  return aggregatePositionPackaging(positions) ?? optionalText(packaging);
+}
+
+function listingPackagingForUpdate(
+  packaging: string | null | undefined,
+  positions: ListingPositionInput[] | undefined,
+): string | null | undefined {
+  if (positions) {
+    return aggregatePositionPackaging(positions) ?? patchOptionalText(packaging) ?? null;
+  }
+  return patchOptionalText(packaging);
+}
+
 function positionCreateData(positions: ListingPositionInput[]) {
   return positions.map((position, index) => ({
     nomenclatureId: position.nomenclatureId,
     position: index,
     weightKg: new Prisma.Decimal(position.weightKg),
     form: position.form,
+    packaging: optionalText(position.packaging),
+    moistureCondition: position.moistureCondition ?? null,
+    contaminationCondition: position.contaminationCondition ?? null,
     moisturePct: position.moisturePct == null ? null : new Prisma.Decimal(position.moisturePct),
     contaminationPct: position.contaminationPct == null ? null : new Prisma.Decimal(position.contaminationPct),
   }));

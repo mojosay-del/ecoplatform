@@ -14,6 +14,8 @@ import type {
   ContentStatus,
   DealResult,
   LegalDocumentType,
+  ListingContaminationCondition,
+  ListingMoistureCondition,
   ListingPositionForm,
   ListingStatus,
   OfferStatus,
@@ -706,8 +708,11 @@ export type MarketplaceListingPositionDetail = {
   categorySlug: string;
   weightKg: number;
   form: ListingPositionForm;
+  packaging: string | null;
   moisturePct: number | null;
   contaminationPct: number | null;
+  moistureCondition: ListingMoistureCondition | null;
+  contaminationCondition: ListingContaminationCondition | null;
 };
 
 // Детальная карточка объявления. `address`/`contactPhone` приходят только тем,
@@ -741,6 +746,11 @@ export type MarketplaceNomenclatureOption = {
   id: string;
   name: string;
   category: string;
+};
+
+export type MarketplaceAddressSuggestion = {
+  value: string;
+  address: CompanyAddress;
 };
 
 // Карточка объявления в кабинете заготовителя «Мои объявления».

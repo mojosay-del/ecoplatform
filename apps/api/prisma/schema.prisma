@@ -1215,7 +1215,7 @@ model ConsentRecord {
 // Предложения (Offer*) — фаза 3 (ниже). Отзывы (MarketplaceReview*) — фаза 4,
 // отдельной аддитивной миграцией. Таблицы заводим по мере готовности кода фазы.
 //
-// Раздел скрыт за ролью admin + флагом MARKETPLACE_ENABLED до публичного запуска
+// Публичный доступ включается через MARKETPLACE_ENABLED=1
 // (см. apps/api/src/marketplace/marketplace-feature.guard.ts). Модерация
 // объявлений переиспользует полиморфные ModerationCase/Complaint/Sanction
 // (entityType='marketplace_listing'), без новых таблиц.
@@ -1289,20 +1289,23 @@ model MarketplaceListing {
 }
 
 model ListingPosition {
-  id               String              @id @default(cuid())
-  listingId        String
-  listing          MarketplaceListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  nomenclatureId   String
-  nomenclature     Nomenclature        @relation(fields: [nomenclatureId], references: [id])
-  position         Int
+  id                     String              @id @default(cuid())
+  listingId              String
+  listing                MarketplaceListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  nomenclatureId         String
+  nomenclature           Nomenclature        @relation(fields: [nomenclatureId], references: [id])
+  position               Int
   // Минимум 100 кг агрегатно по объявлению — проверяется в сервисе.
-  weightKg         Decimal             @db.Decimal(12, 2)
-  form             ListingPositionForm @default(loose)
+  weightKg               Decimal             @db.Decimal(12, 2)
+  form                   ListingPositionForm @default(loose)
+  packaging              String?
+  moistureCondition      String?
+  contaminationCondition String?
   // Влажность и засор в процентах (0–100), опциональны.
-  moisturePct      Decimal?            @db.Decimal(5, 2)
-  contaminationPct Decimal?            @db.Decimal(5, 2)
-  offerPositions   OfferPosition[]
-  createdAt        DateTime            @default(now())
+  moisturePct            Decimal?            @db.Decimal(5, 2)
+  contaminationPct       Decimal?            @db.Decimal(5, 2)
+  offerPositions         OfferPosition[]
+  createdAt              DateTime            @default(now())
 
   @@unique([listingId, position])
   @@index([nomenclatureId])

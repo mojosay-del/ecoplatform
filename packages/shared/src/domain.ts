@@ -100,6 +100,18 @@ export const listingPositionForms = ["pressed", "loose"] as const;
 
 export type ListingPositionForm = (typeof listingPositionForms)[number];
 
+// Влажность в форме объявления теперь выбирается как понятное состояние, а не
+// как процент, чтобы продавец не угадывал лабораторное значение.
+export const listingMoistureConditions = ["dry", "slightly_wet", "wet"] as const;
+
+export type ListingMoistureCondition = (typeof listingMoistureConditions)[number];
+
+// Засор/иные включения тоже задаём бизнес-статусом: для покупателя важнее
+// ожидаемая чистота партии, чем условный процент.
+export const listingContaminationConditions = ["clean", "may_have_inclusions", "has_inclusions"] as const;
+
+export type ListingContaminationCondition = (typeof listingContaminationConditions)[number];
+
 // Предложения (фаза 3): статус, условие цены, итог сделки.
 export const offerStatuses = ["active", "withdrawn", "accepted", "declined"] as const;
 

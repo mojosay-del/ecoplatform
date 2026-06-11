@@ -148,8 +148,13 @@ export function mapToDetail(
       categorySlug: position.nomenclature.category.slug,
       weightKg: Number(position.weightKg),
       form: position.form,
+      packaging: position.packaging,
       moisturePct: decimalToNumberOrNull(position.moisturePct),
       contaminationPct: decimalToNumberOrNull(position.contaminationPct),
+      moistureCondition:
+        position.moistureCondition as MarketplaceListingDetail["positions"][number]["moistureCondition"],
+      contaminationCondition:
+        position.contaminationCondition as MarketplaceListingDetail["positions"][number]["contaminationCondition"],
     })),
     media: listing.media.map((item) => ({
       id: item.id,

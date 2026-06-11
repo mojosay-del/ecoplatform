@@ -49,6 +49,30 @@ function tons(kg: number | null): string {
   return `${Number.isInteger(value) ? value : value.toFixed(1)} т`;
 }
 
+const MOISTURE_CONDITION_LABEL = {
+  dry: "Сухое",
+  slightly_wet: "Немного влажное",
+  wet: "Влажное",
+} as const;
+
+const CONTAMINATION_CONDITION_LABEL = {
+  clean: "Без включений",
+  may_have_inclusions: "Могут быть иные включения",
+  has_inclusions: "Есть иные включения",
+} as const;
+
+function moistureLabel(position: MarketplaceListingDetail["positions"][number] | undefined): string | null {
+  if (!position) return null;
+  if (position.moistureCondition) return MOISTURE_CONDITION_LABEL[position.moistureCondition];
+  return position.moisturePct != null ? `до ${position.moisturePct}%` : null;
+}
+
+function contaminationLabel(position: MarketplaceListingDetail["positions"][number] | undefined): string | null {
+  if (!position) return null;
+  if (position.contaminationCondition) return CONTAMINATION_CONDITION_LABEL[position.contaminationCondition];
+  return position.contaminationPct != null ? `до ${position.contaminationPct}%` : null;
+}
+
 export function ListingModal({
   listingId,
   onClose,
@@ -99,13 +123,17 @@ export function ListingModal({
             const forms = [
               ...new Set(listing.positions.map((position) => LISTING_FORM_LABEL[position.form] ?? position.form)),
             ].join(", ");
-            const firstMoisture =
-              listing.positions.find((position) => position.moisturePct != null)?.moisturePct ?? null;
-            const firstContamination =
-              listing.positions.find((position) => position.contaminationPct != null)?.contaminationPct ?? null;
+            const moisture = moistureLabel(
+              listing.positions.find((position) => position.moistureCondition || position.moisturePct != null),
+            );
+            const contamination = contaminationLabel(
+              listing.positions.find(
+                (position) => position.contaminationCondition || position.contaminationPct != null,
+              ),
+            );
             const productFacts = [
-              firstMoisture != null ? { icon: Droplets, label: "Влажность", value: `до ${firstMoisture}%` } : null,
-              firstContamination != null ? { icon: Filter, label: "Засор", value: `до ${firstContamination}%` } : null,
+              moisture ? { icon: Droplets, label: "Влажность", value: moisture } : null,
+              contamination ? { icon: Filter, label: "Иные включения", value: contamination } : null,
               listing.paymentTerms ? { icon: CreditCard, label: "Оплата", value: listing.paymentTerms } : null,
               listing.typicalLoadKg != null
                 ? { icon: Weight, label: "Обычно гружу в машину", value: tons(listing.typicalLoadKg) }

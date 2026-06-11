@@ -4,6 +4,8 @@ import {
   consentSources,
   dealResults,
   legalDocumentTypes,
+  listingContaminationConditions,
+  listingMoistureConditions,
   listingPositionForms,
   priceConditions,
   reviewCriteria,
@@ -223,6 +225,9 @@ export const listingPositionInputSchema = z.object({
   form: z.enum(listingPositionForms).default("loose"),
   moisturePct: z.number().min(0).max(100).nullish(),
   contaminationPct: z.number().min(0).max(100).nullish(),
+  moistureCondition: z.enum(listingMoistureConditions).nullish(),
+  contaminationCondition: z.enum(listingContaminationConditions).nullish(),
+  packaging: z.string().trim().max(200).nullish(),
 });
 
 export type ListingPositionInput = z.infer<typeof listingPositionInputSchema>;
