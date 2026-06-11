@@ -247,7 +247,6 @@ export const createListingDtoSchema = z.object({
     .trim()
     .regex(/^\+?\d[\d\s()-]{6,30}$/, "Телефон в формате +7XXXXXXXXXX"),
   description: z.string().trim().max(2000).nullish(),
-  packaging: z.string().trim().max(200).nullish(),
   paymentTerms: z.string().trim().max(500).nullish(),
   // Типичный объём отгрузки в одну машину, в кг (фронт вводит тонны → ×1000).
   typicalLoadKg: z.number().positive().max(100000).nullish(),

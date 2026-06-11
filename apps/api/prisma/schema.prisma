@@ -1256,7 +1256,6 @@ model MarketplaceListing {
   // только после акцепта предложения.
   contactPhone  String
   description   String?
-  packaging     String?
   paymentTerms  String?
   // Типичный объём отгрузки в одну машину. Храним в кг (как weightKg позиций),
   // фронт вводит/показывает в тоннах. Опционально.

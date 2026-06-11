@@ -58,6 +58,15 @@ function positionSummaries(listing: ListingWithRelations): MarketplaceListingPos
   }));
 }
 
+function aggregatePositionPackaging(positions: ListingWithRelations["positions"]): string | null {
+  const items = positions
+    .flatMap((position) => (position.packaging ?? "").split(","))
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const unique = Array.from(new Set(items));
+  return unique.length > 0 ? unique.join(", ") : null;
+}
+
 export function mapToListItem(listing: ListingWithRelations): MarketplaceListingListItem {
   return {
     id: listing.id,
@@ -133,7 +142,7 @@ export function mapToDetail(
     address: options.canSeeContacts ? toCompanyAddress(listing.address) : null,
     contactPhone: options.canSeeContacts ? listing.contactPhone : null,
     description: listing.description,
-    packaging: listing.packaging,
+    packaging: aggregatePositionPackaging(listing.positions),
     paymentTerms: listing.paymentTerms,
     typicalLoadKg: decimalToNumberOrNull(listing.typicalLoadKg),
     readyNow: listing.readyNow,

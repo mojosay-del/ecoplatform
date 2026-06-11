@@ -222,15 +222,6 @@ function serializePackaging(value: string[]): string | null {
   return cleaned.length > 0 ? cleaned.join(", ") : null;
 }
 
-function aggregatePositionPackaging(positions: PositionForm[]): string | null {
-  const items = positions
-    .flatMap((position) => position.packaging)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const unique = Array.from(new Set(items));
-  return unique.length > 0 ? unique.join(", ") : null;
-}
-
 function positionWeightKg(position: PositionForm): number {
   const weightTons = Number(position.weightTons);
   return Number.isFinite(weightTons) && weightTons > 0 ? weightTons * 1000 : 0;
@@ -383,7 +374,7 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
             moistureCondition: position.moistureCondition ?? moistureConditionFromPct(position.moisturePct),
             contaminationCondition:
               position.contaminationCondition ?? contaminationConditionFromPct(position.contaminationPct),
-            packaging: parsePackaging(position.packaging ?? existing.packaging),
+            packaging: parsePackaging(position.packaging),
           }))
         : [emptyPosition()],
     );
@@ -477,7 +468,6 @@ export function ListingFormView({ listingId }: { listingId?: string }) {
       },
       contactPhone: formatPhoneFull(getPhoneCountry(phoneCountry), phoneDigits),
       description: description.trim() || null,
-      packaging: aggregatePositionPackaging(positions),
       paymentTerms: paymentTerms.trim() || null,
       typicalLoadKg: typicalLoadTons.trim() === "" ? null : (Number(typicalLoadTons) || 0) * 1000,
       readyNow,
