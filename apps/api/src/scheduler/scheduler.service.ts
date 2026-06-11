@@ -65,7 +65,8 @@ type AccountDeletionCleanupResult = {
  *  - ночью удаляются осиротевшие загрузки (файлы без единой ссылки);
  *  - ночью удаляются отработавшие регистрационные challenge (хэш пароля + ПДн);
  *  - ночью чистятся «копящиеся» таблицы: истёкшие сессии, старые ключи
- *    идемпотентности и журнал доставки нотификаций (cleanup-stale-records).
+ *    идемпотентности, журнал доставки нотификаций и осиротевшие адреса
+ *    (cleanup-stale-records).
  *
  * Запуск задач можно полностью отключить переменной SCHEDULER_DISABLED=1
  * (актуально для integration-тестов — для биллинг-логики используется
@@ -251,6 +252,7 @@ export class SchedulerService {
         await this.cleanupExpiredSessions();
         await this.cleanupStaleIdempotencyKeys();
         await this.cleanupStaleNotificationDeliveries();
+        await this.cleanupOrphanAddresses();
       });
     } catch (error) {
       this.logger.error("Stale record cleanup failed", error as Error);
@@ -305,6 +307,25 @@ export class SchedulerService {
     });
     if (count > 0) {
       this.logger.log(`Notification delivery cleanup: deleted ${count} old deliveries`);
+    }
+    return { deleted: count };
+  }
+
+  /**
+   * Удаляет Address без владельца: не фактический/юридический адрес компании и
+   * не адрес-снимок объявления. Такие строки остаются после каскадного удаления
+   * объявлений или замены/отвязки адресов и дальше никем не используются.
+   */
+  async cleanupOrphanAddresses(): Promise<{ deleted: number }> {
+    const { count } = await this.prisma.address.deleteMany({
+      where: {
+        companyAsFactual: { is: null },
+        companyAsLegal: { is: null },
+        marketplaceListing: { is: null },
+      },
+    });
+    if (count > 0) {
+      this.logger.log(`Address cleanup: deleted ${count} orphan addresses`);
     }
     return { deleted: count };
   }

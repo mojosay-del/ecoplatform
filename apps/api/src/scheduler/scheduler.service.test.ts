@@ -24,6 +24,9 @@ function buildService(lockAcquired = true) {
     notificationDelivery: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    address: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
   };
   const billing = {
     runHourlyCheck: vi.fn().mockResolvedValue({}),
@@ -313,6 +316,28 @@ describe("SchedulerService", () => {
     expect(result).toEqual({ deleted: 11 });
   });
 
+  it("удаляет адреса без привязки к компании или объявлению", async () => {
+    const prisma = {
+      address: { deleteMany: vi.fn().mockResolvedValue({ count: 4 }) },
+    };
+    const service = new SchedulerService(
+      { runHourlyCheck: vi.fn() } as any,
+      prisma as any,
+      { deleteIfUnreferenced: vi.fn() } as any,
+    );
+
+    const result = await service.cleanupOrphanAddresses();
+
+    expect(prisma.address.deleteMany).toHaveBeenCalledWith({
+      where: {
+        companyAsFactual: { is: null },
+        companyAsLegal: { is: null },
+        marketplaceListing: { is: null },
+      },
+    });
+    expect(result).toEqual({ deleted: 4 });
+  });
+
   it("чистит копящиеся таблицы только под Postgres advisory lock", async () => {
     const { prisma, service, tx } = buildService(true);
 
@@ -322,6 +347,7 @@ describe("SchedulerService", () => {
     expect(prisma.session.deleteMany).toHaveBeenCalledTimes(1);
     expect(prisma.idempotencyKey.deleteMany).toHaveBeenCalledTimes(1);
     expect(prisma.notificationDelivery.deleteMany).toHaveBeenCalledTimes(1);
+    expect(prisma.address.deleteMany).toHaveBeenCalledTimes(1);
   });
 
   it("пропускает очистку копящихся таблиц, если advisory lock держит другая реплика", async () => {
@@ -332,6 +358,7 @@ describe("SchedulerService", () => {
     expect(prisma.session.deleteMany).not.toHaveBeenCalled();
     expect(prisma.idempotencyKey.deleteMany).not.toHaveBeenCalled();
     expect(prisma.notificationDelivery.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.address.deleteMany).not.toHaveBeenCalled();
   });
 
   it("не чистит копящиеся таблицы, когда scheduler отключён переменной окружения", async () => {
@@ -342,5 +369,6 @@ describe("SchedulerService", () => {
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.session.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.address.deleteMany).not.toHaveBeenCalled();
   });
 });
