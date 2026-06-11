@@ -153,7 +153,7 @@ export class MarketplaceController {
   }
 
   @Get("marketplace/companies/:id/rating")
-  async companyRating(@Param("id") id: string) {
-    return this.reviews.getCompanyRating(id);
+  async companyRating(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.reviews.getCompanyRating(user, id);
   }
 }

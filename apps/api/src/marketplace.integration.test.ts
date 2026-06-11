@@ -679,6 +679,32 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
     });
   });
 
+  it("рейтинг компании требует активный доступ к площадке", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const deal = await agreedDeal("0009308", "0009308");
+
+      const allowed = await ctx.http
+        .get(`/api/marketplace/companies/${deal.sellerCompanyId}/rating`)
+        .set(bearer(deal.buyerToken));
+      expect(allowed.status).toBe(200);
+
+      const expired = await registerCompany("0009318");
+      await ctx.prisma.company.update({
+        where: { id: expired.companyId },
+        data: { demoEndsAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      });
+      const login = await ctx.http
+        .post("/api/auth/login")
+        .send({ email: "user0009318@test.local", password: "User12345678" });
+      expect(login.status).toBe(201);
+
+      const denied = await ctx.http
+        .get(`/api/marketplace/companies/${deal.sellerCompanyId}/rating`)
+        .set(bearer(login.body.accessToken));
+      expect(denied.status).toBe(403);
+    });
+  });
+
   it("неверный набор критериев и не-участник отклоняются", async () => {
     await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
       const deal = await agreedDeal("0009303", "0009303");

@@ -165,7 +165,8 @@ export class MarketplaceReviewsService {
     return reviews.map((review) => toReviewItem(review, { companyId: user.companyId ?? null }));
   }
 
-  async getCompanyRating(companyId: string): Promise<CompanyRatingSummary> {
+  async getCompanyRating(user: RequestUser, companyId: string): Promise<CompanyRatingSummary> {
+    this.assertCanUse(user);
     const rating = await this.prisma.companyMarketplaceRating.findUnique({ where: { companyId } });
     if (!rating || rating.reviewCount === 0) {
       return { overall: null, reviewCount: 0, byCriterion: [] };
