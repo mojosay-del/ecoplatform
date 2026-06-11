@@ -6,14 +6,15 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MarketplaceListingListItem, PaginatedResponse } from "@ecoplatform/shared";
+import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { haversineKm } from "@ecoplatform/shared";
 import { Check, ChevronDown } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import { api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
+import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
 import { ListingCard, totalWeightKg, useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
 import { YandexMap } from "./YandexMap";
@@ -46,6 +47,8 @@ const SORT_OPTIONS: SortOption[] = [
   { value: "expires", label: "Скоро истекают", description: "Объявления с ближайшим окончанием выше." },
 ];
 
+const MARKETPLACE_FEED_PAGE_SIZE = 40;
+
 function toggle(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
@@ -57,7 +60,7 @@ function dateValue(value: string | null, fallback: number): number {
 }
 
 export function MarketplaceView() {
-  const { user } = useAuth();
+  const { ready, token, user } = useAuth();
   const isCollector = user?.company?.type === "collector";
   const isBuyer = user?.company?.type === "trader" || user?.company?.type === "processor";
 
@@ -69,10 +72,10 @@ export function MarketplaceView() {
   const [openPopover, setOpenPopover] = useState<FilterPopover | null>(null);
   const [companyPoint, setCompanyPoint] = useState<{ lat: number; lon: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [feedRefresh, setFeedRefresh] = useState(0);
   const filtersRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!ready || !token) return;
     api.marketplace
       .regions()
       .then(setRegions)
@@ -87,7 +90,7 @@ export function MarketplaceView() {
         }
       })
       .catch(() => undefined);
-  }, []);
+  }, [ready, token]);
 
   useEffect(() => {
     function closeOnOutsideClick(event: PointerEvent) {
@@ -116,17 +119,23 @@ export function MarketplaceView() {
 
   const filterKey = `${selectedRegions.join(",")}|${selectedNomenclature.join(",")}`;
   const {
-    data: page,
+    items,
+    total,
+    hasMore,
     state,
     errorMessage,
-  } = useApiQuery(
-    `marketplace-listings-${filterKey}-${feedRefresh}`,
-    () => api.marketplace.listings({ region: selectedRegions, nomenclatureId: selectedNomenclature, limit: 200 }),
-    { items: [], total: 0, hasMore: false } as PaginatedResponse<MarketplaceListingListItem>,
+    isLoadingMore,
+    reload,
+    sentinelRef,
+  } = useInfiniteApiQuery(
+    ready && token ? `marketplace-listings-${filterKey}` : null,
+    MARKETPLACE_FEED_PAGE_SIZE,
+    ({ limit, offset }) =>
+      api.marketplace.listings({ region: selectedRegions, nomenclatureId: selectedNomenclature, limit, offset }),
   );
 
   const listings = useMemo(() => {
-    const items = [...page.items];
+    const sortedItems = [...items];
     const newestFirst = (a: MarketplaceListingListItem, b: MarketplaceListingListItem) =>
       dateValue(b.publishedAt, 0) - dateValue(a.publishedAt, 0);
     const distance = (listing: MarketplaceListingListItem) =>
@@ -135,20 +144,20 @@ export function MarketplaceView() {
         : haversineKm(companyPoint, { lat: listing.circleLat, lon: listing.circleLon });
 
     if (sortBy === "distance") {
-      items.sort((a, b) => distance(a) - distance(b) || newestFirst(a, b));
+      sortedItems.sort((a, b) => distance(a) - distance(b) || newestFirst(a, b));
     } else if (sortBy === "weight") {
-      items.sort((a, b) => totalWeightKg(b.positions) - totalWeightKg(a.positions) || newestFirst(a, b));
+      sortedItems.sort((a, b) => totalWeightKg(b.positions) - totalWeightKg(a.positions) || newestFirst(a, b));
     } else if (sortBy === "expires") {
-      items.sort(
+      sortedItems.sort(
         (a, b) =>
           dateValue(a.expiresAt, Number.POSITIVE_INFINITY) - dateValue(b.expiresAt, Number.POSITIVE_INFINITY) ||
           newestFirst(a, b),
       );
     } else {
-      items.sort(newestFirst);
+      sortedItems.sort(newestFirst);
     }
-    return items;
-  }, [page.items, sortBy, companyPoint]);
+    return sortedItems;
+  }, [items, sortBy, companyPoint]);
 
   const sortOptions = useMemo(
     () => SORT_OPTIONS.filter((option) => !option.requiresCompanyPoint || companyPoint),
@@ -268,6 +277,9 @@ export function MarketplaceView() {
     </div>
   );
 
+  if (ready && !token) {
+    return <AuthRequired title="Торговая площадка" />;
+  }
   if (state === "unauthenticated") {
     return <AuthRequired title="Торговая площадка" />;
   }
@@ -301,7 +313,7 @@ export function MarketplaceView() {
           ) : null}
         </div>
 
-        {state === "loading" ? (
+        {state === "idle" || state === "loading" ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
             Загрузка объявлений…
           </p>
@@ -326,6 +338,20 @@ export function MarketplaceView() {
                 />
               ))}
             </div>
+            <div ref={sentinelRef} aria-hidden="true" />
+            <p className="page-subtitle" style={{ textAlign: "center", marginTop: 18 }}>
+              Показано {items.length} из {total}
+            </p>
+            {isLoadingMore ? (
+              <p className="page-subtitle" style={{ textAlign: "center" }}>
+                Загружаем ещё…
+              </p>
+            ) : null}
+            {!hasMore ? (
+              <p className="page-subtitle" style={{ textAlign: "center" }}>
+                Это все объявления.
+              </p>
+            ) : null}
           </>
         )}
 
@@ -333,7 +359,7 @@ export function MarketplaceView() {
           <ListingModal
             listingId={selectedId}
             onClose={() => setSelectedId(null)}
-            onChanged={() => setFeedRefresh((value) => value + 1)}
+            onChanged={reload}
           />
         ) : null}
       </section>
