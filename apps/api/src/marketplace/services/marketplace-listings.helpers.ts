@@ -58,6 +58,8 @@ export function mapToListItem(listing: ListingWithRelations): MarketplaceListing
     status: listing.status,
     city: listing.address.city,
     region: listing.address.region,
+    circleLat: listing.circleLat === null ? null : Number(listing.circleLat),
+    circleLon: listing.circleLon === null ? null : Number(listing.circleLon),
     publishedAt: listing.publishedAt?.toISOString() ?? null,
     expiresAt: listing.expiresAt?.toISOString() ?? null,
     photoCount: photoCount(listing.media),

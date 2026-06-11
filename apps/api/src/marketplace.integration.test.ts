@@ -711,3 +711,60 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
     });
   });
 });
+
+describe("Marketplace — карта и фильтры (фаза 2)", () => {
+  it("фильтры по региону/сырью + список регионов; без ключа геокодера круг пуст", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1", YANDEX_GEOCODER_API_KEY: undefined }, async () => {
+      const { token } = await registerCompany("0009401");
+      const category = await ctx.prisma.nomenclatureCategory.create({
+        data: { name: "Макулатура", slug: "makulatura", position: 1 },
+      });
+      const cardboard = await ctx.prisma.nomenclature.create({
+        data: { code: "MS-5B", name: "МС-5Б", categoryId: category.id },
+      });
+      const pet = await ctx.prisma.nomenclature.create({
+        data: { code: "PET", name: "ПЭТ", categoryId: category.id },
+      });
+
+      const photosMoscow = await seedPhotos(4);
+      const moscowListing = await ctx.http
+        .post("/api/marketplace/listings")
+        .set(bearer(token))
+        .send({ ...listingPayload(cardboard.id, photosMoscow), address: { city: "Москва", region: "Москва" } });
+      await ctx.http.post(`/api/marketplace/listings/${moscowListing.body.id}/publish`).set(bearer(token));
+
+      const photosSpb = await seedPhotos(4);
+      const spbListing = await ctx.http
+        .post("/api/marketplace/listings")
+        .set(bearer(token))
+        .send({
+          positions: [{ nomenclatureId: pet.id, weightKg: 1500, form: "loose" }],
+          address: { city: "Санкт-Петербург", region: "Санкт-Петербург" },
+          contactPhone: "+79991234567",
+          readyNow: true,
+          media: photosSpb.map((fileId) => ({ fileId, kind: "photo" })),
+        });
+      await ctx.http.post(`/api/marketplace/listings/${spbListing.body.id}/publish`).set(bearer(token));
+
+      const all = await ctx.http.get("/api/marketplace/listings").set(bearer(token));
+      expect(all.body.items).toHaveLength(2);
+      // Без ключа геокодера координаты круга не заполняются.
+      expect(all.body.items.every((item: { circleLat: number | null }) => item.circleLat === null)).toBe(true);
+
+      const byRegion = await ctx.http
+        .get(`/api/marketplace/listings?region[]=${encodeURIComponent("Москва")}`)
+        .set(bearer(token));
+      expect(byRegion.body.items).toHaveLength(1);
+      expect(byRegion.body.items[0].city).toBe("Москва");
+
+      const byNomenclature = await ctx.http
+        .get(`/api/marketplace/listings?nomenclatureId[]=${pet.id}`)
+        .set(bearer(token));
+      expect(byNomenclature.body.items).toHaveLength(1);
+      expect(byNomenclature.body.items[0].city).toBe("Санкт-Петербург");
+
+      const regions = await ctx.http.get("/api/marketplace/regions").set(bearer(token));
+      expect(regions.body).toEqual(expect.arrayContaining(["Москва", "Санкт-Петербург"]));
+    });
+  });
+});

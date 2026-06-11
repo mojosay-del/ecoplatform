@@ -620,3 +620,98 @@
   padding: 0;
   line-height: 1;
 }
+
+/* ── Карта и фильтры (фаза 2) ──────────────────────────────────────────────── */
+.mp-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.mp-filter {
+  position: relative;
+}
+
+.mp-filter > summary {
+  cursor: pointer;
+  padding: 7px 12px;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  list-style: none;
+  user-select: none;
+  font-size: 14px;
+}
+
+.mp-filter > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mp-filter[open] > summary {
+  border-color: var(--accent, #1f8a4c);
+  color: var(--accent, #1f8a4c);
+}
+
+.mp-filter-options {
+  position: absolute;
+  z-index: 20;
+  margin-top: 6px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  padding: 10px;
+  max-height: 300px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+}
+
+.mp-filter-options label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.mp-sort {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.mp-sort button {
+  padding: 7px 12px;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+}
+
+.mp-sort button.active {
+  border-color: var(--accent, #1f8a4c);
+  color: var(--accent, #1f8a4c);
+  font-weight: 600;
+}
+
+.mp-map {
+  width: 100%;
+  height: 420px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.mp-map-placeholder {
+  padding: 28px 20px;
+  border: 1px dashed var(--border, #cbd5e1);
+  border-radius: 14px;
+  color: #64748b;
+  text-align: center;
+  background: #f8fafc;
+}

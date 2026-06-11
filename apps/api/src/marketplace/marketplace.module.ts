@@ -3,6 +3,7 @@ import { AuthModule } from "../auth/auth.module";
 import { FilesModule } from "../files/files.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { MarketplaceController } from "./marketplace.controller";
+import { MarketplaceGeocoderService } from "./services/marketplace-geocoder.service";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
 import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
@@ -15,7 +16,12 @@ import { MarketplaceReviewsService } from "./services/marketplace-reviews.servic
 @Module({
   imports: [AuthModule, FilesModule, NotificationsModule],
   controllers: [MarketplaceController],
-  providers: [MarketplaceListingsService, MarketplaceOffersService, MarketplaceReviewsService],
+  providers: [
+    MarketplaceGeocoderService,
+    MarketplaceListingsService,
+    MarketplaceOffersService,
+    MarketplaceReviewsService,
+  ],
   exports: [MarketplaceListingsService, MarketplaceOffersService, MarketplaceReviewsService],
 })
 export class MarketplaceModule {}

@@ -657,6 +657,10 @@ export type MarketplaceListingListItem = {
   status: ListingStatus;
   city: string;
   region: string | null;
+  // Координаты ОТОБРАЖАЕМОГО центра круга 4 км (не реальная точка партии). null,
+  // если адрес ещё не геокодирован (геокодер был недоступен/без ключа).
+  circleLat: number | null;
+  circleLon: number | null;
   publishedAt: IsoDateString | null;
   expiresAt: IsoDateString | null;
   photoCount: number;

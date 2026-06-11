@@ -45,6 +45,11 @@ export class MarketplaceController {
     return this.listings.listNomenclature(user);
   }
 
+  @Get("marketplace/regions")
+  async regions(@CurrentUser() user: RequestUser) {
+    return this.listings.listRegions(user);
+  }
+
   @Get("marketplace/listings/:id")
   async listingDetail(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.listings.getDetail(user, id);

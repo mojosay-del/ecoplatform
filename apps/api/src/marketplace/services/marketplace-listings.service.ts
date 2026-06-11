@@ -22,6 +22,8 @@ import { paginatedResponse, resolvePagination } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import { FilesService } from "../../files/files.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import { generateCircleCenter } from "./marketplace-geo.helpers";
+import { MarketplaceGeocoderService } from "./marketplace-geocoder.service";
 import {
   type ListingWithRelations,
   buildAddressCreateData,
@@ -34,17 +36,46 @@ import {
 const LISTING_FILE_ENTITY = "marketplace_listing";
 const DAY_MS = 24 * 60 * 60 * 1000;
 type ListParams = { limit?: number; offset?: number };
+type FeedParams = ListParams & { region?: string[]; nomenclatureId?: string[] };
+
+// Координаты адреса + отображаемый центр круга для записи в БД (после геокодинга).
+type AddressGeo = {
+  coords: { latitude?: Prisma.Decimal; longitude?: Prisma.Decimal; region?: string | null };
+  circleLat: Prisma.Decimal | null;
+  circleLon: Prisma.Decimal | null;
+};
 
 // Сервис объявлений торговой площадки: жизненный цикл (черновик → публикация →
 // архив/переподача), позиции, медиа (через FileReference), снимок адреса. Точные
 // контакты/адрес отдаются только владельцу и админу (покупатель — после акцепта,
-// фаза 3). Карта и координаты круга 4 км появятся на фазе 2 (геокодинг Яндекса).
+// фаза 3). Координаты круга 4 км — геокодинг Яндекса при сохранении адреса (фаза 2).
 @Injectable()
 export class MarketplaceListingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
+    private readonly geocoder: MarketplaceGeocoderService,
   ) {}
+
+  // Геокодит formatted-адрес (вне транзакции — сетевой вызов) и готовит координаты
+  // адреса + отображаемый центр круга. Без ключа/при ошибке геокодера — пусто
+  // (объявление сохраняется без круга, как требует geo-logic.md).
+  private async resolveAddressGeo(addressData: ReturnType<typeof buildAddressCreateData>): Promise<AddressGeo> {
+    const result = await this.geocoder.geocode(addressData.formatted);
+    if (!result) {
+      return { coords: {}, circleLat: null, circleLon: null };
+    }
+    const center = generateCircleCenter(result.lat, result.lon);
+    return {
+      coords: {
+        latitude: new Prisma.Decimal(result.lat),
+        longitude: new Prisma.Decimal(result.lon),
+        region: result.region ?? addressData.region,
+      },
+      circleLat: new Prisma.Decimal(center.lat),
+      circleLon: new Prisma.Decimal(center.lon),
+    };
+  }
 
   // ── Гейты доступа ─────────────────────────────────────────────────────────
 
@@ -80,10 +111,16 @@ export class MarketplaceListingsService {
 
   // ── Публичная лента + детальная карточка ─────────────────────────────────
 
-  async listPublic(user: RequestUser, params: ListParams): Promise<PaginatedResponse<MarketplaceListingListItem>> {
+  async listPublic(user: RequestUser, params: FeedParams): Promise<PaginatedResponse<MarketplaceListingListItem>> {
     this.assertCanUse(user);
-    const { limit, offset } = resolvePagination(params, { defaultLimit: 20, maxLimit: 100 });
-    const where = { status: "active" as const };
+    const { limit, offset } = resolvePagination(params, { defaultLimit: 100, maxLimit: 200 });
+    const where: Prisma.MarketplaceListingWhereInput = {
+      status: "active",
+      ...(params.region && params.region.length ? { address: { region: { in: params.region } } } : {}),
+      ...(params.nomenclatureId && params.nomenclatureId.length
+        ? { positions: { some: { nomenclatureId: { in: params.nomenclatureId } } } }
+        : {}),
+    };
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.marketplaceListing.count({ where }),
@@ -97,6 +134,18 @@ export class MarketplaceListingsService {
     ]);
 
     return paginatedResponse(rows.map(mapToListItem), total, { limit, offset });
+  }
+
+  // Список регионов активных объявлений (значения для фильтра ленты).
+  async listRegions(user: RequestUser): Promise<string[]> {
+    this.assertCanUse(user);
+    const rows = await this.prisma.marketplaceListing.findMany({
+      where: { status: "active" },
+      select: { address: { select: { region: true } } },
+    });
+    return Array.from(
+      new Set(rows.map((row) => row.address.region).filter((region): region is string => Boolean(region))),
+    ).sort((a, b) => a.localeCompare(b, "ru"));
   }
 
   async getDetail(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {
@@ -155,14 +204,19 @@ export class MarketplaceListingsService {
     await this.assertNomenclatureValid(dto.positions.map((position) => position.nomenclatureId));
     await this.assertMediaValid(dto.media);
 
+    const addressData = buildAddressCreateData(dto.address);
+    const geo = await this.resolveAddressGeo(addressData);
+
     const listing = await this.prisma.$transaction(async (tx) => {
-      const address = await tx.address.create({ data: buildAddressCreateData(dto.address) });
+      const address = await tx.address.create({ data: { ...addressData, ...geo.coords } });
       return tx.marketplaceListing.create({
         data: {
           sellerCompanyId: companyId,
           createdById: user.id,
           status: "draft",
           addressId: address.id,
+          circleLat: geo.circleLat,
+          circleLon: geo.circleLon,
           contactPhone: dto.contactPhone.trim(),
           description: optionalText(dto.description),
           color: optionalText(dto.color),
@@ -198,9 +252,12 @@ export class MarketplaceListingsService {
       await this.assertMediaValid(dto.media);
     }
 
+    const addressData = dto.address ? buildAddressCreateData(dto.address) : null;
+    const geo = addressData ? await this.resolveAddressGeo(addressData) : null;
+
     const updated = await this.prisma.$transaction(async (tx) => {
-      if (dto.address) {
-        await tx.address.update({ where: { id: existing.addressId }, data: buildAddressCreateData(dto.address) });
+      if (addressData && geo) {
+        await tx.address.update({ where: { id: existing.addressId }, data: { ...addressData, ...geo.coords } });
       }
       if (dto.positions) {
         await tx.listingPosition.deleteMany({ where: { listingId: id } });
@@ -225,6 +282,8 @@ export class MarketplaceListingsService {
           readyNow: dto.readyNow,
           readinessDate:
             dto.readinessDate === undefined ? undefined : dto.readinessDate ? new Date(dto.readinessDate) : null,
+          // Смена адреса до первого предложения → новый отображаемый центр (geo-logic.md 7.5).
+          ...(geo ? { circleLat: geo.circleLat, circleLon: geo.circleLon } : {}),
         },
         include: listingInclude,
       });
@@ -305,6 +364,13 @@ export class MarketplaceListingsService {
       throw new BadRequestException("Переподать можно только архивное объявление.");
     }
 
+    // Переподача = новое объявление → новый отображаемый центр (защита от
+    // триангуляции по нескольким объявлениям одной партии, geo-logic.md 7.4).
+    const circle =
+      source.address.latitude !== null && source.address.longitude !== null
+        ? generateCircleCenter(Number(source.address.latitude), Number(source.address.longitude))
+        : null;
+
     const created = await this.prisma.$transaction(async (tx) => {
       const address = await tx.address.create({
         data: {
@@ -327,6 +393,8 @@ export class MarketplaceListingsService {
           createdById: user.id,
           status: "draft",
           addressId: address.id,
+          circleLat: circle ? new Prisma.Decimal(circle.lat) : null,
+          circleLon: circle ? new Prisma.Decimal(circle.lon) : null,
           contactPhone: source.contactPhone,
           description: source.description,
           color: source.color,

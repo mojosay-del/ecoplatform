@@ -96,6 +96,17 @@ function previewSuffix(options: { preview?: boolean } = {}) {
   return options.preview ? "?preview=1" : "";
 }
 
+type MarketplaceFeedInput = PaginationInput & { region?: string[]; nomenclatureId?: string[] };
+
+function marketplaceFeedSuffix(input: MarketplaceFeedInput = {}) {
+  const query = new URLSearchParams();
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  if (input.offset !== undefined) query.set("offset", String(input.offset));
+  input.region?.forEach((region) => query.append("region[]", region));
+  input.nomenclatureId?.forEach((id) => query.append("nomenclatureId[]", id));
+  return query.toString() ? `?${query.toString()}` : "";
+}
+
 export const api = {
   // ── Новости ─────────────────────────────────────────────────────────────
   news: {
@@ -122,8 +133,9 @@ export const api = {
 
   // ── Торговая площадка ─────────────────────────────────────────────────────
   marketplace: {
-    listings: (pagination: PaginationInput = {}) =>
-      apiFetch<PaginatedResponse<MarketplaceListingListItem>>(`/marketplace/listings${paginationSuffix(pagination)}`),
+    listings: (input: MarketplaceFeedInput = {}) =>
+      apiFetch<PaginatedResponse<MarketplaceListingListItem>>(`/marketplace/listings${marketplaceFeedSuffix(input)}`),
+    regions: () => apiFetch<string[]>("/marketplace/regions"),
     myListings: (pagination: PaginationInput = {}) =>
       apiFetch<PaginatedResponse<MyMarketplaceListingItem>>(`/marketplace/my/listings${paginationSuffix(pagination)}`),
     nomenclature: () => apiFetch<MarketplaceNomenclatureOption[]>("/marketplace/nomenclature"),
