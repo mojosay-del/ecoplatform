@@ -11,9 +11,12 @@ import { useApiQuery } from "../shared";
 import { OfferStatusBadge, formatPrice } from "./offer-ui";
 import { ReviewForm } from "./ReviewForm";
 
-function offerConditionText(condition: PriceCondition, city: string | null): string {
+function offerConditionText(condition: PriceCondition, region: string | null, revealedCity: string | null): string {
   if (condition === "at_gate") {
-    return city ? `Доставка к покупателю: ${city}` : "Доставка к покупателю";
+    if (revealedCity) {
+      return `Доставка к покупателю: ${revealedCity}`;
+    }
+    return region ? `Доставка к покупателю: ${region}` : "Доставка к покупателю: город скрыт";
   }
   return "Покупатель забирает сырьё сам";
 }
@@ -54,12 +57,13 @@ export function ListingOffersPanel({ listingId, onChanged }: { listingId: string
 
       {offers.map((offer) => {
         const pricedPositions = offer.positions.filter((position) => position.pricePerTonRub != null);
+        const revealedCity = offer.buyerContact?.city ?? null;
         return (
           <div className="mp-offer-card" key={offer.id}>
             <div className="mp-offer-top">
               <div>
                 <p className="mp-offer-eyebrow">Предложение покупателя</p>
-                <h4>{offerConditionText(offer.priceCondition, offer.city)}</h4>
+                <h4>{offerConditionText(offer.priceCondition, offer.region, revealedCity)}</h4>
               </div>
               <OfferStatusBadge status={offer.status} />
             </div>

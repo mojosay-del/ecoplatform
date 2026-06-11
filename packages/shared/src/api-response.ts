@@ -805,6 +805,7 @@ export type ListingOfferItem = {
   id: string;
   status: OfferStatus;
   priceCondition: PriceCondition;
+  region: string | null;
   city: string | null;
   positions: OfferPositionView[];
   buyerRating: number | null;

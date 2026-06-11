@@ -553,6 +553,72 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
     });
   });
 
+  it("скрывает точный город покупателя до акцепта предложения", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009291");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyerToken = await registerTrader("0009291");
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          response: {
+            GeoObjectCollection: {
+              featureMember: [
+                {
+                  GeoObject: {
+                    Point: { pos: "37.736330 55.910483" },
+                    metaDataProperty: {
+                      GeocoderMetaData: {
+                        Address: {
+                          Components: [
+                            { kind: "country", name: "Россия" },
+                            { kind: "province", name: "Московская область" },
+                            { kind: "locality", name: "Мытищи" },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      });
+
+      try {
+        vi.stubGlobal("fetch", fetchMock);
+        await withEnv({ YANDEX_GEOCODER_API_KEY: "test-key" }, async () => {
+          const offer = await ctx.http
+            .post(`/api/marketplace/listings/${listingId}/offers`)
+            .set(bearer(buyerToken))
+            .send(offerPayload(positionId, { priceCondition: "at_gate", city: "Мытищи" }));
+          expect(offer.status).toBe(201);
+          expect(offer.body.city).toBe("Мытищи");
+
+          const sellerView = await ctx.http
+            .get(`/api/marketplace/listings/${listingId}/offers`)
+            .set(bearer(sellerToken));
+          expect(sellerView.status).toBe(200);
+          expect(sellerView.body[0].buyerContact).toBeNull();
+          expect(sellerView.body[0].city).toBeNull();
+          expect(sellerView.body[0].region).toBe("Московская область");
+          expect(JSON.stringify(sellerView.body[0])).not.toContain("Мытищи");
+
+          const accept = await ctx.http
+            .post(`/api/marketplace/offers/${offer.body.id}/accept`)
+            .set(bearer(sellerToken));
+          expect(accept.status).toBe(201);
+          expect(accept.body.city).toBeNull();
+          expect(accept.body.buyerContact?.city).toBe("Мытищи");
+        });
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+  });
+
   it("один активный оффер на покупателя+объявление; заготовитель не может предлагать", async () => {
     await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
       const { token: sellerToken } = await registerCompany("0009202");

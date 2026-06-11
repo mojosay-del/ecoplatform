@@ -14,6 +14,7 @@ import type { RequestUser } from "../../common/request-user";
 import { swallowAndLog } from "../../common/silent-catch";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import { AddressGeocoderService } from "../../geo/address-geocoder.service";
 import { type OfferWithRelations, offerInclude, toListingOfferItem, toMyOfferItem } from "./marketplace-offers.helpers";
 
 const DECISION_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -29,6 +30,7 @@ export class MarketplaceOffersService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly moduleAccess: ModuleAccessService,
+    private readonly geocoder: AddressGeocoderService,
   ) {}
 
   // ── Гейты ─────────────────────────────────────────────────────────────────
@@ -92,12 +94,15 @@ export class MarketplaceOffersService {
       listing.positions.map((position) => position.id),
     );
 
+    const city = offerCity(dto);
+    const region = await this.resolveOfferRegion(city);
     const offer = await this.createOfferWithRaceGuard({
       listingId,
       buyerCompanyId,
       createdById: user.id,
       priceCondition: dto.priceCondition,
-      city: dto.city?.trim() || null,
+      city,
+      region,
       contactPhone: dto.contactPhone.trim(),
       positions: { create: offerPositionCreateData(dto) },
     });
@@ -124,6 +129,8 @@ export class MarketplaceOffersService {
       offer.listing.positions.map((position) => position.id),
     );
 
+    const city = offerCity(dto);
+    const region = await this.resolveOfferRegion(city);
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.offerPosition.deleteMany({ where: { offerId } });
       await tx.offerPosition.createMany({
@@ -133,7 +140,8 @@ export class MarketplaceOffersService {
         where: { id: offerId },
         data: {
           priceCondition: dto.priceCondition,
-          city: dto.city?.trim() || null,
+          city,
+          region,
           contactPhone: dto.contactPhone.trim(),
         },
         include: offerInclude,
@@ -427,11 +435,21 @@ export class MarketplaceOffersService {
     }
   }
 
+  private async resolveOfferRegion(city: string | null): Promise<string | null> {
+    if (!city) return null;
+    const result = await this.geocoder.geocode(city);
+    return result?.region?.trim() || null;
+  }
+
   private async notify(userId: string, eventType: string, title: string, body: string, link: string, sourceId: string) {
     await this.notifications
       .createInApp({ userId, eventType, category: NotificationCategory.marketplace, title, body, link, sourceId })
       .catch(swallowAndLog(eventType, { userId, sourceId }));
   }
+}
+
+function offerCity(dto: CreateOfferDto): string | null {
+  return dto.priceCondition === "at_gate" ? dto.city?.trim() || null : null;
 }
 
 function offerPositionCreateData(dto: CreateOfferDto) {

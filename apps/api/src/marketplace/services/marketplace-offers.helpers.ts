@@ -42,6 +42,18 @@ function listingSummary(offer: OfferWithRelations): string {
   return offer.listing.positions.map((position) => position.nomenclature.name).join(", ");
 }
 
+function publicOfferRegion(offer: OfferWithRelations): string | null {
+  if (!offer.region) return null;
+  if (offer.city && normalizeLocation(offer.region) === normalizeLocation(offer.city)) {
+    return null;
+  }
+  return offer.region;
+}
+
+function normalizeLocation(value: string): string {
+  return value.trim().toLocaleLowerCase("ru-RU");
+}
+
 // Контакты раскрываются обеим сторонам только после акцепта и остаются
 // раскрытыми после (стороны уже обменялись данными).
 export function toMyOfferItem(offer: OfferWithRelations): MyOfferItem {
@@ -76,7 +88,9 @@ export function toListingOfferItem(offer: OfferWithRelations): ListingOfferItem 
     id: offer.id,
     status: offer.status,
     priceCondition: offer.priceCondition,
-    city: offer.city,
+    region: publicOfferRegion(offer),
+    // Точный город покупателя продавец получает только в buyerContact после акцепта.
+    city: null,
     positions: offerPositionViews(offer),
     buyerRating: companyRating(offer.buyerCompany.marketplaceRating),
     createdAt: offer.createdAt.toISOString(),
