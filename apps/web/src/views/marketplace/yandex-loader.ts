@@ -95,22 +95,8 @@ function svgDataUri(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-// Аккуратная булавка-капля с белой обводкой (читается на любой подложке) и
-// минималистичным глифом «кипа» (скруглённый квадрат + стяжка) в цвет сырья.
-// Для среднего масштаба карты. Размер 30×38.
-export function pinDataUri(color: string): string {
-  return svgDataUri(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38">` +
-      `<path d="M15 37s12-11.8 12-22A12 12 0 1 0 3 15c0 10.2 12 22 12 22Z" fill="${color}" stroke="#fff" stroke-width="1.6"/>` +
-      `<circle cx="15" cy="14" r="7.2" fill="#fff"/>` +
-      `<rect x="11.2" y="10.2" width="7.6" height="7.6" rx="1.6" fill="none" stroke="${color}" stroke-width="1.5"/>` +
-      `<line x1="11.2" y1="14" x2="18.8" y2="14" stroke="${color}" stroke-width="1.5"/>` +
-      `</svg>`,
-  );
-}
-
-// Маленькая точка с белым кольцом — для СИЛЬНОГО отдаления, чтобы точки не
-// загромождали карту. Размер 14×14.
+// Маленькая точка с белым кольцом — для дальнего масштаба, чтобы карта не
+// загромождалась деталями. Размер 14×14.
 export function dotDataUri(color: string): string {
   return svgDataUri(
     `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">` +

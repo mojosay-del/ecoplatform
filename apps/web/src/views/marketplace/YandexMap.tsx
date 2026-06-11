@@ -1,22 +1,22 @@
 "use client";
 
 // Виджет Яндекс.Карт для ленты площадки. Цвет элемента — по сырью (макулатура/
-// плёнки/полимеры). Три масштаба для читаемости: близко — круг 4 км (реальная
-// точка скрыта), средне — аккуратная булавка с кипой, далеко — маленькая точка
+// плёнки/полимеры). Два масштаба для читаемости: близко — круг 4 км (реальная
+// точка скрыта), дальше — маленькая точка
 // (чтобы не загромождать карту). Загрузчик/иконки — в ./yandex-loader; без ключа
 // показываем заглушку, список остаётся доступен.
 
 import { useEffect, useRef, useState } from "react";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
-import { YANDEX_KEY, dotDataUri, loadYmaps, materialColor, pinDataUri, type YmapsMap } from "./yandex-loader";
+import { YANDEX_KEY, dotDataUri, loadYmaps, materialColor, type YmapsMap } from "./yandex-loader";
 
-type MapMode = "dot" | "pin" | "circle";
+type MapMode = "dot" | "circle";
+const CIRCLE_ZOOM_THRESHOLD = 9;
 
-// ≥11 — круг 4 км; 7..10 — булавка; <7 (область/страна) — маленькая точка.
+// Начиная с городского масштаба показываем круг 4 км; дальше — маленькая точка.
 function modeForZoom(zoom: number): MapMode {
-  if (zoom >= 11) return "circle";
-  if (zoom >= 7) return "pin";
+  if (zoom >= CIRCLE_ZOOM_THRESHOLD) return "circle";
   return "dot";
 }
 
@@ -57,22 +57,25 @@ export function YandexMap({
 
       let object;
       if (mode === "circle") {
-        object = new ymaps.Circle([center, MARKETPLACE_CIRCLE_RADIUS_KM * 1000], { hintContent }, {
-          fillColor: `${color}2e`,
-          strokeColor: color,
-          strokeWidth: 2,
-        });
-      } else if (mode === "pin") {
-        object = new ymaps.Placemark(
-          center,
+        object = new ymaps.Circle(
+          [center, MARKETPLACE_CIRCLE_RADIUS_KM * 1000],
           { hintContent },
-          { iconLayout: "default#image", iconImageHref: pinDataUri(color), iconImageSize: [30, 38], iconImageOffset: [-15, -38] },
+          {
+            fillColor: `${color}2e`,
+            strokeColor: color,
+            strokeWidth: 2,
+          },
         );
       } else {
         object = new ymaps.Placemark(
           center,
           { hintContent },
-          { iconLayout: "default#image", iconImageHref: dotDataUri(color), iconImageSize: [14, 14], iconImageOffset: [-7, -7] },
+          {
+            iconLayout: "default#image",
+            iconImageHref: dotDataUri(color),
+            iconImageSize: [14, 14],
+            iconImageOffset: [-7, -7],
+          },
         );
       }
 
@@ -110,7 +113,7 @@ export function YandexMap({
               zoom: 5,
               controls: ["zoomControl"],
             });
-            // Свап точка↔булавка↔круг при пересечении порогов зума.
+            // Свап точка↔круг при пересечении порога зума.
             mapRef.current.events.add("boundschange", () => {
               const map = mapRef.current;
               if (!map) return;
