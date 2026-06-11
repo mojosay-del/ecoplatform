@@ -15,6 +15,7 @@ import {
   Layers,
   MapPin,
   Package,
+  PlayCircle,
   Scale,
   Star,
   Truck,
@@ -88,7 +89,7 @@ export function ListingModal({
     () => api.marketplace.get(listingId),
     null as MarketplaceListingDetail | null,
   );
-  const [activePhoto, setActivePhoto] = useState(0);
+  const [activeMedia, setActiveMedia] = useState(0);
 
   const assets = useFileAssetsByIds((data?.media ?? []).map((item) => item.fileId));
 
@@ -99,6 +100,10 @@ export function ListingModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    setActiveMedia(0);
+  }, [listingId]);
 
   const isBuyer = user?.company?.type === "trader" || user?.company?.type === "processor";
 
@@ -116,9 +121,11 @@ export function ListingModal({
         ) : (
           (() => {
             const listing = data;
-            const photos = listing.media.filter((item) => item.kind === "photo");
-            const videos = listing.media.filter((item) => item.kind === "video");
-            const activeUrl = preferredFileAssetImageUrl(assets.get(photos[activePhoto]?.fileId ?? ""));
+            const mediaItems = listing.media.filter((item) => item.kind === "photo" || item.kind === "video");
+            const selectedMedia = mediaItems[activeMedia] ?? mediaItems[0];
+            const selectedAsset = selectedMedia ? assets.get(selectedMedia.fileId) : undefined;
+            const activePhotoUrl = selectedMedia?.kind === "photo" ? preferredFileAssetImageUrl(selectedAsset) : null;
+            const activeVideoUrl = selectedMedia?.kind === "video" ? preferredFileAssetMediaUrl(selectedAsset) : null;
             const totalWeight = listing.positions.reduce((sum, position) => sum + position.weightKg, 0);
             const forms = [
               ...new Set(listing.positions.map((position) => LISTING_FORM_LABEL[position.form] ?? position.form)),
@@ -170,24 +177,53 @@ export function ListingModal({
 
                 <div className="mp-modal-main">
                   <div className="mp-modal-gallery">
-                    {activeUrl ? (
-                      <img className="mp-modal-photo" src={activeUrl} alt="" />
-                    ) : (
-                      <div className="mp-card-cover-empty mp-modal-photo">Нет фото</div>
-                    )}
-                    {photos.length > 1 ? (
+                    <div className="mp-modal-media-frame">
+                      {activePhotoUrl ? (
+                        <img className="mp-modal-photo" src={activePhotoUrl} alt="" />
+                      ) : activeVideoUrl ? (
+                        <video
+                          className="mp-modal-video"
+                          controls
+                          playsInline
+                          preload="metadata"
+                          src={activeVideoUrl}
+                        />
+                      ) : selectedMedia?.kind === "video" ? (
+                        <div className="mp-modal-media-empty">
+                          {selectedAsset ? "Видео обрабатывается" : "Видео загружается"}
+                        </div>
+                      ) : (
+                        <div className="mp-modal-media-empty">Нет фото</div>
+                      )}
+                    </div>
+                    {mediaItems.length > 1 ? (
                       <div className="mp-modal-thumbs">
-                        {photos.map((photo, index) => {
-                          const thumb = preferredFileAssetImageUrl(assets.get(photo.fileId));
+                        {mediaItems.map((media, index) => {
+                          const asset = assets.get(media.fileId);
+                          const thumb =
+                            media.kind === "video"
+                              ? preferredFileAssetMediaUrl(asset)
+                              : preferredFileAssetImageUrl(asset);
                           return (
                             <button
-                              key={photo.id}
+                              key={media.id}
                               type="button"
-                              className={`mp-modal-thumb ${index === activePhoto ? "active" : ""}`}
-                              onClick={() => setActivePhoto(index)}
-                              aria-label={`Фото ${index + 1}`}
+                              className={`mp-modal-thumb${media.kind === "video" ? " is-video" : ""}${
+                                index === activeMedia ? " active" : ""
+                              }`}
+                              onClick={() => setActiveMedia(index)}
+                              aria-label={media.kind === "video" ? `Видео ${index + 1}` : `Фото ${index + 1}`}
                             >
-                              {thumb ? <img src={thumb} alt="" /> : null}
+                              {media.kind === "video" ? (
+                                <>
+                                  {thumb ? <video src={thumb} muted playsInline preload="metadata" /> : null}
+                                  <span className="mp-modal-thumb-play" aria-hidden="true">
+                                    <PlayCircle size={18} />
+                                  </span>
+                                </>
+                              ) : thumb ? (
+                                <img src={thumb} alt="" />
+                              ) : null}
                             </button>
                           );
                         })}
@@ -253,15 +289,6 @@ export function ListingModal({
                     </div>
                   </div>
                 </div>
-
-                {videos.length > 0 ? (
-                  <div className="mp-modal-videos">
-                    {videos.map((video) => {
-                      const url = preferredFileAssetMediaUrl(assets.get(video.fileId));
-                      return url ? <video key={video.id} controls preload="metadata" src={url} /> : null;
-                    })}
-                  </div>
-                ) : null}
 
                 {!listing.isOwner ? (
                   <div className="mp-modal-columns">
