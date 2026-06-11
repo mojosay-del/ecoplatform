@@ -1264,6 +1264,78 @@
   gap: 12px;
 }
 
+.mp-price-state {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mp-price-state.is-muted {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.mp-offer-summary {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid #eef2f6;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.mp-offer-summary-top,
+.mp-offer-summary-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mp-offer-summary-top span {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mp-offer-summary-top strong {
+  color: #0f172a;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.mp-offer-summary-list {
+  display: grid;
+  gap: 7px;
+}
+
+.mp-offer-summary-line span {
+  min-width: 0;
+  color: #64748b;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.mp-offer-summary-line strong {
+  color: #0f172a;
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mp-offer-summary-line.is-muted strong {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
 .mp-offers-panel {
   display: flex;
   flex-direction: column;
@@ -2208,6 +2280,20 @@
   .mp-modal-backdrop,
   .mp-modal {
     animation: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .mp-offer-summary-top,
+  .mp-offer-summary-line {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mp-offer-summary-line strong {
+    text-align: left;
+    white-space: normal;
   }
 }
 

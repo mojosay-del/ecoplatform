@@ -14,21 +14,16 @@ import type { PhoneCountryId } from "../../components/auth/types";
 import { formatPhoneFull, getPhoneCountry } from "../../components/auth/utils";
 import { ApiError, api } from "../../lib/api";
 import { formatWeight } from "./listing-ui";
+import { buildOfferSummary, formatPricePerTonInput } from "./offer-summary";
+import { formatPrice } from "./offer-ui";
 
 const PRICE_CONDITION_OPTIONS: Array<{ value: PriceCondition; label: string }> = [
   { value: "from_place", label: "Цена с места (вывожу сам)" },
   { value: "at_gate", label: "Цена на воротах (доставка ко мне)" },
 ];
 
-function formatPricePerTonInput(value: string): string {
-  const digits = value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-  return digits ? Number(digits).toLocaleString("ru-RU") : "";
-}
-
-function parsePricePerTon(value: string): number | null {
-  const digits = value.replace(/\s/g, "");
-  if (!digits) return null;
-  return /^\d+$/.test(digits) ? Number(digits) : null;
+function formatRubles(value: number): string {
+  return `${value.toLocaleString("ru-RU")} ₽`;
 }
 
 export function MakeOfferForm({
@@ -47,6 +42,7 @@ export function MakeOfferForm({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [duplicate, setDuplicate] = useState(false);
+  const offerSummary = buildOfferSummary(listing.positions, prices);
 
   function updatePrice(positionId: string, value: string) {
     if (/[.,]/.test(value)) {
@@ -69,11 +65,11 @@ export function MakeOfferForm({
       setError("Для условия «цена на воротах» укажите город доставки.");
       return;
     }
-    const positions = listing.positions.map((position) => ({
+    const positions = offerSummary.lines.map((position) => ({
       listingPositionId: position.id,
-      pricePerTonRub: parsePricePerTon(prices[position.id] ?? ""),
+      pricePerTonRub: position.pricePerTonRub,
     }));
-    if (!positions.some((position) => position.pricePerTonRub != null && position.pricePerTonRub > 0)) {
+    if (offerSummary.selectedCount === 0) {
       setError("Укажите цену хотя бы по одной позиции.");
       return;
     }
@@ -113,7 +109,7 @@ export function MakeOfferForm({
     <div className="mp-offer-form">
       <h3>Сделать предложение</h3>
       <div className="mp-offer-positions">
-        {listing.positions.map((position) => (
+        {offerSummary.lines.map((position) => (
           <div className="mp-field" key={position.id}>
             <label>
               {position.nomenclatureName} ({formatWeight(position.weightKg)}) — ₽/т
@@ -126,8 +122,34 @@ export function MakeOfferForm({
               value={prices[position.id] ?? ""}
               onChange={(event) => updatePrice(position.id, event.target.value)}
             />
+            <span className={`mp-price-state${position.pricePerTonRub == null ? " is-muted" : ""}`}>
+              {position.pricePerTonRub == null ? "Не интересует" : "В ставке"}
+            </span>
           </div>
         ))}
+      </div>
+      <div className="mp-offer-summary" aria-live="polite">
+        <div className="mp-offer-summary-top">
+          <span>
+            Ставка по {offerSummary.selectedCount} из {offerSummary.totalCount} позиций
+          </span>
+          <strong>Итого {formatRubles(offerSummary.totalRub)}</strong>
+        </div>
+        <div className="mp-offer-summary-list">
+          {offerSummary.lines.map((position) => (
+            <div
+              className={`mp-offer-summary-line${position.pricePerTonRub == null ? " is-muted" : ""}`}
+              key={position.id}
+            >
+              <span>{position.nomenclatureName}</span>
+              <strong>
+                {position.pricePerTonRub == null
+                  ? "не интересует"
+                  : `${formatPrice(position.pricePerTonRub)} · ${formatRubles(position.totalRub ?? 0)}`}
+              </strong>
+            </div>
+          ))}
+        </div>
       </div>
       <div className="mp-grid-2">
         <div className="mp-field">
