@@ -10,13 +10,18 @@ import { useEffect, useRef, useState } from "react";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
 import { YANDEX_KEY, dotDataUri, loadYmaps, materialColor, type YmapsMap } from "./yandex-loader";
+import {
+  LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+  LISTING_MAP_DEFAULT_CENTER,
+  LISTING_MAP_DEFAULT_ZOOM,
+  getSinglePointFocusView,
+} from "./yandex-map-view";
 
 type MapMode = "dot" | "circle";
-const CIRCLE_ZOOM_THRESHOLD = 9;
 
 // Начиная с городского масштаба показываем круг 4 км; дальше — маленькая точка.
 function modeForZoom(zoom: number): MapMode {
-  if (zoom >= CIRCLE_ZOOM_THRESHOLD) return "circle";
+  if (zoom >= LISTING_MAP_CIRCLE_ZOOM_THRESHOLD) return "circle";
   return "dot";
 }
 
@@ -44,7 +49,16 @@ export function YandexMap({
     const map = mapRef.current;
     if (!ymaps || !map) return;
 
-    const mode = modeForZoom(map.getZoom());
+    const focusView = fit ? getSinglePointFocusView(points) : null;
+    if (focusView) {
+      try {
+        map.setCenter(focusView.center, focusView.zoom, { checkZoomRange: true });
+      } catch {
+        // Если API карты не смог сменить вид, ниже останется текущий масштаб.
+      }
+    }
+
+    const mode = modeForZoom(focusView?.zoom ?? map.getZoom());
     modeRef.current = mode;
     map.geoObjects.removeAll();
 
@@ -85,11 +99,11 @@ export function YandexMap({
       map.geoObjects.add(object);
     }
 
-    if (fit && bounds.length > 0) {
+    if (fit && bounds.length > 1) {
       try {
         map.setBounds(ymaps.util.bounds.fromPoints(bounds), { checkZoomRange: true, zoomMargin: 48 });
       } catch {
-        // setBounds может бросить на единственной точке — оставляем вид как есть.
+        // setBounds может бросить при невалидной геометрии — оставляем вид как есть.
       }
     }
   };
@@ -108,9 +122,10 @@ export function YandexMap({
         ymaps.ready(() => {
           if (cancelled || !containerRef.current) return;
           if (!mapRef.current) {
+            const focusView = getSinglePointFocusView(points);
             mapRef.current = new ymaps.Map(containerRef.current, {
-              center: [55.76, 37.64],
-              zoom: 5,
+              center: focusView?.center ?? LISTING_MAP_DEFAULT_CENTER,
+              zoom: focusView?.zoom ?? LISTING_MAP_DEFAULT_ZOOM,
               controls: ["zoomControl"],
             });
             // Свап точка↔круг при пересечении порога зума.

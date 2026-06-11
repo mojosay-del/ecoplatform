@@ -8,6 +8,7 @@ export const YANDEX_KEY = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY;
 export type YmapsGeoObject = { events: { add: (type: string, handler: () => void) => void } };
 export type YmapsMap = {
   geoObjects: { add: (object: unknown) => void; remove: (object: unknown) => void; removeAll: () => void };
+  setCenter: (center: number[], zoom?: number, options?: Record<string, unknown>) => void;
   setBounds: (bounds: unknown, options?: Record<string, unknown>) => void;
   getZoom: () => number;
   events: { add: (type: string, handler: () => void) => void };
