@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MarketplaceListingsService } from "./marketplace/services/marketplace-listings.service";
 import { MarketplaceOffersService } from "./marketplace/services/marketplace-offers.service";
 import { setupIntegrationContext } from "./test/integration-context";
@@ -361,6 +361,90 @@ describe("Marketplace — объявления (фаза 1)", () => {
       expect(republished.body.status).toBe("draft");
       expect(republished.body.id).not.toBe(draft.body.id);
       expect(republished.body.positions).toHaveLength(1);
+    });
+  });
+
+  it("переподача заново геокодит адрес, если у исходного объявления нет координат", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1", YANDEX_GEOCODER_API_KEY: undefined }, async () => {
+      const { token } = await registerCompany("0009109");
+      const nomenclatureId = await seedNomenclature();
+      const photos = await seedPhotos(4);
+      const draft = await ctx.http
+        .post("/api/marketplace/listings")
+        .set(bearer(token))
+        .send(
+          listingPayload(nomenclatureId, photos, {
+            address: {
+              city: "Москва",
+              region: "Москва",
+              street: "Тверская улица",
+              building: "1",
+              formatted: "Россия, Москва, Тверская улица, 1",
+            },
+          }),
+        );
+      await ctx.http.post(`/api/marketplace/listings/${draft.body.id}/publish`).set(bearer(token));
+
+      const archived = await ctx.http.post(`/api/marketplace/listings/${draft.body.id}/archive`).set(bearer(token));
+      expect(archived.body.status).toBe("archived");
+
+      const source = await ctx.prisma.marketplaceListing.findUniqueOrThrow({
+        where: { id: draft.body.id },
+        include: { address: true },
+      });
+      expect(source.address.latitude).toBeNull();
+      expect(source.address.longitude).toBeNull();
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          response: {
+            GeoObjectCollection: {
+              featureMember: [
+                {
+                  GeoObject: {
+                    Point: { pos: "37.617698 55.755864" },
+                    metaDataProperty: {
+                      GeocoderMetaData: {
+                        Address: {
+                          Components: [
+                            { kind: "country", name: "Россия" },
+                            { kind: "province", name: "Москва" },
+                            { kind: "locality", name: "Москва" },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      });
+
+      try {
+        vi.stubGlobal("fetch", fetchMock);
+        await withEnv({ YANDEX_GEOCODER_API_KEY: "test-key" }, async () => {
+          const republished = await ctx.http
+            .post(`/api/marketplace/listings/${draft.body.id}/republish`)
+            .set(bearer(token));
+          expect(republished.status).toBe(201);
+
+          expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("geocode="), expect.any(Object));
+          const created = await ctx.prisma.marketplaceListing.findUniqueOrThrow({
+            where: { id: republished.body.id },
+            include: { address: true },
+          });
+          expect(created.address.latitude?.toString()).toBe("55.755864");
+          expect(created.address.longitude?.toString()).toBe("37.617698");
+          expect(created.address.region).toBe("Москва");
+          expect(created.circleLat).not.toBeNull();
+          expect(created.circleLon).not.toBeNull();
+        });
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
   });
 

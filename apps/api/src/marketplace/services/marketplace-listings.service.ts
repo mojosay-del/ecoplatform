@@ -45,6 +45,7 @@ type AddressGeo = {
   circleLat: Prisma.Decimal | null;
   circleLon: Prisma.Decimal | null;
 };
+type AddressCreateData = ReturnType<typeof buildAddressCreateData>;
 
 // Сервис объявлений торговой площадки: жизненный цикл (черновик → публикация →
 // архив/переподача), позиции, медиа (через FileReference), снимок адреса. Точные
@@ -62,7 +63,7 @@ export class MarketplaceListingsService {
   // Геокодит formatted-адрес (вне транзакции — сетевой вызов) и готовит координаты
   // адреса + отображаемый центр круга. Без ключа/при ошибке геокодера — пусто
   // (объявление сохраняется без круга, как требует geo-logic.md).
-  private async resolveAddressGeo(addressData: ReturnType<typeof buildAddressCreateData>): Promise<AddressGeo> {
+  private async resolveAddressGeo(addressData: AddressCreateData): Promise<AddressGeo> {
     const result = await this.geocoder.geocode(addressData.formatted);
     if (!result) {
       return { coords: {}, circleLat: null, circleLon: null };
@@ -77,6 +78,22 @@ export class MarketplaceListingsService {
       circleLat: new Prisma.Decimal(center.lat),
       circleLon: new Prisma.Decimal(center.lon),
     };
+  }
+
+  private async resolveStoredOrFreshAddressGeo(
+    addressData: AddressCreateData,
+    stored: { latitude: Prisma.Decimal | null; longitude: Prisma.Decimal | null },
+  ): Promise<AddressGeo> {
+    if (stored.latitude !== null && stored.longitude !== null) {
+      const center = generateCircleCenter(Number(stored.latitude), Number(stored.longitude));
+      return {
+        coords: { latitude: stored.latitude, longitude: stored.longitude },
+        circleLat: new Prisma.Decimal(center.lat),
+        circleLon: new Prisma.Decimal(center.lon),
+      };
+    }
+
+    return this.resolveAddressGeo(addressData);
   }
 
   // ── Гейты доступа ─────────────────────────────────────────────────────────
@@ -374,27 +391,18 @@ export class MarketplaceListingsService {
       throw new ForbiddenException("Объявление снято модератором — переподача недоступна.");
     }
 
+    const addressData = addressCreateDataFromSource(source.address);
     // Переподача = новое объявление → новый отображаемый центр (защита от
     // триангуляции по нескольким объявлениям одной партии, geo-logic.md 7.4).
-    const circle =
-      source.address.latitude !== null && source.address.longitude !== null
-        ? generateCircleCenter(Number(source.address.latitude), Number(source.address.longitude))
-        : null;
+    // Если старое объявление создавалось без координат, пробуем догеокодить
+    // сохранённую строку адреса перед созданием новой копии.
+    const geo = await this.resolveStoredOrFreshAddressGeo(addressData, source.address);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const address = await tx.address.create({
         data: {
-          country: source.address.country,
-          region: source.address.region,
-          city: source.address.city,
-          street: source.address.street,
-          building: source.address.building,
-          apartment: source.address.apartment,
-          postcode: source.address.postcode,
-          latitude: source.address.latitude,
-          longitude: source.address.longitude,
-          formatted: source.address.formatted,
-          source: source.address.source,
+          ...addressData,
+          ...geo.coords,
         },
       });
       return tx.marketplaceListing.create({
@@ -403,8 +411,8 @@ export class MarketplaceListingsService {
           createdById: user.id,
           status: "draft",
           addressId: address.id,
-          circleLat: circle ? new Prisma.Decimal(circle.lat) : null,
-          circleLon: circle ? new Prisma.Decimal(circle.lon) : null,
+          circleLat: geo.circleLat,
+          circleLon: geo.circleLon,
           contactPhone: source.contactPhone,
           description: source.description,
           packaging: source.packaging,
@@ -584,4 +592,18 @@ function positionCreateData(positions: ListingPositionInput[]) {
 
 function mediaCreateData(media: ListingMediaInput[]) {
   return media.map((item, index) => ({ fileId: item.fileId, kind: item.kind, position: index }));
+}
+
+function addressCreateDataFromSource(address: ListingWithRelations["address"]): AddressCreateData {
+  return {
+    country: address.country,
+    region: address.region,
+    city: address.city,
+    street: address.street,
+    building: address.building,
+    apartment: address.apartment,
+    postcode: address.postcode,
+    formatted: address.formatted,
+    source: address.source,
+  };
 }
