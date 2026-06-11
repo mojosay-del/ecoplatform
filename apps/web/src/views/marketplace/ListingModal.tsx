@@ -30,6 +30,7 @@ import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useApiQuery } from "../shared";
 import { CompanyReviews } from "./CompanyReviews";
 import { ListingOffersPanel } from "./ListingOffersPanel";
+import { compactPositionsTitle } from "./listing-title";
 import { LISTING_FORM_LABEL, ListingStatusBadge, formatLocation, formatWeight } from "./listing-ui";
 import { MakeOfferForm } from "./MakeOfferForm";
 import { ReportControl } from "./ReportControl";
@@ -232,9 +233,7 @@ export function ListingModal({
                   </div>
 
                   <div className="mp-modal-facts">
-                    <h2 className="mp-modal-title">
-                      {listing.positions.map((position) => position.nomenclatureName).join(", ") || "Объявление"}
-                    </h2>
+                    <h2 className="mp-modal-title">{compactPositionsTitle(listing.positions)}</h2>
                     <div className="mp-modal-fact-columns">
                       <dl className="mp-fact-stack">
                         <div>
