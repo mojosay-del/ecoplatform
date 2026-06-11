@@ -25,12 +25,16 @@ describe("AppShell future navigation teasers", () => {
     }
   });
 
-  it("shows marketplace listings to regular users", () => {
-    const labels = appNavSections.flatMap((section) =>
-      filterVisibleItems(section.items, { roles: [], companyType: "trader" }).map((item) => item.label),
-    );
+  it("shows marketplace listings to every signed-in profile", () => {
+    const labelsFor = (companyType: CompanyType | null, roles: string[] = []) =>
+      appNavSections.flatMap((section) =>
+        filterVisibleItems(section.items, { roles, companyType }).map((item) => item.label),
+      );
 
-    expect(labels).toContain("Объявления");
+    expect(labelsFor("collector")).toContain("Объявления");
+    expect(labelsFor("trader")).toContain("Объявления");
+    expect(labelsFor("processor")).toContain("Объявления");
+    expect(labelsFor(null, ["content_manager"])).toContain("Объявления");
   });
 
   it("keeps admin routes behind one panel entry in the sidebar", () => {

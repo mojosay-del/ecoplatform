@@ -10,10 +10,9 @@ import { MarketplaceOffersService } from "./services/marketplace-offers.service"
 import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
 
 // Торговая площадка (закрытый аукцион). Модуль строится по фазам: объявления →
-// карта → закрытые предложения → отзывы. Публичный доступ включает
-// MarketplaceFeatureGuard через MARKETPLACE_ENABLED=1. Сервисы экспортируем —
-// планировщик использует их cron-методы (авто-архив объявлений, авто-разрешение
-// принятых предложений).
+// карта → закрытые предложения → отзывы. Сервисы экспортируем — планировщик
+// использует их cron-методы (авто-архив объявлений, авто-разрешение принятых
+// предложений).
 @Module({
   imports: [AuthModule, FilesModule, GeocodingModule, NotificationsModule],
   controllers: [MarketplaceController],

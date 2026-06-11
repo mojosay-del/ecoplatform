@@ -13,7 +13,6 @@ import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
 import { AddressGeocoderService } from "../geo/address-geocoder.service";
-import { MarketplaceFeatureGuard } from "./marketplace-feature.guard";
 import { marketplaceListQuerySchema } from "./marketplace.schemas";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
@@ -23,11 +22,9 @@ const addressSuggestQuerySchema = z.object({
   q: z.string().trim().min(3).max(200),
 });
 
-// Маршруты торговой площадки. Два гейта на контроллере: JwtAuthGuard (нужен
-// авторизованный пользователь) и MarketplaceFeatureGuard (публичный запуск через
-// MARKETPLACE_ENABLED=1, иначе только админы). Доступ по подписке и роли
-// заготовителя проверяет уже сервис.
-@UseGuards(JwtAuthGuard, MarketplaceFeatureGuard)
+// Маршруты торговой площадки доступны авторизованным пользователям. Доступ по
+// подписке и роли продавца/покупателя проверяет уже сервис.
+@UseGuards(JwtAuthGuard)
 @Controller()
 export class MarketplaceController {
   constructor(
