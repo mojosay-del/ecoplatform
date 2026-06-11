@@ -158,13 +158,15 @@ export class MarketplaceListingsService {
   // Список регионов активных объявлений (значения для фильтра ленты).
   async listRegions(user: RequestUser): Promise<string[]> {
     this.assertCanUse(user);
-    const rows = await this.prisma.marketplaceListing.findMany({
-      where: { status: "active" },
-      select: { address: { select: { region: true } } },
+    const rows = await this.prisma.address.groupBy({
+      by: ["region"],
+      where: {
+        region: { not: null },
+        marketplaceListing: { is: { status: "active" } },
+      },
+      orderBy: { region: "asc" },
     });
-    return Array.from(
-      new Set(rows.map((row) => row.address.region).filter((region): region is string => Boolean(region))),
-    ).sort((a, b) => a.localeCompare(b, "ru"));
+    return rows.map((row) => row.region).filter((region): region is string => Boolean(region));
   }
 
   async getDetail(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {

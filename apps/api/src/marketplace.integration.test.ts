@@ -1071,6 +1071,15 @@ describe("Marketplace — карта и фильтры (фаза 2)", () => {
         });
       await ctx.http.post(`/api/marketplace/listings/${spbListing.body.id}/publish`).set(bearer(token));
 
+      const photosDraft = await seedPhotos(4);
+      await ctx.http
+        .post("/api/marketplace/listings")
+        .set(bearer(token))
+        .send({
+          ...listingPayload(cardboard.id, photosDraft),
+          address: { city: "Казань", region: "Татарстан" },
+        });
+
       const all = await ctx.http.get("/api/marketplace/listings").set(bearer(token));
       expect(all.body.items).toHaveLength(2);
       // Без ключа геокодера координаты круга не заполняются.
@@ -1089,7 +1098,7 @@ describe("Marketplace — карта и фильтры (фаза 2)", () => {
       expect(byNomenclature.body.items[0].city).toBe("Санкт-Петербург");
 
       const regions = await ctx.http.get("/api/marketplace/regions").set(bearer(token));
-      expect(regions.body).toEqual(expect.arrayContaining(["Москва", "Санкт-Петербург"]));
+      expect(regions.body).toEqual(["Москва", "Санкт-Петербург"]);
     });
   });
 });
