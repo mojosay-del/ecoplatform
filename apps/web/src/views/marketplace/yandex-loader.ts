@@ -6,6 +6,10 @@
 export const YANDEX_KEY = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY;
 
 export type YmapsGeoObject = { events: { add: (type: string, handler: () => void) => void } };
+export type YmapsClusterer = YmapsGeoObject & {
+  add: (objects: YmapsGeoObject | YmapsGeoObject[]) => YmapsClusterer;
+  removeAll: () => YmapsClusterer;
+};
 export type YmapsMap = {
   geoObjects: { add: (object: unknown) => void; remove: (object: unknown) => void; removeAll: () => void };
   setCenter: (center: number[], zoom?: number, options?: Record<string, unknown>) => void;
@@ -49,6 +53,7 @@ export type Ymaps = {
     properties: Record<string, unknown>,
     options: Record<string, unknown>,
   ) => YmapsGeoObject;
+  Clusterer: new (options?: Record<string, unknown>) => YmapsClusterer;
   SuggestView: new (element: HTMLInputElement | string, options?: Record<string, unknown>) => YmapsSuggestView;
   geocode: (request: string, options?: Record<string, unknown>) => Promise<YmapsGeoResult>;
   util: { bounds: { fromPoints: (points: number[][]) => unknown } };

@@ -9,18 +9,18 @@
 import { useEffect, useRef, useState } from "react";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
-import { YANDEX_KEY, dotDataUri, loadYmaps, materialColor, type YmapsMap } from "./yandex-loader";
+import { YANDEX_KEY, dotDataUri, loadYmaps, materialColor, type YmapsGeoObject, type YmapsMap } from "./yandex-loader";
 import {
+  type ListingMapMode,
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
   LISTING_MAP_DEFAULT_CENTER,
   LISTING_MAP_DEFAULT_ZOOM,
   getSinglePointFocusView,
+  shouldClusterMapPoints,
 } from "./yandex-map-view";
 
-type MapMode = "dot" | "circle";
-
 // Начиная с городского масштаба показываем круг 4 км; дальше — маленькая точка.
-function modeForZoom(zoom: number): MapMode {
+function modeForZoom(zoom: number): ListingMapMode {
   if (zoom >= LISTING_MAP_CIRCLE_ZOOM_THRESHOLD) return "circle";
   return "dot";
 }
@@ -34,7 +34,7 @@ export function YandexMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<YmapsMap | null>(null);
-  const modeRef = useRef<MapMode | null>(null);
+  const modeRef = useRef<ListingMapMode | null>(null);
   const drawRef = useRef<(fit: boolean) => void>(() => undefined);
   const observerRef = useRef<ResizeObserver | null>(null);
   const [failed, setFailed] = useState(false);
@@ -63,13 +63,15 @@ export function YandexMap({
     map.geoObjects.removeAll();
 
     const bounds: number[][] = [];
+    const dotObjects: YmapsGeoObject[] = [];
+    const useClusterer = shouldClusterMapPoints(mode, points.length);
     for (const listing of points) {
       const center = [listing.circleLat as number, listing.circleLon as number];
       bounds.push(center);
       const color = materialColor(listing.positions[0]?.categorySlug);
       const hintContent = listing.positions.map((position) => position.nomenclatureName).join(", ");
 
-      let object;
+      let object: YmapsGeoObject;
       if (mode === "circle") {
         object = new ymaps.Circle(
           [center, MARKETPLACE_CIRCLE_RADIUS_KM * 1000],
@@ -96,7 +98,24 @@ export function YandexMap({
       if (onSelect) {
         object.events.add("click", () => onSelect(listing.id));
       }
-      map.geoObjects.add(object);
+      if (useClusterer) {
+        dotObjects.push(object);
+      } else {
+        map.geoObjects.add(object);
+      }
+    }
+
+    if (dotObjects.length > 0) {
+      const clusterer = new ymaps.Clusterer({
+        hasBalloon: false,
+        hasHint: true,
+        gridSize: 64,
+        minClusterSize: 2,
+        viewportMargin: 64,
+        zoomMargin: 48,
+      });
+      clusterer.add(dotObjects);
+      map.geoObjects.add(clusterer);
     }
 
     if (fit && bounds.length > 1) {
