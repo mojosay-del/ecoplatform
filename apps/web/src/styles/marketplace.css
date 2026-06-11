@@ -715,3 +715,64 @@
   text-align: center;
   background: #f8fafc;
 }
+
+/* ── Жалобы (пост-модерация, фаза 5) ──────────────────────────────────────── */
+.mp-report {
+  margin-top: 12px;
+}
+
+.mp-report-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: #64748b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.mp-report-toggle:hover,
+.mp-report-toggle[aria-expanded="true"] {
+  color: #b91c1c;
+}
+
+.mp-report-form {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.mp-report-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.mp-report-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.mp-report-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.mp-report-done {
+  display: inline-block;
+  margin-top: 12px;
+  color: #15803d;
+  font-size: 13px;
+}

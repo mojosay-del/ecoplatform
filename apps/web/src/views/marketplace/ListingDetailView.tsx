@@ -17,6 +17,7 @@ import { LISTING_FORM_LABEL, ListingStatusBadge, formatWeight } from "./listing-
 import { CompanyReviews } from "./CompanyReviews";
 import { ListingOffersPanel } from "./ListingOffersPanel";
 import { MakeOfferForm } from "./MakeOfferForm";
+import { ReportControl } from "./ReportControl";
 
 function formatDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString("ru-RU") : "—";
@@ -234,6 +235,10 @@ export function ListingDetailView({ id }: { id: string }) {
               </div>
             ) : null}
             {actionError ? <p className="mp-error">{actionError}</p> : null}
+
+            {!listing.isOwner && listing.status === "active" ? (
+              <ReportControl entityType="marketplace_listing" entityId={listing.id} label="Пожаловаться на объявление" />
+            ) : null}
           </aside>
         </div>
 

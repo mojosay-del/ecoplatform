@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { ModuleAccessService } from "../common/module-access.service";
 import { FilesModule } from "../files/files.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { MarketplaceController } from "./marketplace.controller";
@@ -17,6 +18,7 @@ import { MarketplaceReviewsService } from "./services/marketplace-reviews.servic
   imports: [AuthModule, FilesModule, NotificationsModule],
   controllers: [MarketplaceController],
   providers: [
+    ModuleAccessService,
     MarketplaceGeocoderService,
     MarketplaceListingsService,
     MarketplaceOffersService,

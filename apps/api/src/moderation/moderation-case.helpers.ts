@@ -30,7 +30,22 @@ type ResolvedEntitySummary =
       newsPost: { id: string; title: string; slug: string };
     }
   | { type: "news_post"; id: string; title: string; slug: string; status: ContentStatus }
-  | { type: "knowledge_article"; id: string; title: string; slug: string; status: ContentStatus };
+  | { type: "knowledge_article"; id: string; title: string; slug: string; status: ContentStatus }
+  | {
+      type: "marketplace_listing";
+      id: string;
+      title: string;
+      status: string;
+      sellerCompany: { id: string; organizationName: string } | null;
+    }
+  | {
+      type: "marketplace_review";
+      id: string;
+      text: string;
+      status: string;
+      toCompany: { id: string; organizationName: string } | null;
+      fromCompany: { id: string; organizationName: string } | null;
+    };
 
 type UserSummary = {
   id: string;
@@ -156,6 +171,8 @@ export async function enrichCases(deps: ModerationCaseDeps, cases: ModerationCas
   const commentIds = cases.filter((item) => item.entityType === "news_comment").map((item) => item.entityId);
   const newsPostIds = cases.filter((item) => item.entityType === "news_post").map((item) => item.entityId);
   const articleIds = cases.filter((item) => item.entityType === "knowledge_article").map((item) => item.entityId);
+  const listingIds = cases.filter((item) => item.entityType === "marketplace_listing").map((item) => item.entityId);
+  const reviewIds = cases.filter((item) => item.entityType === "marketplace_review").map((item) => item.entityId);
 
   const [commentsRaw, newsPosts, articles] = await Promise.all([
     deps.prisma.comment.findMany({
@@ -206,6 +223,65 @@ export async function enrichCases(deps: ModerationCaseDeps, cases: ModerationCas
   const newsPostMap = new Map(newsPosts.map((item) => [item.id, item]));
   const articleMap = new Map(articles.map((item) => [item.id, item]));
 
+  const [listings, reviews] = await Promise.all([
+    listingIds.length > 0
+      ? deps.prisma.marketplaceListing.findMany({
+          where: { id: { in: listingIds } },
+          select: {
+            id: true,
+            status: true,
+            description: true,
+            sellerCompany: { select: { id: true, organizationName: true } },
+            positions: { orderBy: { position: "asc" }, select: { nomenclature: { select: { name: true } } } },
+          },
+        })
+      : [],
+    reviewIds.length > 0
+      ? deps.prisma.marketplaceReview.findMany({
+          where: { id: { in: reviewIds } },
+          select: {
+            id: true,
+            status: true,
+            comment: true,
+            toCompany: { select: { id: true, organizationName: true } },
+            fromCompany: { select: { id: true, organizationName: true } },
+          },
+        })
+      : [],
+  ]);
+  const listingMap = new Map(listings.map((item) => [item.id, item]));
+  const reviewMap = new Map(reviews.map((item) => [item.id, item]));
+  // Замыкание над точными prisma-типами — иначе пришлось бы аннотировать Map с
+  // его инвариантным V и ловить ошибки присваивания.
+  const buildMarketplaceSummary = (item: ModerationCaseWithRelations): ResolvedEntitySummary | null => {
+    if (item.entityType === "marketplace_listing") {
+      const found = listingMap.get(item.entityId);
+      if (!found) return null;
+      const names = found.positions.map((position) => position.nomenclature.name).filter(Boolean);
+      const title = names.length > 0 ? names.join(", ") : found.description?.trim()?.slice(0, 80) || "Объявление";
+      return {
+        type: "marketplace_listing",
+        id: found.id,
+        title,
+        status: found.status,
+        sellerCompany: found.sellerCompany,
+      };
+    }
+    if (item.entityType === "marketplace_review") {
+      const found = reviewMap.get(item.entityId);
+      if (!found) return null;
+      return {
+        type: "marketplace_review",
+        id: found.id,
+        text: found.comment ?? "",
+        status: found.status,
+        toCompany: found.toCompany,
+        fromCompany: found.fromCompany,
+      };
+    }
+    return null;
+  };
+
   const userIds = [
     ...cases.flatMap((item) => [
       item.entityAuthorId,
@@ -227,7 +303,7 @@ export async function enrichCases(deps: ModerationCaseDeps, cases: ModerationCas
   const userMap = new Map<string, UserSummary>(users.map((item) => [item.id, item]));
 
   return cases.map((item) => {
-    const entity = buildEntitySummary(item, commentMap, newsPostMap, articleMap);
+    const entity = buildEntitySummary(item, commentMap, newsPostMap, articleMap) ?? buildMarketplaceSummary(item);
     return {
       ...item,
       lockedBy: item.lockedById ? (userMap.get(item.lockedById) ?? null) : null,

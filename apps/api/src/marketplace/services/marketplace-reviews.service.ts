@@ -10,6 +10,7 @@ import {
   type ReviewResponseDto,
   canOpenFunctionalSections,
 } from "@ecoplatform/shared";
+import { ModuleAccessService } from "../../common/module-access.service";
 import type { RequestUser } from "../../common/request-user";
 import { swallowAndLog } from "../../common/silent-catch";
 import { NotificationsService } from "../../notifications/notifications.service";
@@ -28,6 +29,7 @@ export class MarketplaceReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly moduleAccess: ModuleAccessService,
   ) {}
 
   private assertCanUse(user: RequestUser) {
@@ -39,6 +41,8 @@ export class MarketplaceReviewsService {
 
   async createReview(user: RequestUser, offerId: string, dto: CreateReviewDto): Promise<ReviewItem> {
     this.assertCanUse(user);
+    // Санкция модерации module_restriction("reviews") блокирует написание отзывов.
+    await this.moduleAccess.assertModuleAccess(user.id, "reviews");
     if (!user.companyId) {
       throw new ForbiddenException("Действие доступно только компаниям.");
     }
@@ -122,6 +126,7 @@ export class MarketplaceReviewsService {
 
   async respondToReview(user: RequestUser, reviewId: string, dto: ReviewResponseDto): Promise<ReviewItem> {
     this.assertCanUse(user);
+    await this.moduleAccess.assertModuleAccess(user.id, "reviews");
     const review = await this.prisma.marketplaceReview.findUnique({ where: { id: reviewId }, include: reviewInclude });
     if (!review) {
       throw new NotFoundException("Отзыв не найден.");

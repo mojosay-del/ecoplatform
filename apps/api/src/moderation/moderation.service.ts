@@ -1,10 +1,19 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { CommentStatus, ContentStatus, DiscussionTargetType, ModerationCaseStatus } from "@prisma/client";
+import {
+  CommentStatus,
+  ContentStatus,
+  DiscussionTargetType,
+  ListingStatus,
+  ModerationCaseStatus,
+  ReviewStatus,
+} from "@prisma/client";
 import { canOpenFunctionalSections } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { AdminActionLogService } from "../common/admin-action-log.service";
 import type { PaginationInput } from "../common/pagination";
 import type { RequestUser } from "../common/request-user";
+import { swallowAndLog } from "../common/silent-catch";
+import { MarketplaceReviewsService } from "../marketplace/services/marketplace-reviews.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
@@ -56,6 +65,7 @@ export class ModerationService {
     private readonly notifications: NotificationsService,
     private readonly settings: PlatformSettingsService,
     private readonly sessionCache: SessionCacheService,
+    private readonly reviews: MarketplaceReviewsService,
   ) {}
 
   async createComplaint(input: ComplaintInput, user: RequestUser) {
@@ -135,6 +145,18 @@ export class ModerationService {
 
   async createDecision(id: string, input: ModerationDecisionInput, user: RequestUser) {
     const updatedCase = await createDecisionWorkflow(this.moderationDecisionDeps(), id, input, user);
+    // Скрытие отзыва меняет рейтинг компании — пересчитываем кэш по-яндексовски.
+    if (input.type === "remove_content" && updatedCase.entityType === "marketplace_review") {
+      const review = await this.prisma.marketplaceReview.findUnique({
+        where: { id: updatedCase.entityId },
+        select: { toCompanyId: true },
+      });
+      if (review) {
+        await this.reviews
+          .recomputeCompanyRating(review.toCompanyId)
+          .catch(swallowAndLog("moderation.review.recomputeRating", { reviewId: updatedCase.entityId }));
+      }
+    }
     return (await enrichCases(this.moderationCaseDeps(), [updatedCase]))[0];
   }
 
@@ -215,13 +237,40 @@ export class ModerationService {
       return { type: "news_post", authorUserId: post.createdById, authorCompanyId: null };
     }
 
-    const article = await this.prisma.knowledgeBaseArticle.findUnique({
-      where: { id: entityId },
-      select: { id: true, status: true, createdById: true },
-    });
-    if (!article || article.status !== ContentStatus.published) {
-      throw new NotFoundException("Статья базы знаний не найдена или недоступна для жалобы.");
+    if (entityType === "knowledge_article") {
+      const article = await this.prisma.knowledgeBaseArticle.findUnique({
+        where: { id: entityId },
+        select: { id: true, status: true, createdById: true },
+      });
+      if (!article || article.status !== ContentStatus.published) {
+        throw new NotFoundException("Статья базы знаний не найдена или недоступна для жалобы.");
+      }
+      return { type: "knowledge_article", authorUserId: article.createdById, authorCompanyId: null };
     }
-    return { type: "knowledge_article", authorUserId: article.createdById, authorCompanyId: null };
+
+    if (entityType === "marketplace_listing") {
+      const listing = await this.prisma.marketplaceListing.findUnique({
+        where: { id: entityId },
+        select: { id: true, status: true, createdById: true, sellerCompanyId: true },
+      });
+      if (!listing || listing.status !== ListingStatus.active) {
+        throw new NotFoundException("Объявление не найдено или недоступно для жалобы.");
+      }
+      return {
+        type: "marketplace_listing",
+        authorUserId: listing.createdById,
+        authorCompanyId: listing.sellerCompanyId,
+      };
+    }
+
+    // Остаётся marketplace_review (enum жалобы ограничен moderatedEntityTypes).
+    const review = await this.prisma.marketplaceReview.findUnique({
+      where: { id: entityId },
+      select: { id: true, status: true, createdById: true, fromCompanyId: true },
+    });
+    if (!review || review.status !== ReviewStatus.published) {
+      throw new NotFoundException("Отзыв не найден или недоступен для жалобы.");
+    }
+    return { type: "marketplace_review", authorUserId: review.createdById, authorCompanyId: review.fromCompanyId };
   }
 }

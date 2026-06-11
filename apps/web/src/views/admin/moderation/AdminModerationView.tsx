@@ -200,11 +200,18 @@ export function AdminModerationView() {
                     </p>
                   ) : null}
                   <article className="moderated-content">
-                    <strong>
-                      {selectedCase.entity?.type === "news_comment" ? selectedCase.entity.author?.firstName : ""}{" "}
-                      {selectedCase.entity?.type === "news_comment" ? selectedCase.entity.author?.lastName : ""}
-                    </strong>
-                    <p>{selectedCase.entity?.type === "news_comment" ? selectedCase.entity.text : undefined}</p>
+                    {selectedCase.entity?.type === "news_comment" ? (
+                      <strong>
+                        {selectedCase.entity.author?.firstName} {selectedCase.entity.author?.lastName}
+                      </strong>
+                    ) : null}
+                    {selectedCase.entity?.type === "marketplace_listing" && selectedCase.entity.sellerCompany ? (
+                      <strong>{selectedCase.entity.sellerCompany.organizationName}</strong>
+                    ) : null}
+                    {selectedCase.entity?.type === "marketplace_review" && selectedCase.entity.fromCompany ? (
+                      <strong>Отзыв от {selectedCase.entity.fromCompany.organizationName}</strong>
+                    ) : null}
+                    <p>{formatModerationEntityPreview(selectedCase)}</p>
                   </article>
                   <section>
                     <h3>Жалобы</h3>

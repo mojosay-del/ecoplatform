@@ -18,6 +18,7 @@ import {
   type UpdateListingDto,
   canOpenFunctionalSections,
 } from "@ecoplatform/shared";
+import { ModuleAccessService } from "../../common/module-access.service";
 import { paginatedResponse, resolvePagination } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import { FilesService } from "../../files/files.service";
@@ -55,6 +56,7 @@ export class MarketplaceListingsService {
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
     private readonly geocoder: MarketplaceGeocoderService,
+    private readonly moduleAccess: ModuleAccessService,
   ) {}
 
   // Геокодит formatted-адрес (вне транзакции — сетевой вызов) и готовит координаты
@@ -201,6 +203,8 @@ export class MarketplaceListingsService {
 
   async createDraft(user: RequestUser, dto: CreateListingDto): Promise<MarketplaceListingDetail> {
     const companyId = this.assertSeller(user);
+    // Санкция модерации module_restriction("marketplace") блокирует размещение.
+    await this.moduleAccess.assertModuleAccess(user.id, "marketplace");
     await this.assertNomenclatureValid(dto.positions.map((position) => position.nomenclatureId));
     await this.assertMediaValid(dto.media);
 
@@ -301,6 +305,7 @@ export class MarketplaceListingsService {
 
   async publish(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {
     const companyId = this.assertSeller(user);
+    await this.moduleAccess.assertModuleAccess(user.id, "marketplace");
     const listing = await this.findOwnedOr404(companyId, id);
     if (listing.status === "active") {
       return mapToDetail(listing, { canSeeContacts: true });
@@ -359,9 +364,14 @@ export class MarketplaceListingsService {
 
   async republish(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {
     const companyId = this.assertSeller(user);
+    await this.moduleAccess.assertModuleAccess(user.id, "marketplace");
     const source = await this.findOwnedOr404(companyId, id);
     if (source.status !== "archived") {
       throw new BadRequestException("Переподать можно только архивное объявление.");
+    }
+    // Снятое модератором объявление переподать нельзя (обход модерации).
+    if (source.archiveReason === "removed_by_moderator") {
+      throw new ForbiddenException("Объявление снято модератором — переподача недоступна.");
     }
 
     // Переподача = новое объявление → новый отображаемый центр (защита от

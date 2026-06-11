@@ -8,6 +8,7 @@ import {
   type PaginatedResponse,
   canOpenFunctionalSections,
 } from "@ecoplatform/shared";
+import { ModuleAccessService } from "../../common/module-access.service";
 import { paginatedResponse, resolvePagination } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
 import { swallowAndLog } from "../../common/silent-catch";
@@ -27,6 +28,7 @@ export class MarketplaceOffersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly moduleAccess: ModuleAccessService,
   ) {}
 
   // ── Гейты ─────────────────────────────────────────────────────────────────
@@ -59,6 +61,8 @@ export class MarketplaceOffersService {
 
   async createOffer(user: RequestUser, listingId: string, dto: CreateOfferDto): Promise<MyOfferItem> {
     const buyerCompanyId = this.assertBuyer(user);
+    // Санкция модерации module_restriction("marketplace") блокирует участие.
+    await this.moduleAccess.assertModuleAccess(user.id, "marketplace");
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id: listingId },
       select: { id: true, status: true, sellerCompanyId: true, createdById: true, positions: { select: { id: true } } },

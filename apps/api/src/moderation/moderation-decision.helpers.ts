@@ -4,9 +4,11 @@ import {
   ComplaintStatus,
   ContentStatus,
   DiscussionTargetType,
+  ListingStatus,
   ModerationCaseStatus,
   ModerationDecisionType,
   NotificationCategory,
+  ReviewStatus,
   SanctionType,
   type Prisma,
 } from "@prisma/client";
@@ -185,6 +187,38 @@ async function removeModeratedEntity(tx: Prisma.TransactionClient, found: Modera
     return;
   }
 
+  if (found.entityType === "marketplace_listing") {
+    const listing = await tx.marketplaceListing.findUnique({
+      where: { id: found.entityId },
+      select: { status: true },
+    });
+    if (!listing) {
+      throw new BadRequestException("Объявление уже удалено.");
+    }
+    // archived убирает объявление из ленты; archiveReason запрещает переподачу.
+    await tx.marketplaceListing.update({
+      where: { id: found.entityId },
+      data: { status: ListingStatus.archived, archiveReason: "removed_by_moderator", archivedAt: new Date() },
+    });
+    return;
+  }
+
+  if (found.entityType === "marketplace_review") {
+    const review = await tx.marketplaceReview.findUnique({
+      where: { id: found.entityId },
+      select: { status: true },
+    });
+    if (!review) {
+      throw new BadRequestException("Отзыв уже удалён.");
+    }
+    // Пересчёт рейтинга компании делает ModerationService после коммита.
+    await tx.marketplaceReview.update({
+      where: { id: found.entityId },
+      data: { status: ReviewStatus.hidden_by_moderator },
+    });
+    return;
+  }
+
   throw new BadRequestException("Тип сущности не поддерживается модерацией.");
 }
 
@@ -261,16 +295,34 @@ function subjectForEntity(entityType: string, title: string | undefined) {
       warningBody: `По новости «${safeTitle}»`,
     };
   }
+  if (entityType === "knowledge_article") {
+    return {
+      complaintBody: `Жалоба по статье «${safeTitle}»`,
+      removalTitle: "Статья базы знаний снята модератором",
+      removalBody: `Статья «${safeTitle}» снята с публикации по итогам модерации.`,
+      warningBody: `По статье «${safeTitle}»`,
+    };
+  }
+  if (entityType === "marketplace_listing") {
+    return {
+      complaintBody: `Жалоба по объявлению «${safeTitle}»`,
+      removalTitle: "Объявление снято модератором",
+      removalBody: `Ваше объявление «${safeTitle}» снято с площадки по итогам модерации.`,
+      warningBody: `По объявлению «${safeTitle}»`,
+    };
+  }
+  // marketplace_review
   return {
-    complaintBody: `Жалоба по статье «${safeTitle}»`,
-    removalTitle: "Статья базы знаний снята модератором",
-    removalBody: `Статья «${safeTitle}» снята с публикации по итогам модерации.`,
-    warningBody: `По статье «${safeTitle}»`,
+    complaintBody: "Жалоба на отзыв",
+    removalTitle: "Отзыв скрыт модератором",
+    removalBody: "Ваш отзыв скрыт по итогам модерации.",
+    warningBody: "По отзыву",
   };
 }
 
 function fallbackLinkForEntityType(entityType: string): string {
   if (entityType === "knowledge_article") return "/knowledge-base";
+  if (entityType === "marketplace_listing" || entityType === "marketplace_review") return "/marketplace";
   return "/news";
 }
 
@@ -300,12 +352,31 @@ async function getModerationEntity(
     if (!post) return null;
     return { title: post.title, link: `/news/${post.slug}` };
   }
-  const article = await deps.prisma.knowledgeBaseArticle.findUnique({
-    where: { id: found.entityId },
-    select: { title: true, slug: true },
-  });
-  if (!article) return null;
-  return { title: article.title, link: `/knowledge-base/${article.slug}` };
+  if (found.entityType === "knowledge_article") {
+    const article = await deps.prisma.knowledgeBaseArticle.findUnique({
+      where: { id: found.entityId },
+      select: { title: true, slug: true },
+    });
+    if (!article) return null;
+    return { title: article.title, link: `/knowledge-base/${article.slug}` };
+  }
+
+  if (found.entityType === "marketplace_listing") {
+    const listing = await deps.prisma.marketplaceListing.findUnique({
+      where: { id: found.entityId },
+      select: {
+        description: true,
+        positions: { orderBy: { position: "asc" }, select: { nomenclature: { select: { name: true } } } },
+      },
+    });
+    if (!listing) return null;
+    const names = listing.positions.map((position) => position.nomenclature.name).filter(Boolean);
+    const title = names.length > 0 ? names.join(", ") : listing.description?.trim()?.slice(0, 80) || "Объявление";
+    return { title, link: `/marketplace/${found.entityId}` };
+  }
+
+  // marketplace_review — отдельной страницы отзыва нет, ведём в раздел сделок.
+  return { title: "отзыв", link: "/marketplace/offers" };
 }
 
 function isModeratedEntityType(value: string): value is ModeratedEntityType {

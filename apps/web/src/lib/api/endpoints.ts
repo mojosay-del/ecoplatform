@@ -339,7 +339,7 @@ export const api = {
   // ── Жалобы (модерация со стороны пользователя) ─────────────────────────
   moderation: {
     createComplaint: (body: {
-      entityType: "news_comment" | "news_post" | "knowledge_base_article";
+      entityType: "news_comment" | "news_post" | "knowledge_base_article" | "marketplace_listing" | "marketplace_review";
       entityId: string;
       reasonCode: string;
       comment?: string;

@@ -7,6 +7,7 @@ import { useState } from "react";
 import type { CompanyRatingSummary, ReviewItem } from "@ecoplatform/shared";
 import { ApiError, api } from "../../lib/api";
 import { useApiQuery } from "../shared";
+import { ReportControl } from "./ReportControl";
 import { REVIEW_CRITERION_LABEL, RatingBadge, Stars } from "./review-ui";
 
 export function CompanyReviews({ companyId }: { companyId: string }) {
@@ -87,6 +88,7 @@ export function CompanyReviews({ companyId }: { companyId: string }) {
               </button>
             )
           ) : null}
+          {!review.isAuthor ? <ReportControl entityType="marketplace_review" entityId={review.id} /> : null}
         </div>
       ))}
     </div>

@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const moderatedEntityTypes = ["news_comment", "news_post", "knowledge_article"] as const;
+export const moderatedEntityTypes = [
+  "news_comment",
+  "news_post",
+  "knowledge_article",
+  "marketplace_listing",
+  "marketplace_review",
+] as const;
 export type ModeratedEntityType = (typeof moderatedEntityTypes)[number];
 
 export const complaintReasonCodes = [

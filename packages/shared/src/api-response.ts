@@ -553,7 +553,12 @@ export type ModerationDecisionType = "leave_as_is" | "remove_content" | "warn_co
 
 export type SanctionType = "warning" | "content_removal" | "module_restriction" | "user_block" | "company_block";
 
-export type ModeratedEntityType = "news_comment" | "news_post" | "knowledge_article";
+export type ModeratedEntityType =
+  | "news_comment"
+  | "news_post"
+  | "knowledge_article"
+  | "marketplace_listing"
+  | "marketplace_review";
 
 export type ModerationCommentStatus = "published" | "hidden_by_moderator" | "removed_by_admin" | "removed_with_news";
 
@@ -576,7 +581,22 @@ export type ModerationEntitySummary =
       author: ModerationUserSummary | null;
     }
   | { type: "news_post"; id: string; title: string; slug: string; status: ContentStatus }
-  | { type: "knowledge_article"; id: string; title: string; slug: string; status: ContentStatus };
+  | { type: "knowledge_article"; id: string; title: string; slug: string; status: ContentStatus }
+  | {
+      type: "marketplace_listing";
+      id: string;
+      title: string;
+      status: string;
+      sellerCompany: { id: string; organizationName: string } | null;
+    }
+  | {
+      type: "marketplace_review";
+      id: string;
+      text: string;
+      status: string;
+      toCompany: { id: string; organizationName: string } | null;
+      fromCompany: { id: string; organizationName: string } | null;
+    };
 
 export type ModerationComplaint = {
   id: string;
