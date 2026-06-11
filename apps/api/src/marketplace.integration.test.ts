@@ -292,6 +292,22 @@ describe("Marketplace — объявления (фаза 1)", () => {
     });
   });
 
+  it("админ видит чужое объявление как НЕ владелец, но с контактами (isOwner≠canSeeContacts)", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const seller = await registerCompany("0009107");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId } = await createPublishedListing(seller.token, nomenclatureId);
+
+      const adminToken = await loginAdmin();
+      const detail = await ctx.http.get(`/api/marketplace/listings/${listingId}`).set(bearer(adminToken));
+      expect(detail.status).toBe(200);
+      // Админ не владелец — кнопок редактирования быть не должно…
+      expect(detail.body.isOwner).toBe(false);
+      // …но контакты ему раскрыты (canSeeContacts по роли).
+      expect(detail.body.contactPhone).not.toBeNull();
+    });
+  });
+
   it("чужое объявление нельзя редактировать или архивировать (404)", async () => {
     await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
       const { token: ownerToken } = await registerCompany("0009104");

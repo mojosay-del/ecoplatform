@@ -219,11 +219,36 @@ export function ListingModal({
                     <h3>О товаре</h3>
                     {listing.description ? <p>{listing.description}</p> : null}
                     <ul className="mp-spec-list">
-                      {listing.color ? <li>Цвет / сорт: {listing.color}</li> : null}
-                      {firstMoisture != null ? <li>Влажность: до {firstMoisture}%</li> : null}
-                      {firstContamination != null ? <li>Засор: до {firstContamination}%</li> : null}
-                      {listing.packaging ? <li>Упаковка: {listing.packaging}</li> : null}
-                      {listing.paymentTerms ? <li>Оплата: {listing.paymentTerms}</li> : null}
+                      {listing.color ? (
+                        <li>
+                          <span>Цвет / сорт</span>
+                          <span>{listing.color}</span>
+                        </li>
+                      ) : null}
+                      {firstMoisture != null ? (
+                        <li>
+                          <span>Влажность</span>
+                          <span>до {firstMoisture}%</span>
+                        </li>
+                      ) : null}
+                      {firstContamination != null ? (
+                        <li>
+                          <span>Засор</span>
+                          <span>до {firstContamination}%</span>
+                        </li>
+                      ) : null}
+                      {listing.packaging ? (
+                        <li>
+                          <span>Упаковка</span>
+                          <span>{listing.packaging}</span>
+                        </li>
+                      ) : null}
+                      {listing.paymentTerms ? (
+                        <li>
+                          <span>Оплата</span>
+                          <span>{listing.paymentTerms}</span>
+                        </li>
+                      ) : null}
                     </ul>
                     {listing.contactPhone ? (
                       <div className="mp-modal-contacts">

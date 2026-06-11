@@ -11,6 +11,9 @@ export type YmapsMap = {
   setBounds: (bounds: unknown, options?: Record<string, unknown>) => void;
   getZoom: () => number;
   events: { add: (type: string, handler: () => void) => void };
+  // Пересчёт под новый размер контейнера (нужно при сворачивании сайдбара —
+  // грид-колонка расширяется, но канвас карты сам не реагирует).
+  container: { fitToViewport: () => void };
   destroy: () => void;
 };
 export type YmapsSuggestView = {
@@ -88,18 +91,30 @@ export function materialColor(categorySlug: string | undefined): string {
   }
 }
 
-// SVG-булавка с иконкой кипы (для сильного отдаления карты). Цвет — по сырью.
-// Возвращаем data-URI для iconImageHref Яндекс-плейсмарка.
-export function balecasePinDataUri(color: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
-<path d="M16 0C8 0 1 6 1 15c0 11 15 27 15 27s15-16 15-27C31 6 24 0 16 0Z" fill="${color}"/>
-<circle cx="16" cy="15" r="10" fill="#ffffff"/>
-<g fill="none" stroke="${color}" stroke-width="1.7">
-<rect x="10.5" y="10.5" width="11" height="9" rx="1.2"/>
-<line x1="10.5" y1="13.5" x2="21.5" y2="13.5"/>
-<line x1="10.5" y1="16.5" x2="21.5" y2="16.5"/>
-<line x1="16" y1="10.5" x2="16" y2="19.5"/>
-</g>
-</svg>`;
+function svgDataUri(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+// Аккуратная булавка-капля с белой обводкой (читается на любой подложке) и
+// минималистичным глифом «кипа» (скруглённый квадрат + стяжка) в цвет сырья.
+// Для среднего масштаба карты. Размер 30×38.
+export function pinDataUri(color: string): string {
+  return svgDataUri(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38">` +
+      `<path d="M15 37s12-11.8 12-22A12 12 0 1 0 3 15c0 10.2 12 22 12 22Z" fill="${color}" stroke="#fff" stroke-width="1.6"/>` +
+      `<circle cx="15" cy="14" r="7.2" fill="#fff"/>` +
+      `<rect x="11.2" y="10.2" width="7.6" height="7.6" rx="1.6" fill="none" stroke="${color}" stroke-width="1.5"/>` +
+      `<line x1="11.2" y1="14" x2="18.8" y2="14" stroke="${color}" stroke-width="1.5"/>` +
+      `</svg>`,
+  );
+}
+
+// Маленькая точка с белым кольцом — для СИЛЬНОГО отдаления, чтобы точки не
+// загромождали карту. Размер 14×14.
+export function dotDataUri(color: string): string {
+  return svgDataUri(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">` +
+      `<circle cx="7" cy="7" r="4.6" fill="${color}" stroke="#fff" stroke-width="2"/>` +
+      `</svg>`,
+  );
 }

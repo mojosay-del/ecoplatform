@@ -1,18 +1,24 @@
 "use client";
 
-// Виджет Яндекс.Карт для ленты площадки. Круги 4 км по отображаемым центрам
-// объявлений (реальная точка скрыта), цвет — по сырью (макулатура/плёнки/
-// полимеры). На сильном отдалении круг превращается в булавку с иконкой кипы
-// того же цвета — так точки лучше видно издалека. Ключ/загрузчик — в
-// ./yandex-loader; без ключа показываем заглушку, список остаётся доступен.
+// Виджет Яндекс.Карт для ленты площадки. Цвет элемента — по сырью (макулатура/
+// плёнки/полимеры). Три масштаба для читаемости: близко — круг 4 км (реальная
+// точка скрыта), средне — аккуратная булавка с кипой, далеко — маленькая точка
+// (чтобы не загромождать карту). Загрузчик/иконки — в ./yandex-loader; без ключа
+// показываем заглушку, список остаётся доступен.
 
 import { useEffect, useRef, useState } from "react";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
-import { YANDEX_KEY, balecasePinDataUri, loadYmaps, materialColor, type YmapsMap } from "./yandex-loader";
+import { YANDEX_KEY, dotDataUri, loadYmaps, materialColor, pinDataUri, type YmapsMap } from "./yandex-loader";
 
-// Зум < порога → булавки (круг 4 км на мелком масштабе почти не виден); иначе круги.
-const PIN_ZOOM_THRESHOLD = 10;
+type MapMode = "dot" | "pin" | "circle";
+
+// ≥11 — круг 4 км; 7..10 — булавка; <7 (область/страна) — маленькая точка.
+function modeForZoom(zoom: number): MapMode {
+  if (zoom >= 11) return "circle";
+  if (zoom >= 7) return "pin";
+  return "dot";
+}
 
 export function YandexMap({
   listings,
@@ -23,22 +29,22 @@ export function YandexMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<YmapsMap | null>(null);
-  const modeRef = useRef<"pin" | "circle" | null>(null);
+  const modeRef = useRef<MapMode | null>(null);
   const drawRef = useRef<(fit: boolean) => void>(() => undefined);
+  const observerRef = useRef<ResizeObserver | null>(null);
   const [failed, setFailed] = useState(false);
 
   const points = listings.filter((listing) => listing.circleLat != null && listing.circleLon != null);
   const pointsKey = points.map((listing) => `${listing.id}:${listing.circleLat},${listing.circleLon}`).join("|");
 
-  // Реализация отрисовки пересоздаётся каждый рендер — замыкает актуальные
-  // points/onSelect, поэтому слушатель boundschange (добавлен один раз) всегда
-  // дёргает свежую версию через ref.
+  // Пересоздаётся каждый рендер — замыкает актуальные points/onSelect; слушатель
+  // boundschange (добавлен один раз) дёргает свежую версию через ref.
   drawRef.current = (fit: boolean) => {
     const ymaps = window.ymaps;
     const map = mapRef.current;
     if (!ymaps || !map) return;
 
-    const mode: "pin" | "circle" = map.getZoom() < PIN_ZOOM_THRESHOLD ? "pin" : "circle";
+    const mode = modeForZoom(map.getZoom());
     modeRef.current = mode;
     map.geoObjects.removeAll();
 
@@ -49,23 +55,26 @@ export function YandexMap({
       const color = materialColor(listing.positions[0]?.categorySlug);
       const hintContent = listing.positions.map((position) => position.nomenclatureName).join(", ");
 
-      const object =
-        mode === "pin"
-          ? new ymaps.Placemark(
-              center,
-              { hintContent },
-              {
-                iconLayout: "default#image",
-                iconImageHref: balecasePinDataUri(color),
-                iconImageSize: [32, 42],
-                iconImageOffset: [-16, -42],
-              },
-            )
-          : new ymaps.Circle([center, MARKETPLACE_CIRCLE_RADIUS_KM * 1000], { hintContent }, {
-              fillColor: `${color}2e`,
-              strokeColor: color,
-              strokeWidth: 2,
-            });
+      let object;
+      if (mode === "circle") {
+        object = new ymaps.Circle([center, MARKETPLACE_CIRCLE_RADIUS_KM * 1000], { hintContent }, {
+          fillColor: `${color}2e`,
+          strokeColor: color,
+          strokeWidth: 2,
+        });
+      } else if (mode === "pin") {
+        object = new ymaps.Placemark(
+          center,
+          { hintContent },
+          { iconLayout: "default#image", iconImageHref: pinDataUri(color), iconImageSize: [30, 38], iconImageOffset: [-15, -38] },
+        );
+      } else {
+        object = new ymaps.Placemark(
+          center,
+          { hintContent },
+          { iconLayout: "default#image", iconImageHref: dotDataUri(color), iconImageSize: [14, 14], iconImageOffset: [-7, -7] },
+        );
+      }
 
       if (onSelect) {
         object.events.add("click", () => onSelect(listing.id));
@@ -101,13 +110,16 @@ export function YandexMap({
               zoom: 5,
               controls: ["zoomControl"],
             });
-            // Свап булавка↔круг при пересечении порога зума.
+            // Свап точка↔булавка↔круг при пересечении порогов зума.
             mapRef.current.events.add("boundschange", () => {
               const map = mapRef.current;
               if (!map) return;
-              const mode = map.getZoom() < PIN_ZOOM_THRESHOLD ? "pin" : "circle";
-              if (mode !== modeRef.current) drawRef.current(false);
+              if (modeForZoom(map.getZoom()) !== modeRef.current) drawRef.current(false);
             });
+            // Контейнер расширяется при сворачивании сайдбара — канвас карты сам
+            // не реагирует, поэтому пересчитываем его под новый размер.
+            observerRef.current = new ResizeObserver(() => mapRef.current?.container.fitToViewport());
+            observerRef.current.observe(containerRef.current);
           }
           drawRef.current(true);
         });
@@ -121,6 +133,15 @@ export function YandexMap({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointsKey]);
+
+  // Очистка ресурсов при размонтировании.
+  useEffect(() => {
+    return () => {
+      observerRef.current?.disconnect();
+      mapRef.current?.destroy();
+      mapRef.current = null;
+    };
+  }, []);
 
   if (failed || !YANDEX_KEY) {
     return (

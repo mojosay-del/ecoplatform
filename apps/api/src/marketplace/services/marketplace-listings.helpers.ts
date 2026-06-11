@@ -110,7 +110,14 @@ function toCompanyAddress(address: ListingWithRelations["address"]): CompanyAddr
 
 // `canSeeContacts` — раскрываем ли точный адрес и телефон. Пока это только
 // владелец и админ; на фазе предложений сюда добавится покупатель после акцепта.
-export function mapToDetail(listing: ListingWithRelations, options: { canSeeContacts: boolean }): MarketplaceListingDetail {
+// `canSeeContacts` — раскрываем ли точные адрес/телефон (владелец, админ; позже —
+// покупатель после акцепта). `isOwner` — ТОЛЬКО владелец (компания продавца): по
+// нему фронт показывает действия редактирования. Раньше эти понятия были слиты,
+// из-за чего админ/покупатель-после-акцепта видели «Редактировать».
+export function mapToDetail(
+  listing: ListingWithRelations,
+  options: { canSeeContacts: boolean; isOwner: boolean },
+): MarketplaceListingDetail {
   return {
     id: listing.id,
     status: listing.status,
@@ -146,7 +153,7 @@ export function mapToDetail(listing: ListingWithRelations, options: { canSeeCont
       contaminationPct: decimalToNumberOrNull(position.contaminationPct),
     })),
     media: listing.media.map((item) => ({ id: item.id, fileId: item.fileId, kind: item.kind, position: item.position })),
-    isOwner: options.canSeeContacts,
+    isOwner: options.isOwner,
   };
 }
 
