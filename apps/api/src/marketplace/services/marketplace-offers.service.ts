@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { NotificationCategory } from "@prisma/client";
+import { NotificationCategory, Prisma } from "@prisma/client";
 import {
   type CreateOfferDto,
   type DealDecisionDto,
@@ -92,18 +92,14 @@ export class MarketplaceOffersService {
       listing.positions.map((position) => position.id),
     );
 
-    const offer = await this.prisma.offer.create({
-      data: {
-        listingId,
-        buyerCompanyId,
-        createdById: user.id,
-        status: "active",
-        priceCondition: dto.priceCondition,
-        city: dto.city?.trim() || null,
-        contactPhone: dto.contactPhone.trim(),
-        positions: { create: offerPositionCreateData(dto) },
-      },
-      include: offerInclude,
+    const offer = await this.createOfferWithRaceGuard({
+      listingId,
+      buyerCompanyId,
+      createdById: user.id,
+      priceCondition: dto.priceCondition,
+      city: dto.city?.trim() || null,
+      contactPhone: dto.contactPhone.trim(),
+      positions: { create: offerPositionCreateData(dto) },
     });
 
     await this.notify(
@@ -242,11 +238,7 @@ export class MarketplaceOffersService {
     }
 
     const now = new Date();
-    const updated = await this.prisma.offer.update({
-      where: { id: offerId },
-      data: { status: "accepted", acceptedAt: now, decisionDeadline: new Date(now.getTime() + DECISION_WINDOW_MS) },
-      include: offerInclude,
-    });
+    const updated = await this.acceptOfferWithRaceGuard(offer, now);
     await this.notify(
       offer.createdById,
       "marketplace.offer.accepted",
@@ -374,6 +366,50 @@ export class MarketplaceOffersService {
     return offer;
   }
 
+  private async createOfferWithRaceGuard(data: Prisma.OfferCreateArgs["data"]): Promise<OfferWithRelations> {
+    try {
+      return await this.prisma.offer.create({ data, include: offerInclude });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new BadRequestException("У вас уже есть активное предложение по этому объявлению — измените его.");
+      }
+      throw error;
+    }
+  }
+
+  private async acceptOfferWithRaceGuard(offer: OfferWithRelations, now: Date): Promise<OfferWithRelations> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const pending = await tx.offer.findFirst({
+          where: { listingId: offer.listingId, status: "accepted", id: { not: offer.id } },
+          select: { id: true },
+        });
+        if (pending) {
+          throw new BadRequestException("По объявлению уже есть принятое предложение, ожидающее решения.");
+        }
+
+        const accepted = await tx.offer.updateMany({
+          where: { id: offer.id, status: "active" },
+          data: { status: "accepted", acceptedAt: now, decisionDeadline: new Date(now.getTime() + DECISION_WINDOW_MS) },
+        });
+        if (accepted.count === 0) {
+          throw new BadRequestException("Принять можно только активное предложение.");
+        }
+
+        const updated = await tx.offer.findUnique({ where: { id: offer.id }, include: offerInclude });
+        if (!updated) {
+          throw new NotFoundException("Предложение не найдено.");
+        }
+        return updated;
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new BadRequestException("По объявлению уже есть принятое предложение, ожидающее решения.");
+      }
+      throw error;
+    }
+  }
+
   private assertOfferPositions(dto: CreateOfferDto, listingPositionIds: string[]) {
     const ids = dto.positions.map((position) => position.listingPositionId);
     if (new Set(ids).size !== ids.length) {
@@ -403,4 +439,8 @@ function offerPositionCreateData(dto: CreateOfferDto) {
     listingPositionId: position.listingPositionId,
     pricePerTonRub: position.pricePerTonRub ?? null,
   }));
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }

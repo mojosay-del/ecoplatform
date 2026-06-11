@@ -498,6 +498,63 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
     });
   });
 
+  it("параллельные запросы одного покупателя создают только один активный оффер", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009213");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyerToken = await registerTrader("0009213");
+
+      const [first, second] = await Promise.all([
+        ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyerToken))
+          .send(offerPayload(positionId)),
+        ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyerToken))
+          .send(offerPayload(positionId)),
+      ]);
+
+      expect([first.status, second.status].sort((left, right) => left - right)).toEqual([201, 400]);
+      const activeOffers = await ctx.prisma.offer.count({
+        where: { listingId, status: { in: ["active", "accepted"] } },
+      });
+      expect(activeOffers).toBe(1);
+    });
+  });
+
+  it("параллельное принятие не оставляет два принятых оффера по объявлению", async () => {
+    await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
+      const { token: sellerToken } = await registerCompany("0009214");
+      const nomenclatureId = await seedNomenclature();
+      const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
+      const buyer1 = await registerTrader("0009214");
+      const buyer2 = await registerProcessor("0009214");
+      const offer1 = (
+        await ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyer1))
+          .send(offerPayload(positionId))
+      ).body;
+      const offer2 = (
+        await ctx.http
+          .post(`/api/marketplace/listings/${listingId}/offers`)
+          .set(bearer(buyer2))
+          .send(offerPayload(positionId))
+      ).body;
+
+      const [first, second] = await Promise.all([
+        ctx.http.post(`/api/marketplace/offers/${offer1.id}/accept`).set(bearer(sellerToken)),
+        ctx.http.post(`/api/marketplace/offers/${offer2.id}/accept`).set(bearer(sellerToken)),
+      ]);
+
+      expect([first.status, second.status].sort((left, right) => left - right)).toEqual([201, 400]);
+      const acceptedOffers = await ctx.prisma.offer.count({ where: { listingId, status: "accepted" } });
+      expect(acceptedOffers).toBe(1);
+    });
+  });
+
   it("«Не договорились» оставляет объявление активным и закрывает оффер", async () => {
     await withEnv({ MARKETPLACE_ENABLED: "1" }, async () => {
       const { token: sellerToken } = await registerCompany("0009203");
