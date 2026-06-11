@@ -10,7 +10,7 @@ import { AppShell } from "../../components/AppShell";
 import { ApiError, api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
-import { ListingStatusBadge, formatWeight, positionsSummaryText, totalWeightKg } from "./listing-ui";
+import { ListingStatusBadge, archiveReasonLabel, formatWeight, positionsSummaryText, totalWeightKg } from "./listing-ui";
 
 export function MyListingsView() {
   const [refresh, setRefresh] = useState(0);
@@ -84,6 +84,7 @@ export function MyListingsView() {
             {listings.map((listing) => {
               const cover = listing.coverFileId ? preferredFileAssetImageUrl(assets.get(listing.coverFileId)) : null;
               const busy = busyId === listing.id;
+              const archiveLabel = listing.status === "archived" ? archiveReasonLabel(listing.archiveReason) : null;
               return (
                 <div className="mp-row" key={listing.id}>
                   {cover ? <img className="mp-row-cover" src={cover} alt="" /> : <div className="mp-row-cover" />}
@@ -96,7 +97,10 @@ export function MyListingsView() {
                     </span>
                   </div>
                   <div className="mp-row-actions">
-                    <ListingStatusBadge status={listing.status} />
+                    <div className="mp-row-status">
+                      <ListingStatusBadge status={listing.status} />
+                      {archiveLabel ? <span className="mp-archive-reason">{archiveLabel}</span> : null}
+                    </div>
                     {listing.status !== "archived" ? (
                       <Link className="button secondary" href={`/marketplace/${listing.id}/edit`}>
                         Изменить

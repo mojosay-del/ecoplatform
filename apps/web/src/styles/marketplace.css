@@ -183,6 +183,21 @@
   justify-content: flex-end;
 }
 
+.mp-row-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.mp-archive-reason {
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 /* ── Детальная карточка ──────────────────────────────────────────────────── */
 .mp-detail {
   display: grid;

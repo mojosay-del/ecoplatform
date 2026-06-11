@@ -20,6 +20,14 @@ export const LISTING_STATUS_LABEL: Record<ListingStatus, string> = {
   archived: "Архив",
 };
 
+export const LISTING_ARCHIVE_REASON_LABEL = {
+  sold: "Продано",
+  expired: "Истёк срок",
+  withdrawn: "Снято вами",
+  removed_by_moderator: "Снято модератором",
+  not_settled: "Сделка не закрыта в срок",
+} as const;
+
 export const LISTING_FORM_LABEL: Record<string, string> = {
   pressed: "Тюки",
   loose: "Россыпь",
@@ -27,6 +35,13 @@ export const LISTING_FORM_LABEL: Record<string, string> = {
 
 export function ListingStatusBadge({ status }: { status: ListingStatus }) {
   return <span className={`mp-badge mp-badge-${status}`}>{LISTING_STATUS_LABEL[status]}</span>;
+}
+
+export function archiveReasonLabel(reason: string | null): string | null {
+  if (!reason || !(reason in LISTING_ARCHIVE_REASON_LABEL)) {
+    return null;
+  }
+  return LISTING_ARCHIVE_REASON_LABEL[reason as keyof typeof LISTING_ARCHIVE_REASON_LABEL];
 }
 
 export function formatWeight(kg: number): string {
