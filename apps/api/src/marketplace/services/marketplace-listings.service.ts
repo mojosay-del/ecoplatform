@@ -25,6 +25,7 @@ import { publicUrl } from "../../files/files-storage.helpers";
 import { FilesService } from "../../files/files.service";
 import { AddressGeocoderService } from "../../geo/address-geocoder.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import type { MarketplaceFeedBbox } from "../marketplace.schemas";
 import { generateCircleCenter } from "./marketplace-geo.helpers";
 import {
   type ListingWithRelations,
@@ -38,7 +39,18 @@ import {
 const LISTING_FILE_ENTITY = "marketplace_listing";
 const DAY_MS = 24 * 60 * 60 * 1000;
 type ListParams = { limit?: number; offset?: number };
-type FeedParams = ListParams & { region?: string[]; nomenclatureId?: string[] };
+type FeedParams = ListParams & { region?: string[]; nomenclatureId?: string[]; bbox?: MarketplaceFeedBbox };
+
+// Условие «центр круга внутри видимой области карты». NULL-координаты
+// (негеокодированный адрес) не проходят сравнение и отсекаются сами.
+function bboxWhere(bbox: MarketplaceFeedBbox): Prisma.MarketplaceListingWhereInput {
+  const latWhere: Prisma.MarketplaceListingWhereInput = { circleLat: { gte: bbox.south, lte: bbox.north } };
+  if (bbox.west <= bbox.east) {
+    return { ...latWhere, circleLon: { gte: bbox.west, lte: bbox.east } };
+  }
+  // Запад > востока — окно пересекает антимеридиан (Чукотка): долгота двумя ветками.
+  return { AND: [latWhere, { OR: [{ circleLon: { gte: bbox.west } }, { circleLon: { lte: bbox.east } }] }] };
+}
 
 // Координаты адреса + отображаемый центр круга для записи в БД (после геокодинга).
 type AddressGeo = {
@@ -140,6 +152,7 @@ export class MarketplaceListingsService {
       ...(params.nomenclatureId && params.nomenclatureId.length
         ? { positions: { some: { nomenclatureId: { in: params.nomenclatureId } } } }
         : {}),
+      ...(params.bbox ? bboxWhere(params.bbox) : {}),
     };
 
     const [total, rows] = await this.prisma.$transaction([

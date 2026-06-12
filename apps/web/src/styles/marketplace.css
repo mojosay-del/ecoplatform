@@ -2066,6 +2066,40 @@
   white-space: nowrap;
 }
 
+/* «Искать в этой области» — плашка по центру верха карты, появляется после
+   ручного перемещения и применяет видимую область как фильтр. */
+.mp-map-search-area {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 9px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-md);
+  color: var(--text-secondary-strong);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.mp-map-search-area:hover {
+  border-color: var(--accent, #1f8a4c);
+  color: var(--accent, #1f8a4c);
+}
+
 /* Переключатель Список/Карта — виден только когда сплит свёрнут. */
 .mp-view-toggle {
   display: none;

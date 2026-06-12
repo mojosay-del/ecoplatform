@@ -18,7 +18,7 @@ import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
 import { ListingCard, ListingCardSkeleton, totalWeightKg, useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
 import { MATERIAL_LEGEND, materialColor } from "./materials";
-import { YandexMap } from "./YandexMap";
+import { type MapViewBounds, YandexMap } from "./YandexMap";
 
 type SortMode = "date" | "distance" | "weight" | "expires";
 type FilterPopover = "nomenclature" | "region" | "sort";
@@ -74,6 +74,12 @@ function dateValue(value: string | null, fallback: number): number {
   return Number.isNaN(timestamp) ? fallback : timestamp;
 }
 
+// Границы карты → bbox-параметр API. 5 знаков ≈ метровая точность.
+function formatBbox(bounds: MapViewBounds): string {
+  const fixed = (value: number) => value.toFixed(5);
+  return `${fixed(bounds.south)},${fixed(bounds.west)},${fixed(bounds.north)},${fixed(bounds.east)}`;
+}
+
 export function MarketplaceView() {
   const { ready, token, user } = useAuth();
   const isCollector = user?.company?.type === "collector";
@@ -89,6 +95,10 @@ export function MarketplaceView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Hover-синхронизация ленты и карты (id объявления под курсором).
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // «Искать в этой области»: применённый bbox (уходит в API) и границы после
+  // последнего ручного перемещения карты (ждут нажатия кнопки).
+  const [mapBbox, setMapBbox] = useState<string | null>(null);
+  const [pendingBbox, setPendingBbox] = useState<string | null>(null);
   // Узкие экраны: сплит сворачивается, активна либо лента, либо карта.
   const [mobileView, setMobileView] = useState<"list" | "map">("list");
   const filtersRef = useRef<HTMLDivElement>(null);
@@ -136,7 +146,7 @@ export function MarketplaceView() {
     }
   }, [companyPoint, sortBy]);
 
-  const filterKey = `${selectedRegions.join(",")}|${selectedNomenclature.join(",")}`;
+  const filterKey = `${selectedRegions.join(",")}|${selectedNomenclature.join(",")}|${mapBbox ?? ""}`;
   const {
     items,
     total,
@@ -150,7 +160,13 @@ export function MarketplaceView() {
     ready && token ? `marketplace-listings-${filterKey}` : null,
     MARKETPLACE_FEED_PAGE_SIZE,
     ({ limit, offset }) =>
-      api.marketplace.listings({ region: selectedRegions, nomenclatureId: selectedNomenclature, limit, offset }),
+      api.marketplace.listings({
+        region: selectedRegions,
+        nomenclatureId: selectedNomenclature,
+        bbox: mapBbox ?? undefined,
+        limit,
+        offset,
+      }),
   );
 
   // Расстояния от адреса компании до отображаемых центров кругов — для
@@ -194,7 +210,7 @@ export function MarketplaceView() {
     [companyPoint],
   );
   const selectedSort = sortOptions.find((option) => option.value === sortBy) ?? DEFAULT_SORT_OPTION;
-  const hasActiveFilters = selectedRegions.length > 0 || selectedNomenclature.length > 0;
+  const hasActiveFilters = selectedRegions.length > 0 || selectedNomenclature.length > 0 || mapBbox !== null;
 
   // Номенклатура, сгруппированная по категориям (порядок справочника сохранён).
   const nomenclatureGroups = useMemo<NomenclatureGroup[]>(() => {
@@ -225,6 +241,7 @@ export function MarketplaceView() {
   function resetFilters() {
     setSelectedRegions([]);
     setSelectedNomenclature([]);
+    setMapBbox(null);
   }
 
   const coverIds = listings.map((listing) => listing.coverFileId).filter((id): id is string => Boolean(id));
@@ -415,6 +432,17 @@ export function MarketplaceView() {
           <X aria-hidden="true" size={14} />
         </button>
       ))}
+      {mapBbox ? (
+        <button
+          aria-label="Убрать фильтр по области карты"
+          className="mp-active-chip"
+          type="button"
+          onClick={() => setMapBbox(null)}
+        >
+          Область карты
+          <X aria-hidden="true" size={14} />
+        </button>
+      ) : null}
       <button className="mp-active-clear" type="button" onClick={resetFilters}>
         Сбросить всё
       </button>
@@ -537,7 +565,21 @@ export function MarketplaceView() {
               layout-прыжков, а пустое состояние сохраняет географический контекст. */}
           <aside className={`mp-split-map${mobileView === "map" ? " is-mobile-visible" : ""}`}>
             <div className="mp-map-shell">
-              <YandexMap hoveredId={hoveredId} listings={listings} onHover={setHoveredId} onSelect={setSelectedId} />
+              <YandexMap
+                fitOnDataChange={!mapBbox}
+                hoveredId={hoveredId}
+                listings={listings}
+                onHover={setHoveredId}
+                onSelect={setSelectedId}
+                onUserMoved={(bounds) => setPendingBbox(formatBbox(bounds))}
+              />
+              {/* Кнопка появляется после ручного перемещения карты и применяет
+                  видимую область как серверный фильтр ленты. */}
+              {pendingBbox && pendingBbox !== mapBbox ? (
+                <button className="mp-map-search-area" type="button" onClick={() => setMapBbox(pendingBbox)}>
+                  Искать в этой области
+                </button>
+              ) : null}
               {/* Легенда цветов сырья — обычный DOM-оверлей поверх карты. */}
               <div className="mp-map-legend">
                 {MATERIAL_LEGEND.map((item) => (

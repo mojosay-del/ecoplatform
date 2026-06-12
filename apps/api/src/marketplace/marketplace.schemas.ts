@@ -9,8 +9,29 @@ function toStringArray(value: string | string[] | undefined): string[] {
   return Array.isArray(value) ? value : [value];
 }
 
-// Входная схема ленты площадки: пагинация + фильтры по региону и номенклатуре
-// (сырью). Фильтры опциональны; на фазе карты их выставляет UI.
+export type MarketplaceFeedBbox = { south: number; west: number; north: number; east: number };
+
+// Видимая область карты для «Искать в этой области»: `swLat,swLon,neLat,neLon`.
+// west > east допустим — окно пересекает антимеридиан (сервис строит OR-ветку).
+const bboxQueryValue = z
+  .string()
+  .regex(/^-?\d+(\.\d+)?(,-?\d+(\.\d+)?){3}$/, "bbox: swLat,swLon,neLat,neLon")
+  .refine((value) => {
+    const [south, west, north, east] = value.split(",").map(Number);
+    return (
+      Math.abs(south!) <= 90 && Math.abs(north!) <= 90 && Math.abs(west!) <= 180 && Math.abs(east!) <= 180 && south! <= north!
+    );
+  }, "bbox вне диапазона координат")
+  .optional();
+
+function parseBbox(value: string | undefined): MarketplaceFeedBbox | undefined {
+  if (!value) return undefined;
+  const [south, west, north, east] = value.split(",").map(Number);
+  return { south: south!, west: west!, north: north!, east: east! };
+}
+
+// Входная схема ленты площадки: пагинация + фильтры по региону, номенклатуре
+// (сырью) и видимой области карты. Фильтры опциональны; их выставляет UI.
 export const marketplaceListQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -19,10 +40,12 @@ export const marketplaceListQuerySchema = z
     "region[]": stringArrayQueryValue,
     nomenclatureId: stringArrayQueryValue,
     "nomenclatureId[]": stringArrayQueryValue,
+    bbox: bboxQueryValue,
   })
   .transform((query) => ({
     limit: query.limit,
     offset: query.offset,
     region: [...toStringArray(query.region), ...toStringArray(query["region[]"])],
     nomenclatureId: [...toStringArray(query.nomenclatureId), ...toStringArray(query["nomenclatureId[]"])],
+    bbox: parseBbox(query.bbox),
   }));

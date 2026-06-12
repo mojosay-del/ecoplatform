@@ -46,11 +46,16 @@ function applyObjectStyle(entry: MapObjectEntry, highlighted: boolean) {
   }
 }
 
+// Видимая область карты в географических координатах.
+export type MapViewBounds = { south: number; west: number; north: number; east: number };
+
 export function YandexMap({
   listings,
   onSelect,
   hoveredId,
   onHover,
+  onUserMoved,
+  fitOnDataChange = true,
 }: {
   listings: MarketplaceListingListItem[];
   onSelect?: (id: string) => void;
@@ -58,6 +63,12 @@ export function YandexMap({
   hoveredId?: string | null;
   // …и сообщить об наведении на объект карты (null — увели курсор).
   onHover?: (id: string | null) => void;
+  // Ручное перемещение/зум карты (программные fit не считаются) — отдаёт
+  // текущие границы для кнопки «Искать в этой области».
+  onUserMoved?: (bounds: MapViewBounds) => void;
+  // При активном bbox-фильтре карту не пере-fit'им под новые данные, чтобы не
+  // сбивать выставленный пользователем вид (и не зациклить fit → moved).
+  fitOnDataChange?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<YmapsMap | null>(null);
@@ -66,9 +77,16 @@ export function YandexMap({
   const observerRef = useRef<ResizeObserver | null>(null);
   const objectsRef = useRef<Map<string, MapObjectEntry>>(new Map());
   const hoveredIdRef = useRef<string | null>(null);
-  // Через ref, чтобы hover-колбэк родителя не пересоздавал эффект карты.
+  // Через ref, чтобы колбэки родителя не пересоздавали эффект карты.
   const onHoverRef = useRef(onHover);
   onHoverRef.current = onHover;
+  const onUserMovedRef = useRef(onUserMoved);
+  onUserMovedRef.current = onUserMoved;
+  const fitOnDataChangeRef = useRef(fitOnDataChange);
+  fitOnDataChangeRef.current = fitOnDataChange;
+  // Окно подавления boundschange после программных setCenter/setBounds.
+  const suppressMovedUntilRef = useRef(0);
+  const movedTimerRef = useRef<number | undefined>(undefined);
   const [failed, setFailed] = useState(false);
 
   const points = listings.filter((listing) => listing.circleLat != null && listing.circleLon != null);
@@ -84,6 +102,7 @@ export function YandexMap({
     const focusView = fit ? getSinglePointFocusView(points) : null;
     if (focusView) {
       try {
+        suppressMovedUntilRef.current = Date.now() + 600;
         map.setCenter(focusView.center, focusView.zoom, { checkZoomRange: true });
       } catch {
         // Если API карты не смог сменить вид, ниже останется текущий масштаб.
@@ -154,6 +173,7 @@ export function YandexMap({
 
     if (fit && bounds.length > 1) {
       try {
+        suppressMovedUntilRef.current = Date.now() + 600;
         map.setBounds(ymaps.util.bounds.fromPoints(bounds), { checkZoomRange: true, zoomMargin: 48 });
       } catch {
         // setBounds может бросить при невалидной геометрии — оставляем вид как есть.
@@ -181,18 +201,28 @@ export function YandexMap({
               zoom: focusView?.zoom ?? LISTING_MAP_DEFAULT_ZOOM,
               controls: ["zoomControl"],
             });
-            // Свап точка↔круг при пересечении порога зума.
+            // Свап точка↔круг при пересечении порога зума + детект ручного
+            // перемещения (boundschange дребезжит — дебаунс 300 мс).
             mapRef.current.events.add("boundschange", () => {
               const map = mapRef.current;
               if (!map) return;
               if (modeForZoom(map.getZoom()) !== modeRef.current) drawRef.current(false);
+              if (Date.now() < suppressMovedUntilRef.current || !onUserMovedRef.current) return;
+              window.clearTimeout(movedTimerRef.current);
+              movedTimerRef.current = window.setTimeout(() => {
+                const current = mapRef.current;
+                if (!current || !onUserMovedRef.current) return;
+                const [sw, ne] = current.getBounds();
+                if (sw?.[0] == null || sw[1] == null || ne?.[0] == null || ne[1] == null) return;
+                onUserMovedRef.current({ south: sw[0], west: sw[1], north: ne[0], east: ne[1] });
+              }, 300);
             });
             // Контейнер расширяется при сворачивании сайдбара — канвас карты сам
             // не реагирует, поэтому пересчитываем его под новый размер.
             observerRef.current = new ResizeObserver(() => mapRef.current?.container.fitToViewport());
             observerRef.current.observe(containerRef.current);
           }
-          drawRef.current(true);
+          drawRef.current(fitOnDataChangeRef.current);
         });
       })
       .catch(() => {
@@ -224,6 +254,7 @@ export function YandexMap({
   // Очистка ресурсов при размонтировании.
   useEffect(() => {
     return () => {
+      window.clearTimeout(movedTimerRef.current);
       observerRef.current?.disconnect();
       mapRef.current?.destroy();
       mapRef.current = null;

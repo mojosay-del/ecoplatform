@@ -98,7 +98,12 @@ function previewSuffix(options: { preview?: boolean } = {}) {
   return options.preview ? "?preview=1" : "";
 }
 
-type MarketplaceFeedInput = PaginationInput & { region?: string[]; nomenclatureId?: string[] };
+type MarketplaceFeedInput = PaginationInput & {
+  region?: string[];
+  nomenclatureId?: string[];
+  // Видимая область карты «swLat,swLon,neLat,neLon» («Искать в этой области»).
+  bbox?: string;
+};
 
 function marketplaceFeedSuffix(input: MarketplaceFeedInput = {}) {
   const query = new URLSearchParams();
@@ -106,6 +111,7 @@ function marketplaceFeedSuffix(input: MarketplaceFeedInput = {}) {
   if (input.offset !== undefined) query.set("offset", String(input.offset));
   input.region?.forEach((region) => query.append("region[]", region));
   input.nomenclatureId?.forEach((id) => query.append("nomenclatureId[]", id));
+  if (input.bbox) query.set("bbox", input.bbox);
   return query.toString() ? `?${query.toString()}` : "";
 }
 

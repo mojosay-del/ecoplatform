@@ -20,6 +20,8 @@ export type YmapsMap = {
   setCenter: (center: number[], zoom?: number, options?: Record<string, unknown>) => void;
   setBounds: (bounds: unknown, options?: Record<string, unknown>) => void;
   getZoom: () => number;
+  // Видимая область [[swLat, swLon], [neLat, neLon]] — для «Искать в области».
+  getBounds: () => number[][];
   events: { add: (type: string, handler: () => void) => void };
   // Пересчёт под новый размер контейнера (нужно при сворачивании сайдбара —
   // грид-колонка расширяется, но канвас карты сам не реагирует).

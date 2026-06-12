@@ -1032,6 +1032,68 @@ describe("Marketplace — карта и фильтры (фаза 2)", () => {
       expect(regions.body).toEqual(["Москва", "Санкт-Петербург"]);
     });
   });
+
+  it("bbox-фильтр «Искать в этой области» режет ленту по видимой области карты", async () => {
+    const { token } = await registerCompany("0009402");
+    const nomenclatureId = await seedNomenclature();
+    const { listingId: tulaId } = await createPublishedListing(token, nomenclatureId);
+    const { listingId: rostovId } = await createPublishedListing(token, nomenclatureId);
+    // Координаты круга сажаем напрямую: Тула и Ростов-на-Дону.
+    await ctx.prisma.marketplaceListing.update({
+      where: { id: tulaId },
+      data: { circleLat: 54.19, circleLon: 37.62 },
+    });
+    await ctx.prisma.marketplaceListing.update({
+      where: { id: rostovId },
+      data: { circleLat: 47.22, circleLon: 39.72 },
+    });
+
+    // Окно вокруг Тулы ловит только тульское объявление.
+    const aroundTula = await ctx.http.get("/api/marketplace/listings?bbox=53,36,55,39").set(bearer(token));
+    expect(aroundTula.status).toBe(200);
+    expect(aroundTula.body.items.map((item: { id: string }) => item.id)).toEqual([tulaId]);
+
+    // Негеокодированные объявления (circleLat=null) в bbox-выдачу не попадают.
+    const { listingId: noGeoId } = await createPublishedListing(token, nomenclatureId);
+    const wide = await ctx.http.get("/api/marketplace/listings?bbox=40,30,60,45").set(bearer(token));
+    const wideIds = wide.body.items.map((item: { id: string }) => item.id);
+    expect(wideIds).toContain(tulaId);
+    expect(wideIds).toContain(rostovId);
+    expect(wideIds).not.toContain(noGeoId);
+
+    // Мусорный bbox отклоняется валидацией.
+    const malformed = await ctx.http.get("/api/marketplace/listings?bbox=мусор").set(bearer(token));
+    expect(malformed.status).toBe(400);
+    const outOfRange = await ctx.http.get("/api/marketplace/listings?bbox=95,36,99,39").set(bearer(token));
+    expect(outOfRange.status).toBe(400);
+  });
+
+  it("bbox через антимеридиан (west > east) ловит обе стороны 180-го меридиана", async () => {
+    const { token } = await registerCompany("0009403");
+    const nomenclatureId = await seedNomenclature();
+    const { listingId: chukotkaWestId } = await createPublishedListing(token, nomenclatureId);
+    const { listingId: chukotkaEastId } = await createPublishedListing(token, nomenclatureId);
+    const { listingId: tulaId } = await createPublishedListing(token, nomenclatureId);
+    await ctx.prisma.marketplaceListing.update({
+      where: { id: chukotkaWestId },
+      data: { circleLat: 66.0, circleLon: 179.5 },
+    });
+    await ctx.prisma.marketplaceListing.update({
+      where: { id: chukotkaEastId },
+      data: { circleLat: 66.0, circleLon: -179.5 },
+    });
+    await ctx.prisma.marketplaceListing.update({
+      where: { id: tulaId },
+      data: { circleLat: 54.19, circleLon: 37.62 },
+    });
+
+    const acrossDateline = await ctx.http.get("/api/marketplace/listings?bbox=60,178,70,-178").set(bearer(token));
+    expect(acrossDateline.status).toBe(200);
+    const ids = acrossDateline.body.items.map((item: { id: string }) => item.id);
+    expect(ids).toContain(chukotkaWestId);
+    expect(ids).toContain(chukotkaEastId);
+    expect(ids).not.toContain(tulaId);
+  });
 });
 
 describe("Marketplace — модерация (фаза 5)", () => {
