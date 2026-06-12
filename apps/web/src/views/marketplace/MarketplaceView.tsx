@@ -87,6 +87,8 @@ export function MarketplaceView() {
   const [openPopover, setOpenPopover] = useState<FilterPopover | null>(null);
   const [companyPoint, setCompanyPoint] = useState<{ lat: number; lon: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Узкие экраны: сплит сворачивается, активна либо лента, либо карта.
+  const [mobileView, setMobileView] = useState<"list" | "map">("list");
   const filtersRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -227,9 +229,8 @@ export function MarketplaceView() {
   const assets = useFileAssetsByIds(coverIds);
   const filterBar = (
     <div className="mp-filterbar" ref={filtersRef}>
-      <div className="mp-filterbar-group">
-        {/* Чипы категорий сырья — те же цвета, что круги на карте. */}
-        <div aria-label="Категории сырья" className="mp-material-chips" role="group">
+      {/* Чипы категорий сырья — те же цвета, что круги на карте. */}
+      <div aria-label="Категории сырья" className="mp-material-chips" role="group">
           {nomenclatureGroups.map((group) => {
             const state = groupSelectionState(group, selectedNomenclature);
             const color = materialColor(group.slug);
@@ -253,8 +254,9 @@ export function MarketplaceView() {
               </button>
             );
           })}
-        </div>
+      </div>
 
+      <div className="mp-filterbar-group">
         <div className={`mp-filter-popover${openPopover === "nomenclature" ? " is-open" : ""}`}>
           <button
             aria-controls="marketplace-nomenclature-popover"
@@ -453,62 +455,88 @@ export function MarketplaceView() {
           ) : null}
         </div>
 
-        {state === "idle" || state === "loading" ? (
-          <>
+        {/* На узких экранах сплит сворачивается в один столбец — переключатель
+            Список/Карта (карта при этом не размонтируется, только скрывается). */}
+        <div className="mp-view-toggle" role="group" aria-label="Вид ленты">
+          <button
+            aria-pressed={mobileView === "list"}
+            className={mobileView === "list" ? "is-active" : ""}
+            type="button"
+            onClick={() => setMobileView("list")}
+          >
+            Список
+          </button>
+          <button
+            aria-pressed={mobileView === "map"}
+            className={mobileView === "map" ? "is-active" : ""}
+            type="button"
+            onClick={() => setMobileView("map")}
+          >
+            Карта
+          </button>
+        </div>
+
+        <div className="mp-split">
+          <div className={`mp-split-list${mobileView === "map" ? " is-mobile-hidden" : ""}`}>
             {filterBar}
             {activeFiltersRow}
-            <div aria-busy="true" className="mp-grid" style={{ marginTop: 18 }}>
-              {Array.from({ length: 8 }, (_, index) => (
-                <ListingCardSkeleton key={index} />
-              ))}
+            {state === "idle" || state === "loading" ? (
+              <div aria-busy="true" className="mp-grid">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <ListingCardSkeleton key={index} />
+                ))}
+              </div>
+            ) : listings.length === 0 ? (
+              <div className="mp-empty">
+                <strong>По заданным фильтрам объявлений нет.</strong>
+                <p>Попробуйте смягчить условия — или загляните позже, объявления появляются каждый день.</p>
+                {hasActiveFilters ? (
+                  <button className="button secondary" type="button" onClick={resetFilters}>
+                    Сбросить фильтры
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <>
+                <div className="mp-grid">
+                  {listings.map((listing) => (
+                    <ListingCard
+                      key={listing.id}
+                      listing={listing}
+                      coverUrl={
+                        listing.coverFileId ? preferredFileAssetImageUrl(assets.get(listing.coverFileId)) : null
+                      }
+                      distanceKm={distanceById?.get(listing.id) ?? null}
+                      onOpen={setSelectedId}
+                    />
+                  ))}
+                </div>
+                <div ref={sentinelRef} aria-hidden="true" />
+                <p className="page-subtitle" style={{ textAlign: "center", marginTop: 18 }}>
+                  Показано {items.length} из {total}
+                </p>
+                {isLoadingMore ? (
+                  <p className="page-subtitle" style={{ textAlign: "center" }}>
+                    Загружаем ещё…
+                  </p>
+                ) : null}
+                {!hasMore ? (
+                  <p className="page-subtitle" style={{ textAlign: "center" }}>
+                    Это все объявления.
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+
+          {/* Карта живёт всегда (и при загрузке, и при пустой выдаче) — нет
+              layout-прыжков, а пустое состояние сохраняет географический контекст. */}
+          <aside className={`mp-split-map${mobileView === "map" ? " is-mobile-visible" : ""}`}>
+            <div className="mp-map-shell">
+              <YandexMap listings={listings} onSelect={setSelectedId} />
             </div>
-          </>
-        ) : listings.length === 0 ? (
-          <>
-            {filterBar}
-            {activeFiltersRow}
-            <div className="mp-empty">
-              <strong>По заданным фильтрам объявлений нет.</strong>
-              <p>Попробуйте смягчить условия — или загляните позже, объявления появляются каждый день.</p>
-              {hasActiveFilters ? (
-                <button className="button secondary" type="button" onClick={resetFilters}>
-                  Сбросить фильтры
-                </button>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <>
-            <YandexMap listings={listings} onSelect={setSelectedId} />
-            {filterBar}
-            {activeFiltersRow}
-            <div className="mp-grid" style={{ marginTop: 18 }}>
-              {listings.map((listing) => (
-                <ListingCard
-                  key={listing.id}
-                  listing={listing}
-                  coverUrl={listing.coverFileId ? preferredFileAssetImageUrl(assets.get(listing.coverFileId)) : null}
-                  distanceKm={distanceById?.get(listing.id) ?? null}
-                  onOpen={setSelectedId}
-                />
-              ))}
-            </div>
-            <div ref={sentinelRef} aria-hidden="true" />
-            <p className="page-subtitle" style={{ textAlign: "center", marginTop: 18 }}>
-              Показано {items.length} из {total}
-            </p>
-            {isLoadingMore ? (
-              <p className="page-subtitle" style={{ textAlign: "center" }}>
-                Загружаем ещё…
-              </p>
-            ) : null}
-            {!hasMore ? (
-              <p className="page-subtitle" style={{ textAlign: "center" }}>
-                Это все объявления.
-              </p>
-            ) : null}
-          </>
-        )}
+          </aside>
+        </div>
 
         {selectedId ? (
           <ListingModal

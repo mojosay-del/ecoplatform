@@ -1747,11 +1747,13 @@
 }
 
 /* Чипы категорий сырья: точка в цвете материала; активный чип тонируется тем же
-   цветом инлайном (цвет приходит из materials.ts), частичный выбор — пунктир. */
+   цветом инлайном (цвет приходит из materials.ts), частичный выбор — пунктир.
+   Чипы занимают свою строку, «Точнее»/«Регион»/сортировка — строкой ниже. */
 .mp-material-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  flex-basis: 100%;
 }
 
 .mp-material-chip {
@@ -1994,6 +1996,114 @@
   color: #64748b;
   text-align: center;
   background: #f8fafc;
+}
+
+/* ── Сплит лента+карта (как у гео-маркетплейсов) ─────────────────────────────
+   Список скроллится слева, карта закреплена справа на всю высоту вьюпорта.
+   Topbar оболочки не sticky, поэтому карта может занять почти весь экран. */
+.mp-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(380px, 40vw, 600px);
+  gap: 18px;
+  align-items: start;
+}
+
+/* В сплите колонка списка уже, чем была лента во всю ширину — чуть меньший
+   минимум карточки, чтобы на ноутбуках оставались две колонки. */
+.mp-split-list .mp-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* Список выше карты по z-оси: фильтр-попапы не ныряют под контролы ymaps. */
+.mp-split-list {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+}
+
+.mp-split-map {
+  position: sticky;
+  top: 16px;
+  z-index: 1;
+  height: calc(100vh - 32px);
+}
+
+/* Relative-обёртка — якорь для оверлеев карты (легенда, «Искать в области»). */
+.mp-map-shell {
+  position: relative;
+  height: 100%;
+}
+
+.mp-map-shell .mp-map {
+  height: 100%;
+}
+
+/* Переключатель Список/Карта — виден только когда сплит свёрнут. */
+.mp-view-toggle {
+  display: none;
+  position: sticky;
+  top: 8px;
+  z-index: 30;
+  width: max-content;
+  margin: 0 auto 12px;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-card);
+}
+
+.mp-view-toggle button {
+  min-height: 44px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.mp-view-toggle button.is-active {
+  background: var(--brand);
+  color: var(--text-inverse);
+}
+
+@media (max-width: 1024px) {
+  .mp-split {
+    grid-template-columns: 1fr;
+  }
+
+  .mp-view-toggle {
+    display: inline-flex;
+  }
+
+  .mp-split-list.is-mobile-hidden {
+    display: none;
+  }
+
+  /* Карта скрывается классом, но НЕ размонтируется — пересоздание ymaps дорого,
+     а ResizeObserver сам пересчитает канвас при появлении из display:none. */
+  .mp-split-map {
+    position: static;
+    display: none;
+    height: auto;
+  }
+
+  .mp-split-map.is-mobile-visible {
+    display: block;
+  }
+
+  .mp-split-map.is-mobile-visible .mp-map-shell {
+    height: calc(100dvh - 240px);
+    min-height: 320px;
+  }
 }
 
 @media (max-width: 680px) {
