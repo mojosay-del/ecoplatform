@@ -6,12 +6,13 @@
 // ленты по клику на карточку или объект карты; та же модалка — за deep-link
 // /marketplace/[id]. Цену продавец не ставит (закрытый аукцион), мини-карты нет.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   CreditCard,
   Droplets,
   Filter,
+  Handshake,
   Layers,
   Mail,
   MapPin,
@@ -34,9 +35,11 @@ import { useApiQuery } from "../shared";
 import { CompanyReviews } from "./CompanyReviews";
 import { ListingOffersPanel } from "./ListingOffersPanel";
 import { contaminationLabel, moistureLabel } from "./listing-characteristics";
+import { expiryLabel, isExpiringSoon, memberSinceLabel } from "./listing-card-meta";
 import { compactPositionsTitle } from "./listing-title";
 import { LISTING_FORM_LABEL, ListingStatusBadge, formatLocation, formatWeight } from "./listing-ui";
 import { MakeOfferForm } from "./MakeOfferForm";
+import { MediaLightbox } from "./MediaLightbox";
 import { ReportControl } from "./ReportControl";
 
 function formatDateTime(iso: string | null): string {
@@ -71,25 +74,40 @@ export function ListingModal({
     null as MarketplaceListingDetail | null,
   );
   const [activeMedia, setActiveMedia] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  // Якорь колонки действий — мобильная CTA-полоса прокручивает к форме ставки.
+  const actionRef = useRef<HTMLDivElement>(null);
 
   const assets = useFileAssetsByIds((data?.media ?? []).map((item) => item.fileId));
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      // Слои закрытия единым обработчиком: сначала лайтбокс, потом модалка.
+      if (lightboxOpen) {
+        setLightboxOpen(false);
+      } else {
+        onClose();
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, lightboxOpen]);
 
   useEffect(() => {
     setActiveMedia(0);
+    setLightboxOpen(false);
   }, [listingId]);
 
   const isBuyer = user?.company?.type === "trader" || user?.company?.type === "processor";
 
   return (
-    <div className="mp-modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+    <div
+      className={`mp-modal-backdrop${lightboxOpen ? " is-locked" : ""}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
       <div className="mp-modal" onClick={(event) => event.stopPropagation()}>
         <button className="mp-modal-close" type="button" aria-label="Закрыть" onClick={onClose}>
           <X size={20} />
@@ -146,6 +164,18 @@ export function ListingModal({
                             <Star size={13} aria-hidden="true" /> {listing.seller.rating.toFixed(1)}
                           </span>
                         ) : null}
+                        {/* Блок доверия: сделки и стаж на площадке (фаза 8 API). */}
+                        {listing.seller.dealsCompleted > 0 ? (
+                          <span className="mp-modal-deals">
+                            <Handshake size={13} aria-hidden="true" /> {listing.seller.dealsCompleted}{" "}
+                            {pluralizeRu(listing.seller.dealsCompleted, "сделка", "сделки", "сделок")}
+                          </span>
+                        ) : null}
+                        {memberSinceLabel(listing.seller.memberSince) ? (
+                          <span className="mp-modal-member-since">
+                            На площадке {memberSinceLabel(listing.seller.memberSince)}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -155,6 +185,9 @@ export function ListingModal({
                       <Mail aria-hidden="true" size={13} />
                       Закрытый аукцион
                     </span>
+                    {isExpiringSoon(listing.expiresAt) ? (
+                      <span className="mp-expiry-badge">{expiryLabel(listing.expiresAt)}</span>
+                    ) : null}
                     <ListingStatusBadge status={listing.status} />
                   </div>
                 </div>
@@ -163,7 +196,14 @@ export function ListingModal({
                   <div className="mp-modal-gallery">
                     <div className="mp-modal-media-frame">
                       {activePhotoUrl ? (
-                        <img className="mp-modal-photo" src={activePhotoUrl} alt="" />
+                        <button
+                          aria-label="Открыть фото на весь экран"
+                          className="mp-modal-photo-button"
+                          type="button"
+                          onClick={() => setLightboxOpen(true)}
+                        >
+                          <img className="mp-modal-photo" src={activePhotoUrl} alt="" />
+                        </button>
                       ) : activeVideoUrl ? (
                         <video
                           className="mp-modal-video"
@@ -274,7 +314,7 @@ export function ListingModal({
 
                 {!listing.isOwner ? (
                   <div className="mp-modal-columns">
-                    <div className="mp-modal-action">
+                    <div className="mp-modal-action" ref={actionRef}>
                       {/* Соц-доказательство без раскрытия цен: только количество. */}
                       <p className="mp-auction-count">
                         <Mail aria-hidden="true" size={14} />
@@ -328,6 +368,38 @@ export function ListingModal({
                   <div className="mp-modal-section">
                     <ListingOffersPanel listingId={listing.id} onChanged={() => setRefresh((value) => value + 1)} />
                   </div>
+                ) : null}
+
+                {/* Мобильная CTA-полоса: прокручивает к форме ставки (≤760px). */}
+                {!listing.isOwner && isBuyer && listing.status === "active" ? (
+                  <div className="mp-modal-cta-bar">
+                    <button
+                      className="button"
+                      type="button"
+                      onClick={() => actionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    >
+                      Сделать предложение
+                    </button>
+                  </div>
+                ) : null}
+
+                {lightboxOpen ? (
+                  <MediaLightbox
+                    index={activeMedia}
+                    items={mediaItems.map((media) => {
+                      const asset = assets.get(media.fileId);
+                      return {
+                        id: media.id,
+                        kind: media.kind,
+                        url:
+                          media.kind === "video"
+                            ? preferredFileAssetMediaUrl(asset)
+                            : preferredFileAssetImageUrl(asset),
+                      };
+                    })}
+                    onClose={() => setLightboxOpen(false)}
+                    onIndexChange={setActiveMedia}
+                  />
                 ) : null}
               </>
             );

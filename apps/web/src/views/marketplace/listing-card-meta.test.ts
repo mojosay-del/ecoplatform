@@ -5,6 +5,7 @@ import {
   formatDistanceKm,
   isExpiringSoon,
   isFreshListing,
+  memberSinceLabel,
 } from "./listing-card-meta";
 
 const NOW = Date.parse("2026-06-12T12:00:00Z");
@@ -57,5 +58,14 @@ describe("isFreshListing", () => {
     expect(isFreshListing(new Date(NOW - 25 * HOUR_MS).toISOString(), NOW)).toBe(false);
     expect(isFreshListing(new Date(NOW + HOUR_MS).toISOString(), NOW)).toBe(false);
     expect(isFreshListing(null, NOW)).toBe(false);
+  });
+});
+
+describe("memberSinceLabel", () => {
+  it("месяц в родительном падеже", () => {
+    expect(memberSinceLabel("2025-06-05T10:00:00Z")).toBe("с июня 2025");
+    expect(memberSinceLabel("2024-01-15T10:00:00Z")).toBe("с января 2024");
+    expect(memberSinceLabel(null)).toBeNull();
+    expect(memberSinceLabel("мусор")).toBeNull();
   });
 });

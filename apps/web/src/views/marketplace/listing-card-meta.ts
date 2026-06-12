@@ -57,3 +57,27 @@ export function isFreshListing(publishedAt: string | null, now: number = Date.no
   const age = now - timestamp;
   return age >= 0 && age < LISTING_FRESH_HOURS * HOUR_MS;
 }
+
+// Месяцы в родительном падеже: toLocaleDateString без дня даёт именительный
+// («июнь 2025»), а для «На площадке с июня 2025» нужен родительный.
+const MONTHS_GENITIVE = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+] as const;
+
+export function memberSinceLabel(memberSince: string | null): string | null {
+  const timestamp = parseDate(memberSince);
+  if (timestamp == null) return null;
+  const date = new Date(timestamp);
+  return `с ${MONTHS_GENITIVE[date.getMonth()]} ${date.getFullYear()}`;
+}
