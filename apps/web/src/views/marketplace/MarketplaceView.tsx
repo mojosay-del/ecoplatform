@@ -18,7 +18,7 @@ import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
 import { ListingCard, ListingCardSkeleton, totalWeightKg, useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
 import { MATERIAL_LEGEND, materialColor } from "./materials";
-import { type MapViewBounds, YandexMap } from "./YandexMap";
+import { type MapViewBounds, ListingMap } from "./ListingMap";
 
 type SortMode = "date" | "distance" | "weight" | "expires";
 type FilterPopover = "nomenclature" | "region" | "sort";
@@ -565,7 +565,7 @@ export function MarketplaceView() {
               layout-прыжков, а пустое состояние сохраняет географический контекст. */}
           <aside className={`mp-split-map${mobileView === "map" ? " is-mobile-visible" : ""}`}>
             <div className="mp-map-shell">
-              <YandexMap
+              <ListingMap
                 fitOnDataChange={!mapBbox}
                 hoveredId={hoveredId}
                 listings={listings}

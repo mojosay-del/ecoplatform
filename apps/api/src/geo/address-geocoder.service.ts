@@ -4,48 +4,48 @@ import type { MarketplaceAddressSuggestion } from "@ecoplatform/shared";
 export type GeocodeResult = { lat: number; lon: number; region: string | null };
 
 const GEOCODER_TIMEOUT_MS = 3_000;
+const GEOCODER_URL = "https://catalog.api.2gis.com/3.0/items/geocode";
+// Поля, без которых из ответа не собрать адрес: координаты, адм. деление
+// (регион/город) и компоненты улица/дом + полная строка для отображения.
+const GEOCODER_FIELDS = "items.point,items.adm_div,items.address,items.full_name";
 
-type YandexGeoObject = {
+type DgisAdmDiv = { name?: string; type?: string };
+type DgisAddressComponent = { type?: string; street?: string; number?: string };
+type DgisItem = {
   name?: string;
-  description?: string;
-  Point?: { pos?: string };
-  metaDataProperty?: {
-    GeocoderMetaData?: {
-      text?: string;
-      Address?: {
-        formatted?: string;
-        postal_code?: string;
-        Components?: Array<{ kind?: string; name?: string }>;
-      };
-      AddressDetails?: {
-        Country?: { AdministrativeArea?: { AdministrativeAreaName?: string } };
-      };
-    };
+  full_name?: string;
+  address_name?: string;
+  point?: { lat?: number; lon?: number };
+  // Адм. деление: country/region/city/settlement/place/street… — берём по type.
+  adm_div?: DgisAdmDiv[];
+  address?: {
+    postcode?: string;
+    components?: DgisAddressComponent[];
   };
 };
 
-// Геокодер адресов через Яндекс HTTP Geocoder (ключ — секрет окружения
-// YANDEX_GEOCODER_API_KEY, в клиент не попадает). Поведение при недоступности —
+// Геокодер адресов через 2ГИС Catalog/Geocoder API (ключ — секрет окружения
+// DGIS_GEOCODER_API_KEY, в клиент не попадает). Поведение при недоступности —
 // graceful: возвращаем null/[], а доменная логика сохраняет данные без координат.
 @Injectable()
 export class AddressGeocoderService {
   private readonly logger = new Logger(AddressGeocoderService.name);
 
   async geocode(addressLine: string): Promise<GeocodeResult | null> {
-    const geoObjects = await this.fetchGeoObjects(addressLine, 1);
-    const geoObject = geoObjects[0];
-    if (!geoObject) {
+    const items = await this.fetchItems(addressLine, 1);
+    const item = items[0];
+    if (!item) {
       return null;
     }
 
-    const point = parsePoint(geoObject);
+    const point = parsePoint(item);
     if (!point) {
       return null;
     }
 
     return {
       ...point,
-      region: extractRegion(geoObject),
+      region: extractRegion(item),
     };
   }
 
@@ -54,40 +54,43 @@ export class AddressGeocoderService {
       return [];
     }
 
-    const geoObjects = await this.fetchGeoObjects(addressLine, limit);
-    return geoObjects
+    const items = await this.fetchItems(addressLine, limit);
+    return items
       .map(toAddressSuggestion)
       .filter((suggestion): suggestion is MarketplaceAddressSuggestion => Boolean(suggestion));
   }
 
-  private async fetchGeoObjects(addressLine: string, results: number): Promise<YandexGeoObject[]> {
-    const apiKey = process.env.YANDEX_GEOCODER_API_KEY;
+  private async fetchItems(addressLine: string, results: number): Promise<DgisItem[]> {
+    const apiKey = process.env.DGIS_GEOCODER_API_KEY;
     if (!apiKey || !addressLine.trim()) {
       return [];
     }
 
     try {
-      const limit = Math.min(Math.max(results, 1), 10);
-      const url =
-        `https://geocode-maps.yandex.ru/1.x/?format=json&results=${limit}&lang=ru_RU` +
-        `&apikey=${encodeURIComponent(apiKey)}&geocode=${encodeURIComponent(addressLine.trim())}`;
+      const pageSize = Math.min(Math.max(results, 1), 10);
+      const params = new URLSearchParams({
+        q: addressLine.trim(),
+        fields: GEOCODER_FIELDS,
+        page_size: String(pageSize),
+        locale: "ru_RU",
+        key: apiKey,
+      });
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), GEOCODER_TIMEOUT_MS);
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(`${GEOCODER_URL}?${params.toString()}`, { signal: controller.signal });
       clearTimeout(timeout);
+      // 2ГИС отвечает 404, когда по запросу ничего не найдено — это штатная
+      // ситуация автокомплита (промежуточный ввод), не ошибка: тихо отдаём [].
+      if (response.status === 404) {
+        return [];
+      }
       if (!response.ok) {
-        this.logger.warn(`Yandex geocoder responded ${response.status}`);
+        this.logger.warn(`2GIS geocoder responded ${response.status}`);
         return [];
       }
 
-      const data = (await response.json()) as {
-        response?: { GeoObjectCollection?: { featureMember?: Array<{ GeoObject?: YandexGeoObject }> } };
-      };
-      return (
-        data.response?.GeoObjectCollection?.featureMember
-          ?.map((item) => item.GeoObject)
-          .filter((geoObject): geoObject is YandexGeoObject => Boolean(geoObject)) ?? []
-      );
+      const data = (await response.json()) as { result?: { items?: DgisItem[] } };
+      return data.result?.items ?? [];
     } catch (error) {
       this.logger.warn(`Geocode failed: ${(error as Error).message}`);
       return [];
@@ -95,61 +98,59 @@ export class AddressGeocoderService {
   }
 }
 
-function parsePoint(geoObject: YandexGeoObject): Pick<GeocodeResult, "lat" | "lon"> | null {
-  const pos = geoObject.Point?.pos;
-  if (!pos) {
-    return null;
-  }
-
-  // Яндекс отдаёт "долгота широта".
-  const [lonRaw, latRaw] = pos.split(" ");
-  const lat = Number(latRaw);
-  const lon = Number(lonRaw);
+function parsePoint(item: DgisItem): Pick<GeocodeResult, "lat" | "lon"> | null {
+  // 2ГИС отдаёт координаты явными числами (в отличие от строки "lon lat" Яндекса).
+  const lat = Number(item.point?.lat);
+  const lon = Number(item.point?.lon);
   return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
 }
 
-function extractRegion(geoObject: YandexGeoObject): string | null {
-  const components = geoObject.metaDataProperty?.GeocoderMetaData?.Address?.Components ?? [];
-  const province = components.find((component) => component.kind === "province")?.name;
-  if (province) return province;
-
-  return (
-    geoObject.metaDataProperty?.GeocoderMetaData?.AddressDetails?.Country?.AdministrativeArea?.AdministrativeAreaName ??
-    null
-  );
+function admName(item: DgisItem, type: string): string | null {
+  return item.adm_div?.find((division) => division.type === type)?.name ?? null;
 }
 
-function componentName(geoObject: YandexGeoObject, kind: string): string | null {
-  return (
-    geoObject.metaDataProperty?.GeocoderMetaData?.Address?.Components?.find((component) => component.kind === kind)
-      ?.name ?? null
-  );
+function extractRegion(item: DgisItem): string | null {
+  return admName(item, "region");
 }
 
-function toAddressSuggestion(geoObject: YandexGeoObject): MarketplaceAddressSuggestion | null {
-  const meta = geoObject.metaDataProperty?.GeocoderMetaData;
-  const value =
-    meta?.text ?? meta?.Address?.formatted ?? [geoObject.description, geoObject.name].filter(Boolean).join(", ");
-  const city = componentName(geoObject, "locality");
+// Москва/СПб приходят как city внутри region; обычные города — type "city",
+// сёла/посёлки — settlement/place. Берём первое подходящее.
+function extractCity(item: DgisItem): string | null {
+  return admName(item, "city") ?? admName(item, "settlement") ?? admName(item, "place");
+}
+
+function extractStreetBuilding(item: DgisItem): { street: string | null; building: string | null } {
+  const component =
+    item.address?.components?.find((entry) => entry.type === "street_number") ?? item.address?.components?.[0];
+  return {
+    street: component?.street ?? null,
+    building: component?.number ?? null,
+  };
+}
+
+function toAddressSuggestion(item: DgisItem): MarketplaceAddressSuggestion | null {
+  const value = item.full_name ?? item.address_name ?? item.name;
+  const city = extractCity(item);
   if (!value || !city) {
     return null;
   }
 
+  const { street, building } = extractStreetBuilding(item);
   return {
     value,
     address: {
       id: value,
-      country: componentName(geoObject, "country") ?? "Россия",
-      region: extractRegion(geoObject),
+      country: admName(item, "country") ?? "Россия",
+      region: extractRegion(item),
       city,
-      street: componentName(geoObject, "street"),
-      building: componentName(geoObject, "house"),
+      street,
+      building,
       apartment: null,
-      postcode: meta?.Address?.postal_code ?? null,
+      postcode: item.address?.postcode ?? null,
       latitude: null,
       longitude: null,
       formatted: value,
-      source: "yandex",
+      source: "2gis",
     },
   };
 }

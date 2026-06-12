@@ -37,7 +37,7 @@ services:
         # ВАЖНО: NEXT_PUBLIC_* «зашиваются» в сайт на ЭТАПЕ СБОРКИ, не в рантайме.
         # Значение берётся из deploy/.env.prod (через --env-file при запуске).
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_YANDEX_MAPS_API_KEY: ${NEXT_PUBLIC_YANDEX_MAPS_API_KEY}
+        NEXT_PUBLIC_DGIS_MAPS_API_KEY: ${NEXT_PUBLIC_DGIS_MAPS_API_KEY}
     restart: unless-stopped
     env_file: deploy/.env.prod
     expose:

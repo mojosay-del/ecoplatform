@@ -338,7 +338,7 @@ describe("Marketplace — объявления (фаза 1)", () => {
   });
 
   it("переподача заново геокодит адрес, если у исходного объявления нет координат", async () => {
-    await withEnv({ YANDEX_GEOCODER_API_KEY: undefined }, async () => {
+    await withEnv({ DGIS_GEOCODER_API_KEY: undefined }, async () => {
       const { token } = await registerCompany("0009109");
       const nomenclatureId = await seedNomenclature();
       const photos = await seedPhotos(4);
@@ -370,41 +370,36 @@ describe("Marketplace — объявления (фаза 1)", () => {
 
       const fetchMock = vi.fn().mockResolvedValue({
         ok: true,
+        status: 200,
         json: async () => ({
-          response: {
-            GeoObjectCollection: {
-              featureMember: [
-                {
-                  GeoObject: {
-                    Point: { pos: "37.617698 55.755864" },
-                    metaDataProperty: {
-                      GeocoderMetaData: {
-                        Address: {
-                          Components: [
-                            { kind: "country", name: "Россия" },
-                            { kind: "province", name: "Москва" },
-                            { kind: "locality", name: "Москва" },
-                          ],
-                        },
-                      },
-                    },
-                  },
-                },
-              ],
-            },
+          result: {
+            items: [
+              {
+                full_name: "Россия, Москва, Тверская улица, 1",
+                point: { lat: 55.755864, lon: 37.617698 },
+                adm_div: [
+                  { type: "country", name: "Россия" },
+                  { type: "region", name: "Москва" },
+                  { type: "city", name: "Москва" },
+                ],
+              },
+            ],
           },
         }),
       });
 
       try {
         vi.stubGlobal("fetch", fetchMock);
-        await withEnv({ YANDEX_GEOCODER_API_KEY: "test-key" }, async () => {
+        await withEnv({ DGIS_GEOCODER_API_KEY: "test-key" }, async () => {
           const republished = await ctx.http
             .post(`/api/marketplace/listings/${draft.body.id}/republish`)
             .set(bearer(token));
           expect(republished.status).toBe(201);
 
-          expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("geocode="), expect.any(Object));
+          expect(fetchMock).toHaveBeenCalledWith(
+            expect.stringContaining("catalog.api.2gis.com/3.0/items/geocode"),
+            expect.any(Object),
+          );
           const created = await ctx.prisma.marketplaceListing.findUniqueOrThrow({
             where: { id: republished.body.id },
             include: { address: true },
@@ -527,35 +522,27 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
     const buyerToken = await registerTrader("0009291");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({
-        response: {
-          GeoObjectCollection: {
-            featureMember: [
-              {
-                GeoObject: {
-                  Point: { pos: "37.736330 55.910483" },
-                  metaDataProperty: {
-                    GeocoderMetaData: {
-                      Address: {
-                        Components: [
-                          { kind: "country", name: "Россия" },
-                          { kind: "province", name: "Московская область" },
-                          { kind: "locality", name: "Мытищи" },
-                        ],
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-          },
+        result: {
+          items: [
+            {
+              full_name: "Россия, Московская область, Мытищи",
+              point: { lat: 55.910483, lon: 37.736330 },
+              adm_div: [
+                { type: "country", name: "Россия" },
+                { type: "region", name: "Московская область" },
+                { type: "city", name: "Мытищи" },
+              ],
+            },
+          ],
         },
       }),
     });
 
     try {
       vi.stubGlobal("fetch", fetchMock);
-      await withEnv({ YANDEX_GEOCODER_API_KEY: "test-key" }, async () => {
+      await withEnv({ DGIS_GEOCODER_API_KEY: "test-key" }, async () => {
         const offer = await ctx.http
           .post(`/api/marketplace/listings/${listingId}/offers`)
           .set(bearer(buyerToken))
@@ -1021,7 +1008,7 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
 
 describe("Marketplace — карта и фильтры (фаза 2)", () => {
   it("адресные подсказки без ключа геокодера мягко возвращают пустой список", async () => {
-    await withEnv({ YANDEX_GEOCODER_API_KEY: undefined }, async () => {
+    await withEnv({ DGIS_GEOCODER_API_KEY: undefined }, async () => {
       const { token } = await registerCompany("0009399");
 
       const res = await ctx.http.get("/api/marketplace/address-suggest?q=Москва").set(bearer(token));
@@ -1032,7 +1019,7 @@ describe("Marketplace — карта и фильтры (фаза 2)", () => {
   });
 
   it("фильтры по региону/сырью + список регионов; без ключа геокодера круг пуст", async () => {
-    await withEnv({ YANDEX_GEOCODER_API_KEY: undefined }, async () => {
+    await withEnv({ DGIS_GEOCODER_API_KEY: undefined }, async () => {
       const { token } = await registerCompany("0009401");
       const category = await ctx.prisma.nomenclatureCategory.create({
         data: { name: "Макулатура", slug: "makulatura", position: 1 },

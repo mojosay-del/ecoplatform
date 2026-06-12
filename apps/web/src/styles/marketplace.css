@@ -2015,6 +2015,60 @@
   background: #f8fafc;
 }
 
+/* DOM-точки дальнего масштаба (HtmlMarker 2ГИС): цвет по сырью через --dot,
+   увеличение при hover карточки/наведении, пульс у свежих объявлений (<24ч).
+   ::after выходит за 14px-бокс точки, не сдвигая якорь маркера. */
+.mp-map-dot {
+  position: relative;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--dot, #1f8a4c);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.12s ease;
+}
+
+.mp-map-dot.is-hovered {
+  transform: scale(1.5);
+  z-index: 2;
+}
+
+.mp-map-dot.is-fresh::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 2px solid var(--dot, #1f8a4c);
+  pointer-events: none;
+  animation: mp-map-dot-pulse 1.6s ease-out infinite;
+}
+
+@keyframes mp-map-dot-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mp-map-dot.is-fresh::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* ── Сплит лента+карта (как у гео-маркетплейсов) ─────────────────────────────
    Список скроллится слева, карта закреплена справа на всю высоту вьюпорта.
    Topbar оболочки не sticky, поэтому карта может занять почти весь экран. */
@@ -2031,7 +2085,7 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
-/* Список выше карты по z-оси: фильтр-попапы не ныряют под контролы ymaps. */
+/* Список выше карты по z-оси: фильтр-попапы не ныряют под контролы карты. */
 .mp-split-list {
   position: relative;
   z-index: 2;
@@ -2055,8 +2109,8 @@
   height: 100%;
 }
 
-/* Легенда цветов сырья: верхний левый угол (зум-контрол ymaps — слева по
-   центру, копирайты — снизу; углы сверху свободны). */
+/* Легенда цветов сырья: верхний левый угол (зум-контрол 2ГИС — справа по
+   центру, копирайты — снизу; верхние углы свободны). */
 .mp-map-legend {
   position: absolute;
   top: 10px;
@@ -2167,8 +2221,8 @@
     display: none;
   }
 
-  /* Карта скрывается классом, но НЕ размонтируется — пересоздание ymaps дорого,
-     а ResizeObserver сам пересчитает канвас при появлении из display:none. */
+  /* Карта скрывается классом, но НЕ размонтируется — пересоздание карты дорого,
+     а MapGL (enableTrackResize) сам пересчитает канвас при появлении из display:none. */
   .mp-split-map {
     position: static;
     display: none;

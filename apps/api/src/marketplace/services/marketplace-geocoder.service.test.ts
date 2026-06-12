@@ -4,41 +4,33 @@ import { MarketplaceGeocoderService } from "./marketplace-geocoder.service";
 describe("MarketplaceGeocoderService", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    delete process.env.YANDEX_GEOCODER_API_KEY;
+    delete process.env.DGIS_GEOCODER_API_KEY;
   });
 
-  it("собирает варианты адреса из ответа Яндекс-геокодера", async () => {
-    process.env.YANDEX_GEOCODER_API_KEY = "test-key";
+  it("собирает варианты адреса из ответа 2ГИС-геокодера", async () => {
+    process.env.DGIS_GEOCODER_API_KEY = "test-key";
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({
-        response: {
-          GeoObjectCollection: {
-            featureMember: [
-              {
-                GeoObject: {
-                  name: "Тверская улица, 1",
-                  description: "Москва, Россия",
-                  Point: { pos: "37.617698 55.755864" },
-                  metaDataProperty: {
-                    GeocoderMetaData: {
-                      text: "Россия, Москва, Тверская улица, 1",
-                      Address: {
-                        postal_code: "125009",
-                        Components: [
-                          { kind: "country", name: "Россия" },
-                          { kind: "province", name: "Москва" },
-                          { kind: "locality", name: "Москва" },
-                          { kind: "street", name: "Тверская улица" },
-                          { kind: "house", name: "1" },
-                        ],
-                      },
-                    },
-                  },
-                },
+        result: {
+          items: [
+            {
+              name: "Тверская улица, 1",
+              address_name: "Тверская улица, 1",
+              full_name: "Россия, Москва, Тверская улица, 1",
+              point: { lat: 55.755864, lon: 37.617698 },
+              adm_div: [
+                { type: "country", name: "Россия" },
+                { type: "region", name: "Москва" },
+                { type: "city", name: "Москва" },
+              ],
+              address: {
+                postcode: "125009",
+                components: [{ type: "street_number", street: "Тверская улица", number: "1" }],
               },
-            ],
-          },
+            },
+          ],
         },
       }),
     });
@@ -46,7 +38,11 @@ describe("MarketplaceGeocoderService", () => {
 
     const suggestions = await new MarketplaceGeocoderService().suggest("москва тверская", 6);
 
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("results=6"), expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("catalog.api.2gis.com/3.0/items/geocode"),
+      expect.any(Object),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("page_size=6"), expect.any(Object));
     expect(suggestions).toEqual([
       {
         value: "Россия, Москва, Тверская улица, 1",
@@ -62,7 +58,7 @@ describe("MarketplaceGeocoderService", () => {
           latitude: null,
           longitude: null,
           formatted: "Россия, Москва, Тверская улица, 1",
-          source: "yandex",
+          source: "2gis",
         },
       },
     ]);

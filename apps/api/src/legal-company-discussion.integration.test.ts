@@ -394,35 +394,27 @@ describe("Company profile (Волна 7.2/7.3 — Address, расширенны�
   it("PATCH /billing/company геокодит factualAddress для сортировки площадки по расстоянию", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({
-        response: {
-          GeoObjectCollection: {
-            featureMember: [
-              {
-                GeoObject: {
-                  Point: { pos: "37.617698 55.755864" },
-                  metaDataProperty: {
-                    GeocoderMetaData: {
-                      Address: {
-                        Components: [
-                          { kind: "country", name: "Россия" },
-                          { kind: "province", name: "Москва" },
-                          { kind: "locality", name: "Москва" },
-                        ],
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-          },
+        result: {
+          items: [
+            {
+              full_name: "Россия, Москва, Тверская улица, 1",
+              point: { lat: 55.755864, lon: 37.617698 },
+              adm_div: [
+                { type: "country", name: "Россия" },
+                { type: "region", name: "Москва" },
+                { type: "city", name: "Москва" },
+              ],
+            },
+          ],
         },
       }),
     });
 
     try {
       vi.stubGlobal("fetch", fetchMock);
-      await withEnv({ YANDEX_GEOCODER_API_KEY: "test-key" }, async () => {
+      await withEnv({ DGIS_GEOCODER_API_KEY: "test-key" }, async () => {
         const { token, companyId } = await registerCompany("0700103");
 
         const res = await ctx.http
@@ -439,7 +431,7 @@ describe("Company profile (Волна 7.2/7.3 — Address, расширенны�
           });
 
         expect(res.status).toBe(200);
-        expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("geocode=125009"), expect.any(Object));
+        expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("125009"), expect.any(Object));
 
         const company = await ctx.prisma.company.findUniqueOrThrow({
           where: { id: companyId },

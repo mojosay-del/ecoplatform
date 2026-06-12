@@ -25,15 +25,9 @@ function buildContentSecurityPolicy(): string {
     "https://s3.twcstorage.ru",
     "https://*.ingest.sentry.io",
     "https://*.ingest.us.sentry.io",
-    "https://api-maps.yandex.ru",
-    "https://*.api-maps.yandex.ru",
-    "https://suggest-maps.yandex.ru",
-    "https://*.maps.yandex.net",
-    "https://*.maps.yandex.ru",
-    "https://yandex.ru",
-    "https://*.yandex.ru",
-    "https://*.yastatic.net",
-    "https://*.taxi.yandex.net",
+    // 2ГИС MapGL: тайлы, стили и шрифты карты (геокодер каталога дёргает бэкенд,
+    // не браузер, но домены общие — *.2gis.com).
+    "https://*.2gis.com",
   ];
   // Локальный dev ходит в API по http://localhost:4000. В проде API живёт на
   // том же origin (ecoplatform.pro/api → покрывается 'self'), внешний localhost
@@ -44,20 +38,19 @@ function buildContentSecurityPolicy(): string {
 
   return [
     "default-src 'self'",
-    "img-src 'self' data: https://s3.twcstorage.ru https://*.s3.twcstorage.ru https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://*.maps.yandex.net https://*.maps.yandex.ru https://yandex.ru https://*.yandex.ru https://*.yastatic.net",
+    "img-src 'self' data: blob: https://s3.twcstorage.ru https://*.s3.twcstorage.ru https://*.2gis.com",
     // Видео/аудио уроков отдаются signed-URL с S3 (s3.twcstorage.ru). Без явного
     // media-src они наследовали default-src 'self', и в проде (блокирующая CSP)
     // браузер резал загрузку — Vidstack крутил спиннер бесконечно. Зеркалит img-src
     // по доменам, но без data:.
     "media-src 'self' https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
-    "script-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://suggest-maps.yandex.ru https://*.maps.yandex.net https://yandex.ru https://*.yastatic.net",
-    "style-src 'self' 'unsafe-inline' blob: https://api-maps.yandex.ru https://*.yastatic.net",
+    "script-src 'self' 'unsafe-inline' https://mapgl.2gis.com https://*.2gis.com",
+    "style-src 'self' 'unsafe-inline' blob:",
     `connect-src ${connectSrc.join(" ")}`,
-    "font-src 'self' https://*.yastatic.net",
-    // Яндекс.Карты подгружают часть UI через iframe даже без сторонних
-    // плееров; остальные фреймы по-прежнему не разрешаем.
-    "frame-src https://api-maps.yandex.ru",
-    "child-src https://api-maps.yandex.ru",
+    "font-src 'self' https://*.2gis.com",
+    // MapGL поднимает web-workers из blob: — без worker-src карта молча не стартует
+    // (default-src 'self' заблокировал бы blob-воркер).
+    "worker-src 'self' blob:",
     // Жёсткие запреты, которые не влияют на штатную работу приложения, но
     // закрывают классические XSS/clickjacking-векторы:
     "object-src 'none'", // нет <object>/<embed>/<applet> — режем плагины
