@@ -12,7 +12,7 @@ import type {
   MarketplaceListingPositionSummary,
   MarketplaceNomenclatureOption,
 } from "@ecoplatform/shared";
-import { Star } from "lucide-react";
+import { Mail, Star } from "lucide-react";
 import { api } from "../../lib/api";
 import { expiryLabel, formatDistanceKm, isExpiringSoon } from "./listing-card-meta";
 import { materialColor } from "./materials";
@@ -160,12 +160,23 @@ export function ListingCard({
         </div>
         <div className="mp-card-meta">
           <span>{forms.join(" · ")}</span>
-          {listing.sellerRating != null ? (
-            <span aria-label={`Рейтинг продавца ${formatRatingValue(listing.sellerRating)} из 5`} className="mp-card-rating">
-              <Star aria-hidden="true" size={13} />
-              {formatRatingValue(listing.sellerRating)}
-            </span>
-          ) : null}
+          <span className="mp-card-meta-right">
+            {listing.offerCount > 0 ? (
+              <span aria-label={`Подано предложений: ${listing.offerCount}`} className="mp-card-offers">
+                <Mail aria-hidden="true" size={12} />
+                {listing.offerCount}
+              </span>
+            ) : null}
+            {listing.sellerRating != null ? (
+              <span
+                aria-label={`Рейтинг продавца ${formatRatingValue(listing.sellerRating)} из 5`}
+                className="mp-card-rating"
+              >
+                <Star aria-hidden="true" size={13} />
+                {formatRatingValue(listing.sellerRating)}
+              </span>
+            ) : null}
+          </span>
         </div>
       </div>
     </Link>

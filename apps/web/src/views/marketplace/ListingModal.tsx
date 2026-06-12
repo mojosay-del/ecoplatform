@@ -13,6 +13,7 @@ import {
   Droplets,
   Filter,
   Layers,
+  Mail,
   MapPin,
   Package,
   PlayCircle,
@@ -27,6 +28,7 @@ import {
 import type { MarketplaceListingDetail } from "@ecoplatform/shared";
 import { api, preferredFileAssetImageUrl, preferredFileAssetMediaUrl } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { pluralizeRu } from "../../lib/ru-plural";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useApiQuery } from "../shared";
 import { CompanyReviews } from "./CompanyReviews";
@@ -147,7 +149,14 @@ export function ListingModal({
                       </div>
                     </div>
                   </div>
-                  <ListingStatusBadge status={listing.status} />
+                  <div className="mp-modal-header-badges">
+                    {/* Главная механика площадки названа прямо в шапке. */}
+                    <span className="mp-auction-badge">
+                      <Mail aria-hidden="true" size={13} />
+                      Закрытый аукцион
+                    </span>
+                    <ListingStatusBadge status={listing.status} />
+                  </div>
                 </div>
 
                 <div className="mp-modal-main">
@@ -266,6 +275,15 @@ export function ListingModal({
                 {!listing.isOwner ? (
                   <div className="mp-modal-columns">
                     <div className="mp-modal-action">
+                      {/* Соц-доказательство без раскрытия цен: только количество. */}
+                      <p className="mp-auction-count">
+                        <Mail aria-hidden="true" size={14} />
+                        {listing.offerCount > 0
+                          ? `Подано ${listing.offerCount} ${pluralizeRu(listing.offerCount, "предложение", "предложения", "предложений")}`
+                          : isBuyer && listing.status === "active"
+                            ? "Предложений пока нет — будьте первым"
+                            : "Предложений пока нет"}
+                      </p>
                       {isBuyer && listing.status === "active" ? (
                         <>
                           <MakeOfferForm listing={listing} onSubmitted={() => setRefresh((value) => value + 1)} />
@@ -281,6 +299,15 @@ export function ListingModal({
                             : "Объявление сейчас неактивно."}
                         </p>
                       )}
+
+                      <details className="mp-auction-explainer">
+                        <summary>Как работает закрытый аукцион</summary>
+                        <ul>
+                          <li>Ставки других покупателей скрыты — каждый предлагает свою цену вслепую.</li>
+                          <li>Продавец видит цены без названий компаний и выбирает лучшее предложение.</li>
+                          <li>Контакты сторон раскрываются только после принятия предложения.</li>
+                        </ul>
+                      </details>
 
                       {listing.status === "active" ? (
                         <ReportControl

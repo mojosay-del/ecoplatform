@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, MailCheck } from "lucide-react";
 import type { CreateOfferDto, MarketplaceListingDetail, PriceCondition } from "@ecoplatform/shared";
 import { DEFAULT_PHONE_COUNTRY } from "../../components/auth/constants";
 import { PhoneInput } from "../../components/auth/phone-input";
@@ -96,10 +96,16 @@ export function MakeOfferForm({
   }
 
   if (done) {
+    // Визуальный язык закрытого аукциона: ставка «запечатывается» в конверт.
     return (
-      <div className="mp-offer-form">
+      <div className="mp-offer-form mp-offer-sealed">
+        <span aria-hidden="true" className="mp-offer-sealed-icon">
+          <MailCheck size={26} />
+        </span>
+        <strong>Ваша ставка запечатана</strong>
         <p className="mp-hint">
-          Предложение отправлено. Статус — в разделе <Link href="/marketplace/offers">«Мои предложения»</Link>.
+          Продавец увидит цену без названия вашей компании. Статус — в разделе{" "}
+          <Link href="/marketplace/offers">«Мои предложения»</Link>.
         </p>
       </div>
     );
