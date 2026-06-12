@@ -94,15 +94,21 @@ export function ListingCard({
   listing,
   coverUrl,
   distanceKm,
+  highlighted,
   onOpen,
+  onHover,
 }: {
   listing: MarketplaceListingListItem;
   coverUrl: string | null;
   // Расстояние от адреса компании до центра круга (если адрес геокодирован).
   distanceKm?: number | null;
+  // Подсветка при наведении на объект карты (обратная hover-синхронизация).
+  highlighted?: boolean;
   // Если задан — клик открывает модалку (без навигации), но href остаётся для
   // deep-link/доступности и открытия в новой вкладке.
   onOpen?: (id: string) => void;
+  // Hover карточки подсвечивает круг/точку на карте; null — курсор увели.
+  onHover?: (id: string | null) => void;
 }) {
   // Уникальные категории сырья — те же цвета, что круги/точки на карте.
   const materialSlugs = [...new Set(listing.positions.map((position) => position.categorySlug))];
@@ -118,7 +124,7 @@ export function ListingCard({
 
   return (
     <Link
-      className="mp-card"
+      className={`mp-card${highlighted ? " is-map-hover" : ""}`}
       href={`/marketplace/${listing.id}`}
       onClick={
         onOpen
@@ -128,6 +134,8 @@ export function ListingCard({
             }
           : undefined
       }
+      onMouseEnter={onHover ? () => onHover(listing.id) : undefined}
+      onMouseLeave={onHover ? () => onHover(null) : undefined}
     >
       <div className="mp-card-cover">
         {coverUrl ? <img alt="" src={coverUrl} /> : <div className="mp-card-cover-empty">Нет фото</div>}

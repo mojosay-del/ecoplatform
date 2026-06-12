@@ -38,7 +38,8 @@
     transform 0.15s ease;
 }
 
-.mp-card:hover {
+.mp-card:hover,
+.mp-card.is-map-hover {
   border-color: var(--accent, #1f8a4c);
   box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
   transform: translateY(-2px);

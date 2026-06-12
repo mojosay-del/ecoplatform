@@ -23,3 +23,27 @@ export function getSinglePointFocusView(points: ListingMapPoint[]): { center: [n
 export function shouldClusterMapPoints(mode: ListingMapMode, pointCount: number): boolean {
   return mode === "dot" && pointCount >= LISTING_MAP_CLUSTER_MIN_POINTS;
 }
+
+export const LISTING_MAP_DOT_SIZE = 14;
+export const LISTING_MAP_DOT_HIGHLIGHT_SIZE = 20;
+
+// Опции стиля круга 4 км: подсветка при hover карточки в ленте — плотнее
+// заливка и толще обводка, объект НЕ пересоздаётся (options.set).
+export function circleStyleOptions(color: string, highlighted: boolean): Record<string, unknown> {
+  return {
+    fillColor: `${color}${highlighted ? "55" : "2e"}`,
+    strokeColor: color,
+    strokeWidth: highlighted ? 3 : 2,
+  };
+}
+
+// Опции иконки точки дальнего масштаба; href готовит yandex-loader (data URI).
+export function dotIconOptions(iconHref: string, highlighted: boolean): Record<string, unknown> {
+  const size = highlighted ? LISTING_MAP_DOT_HIGHLIGHT_SIZE : LISTING_MAP_DOT_SIZE;
+  return {
+    iconLayout: "default#image",
+    iconImageHref: iconHref,
+    iconImageSize: [size, size],
+    iconImageOffset: [-size / 2, -size / 2],
+  };
+}

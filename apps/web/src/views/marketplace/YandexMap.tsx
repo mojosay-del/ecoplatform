@@ -16,6 +16,8 @@ import {
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
   LISTING_MAP_DEFAULT_CENTER,
   LISTING_MAP_DEFAULT_ZOOM,
+  circleStyleOptions,
+  dotIconOptions,
   getSinglePointFocusView,
   shouldClusterMapPoints,
 } from "./yandex-map-view";
@@ -26,18 +28,40 @@ function modeForZoom(zoom: number): ListingMapMode {
   return "dot";
 }
 
+// Запись реестра объектов карты — для смены стиля при hover без перерисовки.
+type MapObjectEntry = { object: YmapsGeoObject; color: string; mode: ListingMapMode };
+
+function applyObjectStyle(entry: MapObjectEntry, highlighted: boolean) {
+  if (entry.mode === "circle") {
+    entry.object.options.set(circleStyleOptions(entry.color, highlighted));
+  } else {
+    entry.object.options.set(dotIconOptions(dotDataUri(entry.color, highlighted), highlighted));
+  }
+}
+
 export function YandexMap({
   listings,
   onSelect,
+  hoveredId,
+  onHover,
 }: {
   listings: MarketplaceListingListItem[];
   onSelect?: (id: string) => void;
+  // Двусторонняя hover-синхронизация с лентой: подсветить объект по id…
+  hoveredId?: string | null;
+  // …и сообщить об наведении на объект карты (null — увели курсор).
+  onHover?: (id: string | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<YmapsMap | null>(null);
   const modeRef = useRef<ListingMapMode | null>(null);
   const drawRef = useRef<(fit: boolean) => void>(() => undefined);
   const observerRef = useRef<ResizeObserver | null>(null);
+  const objectsRef = useRef<Map<string, MapObjectEntry>>(new Map());
+  const hoveredIdRef = useRef<string | null>(null);
+  // Через ref, чтобы hover-колбэк родителя не пересоздавал эффект карты.
+  const onHoverRef = useRef(onHover);
+  onHoverRef.current = onHover;
   const [failed, setFailed] = useState(false);
 
   const points = listings.filter((listing) => listing.circleLat != null && listing.circleLon != null);
@@ -62,6 +86,7 @@ export function YandexMap({
     const mode = modeForZoom(focusView?.zoom ?? map.getZoom());
     modeRef.current = mode;
     map.geoObjects.removeAll();
+    objectsRef.current = new Map();
 
     const bounds: number[][] = [];
     const dotObjects: YmapsGeoObject[] = [];
@@ -74,36 +99,29 @@ export function YandexMap({
 
       let object: YmapsGeoObject;
       if (mode === "circle") {
-        object = new ymaps.Circle(
-          [center, MARKETPLACE_CIRCLE_RADIUS_KM * 1000],
-          { hintContent },
-          {
-            fillColor: `${color}2e`,
-            strokeColor: color,
-            strokeWidth: 2,
-          },
-        );
+        object = new ymaps.Circle([center, MARKETPLACE_CIRCLE_RADIUS_KM * 1000], { hintContent }, circleStyleOptions(color, false));
       } else {
-        object = new ymaps.Placemark(
-          center,
-          { hintContent },
-          {
-            iconLayout: "default#image",
-            iconImageHref: dotDataUri(color),
-            iconImageSize: [14, 14],
-            iconImageOffset: [-7, -7],
-          },
-        );
+        object = new ymaps.Placemark(center, { hintContent }, dotIconOptions(dotDataUri(color), false));
       }
+      objectsRef.current.set(listing.id, { object, color, mode });
 
       if (onSelect) {
         object.events.add("click", () => onSelect(listing.id));
       }
+      object.events.add("mouseenter", () => onHoverRef.current?.(listing.id));
+      object.events.add("mouseleave", () => onHoverRef.current?.(null));
       if (useClusterer) {
         dotObjects.push(object);
       } else {
         map.geoObjects.add(object);
       }
+    }
+
+    // После перерисовки (свап режима по зуму) переприменяем активную подсветку.
+    const hovered = hoveredIdRef.current;
+    if (hovered) {
+      const entry = objectsRef.current.get(hovered);
+      if (entry) applyObjectStyle(entry, true);
     }
 
     if (dotObjects.length > 0) {
@@ -171,6 +189,22 @@ export function YandexMap({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointsKey]);
+
+  // Подсветка объекта при hover карточки в ленте — стиль меняется через
+  // options.set, без перерисовки карты.
+  useEffect(() => {
+    const previous = hoveredIdRef.current;
+    const next = hoveredId ?? null;
+    if (previous && previous !== next) {
+      const entry = objectsRef.current.get(previous);
+      if (entry) applyObjectStyle(entry, false);
+    }
+    if (next) {
+      const entry = objectsRef.current.get(next);
+      if (entry) applyObjectStyle(entry, true);
+    }
+    hoveredIdRef.current = next;
+  }, [hoveredId]);
 
   // Очистка ресурсов при размонтировании.
   useEffect(() => {

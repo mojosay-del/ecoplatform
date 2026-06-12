@@ -87,6 +87,8 @@ export function MarketplaceView() {
   const [openPopover, setOpenPopover] = useState<FilterPopover | null>(null);
   const [companyPoint, setCompanyPoint] = useState<{ lat: number; lon: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Hover-синхронизация ленты и карты (id объявления под курсором).
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   // Узкие экраны: сплит сворачивается, активна либо лента, либо карта.
   const [mobileView, setMobileView] = useState<"list" | "map">("list");
   const filtersRef = useRef<HTMLDivElement>(null);
@@ -507,7 +509,9 @@ export function MarketplaceView() {
                         listing.coverFileId ? preferredFileAssetImageUrl(assets.get(listing.coverFileId)) : null
                       }
                       distanceKm={distanceById?.get(listing.id) ?? null}
+                      highlighted={hoveredId === listing.id}
                       onOpen={setSelectedId}
+                      onHover={setHoveredId}
                     />
                   ))}
                 </div>
@@ -533,7 +537,7 @@ export function MarketplaceView() {
               layout-прыжков, а пустое состояние сохраняет географический контекст. */}
           <aside className={`mp-split-map${mobileView === "map" ? " is-mobile-visible" : ""}`}>
             <div className="mp-map-shell">
-              <YandexMap listings={listings} onSelect={setSelectedId} />
+              <YandexMap hoveredId={hoveredId} listings={listings} onHover={setHoveredId} onSelect={setSelectedId} />
             </div>
           </aside>
         </div>

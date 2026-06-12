@@ -6,7 +6,11 @@
 
 export const YANDEX_KEY = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY;
 
-export type YmapsGeoObject = { events: { add: (type: string, handler: () => void) => void } };
+export type YmapsGeoObject = {
+  events: { add: (type: string, handler: () => void) => void };
+  // Смена стиля без пересоздания объекта (подсветка hover из ленты).
+  options: { set: (options: Record<string, unknown>) => void };
+};
 export type YmapsClusterer = YmapsGeoObject & {
   add: (objects: YmapsGeoObject | YmapsGeoObject[]) => YmapsClusterer;
   removeAll: () => YmapsClusterer;
@@ -88,11 +92,20 @@ function svgDataUri(svg: string): string {
 }
 
 // Маленькая точка с белым кольцом — для дальнего масштаба, чтобы карта не
-// загромождалась деталями. Размер 14×14.
-export function dotDataUri(color: string): string {
+// загромождалась деталями. Размер 14×14; подсвеченная (hover карточки в
+// ленте) — 20×20 с полупрозрачным ореолом в цвет сырья.
+export function dotDataUri(color: string, highlighted = false): string {
+  if (!highlighted) {
+    return svgDataUri(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">` +
+        `<circle cx="7" cy="7" r="4.6" fill="${color}" stroke="#fff" stroke-width="2"/>` +
+        `</svg>`,
+    );
+  }
   return svgDataUri(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">` +
-      `<circle cx="7" cy="7" r="4.6" fill="${color}" stroke="#fff" stroke-width="2"/>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">` +
+      `<circle cx="10" cy="10" r="9.4" fill="${color}40"/>` +
+      `<circle cx="10" cy="10" r="5.6" fill="${color}" stroke="#fff" stroke-width="2.4"/>` +
       `</svg>`,
   );
 }

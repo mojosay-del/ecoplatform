@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
   LISTING_MAP_CLUSTER_MIN_POINTS,
+  LISTING_MAP_DOT_HIGHLIGHT_SIZE,
+  LISTING_MAP_DOT_SIZE,
+  circleStyleOptions,
+  dotIconOptions,
   getSinglePointFocusView,
   shouldClusterMapPoints,
 } from "./yandex-map-view";
@@ -32,5 +36,33 @@ describe("marketplace Yandex map view", () => {
     expect(shouldClusterMapPoints("dot", LISTING_MAP_CLUSTER_MIN_POINTS)).toBe(true);
     expect(shouldClusterMapPoints("dot", LISTING_MAP_CLUSTER_MIN_POINTS - 1)).toBe(false);
     expect(shouldClusterMapPoints("circle", LISTING_MAP_CLUSTER_MIN_POINTS)).toBe(false);
+  });
+
+  it("подсветка круга — плотнее заливка и толще обводка, цвет сохраняется", () => {
+    expect(circleStyleOptions("#1f6fb8", false)).toEqual({
+      fillColor: "#1f6fb82e",
+      strokeColor: "#1f6fb8",
+      strokeWidth: 2,
+    });
+    expect(circleStyleOptions("#1f6fb8", true)).toEqual({
+      fillColor: "#1f6fb855",
+      strokeColor: "#1f6fb8",
+      strokeWidth: 3,
+    });
+  });
+
+  it("подсвеченная точка крупнее и центрирована по своему размеру", () => {
+    const normal = dotIconOptions("data:normal", false);
+    const highlighted = dotIconOptions("data:hl", true);
+    expect(normal).toMatchObject({
+      iconImageHref: "data:normal",
+      iconImageSize: [LISTING_MAP_DOT_SIZE, LISTING_MAP_DOT_SIZE],
+      iconImageOffset: [-LISTING_MAP_DOT_SIZE / 2, -LISTING_MAP_DOT_SIZE / 2],
+    });
+    expect(highlighted).toMatchObject({
+      iconImageHref: "data:hl",
+      iconImageSize: [LISTING_MAP_DOT_HIGHLIGHT_SIZE, LISTING_MAP_DOT_HIGHLIGHT_SIZE],
+      iconImageOffset: [-LISTING_MAP_DOT_HIGHLIGHT_SIZE / 2, -LISTING_MAP_DOT_HIGHLIGHT_SIZE / 2],
+    });
   });
 });
