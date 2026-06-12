@@ -69,8 +69,12 @@ export type Ymaps = {
 declare global {
   interface Window {
     ymaps?: Ymaps;
+    __ecoplatformYmapsOnError?: (error?: unknown) => void;
   }
 }
+
+const YANDEX_MAPS_API_VERSION = "2.1.79";
+const YANDEX_MAPS_ERROR_CALLBACK = "__ecoplatformYmapsOnError";
 
 let scriptPromise: Promise<void> | null = null;
 
@@ -80,9 +84,24 @@ export function loadYmaps(): Promise<void> {
   if (scriptPromise) return scriptPromise;
   scriptPromise = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://api-maps.yandex.ru/2.1/?apikey=${encodeURIComponent(YANDEX_KEY ?? "")}&lang=ru_RU`;
+    const params = new URLSearchParams({
+      apikey: YANDEX_KEY ?? "",
+      lang: "ru_RU",
+      csp: "true",
+      onerror: YANDEX_MAPS_ERROR_CALLBACK,
+    });
+    window[YANDEX_MAPS_ERROR_CALLBACK] = () => reject(new Error("ymaps load failed"));
+    script.src = `https://api-maps.yandex.ru/${YANDEX_MAPS_API_VERSION}/?${params.toString()}`;
     script.async = true;
-    script.onload = () => resolve();
+    script.onload = () => {
+      window.setTimeout(() => {
+        if (window.ymaps) {
+          resolve();
+        } else {
+          reject(new Error("ymaps namespace missing"));
+        }
+      }, 0);
+    };
     script.onerror = () => reject(new Error("ymaps load failed"));
     document.head.appendChild(script);
   });

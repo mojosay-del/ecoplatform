@@ -26,10 +26,14 @@ function buildContentSecurityPolicy(): string {
     "https://*.ingest.sentry.io",
     "https://*.ingest.us.sentry.io",
     "https://api-maps.yandex.ru",
+    "https://*.api-maps.yandex.ru",
+    "https://suggest-maps.yandex.ru",
     "https://*.maps.yandex.net",
     "https://*.maps.yandex.ru",
+    "https://yandex.ru",
     "https://*.yandex.ru",
     "https://*.yastatic.net",
+    "https://*.taxi.yandex.net",
   ];
   // Локальный dev ходит в API по http://localhost:4000. В проде API живёт на
   // том же origin (ecoplatform.pro/api → покрывается 'self'), внешний localhost
@@ -40,19 +44,20 @@ function buildContentSecurityPolicy(): string {
 
   return [
     "default-src 'self'",
-    "img-src 'self' data: https://s3.twcstorage.ru https://*.s3.twcstorage.ru https://*.maps.yandex.net https://*.maps.yandex.ru https://*.yandex.ru https://*.yastatic.net",
+    "img-src 'self' data: https://s3.twcstorage.ru https://*.s3.twcstorage.ru https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://*.maps.yandex.net https://*.maps.yandex.ru https://yandex.ru https://*.yandex.ru https://*.yastatic.net",
     // Видео/аудио уроков отдаются signed-URL с S3 (s3.twcstorage.ru). Без явного
     // media-src они наследовали default-src 'self', и в проде (блокирующая CSP)
     // браузер резал загрузку — Vidstack крутил спиннер бесконечно. Зеркалит img-src
     // по доменам, но без data:.
     "media-src 'self' https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
-    "script-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://*.maps.yandex.net https://*.yastatic.net",
-    "style-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://*.yastatic.net",
+    "script-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://suggest-maps.yandex.ru https://*.maps.yandex.net https://yandex.ru https://*.yastatic.net",
+    "style-src 'self' 'unsafe-inline' blob: https://api-maps.yandex.ru https://*.yastatic.net",
     `connect-src ${connectSrc.join(" ")}`,
     "font-src 'self' https://*.yastatic.net",
-    // Сторонних плееров/iframe больше нет (Rutube убран) — фреймы режем
-    // полностью, frame-src наследуется как default-src 'self' при отсутствии.
-    "frame-src 'none'",
+    // Яндекс.Карты подгружают часть UI через iframe даже без сторонних
+    // плееров; остальные фреймы по-прежнему не разрешаем.
+    "frame-src https://api-maps.yandex.ru",
+    "child-src https://api-maps.yandex.ru",
     // Жёсткие запреты, которые не влияют на штатную работу приложения, но
     // закрывают классические XSS/clickjacking-векторы:
     "object-src 'none'", // нет <object>/<embed>/<applet> — режем плагины
