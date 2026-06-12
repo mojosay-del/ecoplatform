@@ -25,6 +25,11 @@ function buildContentSecurityPolicy(): string {
     "https://s3.twcstorage.ru",
     "https://*.ingest.sentry.io",
     "https://*.ingest.us.sentry.io",
+    "https://api-maps.yandex.ru",
+    "https://*.maps.yandex.net",
+    "https://*.maps.yandex.ru",
+    "https://*.yandex.ru",
+    "https://*.yastatic.net",
   ];
   // Локальный dev ходит в API по http://localhost:4000. В проде API живёт на
   // том же origin (ecoplatform.pro/api → покрывается 'self'), внешний localhost
@@ -35,16 +40,16 @@ function buildContentSecurityPolicy(): string {
 
   return [
     "default-src 'self'",
-    "img-src 'self' data: https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
+    "img-src 'self' data: https://s3.twcstorage.ru https://*.s3.twcstorage.ru https://*.maps.yandex.net https://*.maps.yandex.ru https://*.yandex.ru https://*.yastatic.net",
     // Видео/аудио уроков отдаются signed-URL с S3 (s3.twcstorage.ru). Без явного
     // media-src они наследовали default-src 'self', и в проде (блокирующая CSP)
     // браузер резал загрузку — Vidstack крутил спиннер бесконечно. Зеркалит img-src
     // по доменам, но без data:.
     "media-src 'self' https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
-    "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://*.maps.yandex.net https://*.yastatic.net",
+    "style-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://*.yastatic.net",
     `connect-src ${connectSrc.join(" ")}`,
-    "font-src 'self'",
+    "font-src 'self' https://*.yastatic.net",
     // Сторонних плееров/iframe больше нет (Rutube убран) — фреймы режем
     // полностью, frame-src наследуется как default-src 'self' при отсутствии.
     "frame-src 'none'",

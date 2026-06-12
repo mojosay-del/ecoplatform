@@ -33,7 +33,9 @@ COPY . .
 
 # NEXT_PUBLIC_* читаются на build-time — пробрасываем как build-arg.
 ARG NEXT_PUBLIC_API_URL="http://localhost:4000/api"
+ARG NEXT_PUBLIC_YANDEX_MAPS_API_KEY=""
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_YANDEX_MAPS_API_KEY=${NEXT_PUBLIC_YANDEX_MAPS_API_KEY}
 
 # Сначала shared (через turbo dependsOn), потом сам next build.
 RUN pnpm --filter @ecoplatform/web... build
