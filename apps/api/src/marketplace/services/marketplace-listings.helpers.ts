@@ -23,7 +23,22 @@ export const listingInclude = {
       id: true,
       type: true,
       organizationName: true,
+      // Дата появления на площадке — для блока доверия в детальной карточке.
+      createdAt: true,
       marketplaceRating: { select: { overall: true, reviewCount: true } },
+    },
+  },
+  // Публичный счётчик предложений закрытого аукциона. Выборка нарочно совпадает
+  // с панелью продавца (listListingOffers): active/accepted/declined с хотя бы
+  // одной ценой, отозванные не считаются — публичное число равно числу в панели.
+  _count: {
+    select: {
+      offers: {
+        where: {
+          status: { in: ["active", "accepted", "declined"] },
+          positions: { some: { pricePerTonRub: { gt: 0 } } },
+        },
+      },
     },
   },
 } satisfies Prisma.MarketplaceListingInclude;
@@ -81,6 +96,7 @@ export function mapToListItem(listing: ListingWithRelations): MarketplaceListing
     coverFileId: coverFileId(listing.media),
     sellerType: listing.sellerCompany.type,
     sellerRating: companyRating(listing.sellerCompany.marketplaceRating),
+    offerCount: listing._count.offers,
     positions: positionSummaries(listing),
   };
 }
@@ -125,7 +141,7 @@ function toCompanyAddress(address: ListingWithRelations["address"]): CompanyAddr
 // из-за чего админ/покупатель-после-акцепта видели «Редактировать».
 export function mapToDetail(
   listing: ListingWithRelations,
-  options: { canSeeContacts: boolean; isOwner: boolean; sellerAvatarUrl?: string | null },
+  options: { canSeeContacts: boolean; isOwner: boolean; sellerAvatarUrl?: string | null; dealsCompleted?: number },
 ): MarketplaceListingDetail {
   return {
     id: listing.id,
@@ -138,6 +154,8 @@ export function mapToDetail(
       // Аватар — загруженное создателем объявления фото (или null → нейтральная
       // иконка на фронте). Пол больше не участвует в выборе аватара (приватность).
       avatarUrl: options.sellerAvatarUrl ?? null,
+      dealsCompleted: options.dealsCompleted ?? 0,
+      memberSince: listing.sellerCompany.createdAt.toISOString(),
     },
     city: listing.address.city,
     region: listing.address.region,
@@ -171,6 +189,7 @@ export function mapToDetail(
       kind: item.kind,
       position: item.position,
     })),
+    offerCount: listing._count.offers,
     isOwner: options.isOwner,
   };
 }

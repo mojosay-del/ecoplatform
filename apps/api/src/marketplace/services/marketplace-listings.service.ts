@@ -502,14 +502,20 @@ export class MarketplaceListingsService {
     // Аватар продавца — загруженное создателем объявления фото. Публичный файл →
     // прямой URL; нет фото → null (фронт покажет нейтральную иконку). Пол больше
     // не используется для аватара (приватность, A2).
-    const sellerUser = await this.prisma.user.findUnique({
-      where: { id: listing.createdById },
-      select: { avatarFile: { select: { storageKey: true, accessLevel: true } } },
-    });
+    const [sellerUser, dealsCompleted] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: listing.createdById },
+        select: { avatarFile: { select: { storageKey: true, accessLevel: true } } },
+      }),
+      // Блок доверия: состоявшиеся сделки продавца по всем его объявлениям.
+      this.prisma.offer.count({
+        where: { dealResult: "agreed", listing: { sellerCompanyId: listing.sellerCompanyId } },
+      }),
+    ]);
     const sellerAvatarUrl = sellerUser?.avatarFile
       ? publicUrl(sellerUser.avatarFile.storageKey, sellerUser.avatarFile.accessLevel)
       : null;
-    return mapToDetail(listing, { ...options, sellerAvatarUrl });
+    return mapToDetail(listing, { ...options, sellerAvatarUrl, dealsCompleted });
   }
 
   private assertPublishable(listing: ListingWithRelations) {

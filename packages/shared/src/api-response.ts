@@ -690,6 +690,9 @@ export type MarketplaceListingListItem = {
   coverFileId: string | null;
   sellerType: CompanyType;
   sellerRating: number | null;
+  // Публичный счётчик закрытого аукциона: сколько предложений подано (без цен —
+  // приватность ставок сохранена). Выборка совпадает с панелью продавца.
+  offerCount: number;
   positions: MarketplaceListingPositionSummary[];
 };
 
@@ -718,7 +721,16 @@ export type MarketplaceListingPositionDetail = {
 export type MarketplaceListingDetail = {
   id: string;
   status: ListingStatus;
-  seller: { companyId: string; name: string; type: CompanyType; rating: number | null; avatarUrl: string | null };
+  seller: {
+    companyId: string;
+    name: string;
+    type: CompanyType;
+    rating: number | null;
+    avatarUrl: string | null;
+    // Блок доверия: состоявшиеся сделки продавца и дата появления на площадке.
+    dealsCompleted: number;
+    memberSince: IsoDateString;
+  };
   city: string;
   region: string | null;
   address: CompanyAddress | null;
@@ -735,6 +747,8 @@ export type MarketplaceListingDetail = {
   archiveReason: string | null;
   positions: MarketplaceListingPositionDetail[];
   media: MarketplaceListingMediaItem[];
+  // Публичный счётчик закрытого аукциона (см. MarketplaceListingListItem.offerCount).
+  offerCount: number;
   isOwner: boolean;
 };
 

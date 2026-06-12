@@ -782,6 +782,68 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
     expect(listing?.status).toBe("archived");
     expect(listing?.archiveReason).toBe("not_settled");
   });
+
+  it("offerCount публичен в ленте и детали (без цен), отзыв ставки уменьшает счётчик", async () => {
+    const seller = await registerCompany("0009610");
+    const nomenclatureId = await seedNomenclature();
+    const { listingId, positionId } = await createPublishedListing(seller.token, nomenclatureId);
+    const buyerA = await registerTrader("0009611");
+    const buyerB = await registerTrader("0009612");
+
+    // До ставок — нулевой счётчик; memberSince в блоке доверия — ISO-дата.
+    const before = await ctx.http.get(`/api/marketplace/listings/${listingId}`).set(bearer(buyerA));
+    expect(before.body.offerCount).toBe(0);
+    expect(before.body.seller.dealsCompleted).toBe(0);
+    expect(Number.isNaN(Date.parse(before.body.seller.memberSince))).toBe(false);
+
+    const offerA = (
+      await ctx.http
+        .post(`/api/marketplace/listings/${listingId}/offers`)
+        .set(bearer(buyerA))
+        .send(offerPayload(positionId))
+    ).body;
+    const afterFirst = await ctx.http.get(`/api/marketplace/listings/${listingId}`).set(bearer(buyerB));
+    expect(afterFirst.body.offerCount).toBe(1);
+    const feed = await ctx.http.get("/api/marketplace/listings").set(bearer(buyerB));
+    expect(feed.body.items.find((item: { id: string }) => item.id === listingId).offerCount).toBe(1);
+
+    // Вторая ставка другого покупателя — 2; отозванная ставка не считается.
+    await ctx.http
+      .post(`/api/marketplace/listings/${listingId}/offers`)
+      .set(bearer(buyerB))
+      .send(offerPayload(positionId));
+    const afterSecond = await ctx.http.get(`/api/marketplace/listings/${listingId}`).set(bearer(seller.token));
+    expect(afterSecond.body.offerCount).toBe(2);
+
+    await ctx.http.post(`/api/marketplace/offers/${offerA.id}/withdraw`).set(bearer(buyerA));
+    const afterWithdraw = await ctx.http.get(`/api/marketplace/listings/${listingId}`).set(bearer(seller.token));
+    expect(afterWithdraw.body.offerCount).toBe(1);
+  });
+
+  it("dealsCompleted в блоке доверия растёт после «Договорились»", async () => {
+    const seller = await registerCompany("0009613");
+    const nomenclatureId = await seedNomenclature();
+    const buyerToken = await registerTrader("0009614");
+
+    // Сделка по первому объявлению: ставка → акцепт → «Договорились».
+    const first = await createPublishedListing(seller.token, nomenclatureId);
+    const offer = (
+      await ctx.http
+        .post(`/api/marketplace/listings/${first.listingId}/offers`)
+        .set(bearer(buyerToken))
+        .send(offerPayload(first.positionId))
+    ).body;
+    await ctx.http.post(`/api/marketplace/offers/${offer.id}/accept`).set(bearer(seller.token));
+    await ctx.http
+      .post(`/api/marketplace/offers/${offer.id}/deal`)
+      .set(bearer(seller.token))
+      .send({ result: "agreed" });
+
+    // Новое объявление того же продавца — доверие учитывает прошлую сделку.
+    const second = await createPublishedListing(seller.token, nomenclatureId);
+    const detail = await ctx.http.get(`/api/marketplace/listings/${second.listingId}`).set(bearer(buyerToken));
+    expect(detail.body.seller.dealsCompleted).toBe(1);
+  });
 });
 
 describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
