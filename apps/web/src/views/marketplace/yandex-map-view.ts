@@ -47,3 +47,16 @@ export function dotIconOptions(iconHref: string, highlighted: boolean): Record<s
     iconImageOffset: [-size / 2, -size / 2],
   };
 }
+
+export const LISTING_MAP_PULSE_SIZE = 28;
+
+// Опции пульсирующей точки свежего объявления — крупнее обычной, чтобы
+// расширяющееся кольцо не обрезалось рамкой иконки.
+export function pulseDotIconOptions(iconHref: string): Record<string, unknown> {
+  return {
+    iconLayout: "default#image",
+    iconImageHref: iconHref,
+    iconImageSize: [LISTING_MAP_PULSE_SIZE, LISTING_MAP_PULSE_SIZE],
+    iconImageOffset: [-LISTING_MAP_PULSE_SIZE / 2, -LISTING_MAP_PULSE_SIZE / 2],
+  };
+}

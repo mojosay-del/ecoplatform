@@ -2039,6 +2039,33 @@
   height: 100%;
 }
 
+/* Легенда цветов сырья: верхний левый угол (зум-контрол ymaps — слева по
+   центру, копирайты — снизу; углы сверху свободны). */
+.mp-map-legend {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  max-width: calc(100% - 20px);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-card);
+  font-size: 12px;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.mp-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 /* Переключатель Список/Карта — виден только когда сплит свёрнут. */
 .mp-view-toggle {
   display: none;

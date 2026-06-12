@@ -9,8 +9,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
+import { isFreshListing } from "./listing-card-meta";
 import { materialColor } from "./materials";
-import { YANDEX_KEY, dotDataUri, loadYmaps, type YmapsGeoObject, type YmapsMap } from "./yandex-loader";
+import { YANDEX_KEY, dotDataUri, loadYmaps, pulseDotDataUri, type YmapsGeoObject, type YmapsMap } from "./yandex-loader";
 import {
   type ListingMapMode,
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
@@ -19,6 +20,7 @@ import {
   circleStyleOptions,
   dotIconOptions,
   getSinglePointFocusView,
+  pulseDotIconOptions,
   shouldClusterMapPoints,
 } from "./yandex-map-view";
 
@@ -29,13 +31,18 @@ function modeForZoom(zoom: number): ListingMapMode {
 }
 
 // Запись реестра объектов карты — для смены стиля при hover без перерисовки.
-type MapObjectEntry = { object: YmapsGeoObject; color: string; mode: ListingMapMode };
+type MapObjectEntry = { object: YmapsGeoObject; color: string; mode: ListingMapMode; pulse: boolean };
 
 function applyObjectStyle(entry: MapObjectEntry, highlighted: boolean) {
   if (entry.mode === "circle") {
     entry.object.options.set(circleStyleOptions(entry.color, highlighted));
+  } else if (highlighted) {
+    entry.object.options.set(dotIconOptions(dotDataUri(entry.color, true), true));
+  } else if (entry.pulse) {
+    // Свежая точка после снятия hover возвращается к пульсации.
+    entry.object.options.set(pulseDotIconOptions(pulseDotDataUri(entry.color)));
   } else {
-    entry.object.options.set(dotIconOptions(dotDataUri(entry.color, highlighted), highlighted));
+    entry.object.options.set(dotIconOptions(dotDataUri(entry.color), false));
   }
 }
 
@@ -91,19 +98,27 @@ export function YandexMap({
     const bounds: number[][] = [];
     const dotObjects: YmapsGeoObject[] = [];
     const useClusterer = shouldClusterMapPoints(mode, points.length);
+    // Пульсация — только без prefers-reduced-motion (SMIL заменяем статикой).
+    const reducedMotion =
+      typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     for (const listing of points) {
       const center = [listing.circleLat as number, listing.circleLon as number];
       bounds.push(center);
       const color = materialColor(listing.positions[0]?.categorySlug);
-      const hintContent = listing.positions.map((position) => position.nomenclatureName).join(", ");
+      const fresh = isFreshListing(listing.publishedAt);
+      const hintContent =
+        (fresh ? "Новое · " : "") + listing.positions.map((position) => position.nomenclatureName).join(", ");
 
       let object: YmapsGeoObject;
+      const pulse = fresh && !reducedMotion && mode === "dot";
       if (mode === "circle") {
         object = new ymaps.Circle([center, MARKETPLACE_CIRCLE_RADIUS_KM * 1000], { hintContent }, circleStyleOptions(color, false));
+      } else if (pulse) {
+        object = new ymaps.Placemark(center, { hintContent }, pulseDotIconOptions(pulseDotDataUri(color)));
       } else {
         object = new ymaps.Placemark(center, { hintContent }, dotIconOptions(dotDataUri(color), false));
       }
-      objectsRef.current.set(listing.id, { object, color, mode });
+      objectsRef.current.set(listing.id, { object, color, mode, pulse });
 
       if (onSelect) {
         object.events.add("click", () => onSelect(listing.id));

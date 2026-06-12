@@ -109,3 +109,18 @@ export function dotDataUri(color: string, highlighted = false): string {
       `</svg>`,
   );
 }
+
+// Пульсирующая точка свежего объявления (<24ч): SMIL-анимация в data URI —
+// layout default#image рендерится <img>-оверлеем, SMIL там работает; для
+// prefers-reduced-motion вызывающий код подставляет обычную точку.
+export function pulseDotDataUri(color: string): string {
+  return svgDataUri(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">` +
+      `<circle cx="14" cy="14" r="5" fill="${color}" stroke="#fff" stroke-width="2"/>` +
+      `<circle cx="14" cy="14" r="6" fill="none" stroke="${color}" stroke-width="2" opacity="0.8">` +
+      `<animate attributeName="r" values="6;13" dur="1.6s" repeatCount="indefinite"/>` +
+      `<animate attributeName="opacity" values="0.8;0" dur="1.6s" repeatCount="indefinite"/>` +
+      `</circle>` +
+      `</svg>`,
+  );
+}

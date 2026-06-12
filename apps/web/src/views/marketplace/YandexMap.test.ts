@@ -4,9 +4,11 @@ import {
   LISTING_MAP_CLUSTER_MIN_POINTS,
   LISTING_MAP_DOT_HIGHLIGHT_SIZE,
   LISTING_MAP_DOT_SIZE,
+  LISTING_MAP_PULSE_SIZE,
   circleStyleOptions,
   dotIconOptions,
   getSinglePointFocusView,
+  pulseDotIconOptions,
   shouldClusterMapPoints,
 } from "./yandex-map-view";
 
@@ -63,6 +65,14 @@ describe("marketplace Yandex map view", () => {
       iconImageHref: "data:hl",
       iconImageSize: [LISTING_MAP_DOT_HIGHLIGHT_SIZE, LISTING_MAP_DOT_HIGHLIGHT_SIZE],
       iconImageOffset: [-LISTING_MAP_DOT_HIGHLIGHT_SIZE / 2, -LISTING_MAP_DOT_HIGHLIGHT_SIZE / 2],
+    });
+  });
+
+  it("пульс-иконка свежего объявления крупнее и центрирована", () => {
+    expect(pulseDotIconOptions("data:pulse")).toMatchObject({
+      iconImageHref: "data:pulse",
+      iconImageSize: [LISTING_MAP_PULSE_SIZE, LISTING_MAP_PULSE_SIZE],
+      iconImageOffset: [-LISTING_MAP_PULSE_SIZE / 2, -LISTING_MAP_PULSE_SIZE / 2],
     });
   });
 });

@@ -17,7 +17,7 @@ import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
 import { ListingCard, ListingCardSkeleton, totalWeightKg, useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
-import { materialColor } from "./materials";
+import { MATERIAL_LEGEND, materialColor } from "./materials";
 import { YandexMap } from "./YandexMap";
 
 type SortMode = "date" | "distance" | "weight" | "expires";
@@ -538,6 +538,15 @@ export function MarketplaceView() {
           <aside className={`mp-split-map${mobileView === "map" ? " is-mobile-visible" : ""}`}>
             <div className="mp-map-shell">
               <YandexMap hoveredId={hoveredId} listings={listings} onHover={setHoveredId} onSelect={setSelectedId} />
+              {/* Легенда цветов сырья — обычный DOM-оверлей поверх карты. */}
+              <div className="mp-map-legend">
+                {MATERIAL_LEGEND.map((item) => (
+                  <span key={item.slug}>
+                    <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: item.color }} />
+                    {item.label}
+                  </span>
+                ))}
+              </div>
             </div>
           </aside>
         </div>
