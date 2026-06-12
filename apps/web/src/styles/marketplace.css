@@ -2082,11 +2082,12 @@
   white-space: nowrap;
 }
 
-/* «Искать в этой области» — плашка по центру верха карты, появляется после
-   ручного перемещения и применяет видимую область как фильтр. */
+/* «Искать в этой области» — плашка по центру, строкой ниже легенды (первая
+   строка занята легендой, низ карты может быть за вьюпортом до прилипания).
+   Появляется после ручного перемещения и применяет видимую область как фильтр. */
 .mp-map-search-area {
   position: absolute;
-  top: 10px;
+  top: 56px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 6;
@@ -2181,6 +2182,12 @@
   .mp-split-map.is-mobile-visible .mp-map-shell {
     height: calc(100dvh - 240px);
     min-height: 320px;
+  }
+
+  /* Компактная легенда на узкой карте. */
+  .mp-map-legend {
+    gap: 4px 10px;
+    padding: 6px 10px;
   }
 }
 
@@ -2816,6 +2823,26 @@
   .mp-skeleton-line,
   .mp-offer-sealed-icon {
     animation: none;
+  }
+}
+
+/* Touch-таргеты ≥44px (WCAG 2.5.5): на сенсорных устройствах и узких экранах
+   мышиные размеры подрастают под палец. */
+@media (pointer: coarse), (max-width: 760px) {
+  .mp-filter-trigger,
+  .mp-material-chip,
+  .mp-active-chip,
+  .mp-active-clear {
+    min-height: 44px;
+  }
+
+  .mp-modal-close {
+    width: 44px;
+    height: 44px;
+  }
+
+  .mp-filter-option {
+    padding: 11px 8px;
   }
 }
 
