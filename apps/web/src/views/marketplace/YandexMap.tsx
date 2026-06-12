@@ -9,7 +9,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
-import { YANDEX_KEY, dotDataUri, loadYmaps, materialColor, type YmapsGeoObject, type YmapsMap } from "./yandex-loader";
+import { materialColor } from "./materials";
+import { YANDEX_KEY, dotDataUri, loadYmaps, type YmapsGeoObject, type YmapsMap } from "./yandex-loader";
 import {
   type ListingMapMode,
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,

@@ -1,7 +1,8 @@
-// Единый загрузчик Яндекс.Карт (JS API 2.1) + цвета по сырью. Используется и
+// Единый загрузчик Яндекс.Карт (JS API 2.1) + SVG-иконки карты. Используется и
 // картой ленты (YandexMap), и подсказками адреса в форме (SuggestView) — чтобы
-// не дублировать тег скрипта и типы. Ключ — NEXT_PUBLIC_YANDEX_MAPS_API_KEY;
-// без него карта/подсказки деградируют в заглушку (см. вызовы).
+// не дублировать тег скрипта и типы. Цвета по сырью — в ./materials (общие с
+// чипами/легендой). Ключ — NEXT_PUBLIC_YANDEX_MAPS_API_KEY; без него
+// карта/подсказки деградируют в заглушку (см. вызовы).
 
 export const YANDEX_KEY = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY;
 
@@ -80,21 +81,6 @@ export function loadYmaps(): Promise<void> {
     document.head.appendChild(script);
   });
   return scriptPromise;
-}
-
-// Цвет по категории сырья (как просил владелец): макулатура — коричневый,
-// плёнки — синий, полимеры/пластики — жёлтый; прочее — зелёный Ecoplatform.
-export function materialColor(categorySlug: string | undefined): string {
-  switch (categorySlug) {
-    case "makulatura":
-      return "#8a5a2b";
-    case "plenki":
-      return "#1f6fb8";
-    case "plastiki":
-      return "#d9a300";
-    default:
-      return "#1f8a4c";
-  }
 }
 
 function svgDataUri(svg: string): string {
