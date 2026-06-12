@@ -88,4 +88,3 @@ ALTER TABLE "MarketplaceReviewResponse" ADD CONSTRAINT "MarketplaceReviewRespons
 
 -- AddForeignKey
 ALTER TABLE "CompanyMarketplaceRating" ADD CONSTRAINT "CompanyMarketplaceRating_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-

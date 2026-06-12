@@ -64,4 +64,3 @@ ALTER TABLE "OfferPosition" ADD CONSTRAINT "OfferPosition_offerId_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "OfferPosition" ADD CONSTRAINT "OfferPosition_listingPositionId_fkey" FOREIGN KEY ("listingPositionId") REFERENCES "ListingPosition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-

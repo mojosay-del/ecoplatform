@@ -95,4 +95,3 @@ ALTER TABLE "ListingPosition" ADD CONSTRAINT "ListingPosition_nomenclatureId_fke
 
 -- AddForeignKey
 ALTER TABLE "ListingMedia" ADD CONSTRAINT "ListingMedia_listingId_fkey" FOREIGN KEY ("listingId") REFERENCES "MarketplaceListing"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
