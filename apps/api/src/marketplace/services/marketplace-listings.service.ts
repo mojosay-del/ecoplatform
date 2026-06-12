@@ -193,9 +193,14 @@ export class MarketplaceListingsService {
     const rows = await this.prisma.nomenclature.findMany({
       where: { isActive: true },
       orderBy: [{ category: { position: "asc" } }, { position: "asc" }],
-      include: { category: { select: { name: true } } },
+      include: { category: { select: { name: true, slug: true } } },
     });
-    return rows.map((row) => ({ id: row.id, name: row.name, category: row.category.name }));
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      category: row.category.name,
+      categorySlug: row.category.slug,
+    }));
   }
 
   // ── Кабинет заготовителя ──────────────────────────────────────────────────

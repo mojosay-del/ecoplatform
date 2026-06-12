@@ -1712,8 +1712,7 @@
   position: relative;
 }
 
-.mp-filter-trigger,
-.mp-filter-reset {
+.mp-filter-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1737,8 +1736,7 @@
 }
 
 .mp-filter-popover.is-open .mp-filter-trigger,
-.mp-filter-trigger:hover,
-.mp-filter-reset:hover {
+.mp-filter-trigger:hover {
   border-color: var(--accent, #1f8a4c);
   color: var(--accent, #1f8a4c);
 }
@@ -1748,10 +1746,131 @@
   color: currentColor;
 }
 
-.mp-filter-reset {
-  border-color: transparent;
-  background: #f8fafc;
-  color: #64748b;
+/* Чипы категорий сырья: точка в цвете материала; активный чип тонируется тем же
+   цветом инлайном (цвет приходит из materials.ts), частичный выбор — пунктир. */
+.mp-material-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mp-material-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.mp-material-chip:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+}
+
+.mp-material-chip.is-partial {
+  border-style: dashed;
+}
+
+/* Счётчик частичного выбора: фон — цвет материала (инлайном из materials.ts). */
+.mp-material-chip-count {
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* Группы в попапе «Точнее». */
+.mp-filter-menu-grouped {
+  min-width: 300px;
+  gap: 10px;
+}
+
+.mp-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mp-filter-group-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* Ряд активных фильтров с крестиками. */
+.mp-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 18px;
+}
+
+.mp-active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface-muted-strong);
+  color: var(--text-secondary-strong);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.mp-active-chip:hover {
+  background: var(--surface-muted-hover);
+}
+
+.mp-active-chip svg {
+  color: var(--text-muted);
+}
+
+.mp-active-chip:hover svg {
+  color: var(--danger-text);
+}
+
+.mp-active-clear {
+  border: none;
+  background: none;
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.mp-active-clear:hover {
+  color: var(--danger-text);
 }
 
 .mp-filter-menu {
@@ -1886,8 +2005,7 @@
 
   .mp-filter-popover,
   .mp-filter-popover-sort,
-  .mp-filter-trigger,
-  .mp-filter-reset {
+  .mp-filter-trigger {
     width: 100%;
   }
 

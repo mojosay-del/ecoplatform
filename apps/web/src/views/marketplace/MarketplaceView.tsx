@@ -6,9 +6,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MarketplaceListingListItem } from "@ecoplatform/shared";
+import type { MarketplaceListingListItem, MarketplaceNomenclatureOption } from "@ecoplatform/shared";
 import { haversineKm } from "@ecoplatform/shared";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, X } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import { api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -17,10 +17,25 @@ import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
 import { ListingCard, ListingCardSkeleton, totalWeightKg, useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
+import { materialColor } from "./materials";
 import { YandexMap } from "./YandexMap";
 
 type SortMode = "date" | "distance" | "weight" | "expires";
 type FilterPopover = "nomenclature" | "region" | "sort";
+
+// Категория сырья со своими номенклатурами — чип фильтра + группа в «Точнее».
+type NomenclatureGroup = {
+  slug: string;
+  name: string;
+  options: MarketplaceNomenclatureOption[];
+};
+
+// Состояние чипа категории: не выбрана / выбрана часть номенклатур / вся.
+function groupSelectionState(group: NomenclatureGroup, selected: string[]): "none" | "partial" | "all" {
+  const count = group.options.filter((option) => selected.includes(option.id)).length;
+  if (count === 0) return "none";
+  return count === group.options.length ? "all" : "partial";
+}
 
 type SortOption = {
   value: SortMode;
@@ -177,11 +192,69 @@ export function MarketplaceView() {
   const selectedSort = sortOptions.find((option) => option.value === sortBy) ?? DEFAULT_SORT_OPTION;
   const hasActiveFilters = selectedRegions.length > 0 || selectedNomenclature.length > 0;
 
+  // Номенклатура, сгруппированная по категориям (порядок справочника сохранён).
+  const nomenclatureGroups = useMemo<NomenclatureGroup[]>(() => {
+    const groups: NomenclatureGroup[] = [];
+    const bySlug = new Map<string, NomenclatureGroup>();
+    for (const option of nomenclature) {
+      let group = bySlug.get(option.categorySlug);
+      if (!group) {
+        group = { slug: option.categorySlug, name: option.category, options: [] };
+        bySlug.set(option.categorySlug, group);
+        groups.push(group);
+      }
+      group.options.push(option);
+    }
+    return groups;
+  }, [nomenclature]);
+
+  // Чип категории: «вся выбрана» → снять; «нет/часть» → выбрать целиком.
+  function toggleGroup(group: NomenclatureGroup) {
+    const ids = group.options.map((option) => option.id);
+    setSelectedNomenclature((prev) => {
+      const allSelected = ids.every((id) => prev.includes(id));
+      if (allSelected) return prev.filter((id) => !ids.includes(id));
+      return [...new Set([...prev, ...ids])];
+    });
+  }
+
+  function resetFilters() {
+    setSelectedRegions([]);
+    setSelectedNomenclature([]);
+  }
+
   const coverIds = listings.map((listing) => listing.coverFileId).filter((id): id is string => Boolean(id));
   const assets = useFileAssetsByIds(coverIds);
   const filterBar = (
     <div className="mp-filterbar" ref={filtersRef}>
       <div className="mp-filterbar-group">
+        {/* Чипы категорий сырья — те же цвета, что круги на карте. */}
+        <div aria-label="Категории сырья" className="mp-material-chips" role="group">
+          {nomenclatureGroups.map((group) => {
+            const state = groupSelectionState(group, selectedNomenclature);
+            const color = materialColor(group.slug);
+            const selectedCount = group.options.filter((option) => selectedNomenclature.includes(option.id)).length;
+            return (
+              <button
+                aria-pressed={state !== "none"}
+                className={`mp-material-chip${state === "all" ? " is-active" : ""}${state === "partial" ? " is-partial" : ""}`}
+                key={group.slug}
+                style={state !== "none" ? { borderColor: color, color, backgroundColor: `${color}14` } : undefined}
+                type="button"
+                onClick={() => toggleGroup(group)}
+              >
+                <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
+                {group.name}
+                {state === "partial" ? (
+                  <span className="mp-material-chip-count" style={{ backgroundColor: color }}>
+                    {selectedCount}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
         <div className={`mp-filter-popover${openPopover === "nomenclature" ? " is-open" : ""}`}>
           <button
             aria-controls="marketplace-nomenclature-popover"
@@ -190,21 +263,33 @@ export function MarketplaceView() {
             type="button"
             onClick={() => setOpenPopover((value) => (value === "nomenclature" ? null : "nomenclature"))}
           >
-            <span>Сырьё{selectedNomenclature.length ? ` · ${selectedNomenclature.length}` : ""}</span>
+            <span>Точнее</span>
             <ChevronDown aria-hidden="true" size={16} />
           </button>
           {openPopover === "nomenclature" ? (
-            <div className="mp-filter-menu" id="marketplace-nomenclature-popover">
-              {nomenclature.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
-              {nomenclature.map((option) => (
-                <label className="mp-filter-option" key={option.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedNomenclature.includes(option.id)}
-                    onChange={() => setSelectedNomenclature((prev) => toggle(prev, option.id))}
-                  />
-                  <span>{option.name}</span>
-                </label>
+            <div className="mp-filter-menu mp-filter-menu-grouped" id="marketplace-nomenclature-popover">
+              {nomenclatureGroups.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
+              {nomenclatureGroups.map((group) => (
+                <div className="mp-filter-group" key={group.slug}>
+                  <div className="mp-filter-group-title">
+                    <i
+                      aria-hidden="true"
+                      className="mp-material-dot"
+                      style={{ backgroundColor: materialColor(group.slug) }}
+                    />
+                    {group.name}
+                  </div>
+                  {group.options.map((option) => (
+                    <label className="mp-filter-option" key={option.id}>
+                      <input
+                        type="checkbox"
+                        checked={selectedNomenclature.includes(option.id)}
+                        onChange={() => setSelectedNomenclature((prev) => toggle(prev, option.id))}
+                      />
+                      <span>{option.name}</span>
+                    </label>
+                  ))}
+                </div>
               ))}
             </div>
           ) : null}
@@ -237,19 +322,6 @@ export function MarketplaceView() {
             </div>
           ) : null}
         </div>
-
-        {hasActiveFilters ? (
-          <button
-            className="mp-filter-reset"
-            type="button"
-            onClick={() => {
-              setSelectedRegions([]);
-              setSelectedNomenclature([]);
-            }}
-          >
-            Сбросить
-          </button>
-        ) : null}
       </div>
 
       <div className={`mp-filter-popover mp-filter-popover-sort${openPopover === "sort" ? " is-open" : ""}`}>
@@ -287,6 +359,63 @@ export function MarketplaceView() {
       </div>
     </div>
   );
+
+  // Ряд активных фильтров: целиком выбранная категория сворачивается в один чип,
+  // частичный выбор разворачивается в чипы отдельных номенклатур.
+  const activeFiltersRow = hasActiveFilters ? (
+    <div className="mp-active-filters">
+      {nomenclatureGroups.flatMap((group) => {
+        const state = groupSelectionState(group, selectedNomenclature);
+        if (state === "none") return [];
+        const color = materialColor(group.slug);
+        if (state === "all") {
+          return [
+            <button
+              aria-label={`Убрать фильтр ${group.name}`}
+              className="mp-active-chip"
+              key={`group:${group.slug}`}
+              type="button"
+              onClick={() => toggleGroup(group)}
+            >
+              <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
+              {group.name}
+              <X aria-hidden="true" size={14} />
+            </button>,
+          ];
+        }
+        return group.options
+          .filter((option) => selectedNomenclature.includes(option.id))
+          .map((option) => (
+            <button
+              aria-label={`Убрать фильтр ${option.name}`}
+              className="mp-active-chip"
+              key={`nom:${option.id}`}
+              type="button"
+              onClick={() => setSelectedNomenclature((prev) => toggle(prev, option.id))}
+            >
+              <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
+              {option.name}
+              <X aria-hidden="true" size={14} />
+            </button>
+          ));
+      })}
+      {selectedRegions.map((region) => (
+        <button
+          aria-label={`Убрать регион ${region}`}
+          className="mp-active-chip"
+          key={`region:${region}`}
+          type="button"
+          onClick={() => setSelectedRegions((prev) => toggle(prev, region))}
+        >
+          {region}
+          <X aria-hidden="true" size={14} />
+        </button>
+      ))}
+      <button className="mp-active-clear" type="button" onClick={resetFilters}>
+        Сбросить всё
+      </button>
+    </div>
+  ) : null;
 
   if (ready && !token) {
     return <AuthRequired title="Торговая площадка" />;
@@ -327,6 +456,7 @@ export function MarketplaceView() {
         {state === "idle" || state === "loading" ? (
           <>
             {filterBar}
+            {activeFiltersRow}
             <div aria-busy="true" className="mp-grid" style={{ marginTop: 18 }}>
               {Array.from({ length: 8 }, (_, index) => (
                 <ListingCardSkeleton key={index} />
@@ -336,18 +466,12 @@ export function MarketplaceView() {
         ) : listings.length === 0 ? (
           <>
             {filterBar}
+            {activeFiltersRow}
             <div className="mp-empty">
               <strong>По заданным фильтрам объявлений нет.</strong>
               <p>Попробуйте смягчить условия — или загляните позже, объявления появляются каждый день.</p>
               {hasActiveFilters ? (
-                <button
-                  className="button secondary"
-                  type="button"
-                  onClick={() => {
-                    setSelectedRegions([]);
-                    setSelectedNomenclature([]);
-                  }}
-                >
+                <button className="button secondary" type="button" onClick={resetFilters}>
                   Сбросить фильтры
                 </button>
               ) : null}
@@ -357,6 +481,7 @@ export function MarketplaceView() {
           <>
             <YandexMap listings={listings} onSelect={setSelectedId} />
             {filterBar}
+            {activeFiltersRow}
             <div className="mp-grid" style={{ marginTop: 18 }}>
               {listings.map((listing) => (
                 <ListingCard

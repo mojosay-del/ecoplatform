@@ -217,6 +217,12 @@ describe("Marketplace — объявления (фаза 1)", () => {
 
     const feed = await ctx.http.get("/api/marketplace/listings").set(bearer(seller.token));
     expect(feed.body.items[0].positions[0].categorySlug).toBe("makulatura");
+
+    // Справочник отдаёт slug категории — по нему красятся чипы фильтра сырья.
+    const nomenclature = await ctx.http.get("/api/marketplace/nomenclature").set(bearer(seller.token));
+    expect(nomenclature.status).toBe(200);
+    const option = nomenclature.body.find((item: { id: string }) => item.id === nomenclatureId);
+    expect(option).toMatchObject({ category: "Макулатура", categorySlug: "makulatura" });
   });
 
   it("публикация без 4 фото или с весом <100 кг отклоняется", async () => {

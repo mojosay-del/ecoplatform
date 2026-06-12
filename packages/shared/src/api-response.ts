@@ -743,6 +743,9 @@ export type MarketplaceNomenclatureOption = {
   id: string;
   name: string;
   category: string;
+  // Slug категории (makulatura/plenki/plastiki) — цвет чипа фильтра и группировка
+  // в попапе «Точнее»; тот же ключ, что у кругов на карте.
+  categorySlug: string;
 };
 
 export type MarketplaceAddressSuggestion = {
