@@ -15,7 +15,7 @@ import { useAuth } from "../../lib/auth";
 import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
-import { ListingCard, totalWeightKg, useNomenclatureOptions } from "./listing-ui";
+import { ListingCard, ListingCardSkeleton, totalWeightKg, useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
 import { YandexMap } from "./YandexMap";
 
@@ -134,14 +134,25 @@ export function MarketplaceView() {
       api.marketplace.listings({ region: selectedRegions, nomenclatureId: selectedNomenclature, limit, offset }),
   );
 
+  // Расстояния от адреса компании до отображаемых центров кругов — для
+  // сортировки «Ближе ко мне» и подписи «≈ N км» на карточках.
+  const distanceById = useMemo(() => {
+    if (!companyPoint) return null;
+    const map = new Map<string, number>();
+    for (const listing of items) {
+      if (listing.circleLat != null && listing.circleLon != null) {
+        map.set(listing.id, haversineKm(companyPoint, { lat: listing.circleLat, lon: listing.circleLon }));
+      }
+    }
+    return map;
+  }, [items, companyPoint]);
+
   const listings = useMemo(() => {
     const sortedItems = [...items];
     const newestFirst = (a: MarketplaceListingListItem, b: MarketplaceListingListItem) =>
       dateValue(b.publishedAt, 0) - dateValue(a.publishedAt, 0);
     const distance = (listing: MarketplaceListingListItem) =>
-      listing.circleLat == null || listing.circleLon == null || !companyPoint
-        ? Number.POSITIVE_INFINITY
-        : haversineKm(companyPoint, { lat: listing.circleLat, lon: listing.circleLon });
+      distanceById?.get(listing.id) ?? Number.POSITIVE_INFINITY;
 
     if (sortBy === "distance") {
       sortedItems.sort((a, b) => distance(a) - distance(b) || newestFirst(a, b));
@@ -157,7 +168,7 @@ export function MarketplaceView() {
       sortedItems.sort(newestFirst);
     }
     return sortedItems;
-  }, [items, sortBy, companyPoint]);
+  }, [items, sortBy, distanceById]);
 
   const sortOptions = useMemo(
     () => SORT_OPTIONS.filter((option) => !option.requiresCompanyPoint || companyPoint),
@@ -314,15 +325,33 @@ export function MarketplaceView() {
         </div>
 
         {state === "idle" || state === "loading" ? (
-          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            Загрузка объявлений…
-          </p>
+          <>
+            {filterBar}
+            <div aria-busy="true" className="mp-grid" style={{ marginTop: 18 }}>
+              {Array.from({ length: 8 }, (_, index) => (
+                <ListingCardSkeleton key={index} />
+              ))}
+            </div>
+          </>
         ) : listings.length === 0 ? (
           <>
             {filterBar}
-            <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-              По заданным фильтрам объявлений нет.
-            </p>
+            <div className="mp-empty">
+              <strong>По заданным фильтрам объявлений нет.</strong>
+              <p>Попробуйте смягчить условия — или загляните позже, объявления появляются каждый день.</p>
+              {hasActiveFilters ? (
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => {
+                    setSelectedRegions([]);
+                    setSelectedNomenclature([]);
+                  }}
+                >
+                  Сбросить фильтры
+                </button>
+              ) : null}
+            </div>
           </>
         ) : (
           <>
@@ -334,6 +363,7 @@ export function MarketplaceView() {
                   key={listing.id}
                   listing={listing}
                   coverUrl={listing.coverFileId ? preferredFileAssetImageUrl(assets.get(listing.coverFileId)) : null}
+                  distanceKm={distanceById?.get(listing.id) ?? null}
                   onOpen={setSelectedId}
                 />
               ))}

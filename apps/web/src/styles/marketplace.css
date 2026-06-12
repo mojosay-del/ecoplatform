@@ -108,6 +108,91 @@
   white-space: nowrap;
 }
 
+/* Цветные метки сырья на карточке — те же цвета, что круги на карте
+   (--material-* из tokens.css). */
+.mp-card-materials {
+  display: inline-flex;
+  gap: 4px;
+  margin-right: 7px;
+  vertical-align: baseline;
+}
+
+.mp-material-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.mp-card-expiry {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mp-card-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mp-card-rating svg {
+  color: #f59e0b;
+  fill: #f59e0b;
+}
+
+/* Скелетон карточки: shimmer как у оболочки (keyframes в globals.css). */
+.mp-card-skeleton {
+  pointer-events: none;
+}
+
+.mp-card-skeleton .mp-card-cover,
+.mp-skeleton-line {
+  background: linear-gradient(90deg, var(--surface-muted), var(--surface-elevated), var(--surface-muted));
+  background-size: 220% 100%;
+  animation: app-shell-loading-shimmer 1200ms ease-in-out infinite;
+}
+
+.mp-skeleton-line {
+  display: block;
+  height: 12px;
+  border-radius: 999px;
+}
+
+/* Пустая выдача: текст + действие, а не голая строка. */
+.mp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 56px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.mp-empty strong {
+  color: var(--text-secondary-strong);
+  font-size: 15px;
+}
+
+.mp-empty p {
+  margin: 0;
+  max-width: 420px;
+  font-size: 14px;
+}
+
 /* ── Бейджи статусов ─────────────────────────────────────────────────────── */
 .mp-badge {
   display: inline-flex;
@@ -2311,7 +2396,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mp-modal-backdrop,
-  .mp-modal {
+  .mp-modal,
+  .mp-card-skeleton .mp-card-cover,
+  .mp-skeleton-line {
     animation: none;
   }
 }

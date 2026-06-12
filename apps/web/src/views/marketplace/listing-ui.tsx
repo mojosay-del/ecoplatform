@@ -12,7 +12,11 @@ import type {
   MarketplaceListingPositionSummary,
   MarketplaceNomenclatureOption,
 } from "@ecoplatform/shared";
+import { Star } from "lucide-react";
 import { api } from "../../lib/api";
+import { expiryLabel, formatDistanceKm, isExpiringSoon } from "./listing-card-meta";
+import { materialColor } from "./materials";
+import { formatRatingValue } from "./review-rating";
 
 export const LISTING_STATUS_LABEL: Record<ListingStatus, string> = {
   draft: "Черновик",
@@ -89,14 +93,29 @@ export function useNomenclatureOptions(): MarketplaceNomenclatureOption[] {
 export function ListingCard({
   listing,
   coverUrl,
+  distanceKm,
   onOpen,
 }: {
   listing: MarketplaceListingListItem;
   coverUrl: string | null;
+  // Расстояние от адреса компании до центра круга (если адрес геокодирован).
+  distanceKm?: number | null;
   // Если задан — клик открывает модалку (без навигации), но href остаётся для
   // deep-link/доступности и открытия в новой вкладке.
   onOpen?: (id: string) => void;
 }) {
+  // Уникальные категории сырья — те же цвета, что круги/точки на карте.
+  const materialSlugs = [...new Set(listing.positions.map((position) => position.categorySlug))];
+  const forms = [
+    ...new Set(
+      listing.positions
+        .map((position) => LISTING_FORM_LABEL[position.form])
+        .filter((label): label is string => Boolean(label)),
+    ),
+  ];
+  const expiry = isExpiringSoon(listing.expiresAt) ? expiryLabel(listing.expiresAt) : null;
+  const distanceText = distanceKm != null ? formatDistanceKm(distanceKm) : "";
+
   return (
     <Link
       className="mp-card"
@@ -112,15 +131,49 @@ export function ListingCard({
     >
       <div className="mp-card-cover">
         {coverUrl ? <img alt="" src={coverUrl} /> : <div className="mp-card-cover-empty">Нет фото</div>}
+        {expiry ? <span className="mp-card-expiry">{expiry}</span> : null}
         {listing.photoCount > 1 ? <span className="mp-card-photos">{listing.photoCount} фото</span> : null}
       </div>
       <div className="mp-card-body">
-        <div className="mp-card-positions">{positionsSummaryText(listing.positions)}</div>
+        <div className="mp-card-positions">
+          <span aria-hidden="true" className="mp-card-materials">
+            {materialSlugs.map((slug) => (
+              <i key={slug} className="mp-material-dot" style={{ backgroundColor: materialColor(slug) }} />
+            ))}
+          </span>
+          {positionsSummaryText(listing.positions)}
+        </div>
         <div className="mp-card-meta">
-          <span>{formatLocation(listing.city, listing.region)}</span>
+          <span>
+            {formatLocation(listing.city, listing.region)}
+            {distanceText ? ` · ${distanceText}` : ""}
+          </span>
           <span className="mp-card-weight">{formatWeight(totalWeightKg(listing.positions))}</span>
+        </div>
+        <div className="mp-card-meta">
+          <span>{forms.join(" · ")}</span>
+          {listing.sellerRating != null ? (
+            <span aria-label={`Рейтинг продавца ${formatRatingValue(listing.sellerRating)} из 5`} className="mp-card-rating">
+              <Star aria-hidden="true" size={13} />
+              {formatRatingValue(listing.sellerRating)}
+            </span>
+          ) : null}
         </div>
       </div>
     </Link>
+  );
+}
+
+// Скелетон карточки на время загрузки ленты — резервирует место под cover и
+// две строки текста, чтобы грид не прыгал при появлении данных.
+export function ListingCardSkeleton() {
+  return (
+    <div aria-hidden="true" className="mp-card mp-card-skeleton">
+      <div className="mp-card-cover" />
+      <div className="mp-card-body">
+        <span className="mp-skeleton-line" style={{ width: "78%" }} />
+        <span className="mp-skeleton-line" style={{ width: "52%" }} />
+      </div>
+    </div>
   );
 }
