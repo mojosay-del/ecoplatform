@@ -90,6 +90,72 @@ export function getIndexMovementSummary(
   };
 }
 
+export type IndexMarketPulse = {
+  count: number;
+  risingCount: number;
+  fallingCount: number;
+  flatCount: number;
+  averagePrice: number | null;
+  averageWeeklyChange: number | null;
+  leader: IndexMovementRow | null;
+  lastUpdated: Date | null;
+};
+
+// Агрегат «пульс рынка» по категории — недельный пульс: сколько индексов
+// растёт/падает/стоит (по summary.trend, как и чипы карточек), средняя цена и
+// недельная динамика, лидер недели (макс. по модулю weeklyChange) и дата
+// последнего обновления. Всё из summary → один период, согласованно.
+export function getIndexMarketPulse(items: NomenclatureListItem[]): IndexMarketPulse {
+  let risingCount = 0;
+  let fallingCount = 0;
+  let flatCount = 0;
+  for (const item of items) {
+    const trend = item.summary?.trend;
+    if (trend === "growth") risingCount += 1;
+    else if (trend === "fall") fallingCount += 1;
+    else if (trend === "stagnation") flatCount += 1;
+  }
+
+  const prices = items
+    .map((item) => Number(item.summary?.currentPrice))
+    .filter((price) => Number.isFinite(price) && price > 0);
+  const averagePrice = prices.length ? prices.reduce((sum, price) => sum + price, 0) / prices.length : null;
+
+  const weeklyChanges = items
+    .map((item) => item.summary?.weeklyChange)
+    .filter((change): change is number => typeof change === "number" && Number.isFinite(change));
+  const averageWeeklyChange = weeklyChanges.length
+    ? Number((weeklyChanges.reduce((sum, change) => sum + change, 0) / weeklyChanges.length).toFixed(1))
+    : null;
+
+  let leader: IndexMovementRow | null = null;
+  for (const item of items) {
+    const change = item.summary?.weeklyChange;
+    if (typeof change !== "number" || !Number.isFinite(change)) continue;
+    if (!leader || Math.abs(change) > Math.abs(leader.change)) {
+      leader = { item, change, currentPrice: Number(item.summary?.currentPrice ?? 0) };
+    }
+  }
+
+  const dates = items
+    .map((item) => item.summary?.currentDate)
+    .filter(Boolean)
+    .map((date) => new Date(date as string | Date))
+    .filter((date) => !Number.isNaN(date.getTime()));
+  const lastUpdated = dates.length ? new Date(Math.max(...dates.map((date) => date.getTime()))) : null;
+
+  return {
+    count: items.length,
+    risingCount,
+    fallingCount,
+    flatCount,
+    averagePrice,
+    averageWeeklyChange,
+    leader,
+    lastUpdated,
+  };
+}
+
 export function formatIndexMovementChange(change: number) {
   const formatted = change.toLocaleString("ru-RU", {
     maximumFractionDigits: 1,

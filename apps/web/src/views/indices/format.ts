@@ -1,5 +1,21 @@
 import { MONTH_LABELS } from "./constants";
-import type { IndexPeriod } from "./types";
+import type { IndexPeriod, IndexPoint } from "./types";
+
+// Недавняя серия для спарклайна: предпочитаем короткое окно с линией (≥2 точек),
+// иначе любое непустое. Возвращает [] если истории нет. Общий для «пульса» и
+// списка движения.
+const RECENT_SERIES_ORDER: IndexPeriod[] = ["1M", "2W", "3M", "6M", "1Y", "2Y", "3Y"];
+export function pickRecentSeries(chart: Partial<Record<IndexPeriod, IndexPoint[]>> | undefined): IndexPoint[] {
+  for (const key of RECENT_SERIES_ORDER) {
+    const series = chart?.[key];
+    if (series && series.length >= 2) return series;
+  }
+  for (const key of RECENT_SERIES_ORDER) {
+    const series = chart?.[key];
+    if (series && series.length > 0) return series;
+  }
+  return [];
+}
 
 export function formatIndexPrice(value: number) {
   return value.toLocaleString("ru-RU", {
@@ -17,6 +33,14 @@ export function formatIndexDateLabel(date: Date, period: IndexPeriod) {
 export function formatIndexTooltipDate(date: Date) {
   const month = MONTH_LABELS[date.getMonth()];
   return `${date.getDate()} ${month} ${date.getFullYear()}`;
+}
+
+// «обновлено 12 июня» — дата последнего значения индекса. Без года: для свежести
+// важнее день/месяц, а год загромождает. locale-aware (ru-RU).
+export function formatIndexUpdatedDate(value: string | Date) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
 export function buildSmoothChartPath(rawXs: number[], rawYs: number[]) {

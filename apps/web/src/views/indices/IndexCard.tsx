@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { NomenclatureListItem } from "@ecoplatform/shared";
-import { getIndexAnchorId } from "../index-movement-summary";
-import { formatIndexPrice } from "./format";
+import { formatIndexMovementChange, getIndexAnchorId } from "../index-movement-summary";
+import { formatIndexPrice, formatIndexUpdatedDate } from "./format";
 import { IndexChart } from "./IndexChart";
 import { IndexPeriodTabs } from "./IndexPeriodTabs";
+import { trendFromSummary } from "./trend";
+import { TrendArrow, TrendChip } from "./TrendChip";
 import type { IndexPeriod } from "./types";
 
 export function IndexCard({ item }: { item: NomenclatureListItem }) {
@@ -34,45 +36,54 @@ export function IndexCard({ item }: { item: NomenclatureListItem }) {
   }, [defaultPeriod]);
 
   // Если в выбранном периоде истории меньше, чем нужно (например, спросили
-  // «1 год», а есть только 4 месяца), берём всё, что есть. На бэке
-  // filterPriceIndexPoints уже отдаёт сколько накопилось — здесь только
-  // фолбэк, если фронт получил пустой массив.
-  // Если в выбранном периоде истории меньше, чем нужно (например, спросили
   // «1 год», а есть только 4 месяца), берём ближайший непустой период вниз.
   const fallbackOrder: IndexPeriod[] = [period, "3Y", "2Y", "1Y", "6M", "3M", "1M", "2W"];
   const points: Array<{ date: string | Date; price: number }> =
     fallbackOrder.map((key) => chart[key]).find((arr) => arr && arr.length > 0) ?? [];
 
   const currentPrice = Number(item.summary?.currentPrice ?? points[points.length - 1]?.price ?? 0);
-  const weeklyChange = Number(item.summary?.weeklyChange ?? 0);
+  const weeklyChangeRaw = item.summary?.weeklyChange;
+  const hasWeekly = typeof weeklyChangeRaw === "number" && Number.isFinite(weeklyChangeRaw);
+  // Цвет дельты берём из того же тренда, что и чип: иначе мелкое движение в зоне
+  // «стагнации» давало серый чип «Без изменений» рядом с красной дельтой.
+  const trend = trendFromSummary(item.summary?.trend);
+  const updatedLabel = item.summary?.currentDate ? formatIndexUpdatedDate(item.summary.currentDate) : "";
 
   return (
     <article className="index-card" id={getIndexAnchorId(item.id)}>
       <div className="index-card-head">
         <div className="index-card-body">
           <h2 className="index-card-title">{item.name}</h2>
-          <p className="index-card-subtitle">
-            {item.code}
-            {weeklyChange !== 0 ? (
-              <>
-                {" · "}
-                <span className={weeklyChange >= 0 ? "index-change-positive" : "index-change-negative"}>
-                  {weeklyChange > 0 ? "+" : ""}
-                  {weeklyChange}% за неделю
-                </span>
-              </>
-            ) : null}
-          </p>
+          <div className="index-card-tags">
+            <span className="index-card-code">{item.code}</span>
+            <TrendChip direction={trend} />
+          </div>
         </div>
         <div className="index-current-price">
-          <strong>{formatIndexPrice(currentPrice)}</strong>
-          <span>{item.unit ?? "₽/т"}</span>
+          <strong className="index-num">{formatIndexPrice(currentPrice)}</strong>
+          <span className="index-current-unit">{item.unit ?? "₽/т"}</span>
+          {hasWeekly ? (
+            <span className={`index-delta ${trend} index-num`}>
+              <TrendArrow direction={trend} />
+              {formatIndexMovementChange(weeklyChangeRaw)} за нед.
+            </span>
+          ) : (
+            <span className="index-delta flat">— за нед.</span>
+          )}
         </div>
       </div>
 
       <IndexChart points={points} period={period} />
 
-      <IndexPeriodTabs ariaLabel="Период графика" period={period} onChange={setPeriod} />
+      <div className="index-card-foot">
+        <IndexPeriodTabs
+          ariaLabel="Период графика"
+          className="index-card-periods"
+          period={period}
+          onChange={setPeriod}
+        />
+        {updatedLabel ? <span className="index-card-updated">обновлено {updatedLabel}</span> : null}
+      </div>
     </article>
   );
 }

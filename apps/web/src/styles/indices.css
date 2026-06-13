@@ -56,10 +56,13 @@
 }
 
 .indices-category-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border: 1px solid var(--line);
   background: var(--panel);
-  color: var(--muted);
-  padding: 8px 16px;
+  color: var(--text-secondary);
+  padding: 7px 14px;
   border-radius: var(--radius-chip);
   font-size: 13px;
   font-weight: 600;
@@ -67,12 +70,52 @@
   transition:
     background 120ms ease,
     color 120ms ease,
-    border-color 120ms ease;
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .indices-category-tab:hover {
   color: var(--text);
   border-color: var(--line-strong);
+}
+
+/* Активная вкладка — мягкая заливка цветом материала (макулатура/плёнки/…) с
+   тёмным текстом: идентичность категории + контраст на любом материале (в т.ч.
+   жёлтом). Цвет приходит инлайном через --cat-color (см. materials.ts). */
+.indices-category-tab.active {
+  background: var(--panel);
+  background: color-mix(in srgb, var(--cat-color, var(--primary)) 14%, var(--panel));
+  border-color: var(--cat-color, var(--primary));
+  box-shadow: inset 0 0 0 1px var(--cat-color, var(--primary));
+  color: var(--text);
+  font-weight: 700;
+}
+
+.indices-category-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--cat-color, var(--primary));
+}
+
+.indices-category-name {
+  white-space: nowrap;
+}
+
+.indices-category-counts {
+  display: inline-flex;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.indices-category-counts .up {
+  color: var(--success-text);
+}
+
+.indices-category-counts .down {
+  color: var(--danger-text);
 }
 
 .indices-grid {
@@ -144,30 +187,42 @@
 
 .index-movement-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 860px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
 }
 
 .index-movement-col-kind {
-  width: 23%;
+  width: 17%;
 }
 
 .index-movement-col-name {
-  width: 24%;
+  width: 22%;
+}
+
+.index-movement-col-spark {
+  width: 15%;
 }
 
 .index-movement-col-code {
-  width: 16%;
+  width: 13%;
 }
 
 .index-movement-col-price {
-  width: 20%;
+  width: 18%;
 }
 
 .index-movement-col-change {
-  width: 17%;
+  width: 15%;
+}
+
+.index-movement-spark {
+  line-height: 0;
+}
+
+.index-movement-spark .index-sparkline {
+  display: block;
 }
 
 .index-movement-table th,
@@ -201,22 +256,6 @@
   background: var(--panel-soft);
 }
 
-.index-movement-kind {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 82px;
-  padding: 5px 10px;
-  border-radius: var(--radius-chip);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.index-movement-kind.neutral {
-  background: var(--panel-soft);
-  color: var(--muted);
-}
-
 .index-movement-link {
   display: inline-block;
   color: var(--text);
@@ -245,7 +284,15 @@
   font-size: 15px;
 }
 
-.index-movement-change.neutral {
+.index-movement-change.up {
+  color: var(--success-text);
+}
+
+.index-movement-change.down {
+  color: var(--danger-text);
+}
+
+.index-movement-change.flat {
   color: var(--muted);
 }
 
@@ -275,6 +322,17 @@
   min-height: 360px;
   padding: 24px 28px 18px;
   scroll-margin-top: 120px;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease;
+}
+
+/* Подъём карточки на ховер — как у карточек площадки (.mp-card). */
+.index-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .index-card-head {
@@ -283,6 +341,26 @@
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
+}
+
+.index-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.index-card-code {
+  display: inline-flex;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .index-period-tabs {
@@ -362,22 +440,41 @@
 }
 
 .index-current-price {
-  text-align: right;
   display: grid;
+  justify-items: end;
   flex: 0 0 auto;
-  gap: 2px;
+  gap: 3px;
 }
 
 .index-current-price strong {
   font-size: 26px;
   font-weight: 700;
   letter-spacing: 0;
+  line-height: 1.05;
   color: var(--text);
 }
 
-.index-current-price span {
+.index-current-unit {
   font-size: 12px;
   color: var(--muted);
+}
+
+.index-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.index-card-periods.index-period-tabs {
+  margin: 0;
+}
+
+.index-card-updated {
+  font-size: 11px;
+  color: var(--text-subtle);
+  white-space: nowrap;
 }
 
 .index-card-body {
@@ -395,23 +492,6 @@
   overflow-wrap: anywhere;
 }
 
-.index-card-subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
-.index-change-positive {
-  color: var(--green);
-  font-weight: 600;
-}
-
-.index-change-negative {
-  color: var(--red);
-  font-weight: 600;
-}
-
 .index-chart-wrap {
   min-width: 0;
   width: 100%;
@@ -424,6 +504,8 @@
   height: auto;
   aspect-ratio: 720 / 260;
   display: block;
+  /* Палец читает график; вертикальный скролл страницы остаётся за браузером. */
+  touch-action: pan-y;
 }
 
 .index-chart-empty {
@@ -495,13 +577,14 @@
   height: auto;
   aspect-ratio: 1080 / 360;
   display: block;
+  touch-action: pan-y;
 }
 
 .index-combined-legend {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px 16px;
+  justify-content: flex-start;
+  gap: 8px 18px;
   margin: 0;
   padding: 12px 0 0;
   border-top: 1px solid var(--line);
@@ -513,7 +596,7 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 13px;
   cursor: default;
   transition: color 120ms ease;
@@ -534,6 +617,255 @@
 
 .index-combined-legend-name {
   overflow-wrap: anywhere;
+}
+
+.index-combined-legend-value {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.index-combined-legend-delta {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.index-combined-legend-delta.up {
+  color: var(--success-text);
+}
+
+.index-combined-legend-delta.down {
+  color: var(--danger-text);
+}
+
+.index-combined-legend-delta.flat {
+  color: var(--muted);
+}
+
+/* ── Общие элементы редизайна ─────────────────────────────────────────────── */
+
+/* Моноширинные цифры: цены и проценты не «прыгают» при смене значений. */
+.index-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Дельта «±X%» со стрелкой. Цвет = смысл (зелёный/красный/нейтраль). */
+.index-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.index-delta.up {
+  color: var(--success-text);
+}
+
+.index-delta.down {
+  color: var(--danger-text);
+}
+
+.index-delta.flat {
+  color: var(--muted);
+}
+
+.index-trend-arrow {
+  flex: 0 0 auto;
+}
+
+/* Чип тренда «Рост / Снижение / Без изменений». Тот же язык цвета везде. */
+.index-trend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-chip);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.index-trend-chip.up {
+  background: var(--green-soft);
+  color: var(--success-text);
+}
+
+.index-trend-chip.down {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+.index-trend-chip.flat {
+  background: var(--panel-soft);
+  color: var(--muted);
+}
+
+/* Шапка раздела: заголовок слева, плашка «обновлено …» справа. */
+.indices-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.indices-updated-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-top: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.indices-updated-icon {
+  flex: 0 0 auto;
+}
+
+/* «Пульс рынка» — три метрик-карты сверху: средняя цена, настроение, лидер. */
+.index-pulse {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin: 0 0 22px;
+}
+
+.index-pulse-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.index-pulse-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.index-pulse-price {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.index-pulse-unit {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.index-pulse-sentiment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.index-pulse-sentiment span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.index-pulse-sentiment strong {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.index-pulse-sentiment .up strong {
+  color: var(--success-text);
+}
+
+.index-pulse-sentiment .down strong {
+  color: var(--danger-text);
+}
+
+.index-pulse-sentiment .flat strong {
+  color: var(--text-secondary);
+}
+
+.index-pulse-bar {
+  display: flex;
+  height: 7px;
+  margin-top: auto;
+  border-radius: var(--radius-chip);
+  overflow: hidden;
+  background: var(--surface-muted-strong);
+}
+
+.index-pulse-bar .up {
+  background: var(--green);
+}
+
+.index-pulse-bar .down {
+  background: var(--red);
+}
+
+.index-pulse-bar .flat {
+  background: var(--neutral-soft);
+}
+
+.index-pulse-leader-name {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.index-pulse-leader-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.index-pulse-muted {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.index-pulse-skeleton {
+  min-height: 104px;
+  background: linear-gradient(90deg, var(--surface-muted), var(--surface-elevated), var(--surface-muted));
+  background-size: 220% 100%;
+  animation: app-shell-loading-shimmer 1200ms ease-in-out infinite;
+}
+
+.index-sparkline,
+.index-sparkline-empty {
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .index-card,
+  .index-card:hover {
+    transform: none;
+    transition: none;
+  }
 }
 
 @media (max-width: 720px) {
@@ -576,9 +908,15 @@
     padding: 0;
     border-top: 0;
   }
-  .index-movement-table td:nth-child(3)::before,
+  /* На карточном мобильном виде спарклайн (3-я колонка) скрываем — числа рядом
+     несут те же данные. */
+  .index-movement-table th:nth-child(3),
+  .index-movement-table td:nth-child(3) {
+    display: none;
+  }
   .index-movement-table td:nth-child(4)::before,
-  .index-movement-table td:nth-child(5)::before {
+  .index-movement-table td:nth-child(5)::before,
+  .index-movement-table td:nth-child(6)::before {
     content: attr(data-label);
     display: block;
     margin-bottom: 2px;

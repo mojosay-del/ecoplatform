@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { NomenclatureListItem } from "@ecoplatform/shared";
-import { formatIndexMovementChange, getIndexAnchorId, getIndexMovementSummary } from "./index-movement-summary";
+import {
+  formatIndexMovementChange,
+  getIndexAnchorId,
+  getIndexMarketPulse,
+  getIndexMovementSummary,
+} from "./index-movement-summary";
 
 function indexItem(id: string, change: number | null, chartKey: "2W" | "3Y" = "2W"): NomenclatureListItem {
   const basePrice = 100;
@@ -73,5 +78,34 @@ describe("index movement summary", () => {
     expect(getIndexAnchorId("abc123")).toBe("index-abc123");
     expect(formatIndexMovementChange(4.25)).toBe("+4,3%");
     expect(formatIndexMovementChange(-2)).toBe("-2%");
+  });
+});
+
+describe("index market pulse", () => {
+  it("aggregates counts, averages, leader and last updated", () => {
+    const pulse = getIndexMarketPulse([
+      indexItem("a", 2), // 102
+      indexItem("b", 8), // 108 — крупнейшее по модулю движение
+      indexItem("c", -4), // 96
+      indexItem("d", 0), // 100 — без изменений
+    ]);
+
+    expect(pulse.count).toBe(4);
+    expect(pulse.risingCount).toBe(2);
+    expect(pulse.fallingCount).toBe(1);
+    expect(pulse.flatCount).toBe(1);
+    expect(pulse.leader?.item.id).toBe("b");
+    expect(pulse.averagePrice).toBe(101.5); // (102+108+96+100)/4
+    expect(pulse.averageWeeklyChange).toBe(1.5); // (2+8-4+0)/4
+    expect(pulse.lastUpdated?.toISOString()).toBe("2026-05-27T00:00:00.000Z");
+  });
+
+  it("returns empty pulse when nothing has data", () => {
+    const pulse = getIndexMarketPulse([indexItem("none", null)]);
+
+    expect(pulse.risingCount).toBe(0);
+    expect(pulse.fallingCount).toBe(0);
+    expect(pulse.leader).toBeNull();
+    expect(pulse.averageWeeklyChange).toBeNull();
   });
 });

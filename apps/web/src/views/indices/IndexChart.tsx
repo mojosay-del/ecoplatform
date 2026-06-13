@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 import {
   buildSmoothChartPath,
   formatIndexDateLabel,
@@ -8,6 +15,7 @@ import {
   formatIndexTooltipDate,
   smoothPricesForScale,
 } from "./format";
+import { netDirection, TREND_COLOR } from "./trend";
 import type { IndexPeriod, IndexPoint } from "./types";
 
 export function IndexChart({ points, period }: { points: IndexPoint[]; period: IndexPeriod }) {
@@ -18,8 +26,6 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
   // экранируем — они недопустимы в SVG id/url(#…).
   const rawId = useId();
   const uid = rawId.replace(/:/g, "");
-  const lineGradId = `index-line-${uid}`;
-  const areaGradId = `index-area-${uid}`;
   const fadeMaskId = `index-fade-${uid}`;
   const fadeGradId = `index-fadegrad-${uid}`;
 
@@ -79,11 +85,10 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
   const lastIndex = points.length - 1;
   const areaPath = `${linePath} L${xs[lastIndex]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} L${xs[0]!.toFixed(1)},${(padding.top + innerHeight).toFixed(1)} Z`;
 
-  // Направление градиента: при росте — «прошлое = оранжевый, настоящее = синий»,
-  // при падении наоборот. Так визуально подсказываем направление за период.
-  const isGrowth = (prices[lastIndex] ?? 0) >= (prices[0] ?? 0);
-  const startColor = isGrowth ? "#f5773e" : "#4d73d8";
-  const endColor = isGrowth ? "#4d73d8" : "#f5773e";
+  // Единая семантика цвета: линия/заливка/точка зелёные при росте за показанный
+  // период, красные при снижении, нейтральные при отсутствии движения. График
+  // говорит тем же языком, что таблица движения и чипы (см. trend.ts).
+  const color = TREND_COLOR[netDirection(points)];
 
   // Подписи на оси X: короткие периоды чаще, длинные — реже, чтобы даты не наезжали.
   const labelDivisor = period === "2W" || period === "1M" || period === "3M" ? 4 : 6;
@@ -116,17 +121,14 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
   const activeDate = new Date(points[activeIndex]!.date);
   const activeDateLabel = formatIndexTooltipDate(activeDate);
 
-  function handleMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
-    const svg = event.currentTarget;
-    const rect = svg.getBoundingClientRect();
+  // Перевод X курсора/пальца в систему viewBox + поиск ближайшей точки.
+  function updateHoverFromClientX(clientX: number, rect: DOMRect) {
     if (rect.width === 0) return;
-    // Перевод координаты курсора в систему viewBox.
-    const svgX = ((event.clientX - rect.left) / rect.width) * width;
+    const svgX = ((clientX - rect.left) / rect.width) * width;
     if (points.length === 1) {
       setHoverIndex((current) => (current === 0 ? current : 0));
       return;
     }
-    // Ищем ближайшую точку по X.
     let nearest = 0;
     let bestDistance = Math.abs(svgX - xs[0]!);
     for (let i = 1; i < xs.length; i += 1) {
@@ -137,6 +139,18 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
       }
     }
     setHoverIndex((current) => (current === nearest ? current : nearest));
+  }
+
+  function handleMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
+    updateHoverFromClientX(event.clientX, event.currentTarget.getBoundingClientRect());
+  }
+
+  // Тач: палец читает график так же, как курсор. touch-action: pan-y (в CSS)
+  // оставляет вертикальный скролл странице.
+  function handleTouch(event: ReactTouchEvent<SVGSVGElement>) {
+    const touch = event.touches[0];
+    if (!touch) return;
+    updateHoverFromClientX(touch.clientX, event.currentTarget.getBoundingClientRect());
   }
 
   // Ширина плашки масштабируем под содержимое: «20 мая · 31 635».
@@ -157,23 +171,15 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
         height={height}
         onMouseLeave={() => setHoverIndex(null)}
         onMouseMove={handleMouseMove}
+        onTouchMove={handleTouch}
+        onTouchStart={handleTouch}
         preserveAspectRatio="xMidYMid meet"
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
       >
         <defs>
-          {/* Горизонтальный градиент для самой линии. */}
-          <linearGradient id={lineGradId} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={startColor} />
-            <stop offset="100%" stopColor={endColor} />
-          </linearGradient>
-          {/* Тот же горизонтальный градиент для заливки области. */}
-          <linearGradient id={areaGradId} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={startColor} />
-            <stop offset="100%" stopColor={endColor} />
-          </linearGradient>
           {/* Вертикальная маска: непрозрачная сверху, прозрачная внизу —
-              чтобы заливка плавно угасала к оси X, как было раньше. */}
+              заливка плавно угасает к оси X. */}
           <linearGradient id={fadeGradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="white" stopOpacity="0.35" />
             <stop offset="100%" stopColor="white" stopOpacity="0" />
@@ -183,7 +189,7 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
           </mask>
         </defs>
         <rect x="0" y="0" width={width} height={height} fill="transparent" />
-        <path d={areaPath} fill={`url(#${areaGradId})`} mask={`url(#${fadeMaskId})`} />
+        <path d={areaPath} fill={color} mask={`url(#${fadeMaskId})`} />
         {isHoveringChart ? (
           <line
             x1={activeX}
@@ -198,12 +204,12 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
         <path
           d={linePath}
           fill="none"
-          stroke={`url(#${lineGradId})`}
+          stroke={color}
           strokeWidth="3.2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        <circle cx={lastX} cy={lastY} r="6.5" fill={endColor} stroke="white" strokeWidth="2.4" />
+        <circle cx={lastX} cy={lastY} r="6.5" fill={color} stroke="white" strokeWidth="2.4" />
         {isHoveringChart && activeIndex !== lastIndex ? (
           <circle cx={activeX} cy={activeY} r="6.5" fill="#1a202e" stroke="white" strokeWidth="2.4" />
         ) : null}

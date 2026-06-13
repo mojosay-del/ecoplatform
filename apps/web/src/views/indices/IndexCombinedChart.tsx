@@ -8,8 +8,17 @@
 // показываем название номенклатуры + дату + цену; наведение на легенду
 // подсвечивает соответствующую кривую.
 
-import { useEffect, useId, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 import type { NomenclatureListItem } from "@ecoplatform/shared";
+import { formatIndexMovementChange } from "../index-movement-summary";
 import {
   buildSmoothChartPath,
   formatIndexDateLabel,
@@ -19,27 +28,24 @@ import {
   smoothPricesForScale,
 } from "./format";
 import { IndexPeriodTabs } from "./IndexPeriodTabs";
+import { directionFromChange } from "./trend";
 import type { IndexPeriod } from "./types";
 
-// Различимая палитра; циклится по индексу номенклатуры. Синий и оранжевый
-// зарезервированы под направление хвоста линии: рост / снижение.
+// Категориальная палитра: различает кривые номенклатур (это идентичность серий,
+// а не смысл). Намеренно без чистого зелёного/красного — они зарезервированы под
+// семантику роста/снижения (см. trend.ts) и используются в дельтах легенды.
 const SERIES_COLORS = [
   "#7c3aed",
-  "#16a34a",
+  "#2563eb",
+  "#0891b2",
   "#db2777",
-  "#52525b",
+  "#c026d3",
+  "#475569",
+  "#a16207",
   "#0f766e",
-  "#a21caf",
-  "#4d7c0f",
-  "#64748b",
-  "#be185d",
-  "#15803d",
+  "#9333ea",
+  "#1d4ed8",
 ];
-const TREND_GROWTH_COLOR = "#4d73d8";
-const TREND_FALL_COLOR = "#f5773e";
-const TREND_START_RATIO = 0.9;
-const TREND_SOLID_START_OFFSET = "92%";
-const TREND_BASE_END_OFFSET = "90%";
 
 type SeriesPoint = { t: number; price: number };
 type ProjectedPoint = { x: number; y: number; t: number; price: number };
@@ -153,9 +159,6 @@ export function IndexCombinedChart({
       tMax === tMin ? padding.left + innerWidth / 2 : padding.left + ((t - tMin) / tRange) * innerWidth;
     const scaleY = (price: number) => padding.top + innerHeight - ((price - domainMin) / domainRange) * innerHeight;
 
-    const trendStartT = tMin + tRange * TREND_START_RATIO;
-    const trendStartX = scaleX(trendStartT);
-
     const projected = series.map((entry) => {
       const xs = entry.points.map((point) => scaleX(point.t));
       const rawY = entry.points.map((point) => point.price);
@@ -167,12 +170,7 @@ export function IndexCombinedChart({
         t: point.t,
         price: point.price,
       }));
-      const lastPoint = coords[coords.length - 1];
-      const firstTailPoint =
-        coords.find((point) => point.t >= trendStartT) ?? (coords.length > 1 ? coords[coords.length - 2] : coords[0]);
-      const trendColor =
-        lastPoint && firstTailPoint && lastPoint.price >= firstTailPoint.price ? TREND_GROWTH_COLOR : TREND_FALL_COLOR;
-      return { ...entry, coords, path: buildSmoothChartPath(xs, ys), trendColor };
+      return { ...entry, coords, path: buildSmoothChartPath(xs, ys) };
     });
 
     // Горизонтальная сетка + подписи цены слева — без них кривые «висели в
@@ -192,15 +190,13 @@ export function IndexCombinedChart({
       if (!previous || x - previous.x >= 120) labels.push({ x, text });
     }
 
-    return { projected, labels, yTicks, tMin, tMax, trendStartX };
+    return { projected, labels, yTicks, tMin, tMax };
   }, [series, period, innerWidth, innerHeight, padding.left, padding.top]);
 
-  function handleMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
-    if (!geometry) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (rect.width === 0) return;
-    const svgX = ((event.clientX - rect.left) / rect.width) * width;
-    const svgY = ((event.clientY - rect.top) / rect.height) * height;
+  function updateHover(clientX: number, clientY: number, rect: DOMRect) {
+    if (!geometry || rect.width === 0) return;
+    const svgX = ((clientX - rect.left) / rect.width) * width;
+    const svgY = ((clientY - rect.top) / rect.height) * height;
 
     let best: { seriesIndex: number; pointIndex: number; dist: number } | null = null;
     geometry.projected.forEach((entry, seriesIndex) => {
@@ -221,18 +217,25 @@ export function IndexCombinedChart({
     );
   }
 
+  function handleMouseMove(event: ReactMouseEvent<SVGSVGElement>) {
+    updateHover(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect());
+  }
+
+  // Тач: палец читает кривые так же, как курсор. touch-action: pan-y (в CSS)
+  // оставляет вертикальный скролл странице.
+  function handleTouch(event: ReactTouchEvent<SVGSVGElement>) {
+    const touch = event.touches[0];
+    if (!touch) return;
+    updateHover(touch.clientX, touch.clientY, event.currentTarget.getBoundingClientRect());
+  }
+
   // Подсвеченная кривая: либо под курсором на графике, либо под курсором в легенде.
   const activeSeriesIndex = hover?.seriesIndex ?? legendSeries;
 
   const active =
     geometry && hover
       ? {
-          color:
-            geometry.projected[hover.seriesIndex] && geometry.projected[hover.seriesIndex]?.coords[hover.pointIndex]
-              ? geometry.projected[hover.seriesIndex]!.coords[hover.pointIndex]!.x >= geometry.trendStartX
-                ? geometry.projected[hover.seriesIndex]!.trendColor
-                : geometry.projected[hover.seriesIndex]!.color
-              : undefined,
+          color: geometry.projected[hover.seriesIndex]?.color,
           name: geometry.projected[hover.seriesIndex]?.name,
           unit: geometry.projected[hover.seriesIndex]?.unit,
           point: geometry.projected[hover.seriesIndex]?.coords[hover.pointIndex],
@@ -278,25 +281,9 @@ export function IndexCombinedChart({
               ref={svgRef}
               onMouseMove={handleMouseMove}
               onMouseLeave={() => setHover(null)}
+              onTouchMove={handleTouch}
+              onTouchStart={handleTouch}
             >
-              <defs>
-                {geometry.projected.map((entry) => (
-                  <linearGradient
-                    id={`index-combined-line-${uid}-${entry.id}`}
-                    key={entry.id}
-                    x1={padding.left}
-                    x2={width - padding.right}
-                    y1="0"
-                    y2="0"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop offset="0%" stopColor={entry.color} />
-                    <stop offset={TREND_BASE_END_OFFSET} stopColor={entry.color} />
-                    <stop offset={TREND_SOLID_START_OFFSET} stopColor={entry.trendColor} />
-                    <stop offset="100%" stopColor={entry.trendColor} />
-                  </linearGradient>
-                ))}
-              </defs>
               <rect x="0" y="0" width={width} height={height} fill="transparent" />
 
               {/* Горизонтальная сетка + подписи цены. */}
@@ -346,7 +333,7 @@ export function IndexCombinedChart({
                     <path
                       d={entry.path}
                       fill="none"
-                      stroke={`url(#index-combined-line-${uid}-${entry.id})`}
+                      stroke={entry.color}
                       strokeWidth={highlighted ? 3.4 : 2.4}
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -358,7 +345,7 @@ export function IndexCombinedChart({
                         cx={last.x}
                         cy={last.y}
                         r={highlighted ? 4.6 : 3.4}
-                        fill={entry.trendColor}
+                        fill={entry.color}
                         stroke="var(--panel)"
                         strokeWidth="1.6"
                       />
@@ -402,17 +389,36 @@ export function IndexCombinedChart({
           </div>
 
           <ul className="index-combined-legend">
-            {geometry.projected.map((entry, seriesIndex) => (
-              <li
-                className={`index-combined-legend-item${activeSeriesIndex === seriesIndex ? " is-active" : ""}`}
-                key={entry.id}
-                onMouseEnter={() => setLegendSeries(seriesIndex)}
-                onMouseLeave={() => setLegendSeries((current) => (current === seriesIndex ? null : current))}
-              >
-                <span className="index-combined-legend-dot" style={{ background: entry.color }} aria-hidden="true" />
-                <span className="index-combined-legend-name">{entry.name}</span>
-              </li>
-            ))}
+            {geometry.projected.map((entry, seriesIndex) => {
+              // Дельта легенды = net-изменение за показанный период (первая→последняя
+              // точка). Цвет зелёный/красный — единая семантика; цена справа tabular.
+              const first = entry.coords[0];
+              const last = entry.coords[entry.coords.length - 1];
+              const pct =
+                first && last && first.price !== 0
+                  ? Number((((last.price - first.price) / first.price) * 100).toFixed(1))
+                  : 0;
+              const dir = directionFromChange(pct);
+              return (
+                <li
+                  className={`index-combined-legend-item${activeSeriesIndex === seriesIndex ? " is-active" : ""}`}
+                  key={entry.id}
+                  onMouseEnter={() => setLegendSeries(seriesIndex)}
+                  onMouseLeave={() => setLegendSeries((current) => (current === seriesIndex ? null : current))}
+                >
+                  <span className="index-combined-legend-dot" style={{ background: entry.color }} aria-hidden="true" />
+                  <span className="index-combined-legend-name">{entry.name}</span>
+                  {last ? (
+                    <span className="index-combined-legend-value index-num">
+                      {formatIndexPrice(last.price)} {entry.unit}
+                    </span>
+                  ) : null}
+                  <span className={`index-combined-legend-delta ${dir} index-num`}>
+                    {formatIndexMovementChange(pct)}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}

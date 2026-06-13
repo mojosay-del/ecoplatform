@@ -1289,30 +1289,6 @@ input[type="checkbox"]:focus-visible {
   }
 }
 
-.indices-category-tab.active {
-  background: var(--text);
-  color: var(--white);
-  border-color: var(--text);
-}
-
-.index-movement-kind.positive {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.index-movement-kind.negative {
-  background: var(--danger-soft);
-  color: var(--danger-text-strong);
-}
-
-.index-movement-change.positive {
-  color: var(--green);
-}
-
-.index-movement-change.negative {
-  color: var(--red);
-}
-
 .index-period-tab.active {
   background: var(--text);
   color: var(--white);

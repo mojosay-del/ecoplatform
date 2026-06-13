@@ -9,9 +9,18 @@ import {
   type IndexMovementRow,
 } from "../index-movement-summary";
 import { INDEX_PERIOD_LABELS } from "./constants";
-import { formatIndexPrice } from "./format";
+import { formatIndexPrice, pickRecentSeries } from "./format";
 import { IndexPeriodTabs } from "./IndexPeriodTabs";
+import { IndexSparkline } from "./IndexSparkline";
+import type { TrendDirection } from "./trend";
+import { TrendChip } from "./TrendChip";
 import type { IndexPeriod } from "./types";
+
+const KIND_DIRECTION: Record<"rising" | "falling" | "flat", TrendDirection> = {
+  rising: "up",
+  falling: "down",
+  flat: "flat",
+};
 
 export function IndexMovementSummaryTable({ items }: { items: NomenclatureListItem[] }) {
   const [period, setPeriod] = useState<IndexPeriod>("2W");
@@ -46,6 +55,7 @@ export function IndexMovementSummaryTable({ items }: { items: NomenclatureListIt
             <colgroup>
               <col className="index-movement-col-kind" />
               <col className="index-movement-col-name" />
+              <col className="index-movement-col-spark" />
               <col className="index-movement-col-code" />
               <col className="index-movement-col-price" />
               <col className="index-movement-col-change" />
@@ -54,6 +64,7 @@ export function IndexMovementSummaryTable({ items }: { items: NomenclatureListIt
               <tr>
                 <th scope="col">Динамика</th>
                 <th scope="col">Индекс</th>
+                <th scope="col">График</th>
                 <th scope="col">Код</th>
                 <th scope="col">Цена</th>
                 <th scope="col">Изменение</th>
@@ -61,30 +72,34 @@ export function IndexMovementSummaryTable({ items }: { items: NomenclatureListIt
             </thead>
             <tbody>
               {rows.map((row) => {
-                const isRising = row.kind === "rising";
-                const isFalling = row.kind === "falling";
-                const kindClass = isRising ? "positive" : isFalling ? "negative" : "neutral";
+                const dir = KIND_DIRECTION[row.kind];
 
                 return (
                   <tr key={`${row.kind}-${row.item.id}`}>
                     <td>
-                      <span className={`index-movement-kind ${kindClass}`}>
-                        {isRising ? "Рост" : isFalling ? "Снижение" : "Без изм."}
-                      </span>
+                      <TrendChip direction={dir} />
                     </td>
                     <td>
                       <a className="index-movement-link" href={`#${getIndexAnchorId(row.item.id)}`}>
                         {row.item.name}
                       </a>
                     </td>
+                    <td className="index-movement-spark">
+                      <IndexSparkline
+                        points={pickRecentSeries(row.item.chart)}
+                        direction={dir}
+                        width={88}
+                        height={28}
+                      />
+                    </td>
                     <td data-label="Код">
                       <span className="index-movement-code">{row.item.code}</span>
                     </td>
-                    <td data-label="Цена">
+                    <td data-label="Цена" className="index-num">
                       {formatIndexPrice(row.currentPrice)} {row.item.unit ?? "₽/т"}
                     </td>
                     <td data-label="Изменение">
-                      <strong className={`index-movement-change ${kindClass}`}>
+                      <strong className={`index-movement-change ${dir} index-num`}>
                         {formatIndexMovementChange(row.change)}
                       </strong>
                     </td>
