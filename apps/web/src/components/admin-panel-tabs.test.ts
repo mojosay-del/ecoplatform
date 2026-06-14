@@ -11,6 +11,7 @@ describe("admin panel home groups", () => {
       "Индексы цен",
       "Обучение",
       "База знаний",
+      "Документация",
       "Пользователи",
       "Компании",
       "Сотрудники",
@@ -25,7 +26,7 @@ describe("admin panel home groups", () => {
   it("keeps content managers on CMS home links without local tabs", () => {
     expect(
       visibleAdminHomeGroups(["content_manager"]).flatMap((group) => group.items.map((item) => item.label)),
-    ).toEqual(["Новости", "Индексы цен", "Обучение", "База знаний"]);
+    ).toEqual(["Новости", "Индексы цен", "Обучение", "База знаний", "Документация"]);
   });
 
   it("limits moderator home navigation to moderation work", () => {

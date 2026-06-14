@@ -275,6 +275,67 @@ export type KnowledgeArticleDetail = KnowledgeNode & {
   breadcrumbs: KnowledgeBreadcrumb[];
 };
 
+// ── Документация (база документов) ─────────────────────────────────────────
+// Близнец «Базы знаний» по структуре (дерево разделов + блоки описания), но сам
+// документ — первоклассная сущность: прикреплённый файл, формат, версия,
+// «действует с», закрепление («часто нужные») и отметка обновления («свежесть»).
+export type DocumentationFileMeta = {
+  id: string;
+  fileName: string;
+  // Нормализованный формат — расширение в нижнем регистре: "pdf" | "docx" | "xlsx" | …
+  format: string;
+  sizeBytes: number;
+};
+
+export type DocumentationNode = {
+  id: string;
+  slug: string;
+  title: string;
+  // Короткий дескриптор документа (строка под заголовком на карточке).
+  subtitle: string | null;
+  iconType: string | null;
+  parentId: string | null;
+  position: number;
+  status: string;
+  isPinned: boolean;
+  version: string | null;
+  effectiveDate: IsoDateString | null;
+  firstPublishedAt: IsoDateString | null;
+  revisedAt: IsoDateString | null;
+  // У разделов (iconType="category") файла нет.
+  file: DocumentationFileMeta | null;
+  // tree-выдача отдаёт детей вложенным массивом; detail — без children.
+  children?: DocumentationNode[];
+  blocks?: Array<{
+    id: string;
+    position: number;
+    type: string;
+    payload: Record<string, unknown>;
+  }>;
+};
+
+export type DocumentationBreadcrumb = {
+  id: string;
+  slug: string;
+  title: string;
+};
+
+export type DocumentationDetail = DocumentationNode & {
+  blocks: Array<{
+    id: string;
+    position: number;
+    type: string;
+    payload: Record<string, unknown>;
+  }>;
+  breadcrumbs: DocumentationBreadcrumb[];
+};
+
+// Ответ эндпоинта скачивания: свежая короткоживущая presigned-ссылка на
+// приватный файл (или null, если файла нет / S3 не настроен).
+export type DocumentationDownload = {
+  url: string | null;
+};
+
 // ── Account / billing / notifications ─────────────────────────────────────
 export type BillingSubscription = {
   id: string;

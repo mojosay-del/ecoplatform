@@ -49,6 +49,16 @@
   --material-plastiki: #d9a300;
   --material-default: #1f8a4c;
 
+  /* Цвета форматов документов — зеркало FORMAT_COLORS из
+     views/documentation/documentFormats.ts (синхронность проверяет
+     documentFormats.test.ts). Бейджи формата, чипы фильтра и иконки файлов. */
+  --format-pdf: #d2322c;
+  --format-doc: #2563aa;
+  --format-sheet: #1f8a4c;
+  --format-slide: #c4521f;
+  --format-archive: #6f5fa6;
+  --format-default: #6b7280;
+
   --surface: #fdf9f4;
   --surface-muted: #f5f6f8;
   --surface-muted-alt: #f4f5f7;

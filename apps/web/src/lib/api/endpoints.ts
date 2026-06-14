@@ -16,6 +16,9 @@ import type {
   ConsentSource,
   AdminDashboardSummary,
   AdminStaffSummary,
+  DocumentationDetail,
+  DocumentationDownload,
+  DocumentationNode,
   KnowledgeArticleDetail,
   KnowledgeNode,
   LearningModuleDetail,
@@ -211,6 +214,18 @@ export const api = {
   knowledgeBase: {
     tree: () => apiFetch<KnowledgeNode[]>("/knowledge-base"),
     getArticle: (slug: string) => apiFetch<KnowledgeArticleDetail>(`/knowledge-base/${enc(slug)}`),
+  },
+
+  // ── Документация (база документов) ───────────────────────────────────────
+  documentation: {
+    tree: () => apiFetch<DocumentationNode[]>("/documentation"),
+    pinned: () => apiFetch<DocumentationNode[]>("/documentation/pinned"),
+    recent: (limit?: number) =>
+      apiFetch<DocumentationNode[]>(`/documentation/recent${limit !== undefined ? `?limit=${limit}` : ""}`),
+    search: (q: string) => apiFetch<DocumentationNode[]>(`/documentation/search?q=${enc(q)}`),
+    getDocument: (slug: string) => apiFetch<DocumentationDetail>(`/documentation/${enc(slug)}`),
+    // Свежая presigned-ссылка для скачивания прикреплённого файла.
+    download: (id: string) => apiFetch<DocumentationDownload>(`/documentation/${enc(id)}/download`),
   },
 
   // ── Калькуляторы (розничный калькулятор рейса) ───────────────────────────

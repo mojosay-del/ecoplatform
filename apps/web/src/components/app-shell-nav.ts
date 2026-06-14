@@ -92,7 +92,7 @@ export const appNavSections: NavSection[] = [
     title: "Базы знаний",
     items: [
       { key: "knowledge-base", href: "/knowledge-base", label: "Сырьё", icon: BookOpen },
-      futureItem("docs", "Документация", FileText, "Документация — шаблоны, регламенты и отраслевые справки."),
+      { key: "docs", href: "/documentation", label: "Документация", icon: FileText },
     ],
   },
   {
@@ -268,6 +268,10 @@ const adminBreadcrumbs: { prefix: string; trail: BreadcrumbItem[] }[] = [
   {
     prefix: "/admin/content/knowledge-base",
     trail: [adminPanelRoot, adminContentRoot, { href: "/admin/content/knowledge-base", label: "База знаний" }],
+  },
+  {
+    prefix: "/admin/content/documentation",
+    trail: [adminPanelRoot, adminContentRoot, { href: "/admin/content/documentation", label: "Документация" }],
   },
   {
     prefix: "/admin/content/education",

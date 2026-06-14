@@ -3,6 +3,7 @@ import {
   BookOpen,
   Building2,
   CreditCard,
+  FileText,
   Gauge,
   GraduationCap,
   Headphones,
@@ -68,6 +69,13 @@ const knowledgeBaseTab: AdminPanelTab = {
   roles: ["admin", "content_manager"],
 };
 
+const documentationTab: AdminPanelTab = {
+  href: "/admin/content/documentation",
+  label: "Документация",
+  pathname: "/admin/content/documentation",
+  roles: ["admin", "content_manager"],
+};
+
 const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
   {
     title: "CMS",
@@ -96,6 +104,11 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         ...knowledgeBaseTab,
         description: "Статьи и разделы отраслевой базы знаний.",
         icon: BookOpen,
+      },
+      {
+        ...documentationTab,
+        description: "Шаблоны, регламенты и отраслевые справки с файлами.",
+        icon: FileText,
       },
     ],
   },

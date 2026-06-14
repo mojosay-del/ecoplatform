@@ -634,6 +634,8 @@ model FileAsset {
   uploadedById    String?
   createdAt       DateTime        @default(now())
   references      FileReference[]
+  // Документы, у которых этот файл — основной скачиваемый (см. DocumentationArticle.file).
+  documentationArticles DocumentationArticle[] @relation("DocumentationFile")
   // Пользователи, у которых этот файл выбран аватаром (см. User.avatarFile).
   avatarUsers     User[]          @relation("UserAvatar")
 }
@@ -983,6 +985,55 @@ model KnowledgeBaseBlock {
   id        String               @id @default(cuid())
   articleId String
   article   KnowledgeBaseArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  position  Int
+  type      String
+  payload   Json
+
+  @@unique([articleId, position])
+}
+
+// База документации: дерево разделов (category) → документы. По структуре —
+// близнец KnowledgeBaseArticle (дерево + блоки описания), но сам документ —
+// первоклассная сущность: прикреплённый файл, формат, версия, «действует с»,
+// закрепление и отметка обновления.
+model DocumentationArticle {
+  id               String                 @id @default(cuid())
+  parentId         String?
+  parent           DocumentationArticle?  @relation("DocumentationTree", fields: [parentId], references: [id])
+  children         DocumentationArticle[] @relation("DocumentationTree")
+  title            String
+  subtitle         String?
+  slug             String                 @unique
+  position         Int
+  iconType         String?
+  status           ContentStatus          @default(draft)
+  firstPublishedAt DateTime?
+  createdById      String
+  blocks           DocumentationBlock[]
+  // Документ-первые поля. У разделов (iconType="category") остаются пустыми.
+  fileAssetId      String?
+  file             FileAsset?             @relation("DocumentationFile", fields: [fileAssetId], references: [id])
+  version          String?
+  effectiveDate    DateTime?
+  isPinned         Boolean                @default(false)
+  // Отметка существенного обновления (драйвер бейджа «Обновлено» и ленты
+  // «Недавно обновлено»). Ставится при смене файла или явной отметке в CMS.
+  revisedAt        DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([parentId, position])
+  @@index([parentId, status, position])
+  @@index([status, position])
+  // «Часто нужные» (status+isPinned) и «Недавно обновлено» (status+revisedAt).
+  @@index([status, isPinned])
+  @@index([status, revisedAt])
+}
+
+model DocumentationBlock {
+  id        String               @id @default(cuid())
+  articleId String
+  article   DocumentationArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
   position  Int
   type      String
   payload   Json

@@ -1,0 +1,1 @@
+export { AdminDocumentationView } from "./AdminDocumentationView";

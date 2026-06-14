@@ -143,6 +143,37 @@ export const knowledgeMoveInputSchema = z.object({
   position: z.number().int().nonnegative(),
 });
 
+export const documentationTreeQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  depth: z.coerce.number().int().min(1).max(3).optional(),
+});
+
+export const documentationRecentQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
+
+export const documentationArticleInputSchema = z.object({
+  parentId: z.string().nullable().optional(),
+  title: z.string().min(1),
+  subtitle: z.string().nullable().optional(),
+  slug: z.string().optional(),
+  position: z.number().int().nonnegative(),
+  iconType: z.string().optional(),
+  blocks: z.array(baseContentBlockSchema).default([]),
+  // Документ-первые поля (для листьев; у разделов остаются пустыми).
+  fileAssetId: z.string().nullable().optional(),
+  version: z.string().trim().max(60).nullable().optional(),
+  effectiveDate: z.string().datetime().nullable().optional(),
+  isPinned: z.boolean().optional(),
+  // Явная отметка «это обновление документа» → ставит revisedAt=now() при сохранении.
+  markRevised: z.boolean().optional(),
+});
+
+export const documentationMoveInputSchema = z.object({
+  parentId: z.string().nullable(),
+  position: z.number().int().nonnegative(),
+});
+
 export const learningModuleUpdateInputSchema = z.object({
   title: z.string().min(1).optional(),
   summary: z.string().min(1).optional(),
