@@ -43,6 +43,8 @@ import type {
   NomenclatureCategoryListItem,
   PaginatedResponse,
   SelfSubscriptionDto,
+  TripCalculatorSettings,
+  TripCalculatorSettingsGetResponse,
 } from "@ecoplatform/shared";
 import { apiDownload, apiFetch, type FileAsset } from "./core";
 
@@ -209,6 +211,16 @@ export const api = {
   knowledgeBase: {
     tree: () => apiFetch<KnowledgeNode[]>("/knowledge-base"),
     getArticle: (slug: string) => apiFetch<KnowledgeArticleDetail>(`/knowledge-base/${enc(slug)}`),
+  },
+
+  // ── Калькуляторы (розничный калькулятор рейса) ───────────────────────────
+  // Индивидуальные настройки заготовителя (парк машин, бригада, цены, топливо).
+  // getSettings → null, если компания ещё ничего не сохраняла.
+  tripCalculator: {
+    getSettings: () =>
+      apiFetch<TripCalculatorSettingsGetResponse>("/trip-calculator/settings").then((response) => response.settings),
+    saveSettings: (settings: TripCalculatorSettings) =>
+      apiFetch<TripCalculatorSettings>("/trip-calculator/settings", { method: "PATCH", body: settings }),
   },
 
   // ── Биллинг / кабинет ───────────────────────────────────────────────────

@@ -318,10 +318,10 @@ model EmailVerificationChallenge {
 }
 
 model Company {
-  id                       String                    @id @default(cuid())
+  id                       String                         @id @default(cuid())
   organizationName         String
-  type                     CompanyType               @default(collector)
-  status                   CompanyStatus             @default(demo)
+  type                     CompanyType                    @default(collector)
+  status                   CompanyStatus                  @default(demo)
   statusBeforeDeletion     CompanyStatus?
   demoEndsAt               DateTime?
   subscriptionPlan         SubscriptionPlan?
@@ -331,17 +331,17 @@ model Company {
   // поэтому дефолт 1. Добавление сотрудника = докупленное место; при
   // подключении биллинга это число будет расти после оплаты. Денормализовано
   // на компанию (текущее состояние), история мест — в Subscription.seats.
-  seatsPurchased           Int                       @default(1)
+  seatsPurchased           Int                            @default(1)
   billingInn               String?
   billingKpp               String?
   // Старое текстовое поле legalAddress оставлено для обратной совместимости
   // (на форму биллинга, где адрес показывается как одна строка). Полноценная
   // структура адреса — в Address (factualAddress/legalAddress relation'ами).
   legalAddress             String?
-  factualAddressId         String?                   @unique
-  factualAddress           Address?                  @relation("CompanyFactualAddress", fields: [factualAddressId], references: [id])
-  structuredLegalAddressId String?                   @unique
-  structuredLegalAddress   Address?                  @relation("CompanyStructuredLegalAddress", fields: [structuredLegalAddressId], references: [id])
+  factualAddressId         String?                        @unique
+  factualAddress           Address?                       @relation("CompanyFactualAddress", fields: [factualAddressId], references: [id])
+  structuredLegalAddressId String?                        @unique
+  structuredLegalAddress   Address?                       @relation("CompanyStructuredLegalAddress", fields: [structuredLegalAddressId], references: [id])
   // Контакты компании. Все опциональные, заполняются в /account → Компания.
   websiteUrl               String?
   corporatePhone           String?
@@ -364,13 +364,14 @@ model Company {
   paymentMethods           PaymentMethod[]
   payments                 Payment[]
   apiKeys                  ApiKey[]
-  listings                 MarketplaceListing[]      @relation("CompanyListings")
-  offers                   Offer[]                   @relation("CompanyOffers")
-  reviewsAuthored          MarketplaceReview[]       @relation("ReviewsAuthored")
-  reviewsReceived          MarketplaceReview[]       @relation("ReviewsReceived")
+  listings                 MarketplaceListing[]           @relation("CompanyListings")
+  offers                   Offer[]                        @relation("CompanyOffers")
+  reviewsAuthored          MarketplaceReview[]            @relation("ReviewsAuthored")
+  reviewsReceived          MarketplaceReview[]            @relation("ReviewsReceived")
   marketplaceRating        CompanyMarketplaceRating?
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
+  tripCalculatorSettings   CompanyTripCalculatorSettings?
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
 }
 
 // Сохранённый способ оплаты компании. В MVP UI заглушен «Подключим в
@@ -1487,4 +1488,16 @@ model CompanyMarketplaceRating {
   reviewCount Int      @default(0)
   byCriterion Json
   updatedAt   DateTime @updatedAt
+}
+
+// Индивидуальные настройки розничного калькулятора рейса — один JSON-блок на
+// компанию-заготовителя (парк машин, бригада, цена топлива, цены сырья).
+// Валидация блока — packages/shared/src/trip-calculator.ts, UI — apps/web/src/
+// views/calculators. Per-company: сотрудники компании делят один набор.
+model CompanyTripCalculatorSettings {
+  companyId String   @id
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

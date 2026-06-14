@@ -24,6 +24,7 @@ import { RedisModule } from "./redis/redis.module";
 import { RedisThrottlerStorageService } from "./redis/redis-throttler-storage.service";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { SupportModule } from "./support/support.module";
+import { TripCalculatorModule } from "./trip-calculator/trip-calculator.module";
 import { createLoggerModuleOptions } from "./common/logging";
 
 const AUTH_THROTTLE_PATHS = new Set([
@@ -86,6 +87,7 @@ function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
     ObservabilityModule,
     SchedulerModule,
     SupportModule,
+    TripCalculatorModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

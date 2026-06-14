@@ -17,7 +17,7 @@ describe("AppShell future navigation teasers", () => {
   it("keeps every disabled sidebar item documented as a roadmap teaser", () => {
     const items = futureNavItems();
 
-    expect(items.map((item) => item.label)).toEqual(["Форум", "Документация", "Карты", "Калькуляторы"]);
+    expect(items.map((item) => item.label)).toEqual(["Форум", "Документация", "Карты"]);
 
     for (const item of items) {
       expect(item.disabledHint).toContain("—");
@@ -54,6 +54,18 @@ describe("AppShell future navigation teasers", () => {
     expect(labelsFor("trader")).not.toContain("Обучение");
     expect(labelsFor("processor")).not.toContain("Обучение");
     expect(labelsFor(null, ["content_manager"])).toContain("Обучение");
+  });
+
+  it("shows the retail calculator only to collectors among regular users", () => {
+    const labelsFor = (companyType: CompanyType | null, roles: string[] = []) =>
+      appNavSections.flatMap((section) =>
+        filterVisibleItems(section.items, { roles, companyType }).map((item) => item.label),
+      );
+
+    expect(labelsFor("collector")).toContain("Розничный");
+    expect(labelsFor("trader")).not.toContain("Розничный");
+    expect(labelsFor("processor")).not.toContain("Розничный");
+    expect(labelsFor(null, ["content_manager"])).toContain("Розничный");
   });
 
   it("keeps account and notification links out of the global sidebar", () => {
