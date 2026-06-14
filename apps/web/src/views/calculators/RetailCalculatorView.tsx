@@ -265,10 +265,9 @@ export function RetailCalculatorView() {
                   </li>
                 </ul>
               </section>
+              <SettingsPanel settings={settings} update={update} vehicleId={vehicleId} />
             </div>
           </div>
-
-          <SettingsPanel settings={settings} update={update} vehicleId={vehicleId} />
 
           <p className="tc-footnote">
             Цены и ставки — ориентиры, замените на свои. Расчёт по предельной выгоде рейса: маржа с сырья минус расходы

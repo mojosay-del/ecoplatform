@@ -700,11 +700,6 @@
     align-items: start;
     gap: 16px;
   }
-
-  .tc-settings-body {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr) minmax(260px, 0.8fr);
-    align-items: start;
-  }
 }
 
 @media (max-width: 380px) {
