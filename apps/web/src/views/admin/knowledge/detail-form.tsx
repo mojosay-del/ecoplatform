@@ -6,6 +6,7 @@ import type { Block } from "../../../lib/editor/block-types";
 import { DocumentEditor } from "../../../components/editor/DocumentEditor";
 import { FileUploadField } from "../../../components/FileUploadField";
 import { KNOWLEDGE_ATOMIC_KINDS } from "./constants";
+import { KnowledgeIconPicker } from "./icon-picker";
 import type { Article, DraftState, KnowledgeAutosaveUi, SetKnowledgeDraft } from "./types";
 
 export function KnowledgeDetailForm({
@@ -73,6 +74,14 @@ export function KnowledgeDetailForm({
               onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
             />
           </label>
+
+          <div className="form-field news-content-field">
+            <span>Иконка раздела</span>
+            <KnowledgeIconPicker
+              value={draft.displayIcon}
+              onChange={(displayIcon) => setDraft((prev) => ({ ...prev, displayIcon }))}
+            />
+          </div>
         </>
       ) : (
         <>
@@ -96,6 +105,14 @@ export function KnowledgeDetailForm({
               onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
             />
           </label>
+
+          <div className="form-field news-content-field">
+            <span>Иконка подраздела</span>
+            <KnowledgeIconPicker
+              value={draft.displayIcon}
+              onChange={(displayIcon) => setDraft((prev) => ({ ...prev, displayIcon }))}
+            />
+          </div>
 
           <div className="form-field news-content-field news-form-preview">
             <span>Обложка материала</span>

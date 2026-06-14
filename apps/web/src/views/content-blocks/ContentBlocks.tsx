@@ -5,7 +5,7 @@
 // knowledge-base) могли его импортировать без циркулярных ссылок.
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, X } from "lucide-react";
+import { Ban, Check, CircleDot, X, type LucideIcon } from "lucide-react";
 import { AudioMessagePlayer } from "../../components/AudioMessagePlayer";
 import { api, preferredFileAssetMediaUrl, type FileAsset } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -35,17 +35,22 @@ type RenderableBlock =
     }
   | { type: string; payload: Record<string, unknown> };
 
+type ContentBlocksVariant = "default" | "knowledge";
+type ChecklistPayload = { title: string; style: string; items: string[] };
+
 export function ContentBlocks({
   blocks,
   onImageLoadSettled,
+  variant = "default",
 }: {
   blocks: RenderableBlock[];
   onImageLoadSettled?: (fileId: string) => void;
+  variant?: ContentBlocksVariant;
 }) {
   const { assets, isLoading } = useFileAssets(blocks);
 
   return (
-    <div className="content-blocks">
+    <div className={`content-blocks${variant === "knowledge" ? " content-blocks-knowledge" : ""}`}>
       {blocks.map((block, index) => {
         if (block.type === "heading") {
           return (
@@ -148,17 +153,8 @@ export function ContentBlocks({
           );
         }
         if (block.type === "checklist") {
-          const payload = block.payload as { title: string; style: string; items: string[] };
-          return (
-            <div className={`checklist-block checklist-${payload.style}`} key={index}>
-              <h3>{payload.title}</h3>
-              <ul>
-                {payload.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          );
+          const payload = block.payload as ChecklistPayload;
+          return <ChecklistBlock key={index} payload={payload} variant={variant} />;
         }
         if (block.type === "image_checklist") {
           const payload = block.payload as {
@@ -177,14 +173,7 @@ export function ContentBlocks({
                 fileId={payload.image.fileId}
                 onImageLoadSettled={onImageLoadSettled}
               />
-              <div className={`checklist-block checklist-${payload.style}`}>
-                <h3>{payload.title}</h3>
-                <ul>
-                  {payload.items.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
+              <ChecklistBlock payload={payload} variant={variant} />
             </div>
           );
         }
@@ -198,6 +187,41 @@ export function ContentBlocks({
       })}
     </div>
   );
+}
+
+function ChecklistBlock({ payload, variant }: { payload: ChecklistPayload; variant: ContentBlocksVariant }) {
+  const isKnowledge = variant === "knowledge";
+  const isRejected = isRejectChecklist(payload);
+  const Icon = isKnowledge ? checklistIcon(payload, isRejected) : null;
+  const knowledgeClass = isKnowledge ? ` checklist-knowledge${isRejected ? " checklist-reject" : ""}` : "";
+
+  return (
+    <div className={`checklist-block checklist-${payload.style}${knowledgeClass}`}>
+      <h3>
+        {Icon ? (
+          <span className="checklist-title-icon" aria-hidden="true">
+            <Icon size={17} strokeWidth={2.4} />
+          </span>
+        ) : null}
+        <span>{payload.title}</span>
+      </h3>
+      <ul>
+        {payload.items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function checklistIcon(payload: ChecklistPayload, isRejected: boolean): LucideIcon {
+  if (isRejected || payload.style === "negative") return Ban;
+  if (payload.style === "positive") return Check;
+  return CircleDot;
+}
+
+function isRejectChecklist(payload: ChecklistPayload): boolean {
+  return payload.title.trim().toLowerCase().includes("не принимается");
 }
 
 function HeadingIcon({ kind }: { kind: "heading" | "subheading" }) {

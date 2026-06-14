@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { baseContentBlockSchema, lessonBlockSchema, newsBlockSchema } from "@ecoplatform/shared";
+import {
+  baseContentBlockSchema,
+  knowledgeBaseDisplayIconNames,
+  lessonBlockSchema,
+  newsBlockSchema,
+} from "@ecoplatform/shared";
 
 function paginationQuerySchema(maxLimit: number) {
   return z.object({
@@ -130,6 +135,7 @@ export const knowledgeArticleInputSchema = z.object({
   slug: z.string().optional(),
   position: z.number().int().nonnegative(),
   iconType: z.string().optional(),
+  displayIcon: z.enum(knowledgeBaseDisplayIconNames).nullable().optional(),
   blocks: z.array(baseContentBlockSchema).default([]),
 });
 

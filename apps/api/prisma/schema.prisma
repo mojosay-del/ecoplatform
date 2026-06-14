@@ -968,6 +968,7 @@ model KnowledgeBaseArticle {
   slug             String                 @unique
   position         Int
   iconType         String?
+  displayIcon      String?
   status           ContentStatus          @default(draft)
   firstPublishedAt DateTime?
   createdById      String

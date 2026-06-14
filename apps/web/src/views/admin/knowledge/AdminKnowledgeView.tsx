@@ -14,6 +14,7 @@ import { ApiError, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
+import { knowledgeDisplayIconNameForNode } from "../../knowledge-base-icons";
 import {
   EMPTY_CATEGORY_DRAFT,
   EMPTY_MATERIAL_DRAFT,
@@ -81,6 +82,7 @@ export function AdminKnowledgeView() {
         draft.title.trim().length > 0 ||
         draft.subtitle.trim().length > 0 ||
         draft.coverImageId.trim().length > 0 ||
+        draft.displayIcon !== (draft.kind === "category" ? EMPTY_CATEGORY_DRAFT : EMPTY_MATERIAL_DRAFT).displayIcon ||
         draft.blocks.length > 0
       );
     }
@@ -90,6 +92,7 @@ export function AdminKnowledgeView() {
     if (draft.title !== original.title) return true;
     if (draft.subtitle !== (original.subtitle ?? "")) return true;
     if (draft.position !== original.position) return true;
+    if (draft.displayIcon !== knowledgeDisplayIconNameForNode(original, draft.kind === "category" ? 0 : 1)) return true;
 
     if (draft.kind === "category") {
       return false;
@@ -169,6 +172,7 @@ export function AdminKnowledgeView() {
       subtitle: article.subtitle ?? "",
       coverImageId: kind === "category" ? "" : (article.coverImageId ?? ""),
       iconType: kind === "category" ? KNOWLEDGE_CATEGORY_ICON_TYPE : (article.iconType ?? ""),
+      displayIcon: knowledgeDisplayIconNameForNode(article, kind === "category" ? 0 : 1),
       position: article.position,
       blocks:
         kind === "category" ? [] : article.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
@@ -189,6 +193,7 @@ export function AdminKnowledgeView() {
           title: title.trim(),
           position: categories.length,
           iconType: KNOWLEDGE_CATEGORY_ICON_TYPE,
+          displayIcon: knowledgeDisplayIconNameForNode({ title: title.trim() || "Категория" }, 0),
           blocks: [],
         },
       });
@@ -199,6 +204,7 @@ export function AdminKnowledgeView() {
         id: category.id,
         title: category.title,
         position: category.position,
+        displayIcon: knowledgeDisplayIconNameForNode(category, 0),
       });
       setMessage("Категория создана.");
       return true;
@@ -216,6 +222,7 @@ export function AdminKnowledgeView() {
         subtitle: draft.subtitle.trim() || undefined,
         coverImageId: null,
         iconType: KNOWLEDGE_CATEGORY_ICON_TYPE,
+        displayIcon: draft.displayIcon,
         position: draft.position,
         blocks: [],
       };
@@ -226,6 +233,7 @@ export function AdminKnowledgeView() {
       title: draft.title.trim(),
       subtitle: draft.subtitle.trim() || undefined,
       coverImageId: draft.coverImageId.trim() || null,
+      displayIcon: draft.displayIcon,
       position: draft.position,
       blocks: draft.blocks,
     };

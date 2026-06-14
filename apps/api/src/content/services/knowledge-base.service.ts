@@ -118,6 +118,7 @@ export class KnowledgeBaseService {
         slug,
         position: input.position,
         iconType: input.iconType,
+        displayIcon: input.displayIcon ?? null,
         createdById: user.id,
         blocks: {
           create: blocks.map((block, position) => ({
@@ -173,6 +174,10 @@ export class KnowledgeBaseService {
       ...this.common.collectFileIdsFromBlocks(existing.blocks),
     ]);
 
+    const displayIcon = Object.prototype.hasOwnProperty.call(input, "displayIcon")
+      ? (input.displayIcon ?? null)
+      : existing.displayIcon;
+
     const article = await this.prisma.$transaction(async (tx) => {
       await tx.knowledgeBaseBlock.deleteMany({ where: { articleId: id } });
       await tx.knowledgeBaseArticle.update({
@@ -182,6 +187,7 @@ export class KnowledgeBaseService {
           subtitle: input.subtitle,
           coverImageId: input.coverImageId,
           iconType: input.iconType,
+          displayIcon,
           blocks: {
             create: blocks.map((block, position) => ({
               position,

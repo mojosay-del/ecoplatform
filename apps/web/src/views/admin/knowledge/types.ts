@@ -11,6 +11,7 @@ export type Article = {
   slug: string;
   position: number;
   iconType: string | null;
+  displayIcon: string | null;
   status: "draft" | "published";
   firstPublishedAt: string | null;
   blocks: Block[];
@@ -29,6 +30,7 @@ export type DraftState = {
   subtitle: string;
   coverImageId: string;
   iconType: string;
+  displayIcon: string;
   position: number;
   blocks: Block[];
 };

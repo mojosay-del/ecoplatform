@@ -4,6 +4,7 @@ export * from "./content-blocks";
 export * from "./domain";
 export * from "./dto";
 export * from "./geo";
+export * from "./knowledge-base-icons";
 export * from "./price-index";
 export * from "./slug";
 export * from "./trip-calculator";

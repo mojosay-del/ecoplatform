@@ -4,9 +4,10 @@ import { type CSSProperties, type ReactNode } from "react";
 import { DndContext, closestCenter, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronRight, GripVertical, Plus } from "lucide-react";
+import { ChevronRight, GripVertical, Plus, type LucideIcon } from "lucide-react";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";
 import { pluralizeRu } from "../../../lib/ru-plural";
+import { knowledgeDisplayIconForNode } from "../../knowledge-base-icons";
 import type { Article } from "./types";
 
 export function KnowledgeCategoryNode({
@@ -42,6 +43,7 @@ export function KnowledgeCategoryNode({
         status={category.status}
         title={category.title}
         meta={`${materials.length} ${pluralizeRu(materials.length, "материал", "материала", "материалов")}`}
+        Icon={knowledgeDisplayIconForNode(category, 0)}
       />
       {expanded ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onReorder}>
@@ -170,6 +172,7 @@ function KnowledgeMaterialRow({
       title={material.title}
       meta={`${material.blocks.length} ${pluralizeRu(material.blocks.length, "блок", "блока", "блоков")}`}
       dragHandle={dragHandle}
+      Icon={knowledgeDisplayIconForNode(material, 1)}
     />
   );
 }
@@ -185,6 +188,7 @@ function KnowledgeTreeRow({
   title,
   meta,
   dragHandle,
+  Icon,
 }: {
   depth: number;
   expandable?: boolean;
@@ -196,6 +200,7 @@ function KnowledgeTreeRow({
   title: string;
   meta?: string;
   dragHandle?: ReactNode;
+  Icon?: LucideIcon;
 }) {
   return (
     <div className={`tree-row depth-${depth}${active ? " is-active" : ""}${dragHandle ? " has-drag-handle" : ""}`}>
@@ -219,6 +224,11 @@ function KnowledgeTreeRow({
             title={CONTENT_STATUS_LABELS[status]}
             aria-hidden
           />
+        ) : null}
+        {Icon ? (
+          <span className="tree-row-icon" aria-hidden="true">
+            <Icon size={15} strokeWidth={2.1} />
+          </span>
         ) : null}
         <span className="tree-row-title">{title}</span>
         {meta ? <span className="tree-row-meta">{meta}</span> : null}

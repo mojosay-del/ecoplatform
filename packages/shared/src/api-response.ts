@@ -242,6 +242,7 @@ export type KnowledgeNode = {
   title: string;
   subtitle: string | null;
   iconType: string | null;
+  displayIcon: string | null;
   coverImageId: string | null;
   parentId: string | null;
   position: number;

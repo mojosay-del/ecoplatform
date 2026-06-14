@@ -174,9 +174,11 @@ describe("Content lifecycle: knowledge base", () => {
         title: "Категория БЗ без блоков",
         position: 0,
         iconType: "category",
+        displayIcon: "Newspaper",
         blocks: [],
       });
     expect(category.status).toBe(201);
+    expect(category.body.displayIcon).toBe("Newspaper");
 
     const publish = await ctx.http
       .post(`/api/admin/content/knowledge-base/${category.body.id}/publish`)
@@ -185,7 +187,9 @@ describe("Content lifecycle: knowledge base", () => {
     expect(publish.body.status).toBe("published");
 
     const tree = await ctx.http.get("/api/knowledge-base?depth=1").set("Authorization", `Bearer ${reader.token}`);
-    expect(tree.body.find((item: { id: string }) => item.id === category.body.id)).toBeTruthy();
+    const categoryNode = tree.body.find((item: { id: string }) => item.id === category.body.id);
+    expect(categoryNode).toBeTruthy();
+    expect(categoryNode.displayIcon).toBe("Newspaper");
   });
 
   it("сохраняет пустой материал как черновик, но запрещает публикацию без блоков", async () => {
@@ -400,7 +404,9 @@ describe("Content lifecycle: learning modules", () => {
       .set("Authorization", `Bearer ${adminToken}`);
     expect(publish.status).toBe(201);
 
-    const collectorList = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${collector.token}`);
+    const collectorList = await ctx.http
+      .get("/api/education/modules")
+      .set("Authorization", `Bearer ${collector.token}`);
     expect(collectorList.status).toBe(200);
     expect(collectorList.body.items.find((item: { id: string }) => item.id === moduleId)).toBeTruthy();
 
