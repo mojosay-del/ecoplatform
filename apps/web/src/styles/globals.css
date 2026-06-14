@@ -2,8 +2,14 @@
   box-sizing: border-box;
 }
 
+html {
+  min-height: 100%;
+  background: var(--panel);
+}
+
 body {
   margin: 0;
+  min-height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family:
@@ -7895,6 +7901,102 @@ body.news-modal-open .app-shell {
 }
 
 @media (max-width: 640px) {
+  .notif-popover {
+    position: fixed;
+    top: calc(72px + env(safe-area-inset-top));
+    right: max(10px, calc(10px + env(safe-area-inset-right)));
+    left: max(10px, calc(10px + env(safe-area-inset-left)));
+    width: auto;
+    max-height: calc(100dvh - 88px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius: 16px;
+    z-index: 1150;
+  }
+
+  .notif-popover-head {
+    padding: 10px 12px;
+  }
+
+  .notif-popover-title {
+    font-size: 13px;
+  }
+
+  .notif-popover-action {
+    padding: 4px 0;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .notif-popover-body {
+    padding: 4px;
+  }
+
+  .notif-popover-item-button {
+    padding: 9px 10px;
+  }
+
+  .notif-popover-item-head {
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .notif-popover-item-title {
+    font-size: 12.5px;
+  }
+
+  .notif-popover-item-cat {
+    max-width: 34%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .notif-popover-item-body {
+    font-size: 11.5px;
+    line-height: 1.35;
+  }
+
+  .notif-popover-item-link {
+    padding: 0 8px;
+    font-size: 11.5px;
+  }
+
+  .notif-popover-foot {
+    padding: 9px 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell-footer {
+    align-items: center;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+    text-align: center;
+  }
+
+  .app-shell-footer strong,
+  .app-shell-footer > span,
+  .app-shell-footer a {
+    max-width: 100%;
+  }
+
+  .app-shell-footer-links {
+    justify-content: center;
+    gap: 7px 12px;
+    line-height: 1.35;
+  }
+
+  .app-shell-footer a {
+    overflow-wrap: anywhere;
+  }
+
+  .app-shell-footer-separator {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
   .auth-visual {
     display: none;
   }
@@ -7933,10 +8035,24 @@ body.news-modal-open .app-shell {
        симметричные углы, компактные паддинги, резерв под cookie-баннер. --- */
 
 @media (max-width: 640px) {
+  html,
+  body {
+    background: var(--bg);
+  }
+
+  .app-shell,
+  .app-shell[data-collapsed="true"] {
+    min-height: 100dvh;
+    background: var(--bg);
+  }
+
   .page-surface {
     margin-left: 0;
-    border-radius: 18px;
-    padding: 16px 14px calc(24px + env(safe-area-inset-bottom) + var(--cookie-banner-height, 0px));
+    border-radius: 0;
+    padding-top: 16px;
+    padding-right: max(14px, calc(14px + env(safe-area-inset-right)));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom) + var(--cookie-banner-height, 0px));
+    padding-left: max(14px, calc(14px + env(safe-area-inset-left)));
   }
 
   /* iOS зумит страницу при фокусе на поле с font-size < 16px. Поднимаем
@@ -7995,7 +8111,7 @@ body.news-modal-open .app-shell {
   /* Даже если в localStorage сохранено свёрнутое состояние с десктопа — на
      мобиле всегда показываем полный вид (подписи, обычные отступы). */
   .app-shell[data-collapsed="true"] .sidebar {
-    padding: 22px 16px 28px;
+    padding: calc(22px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));
   }
 
   .app-shell[data-collapsed="true"] .brand-text,
@@ -8016,8 +8132,13 @@ body.news-modal-open .app-shell {
 
   /* Мобильное меню-драуэр: верх под вырезом, низ над домашней полосой. */
   .sidebar {
+    bottom: auto;
+    min-height: 100dvh;
+    height: 100dvh;
+    max-height: 100dvh;
     padding-top: calc(22px + env(safe-area-inset-top));
     padding-bottom: calc(28px + env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
   }
 
   /* Авторизованный топбар на мобильном уводим из-под чёлки/Dynamic Island
@@ -8026,6 +8147,20 @@ body.news-modal-open .app-shell {
     height: auto;
     min-height: 64px;
     padding-top: calc(8px + env(safe-area-inset-top));
+  }
+}
+
+@media (max-width: 880px) {
+  .main {
+    padding: 0 0 32px;
+    background: var(--bg);
+  }
+
+  .topbar {
+    margin: 0;
+    padding-right: max(18px, calc(18px + env(safe-area-inset-right)));
+    padding-left: max(18px, calc(18px + env(safe-area-inset-left)));
+    background: var(--panel);
   }
 }
 

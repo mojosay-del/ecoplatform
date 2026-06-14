@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   applicationName: "ЭкоПлатформа",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "ЭкоПлатформа",
   },
   icons: {

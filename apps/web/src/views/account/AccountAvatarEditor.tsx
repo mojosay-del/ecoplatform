@@ -60,7 +60,9 @@ export function AccountAvatarEditor() {
         aria-label="Загрузить фото профиля"
       >
         {user?.avatarUrl ? (
-          <Image alt="" src={user.avatarUrl} width={84} height={84} />
+          <span className="account-avatar-image-frame">
+            <Image alt="" src={user.avatarUrl} width={84} height={84} />
+          </span>
         ) : (
           <UserRound size={38} aria-hidden="true" />
         )}

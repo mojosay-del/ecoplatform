@@ -532,6 +532,7 @@ body.account-password-modal-open {
   border-radius: 24px;
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
   font-size: 30px;
   font-weight: 800;
   color: var(--white);
@@ -541,10 +542,19 @@ body.account-password-modal-open {
     0 10px 24px -8px rgb(var(--black-rgb) / 0.3);
 }
 
-.account-welcome-avatar img {
+.account-avatar-image-frame {
+  display: block;
   width: 100%;
   height: 100%;
-  border-radius: 24px;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.account-avatar-image-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
   object-fit: cover;
 }
 
@@ -1172,6 +1182,22 @@ body.account-password-modal-open {
     grid-template-columns: 1fr;
     text-align: center;
     justify-items: center;
+  }
+
+  .account-welcome-info {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .account-welcome-name {
+    max-width: 100%;
+    margin-inline: auto;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
+  .account-welcome-tags {
+    justify-content: center;
   }
 
   .account-welcome-ring {
