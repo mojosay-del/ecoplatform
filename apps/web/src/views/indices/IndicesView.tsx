@@ -129,11 +129,7 @@ export function IndicesView() {
               </p>
             ) : (
               <>
-                <IndexMarketPulse
-                  items={active.nomenclatures}
-                  categorySlug={active.slug}
-                  categoryName={active.name}
-                />
+                <IndexMarketPulse items={active.nomenclatures} categorySlug={active.slug} categoryName={active.name} />
                 <IndexMovementSummaryTable items={active.nomenclatures} />
                 {active.nomenclatures.length >= 2 ? (
                   <IndexCombinedChart nomenclatures={active.nomenclatures} categoryName={active.name} />

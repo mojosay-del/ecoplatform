@@ -19,7 +19,11 @@ const bboxQueryValue = z
   .refine((value) => {
     const [south, west, north, east] = value.split(",").map(Number);
     return (
-      Math.abs(south!) <= 90 && Math.abs(north!) <= 90 && Math.abs(west!) <= 180 && Math.abs(east!) <= 180 && south! <= north!
+      Math.abs(south!) <= 90 &&
+      Math.abs(north!) <= 90 &&
+      Math.abs(west!) <= 180 &&
+      Math.abs(east!) <= 180 &&
+      south! <= north!
     );
   }, "bbox вне диапазона координат")
   .optional();

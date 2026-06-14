@@ -81,14 +81,7 @@ export function VideoPlayer({ sources, title }: { sources: VideoPlayerSource[]; 
   // как VideoMimeType. На границе с библиотекой приводим тип.
   const src = sources as unknown as MediaSrc[];
   return (
-    <MediaPlayer
-      className="eco-video-player"
-      title={title}
-      src={src}
-      playsInline
-      load="visible"
-      aspectRatio="16/9"
-    >
+    <MediaPlayer className="eco-video-player" title={title} src={src} playsInline load="visible" aspectRatio="16/9">
       <MediaProvider />
       <DefaultVideoLayout icons={defaultLayoutIcons} translations={RU_VIDEO_TRANSLATIONS} />
     </MediaPlayer>

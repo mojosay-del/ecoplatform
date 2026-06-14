@@ -201,14 +201,7 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
             strokeOpacity="0.2"
           />
         ) : null}
-        <path
-          d={linePath}
-          fill="none"
-          stroke={color}
-          strokeWidth="3.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <path d={linePath} fill="none" stroke={color} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
         <circle cx={lastX} cy={lastY} r="6.5" fill={color} stroke="white" strokeWidth="2.4" />
         {isHoveringChart && activeIndex !== lastIndex ? (
           <circle cx={activeX} cy={activeY} r="6.5" fill="#1a202e" stroke="white" strokeWidth="2.4" />

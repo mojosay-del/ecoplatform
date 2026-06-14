@@ -202,9 +202,7 @@ export function VerificationStepFields({
         Код отправлен на {verificationEmail ?? normalizeEmailValue(valuesEmail)}
         {verificationExpiresAt ? `, действует до ${verificationExpiresAt}.` : "."}
       </p>
-      <p className="auth-verification-hint">
-        Не пришёл код? Проверьте папку «Спам» — иногда письмо попадает туда.
-      </p>
+      <p className="auth-verification-hint">Не пришёл код? Проверьте папку «Спам» — иногда письмо попадает туда.</p>
       <div
         className={`auth-code-stage is-${verificationPhase}`}
         aria-busy={verificationPhase === "checking"}

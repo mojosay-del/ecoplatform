@@ -184,7 +184,7 @@ export class DocumentationService {
   async createDocument(input: DocumentationInput, user: RequestUser) {
     const isCategory = isDocumentationCategory(input.iconType);
     const blocks = isCategory ? [] : input.blocks;
-    const fileAssetId = isCategory ? null : input.fileAssetId ?? null;
+    const fileAssetId = isCategory ? null : (input.fileAssetId ?? null);
     const check = this.validateDraftableBlocks(blocks);
 
     if (!check.ok) {
@@ -212,9 +212,9 @@ export class DocumentationService {
         iconType: input.iconType,
         createdById: user.id,
         fileAssetId,
-        version: isCategory ? null : input.version ?? null,
+        version: isCategory ? null : (input.version ?? null),
         effectiveDate: isCategory ? null : this.parseDate(input.effectiveDate),
-        isPinned: isCategory ? false : input.isPinned ?? false,
+        isPinned: isCategory ? false : (input.isPinned ?? false),
         blocks: {
           create: blocks.map((block, position) => ({
             position,
@@ -252,7 +252,7 @@ export class DocumentationService {
 
     const isCategory = isDocumentationCategory(input.iconType);
     const blocks = isCategory ? [] : input.blocks;
-    const fileAssetId = isCategory ? null : input.fileAssetId ?? null;
+    const fileAssetId = isCategory ? null : (input.fileAssetId ?? null);
     const check = this.validateDraftableBlocks(blocks);
 
     if (!check.ok) {
@@ -271,9 +271,7 @@ export class DocumentationService {
     // публикация.
     const fileChanged = fileAssetId !== existing.fileAssetId;
     const shouldRevise =
-      !isCategory &&
-      existing.status === ContentStatus.published &&
-      (fileChanged || input.markRevised === true);
+      !isCategory && existing.status === ContentStatus.published && (fileChanged || input.markRevised === true);
 
     const previousFileIds = this.common.compactFileIds([
       existing.fileAssetId,
@@ -289,9 +287,9 @@ export class DocumentationService {
           subtitle: input.subtitle ?? null,
           iconType: input.iconType,
           fileAssetId,
-          version: isCategory ? null : input.version ?? null,
+          version: isCategory ? null : (input.version ?? null),
           effectiveDate: isCategory ? null : this.parseDate(input.effectiveDate),
-          isPinned: isCategory ? false : input.isPinned ?? false,
+          isPinned: isCategory ? false : (input.isPinned ?? false),
           ...(shouldRevise ? { revisedAt: new Date() } : {}),
           blocks: {
             create: blocks.map((block, position) => ({

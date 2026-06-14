@@ -64,7 +64,12 @@ export function SettingsPanel({ settings, update, vehicleId }: SettingsPanelProp
 
   return (
     <section className="tc-card tc-settings">
-      <button type="button" className="tc-settings-toggle" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+      <button
+        type="button"
+        className="tc-settings-toggle"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
         <span className="tc-settings-title">
           <Settings2 size={16} aria-hidden /> Настройки <span className="tc-settings-veh">({veh.name})</span>
         </span>
@@ -101,9 +106,7 @@ export function SettingsPanel({ settings, update, vehicleId }: SettingsPanelProp
                     <select
                       className="tc-select"
                       value={worker.type}
-                      onChange={(event) =>
-                        updateWorker(worker.id, { type: event.target.value as typeof worker.type })
-                      }
+                      onChange={(event) => updateWorker(worker.id, { type: event.target.value as typeof worker.type })}
                     >
                       {PAY_TYPES.map((pay) => (
                         <option key={pay.value} value={pay.value}>
@@ -138,9 +141,7 @@ export function SettingsPanel({ settings, update, vehicleId }: SettingsPanelProp
                     </div>
                   ) : null}
                   {worker.type === "oklad" ? (
-                    <p className="tc-muted-sm tc-worker-note">
-                      В окладе — рейс не добавляет затрат на этого человека.
-                    </p>
+                    <p className="tc-muted-sm tc-worker-note">В окладе — рейс не добавляет затрат на этого человека.</p>
                   ) : null}
                 </div>
               ))}
@@ -150,15 +151,30 @@ export function SettingsPanel({ settings, update, vehicleId }: SettingsPanelProp
             </button>
           </div>
 
-          <Field label="Название машины" type="text" value={veh.name} onChange={(value) => updateVehicle({ name: value })} />
+          <Field
+            label="Название машины"
+            type="text"
+            value={veh.name}
+            onChange={(value) => updateVehicle({ name: value })}
+          />
 
           <div className="tc-group">
             <div className="tc-group-label">
               <Fuel size={14} aria-hidden /> Топливо
             </div>
             <div className="tc-fields">
-              <Field label="Расход" unit="л/100км" value={veh.fuel} onChange={(value) => updateVehicle({ fuel: value })} />
-              <Field label="Цена топлива" unit="₽/л" value={settings.fuelPrice} onChange={(value) => setField("fuelPrice", value)} />
+              <Field
+                label="Расход"
+                unit="л/100км"
+                value={veh.fuel}
+                onChange={(value) => updateVehicle({ fuel: value })}
+              />
+              <Field
+                label="Цена топлива"
+                unit="₽/л"
+                value={settings.fuelPrice}
+                onChange={(value) => setField("fuelPrice", value)}
+              />
             </div>
           </div>
 
@@ -167,10 +183,30 @@ export function SettingsPanel({ settings, update, vehicleId }: SettingsPanelProp
               <Wrench size={14} aria-hidden /> Машина и время
             </div>
             <div className="tc-fields">
-              <Field label="Амортизация" unit="₽/км" value={veh.deprec} onChange={(value) => updateVehicle({ deprec: value })} />
-              <Field label="Средняя скорость" unit="км/ч" value={veh.speed} onChange={(value) => updateVehicle({ speed: value })} />
-              <Field label="Время погрузки" unit="ч" value={settings.loadTime} onChange={(value) => setField("loadTime", value)} />
-              <Field label="Прочее (платные дороги)" unit="₽" value={settings.otherCosts} onChange={(value) => setField("otherCosts", value)} />
+              <Field
+                label="Амортизация"
+                unit="₽/км"
+                value={veh.deprec}
+                onChange={(value) => updateVehicle({ deprec: value })}
+              />
+              <Field
+                label="Средняя скорость"
+                unit="км/ч"
+                value={veh.speed}
+                onChange={(value) => updateVehicle({ speed: value })}
+              />
+              <Field
+                label="Время погрузки"
+                unit="ч"
+                value={settings.loadTime}
+                onChange={(value) => setField("loadTime", value)}
+              />
+              <Field
+                label="Прочее (платные дороги)"
+                unit="₽"
+                value={settings.otherCosts}
+                onChange={(value) => setField("otherCosts", value)}
+              />
             </div>
             <button type="button" className="tc-add-link" onClick={() => setShowAmort((value) => !value)}>
               <Calculator size={14} aria-hidden /> Посчитать амортизацию
@@ -180,10 +216,30 @@ export function SettingsPanel({ settings, update, vehicleId }: SettingsPanelProp
               <div className="tc-amort">
                 <p className="tc-muted-sm">Затраты на машину за год ÷ годовой пробег:</p>
                 <div className="tc-fields">
-                  <Field label="Ремонт и ТО за год" unit="₽" value={settings.amort.repair} onChange={(value) => updateAmort({ repair: value })} />
-                  <Field label="Резина за год" unit="₽" value={settings.amort.tires} onChange={(value) => updateAmort({ tires: value })} />
-                  <Field label="Откладываю на новую машину" unit="₽/год" value={settings.amort.replace} onChange={(value) => updateAmort({ replace: value })} />
-                  <Field label="Пробег за год" unit="км" value={settings.amort.mileage} onChange={(value) => updateAmort({ mileage: value })} />
+                  <Field
+                    label="Ремонт и ТО за год"
+                    unit="₽"
+                    value={settings.amort.repair}
+                    onChange={(value) => updateAmort({ repair: value })}
+                  />
+                  <Field
+                    label="Резина за год"
+                    unit="₽"
+                    value={settings.amort.tires}
+                    onChange={(value) => updateAmort({ tires: value })}
+                  />
+                  <Field
+                    label="Откладываю на новую машину"
+                    unit="₽/год"
+                    value={settings.amort.replace}
+                    onChange={(value) => updateAmort({ replace: value })}
+                  />
+                  <Field
+                    label="Пробег за год"
+                    unit="км"
+                    value={settings.amort.mileage}
+                    onChange={(value) => updateAmort({ mileage: value })}
+                  />
                 </div>
                 <button
                   type="button"

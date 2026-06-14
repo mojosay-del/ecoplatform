@@ -147,16 +147,7 @@ export function MarketplaceView() {
   }, [companyPoint, sortBy]);
 
   const filterKey = `${selectedRegions.join(",")}|${selectedNomenclature.join(",")}|${mapBbox ?? ""}`;
-  const {
-    items,
-    total,
-    hasMore,
-    state,
-    errorMessage,
-    isLoadingMore,
-    reload,
-    sentinelRef,
-  } = useInfiniteApiQuery(
+  const { items, total, hasMore, state, errorMessage, isLoadingMore, reload, sentinelRef } = useInfiniteApiQuery(
     ready && token ? `marketplace-listings-${filterKey}` : null,
     MARKETPLACE_FEED_PAGE_SIZE,
     ({ limit, offset }) =>
@@ -186,8 +177,7 @@ export function MarketplaceView() {
     const sortedItems = [...items];
     const newestFirst = (a: MarketplaceListingListItem, b: MarketplaceListingListItem) =>
       dateValue(b.publishedAt, 0) - dateValue(a.publishedAt, 0);
-    const distance = (listing: MarketplaceListingListItem) =>
-      distanceById?.get(listing.id) ?? Number.POSITIVE_INFINITY;
+    const distance = (listing: MarketplaceListingListItem) => distanceById?.get(listing.id) ?? Number.POSITIVE_INFINITY;
 
     if (sortBy === "distance") {
       sortedItems.sort((a, b) => distance(a) - distance(b) || newestFirst(a, b));
@@ -250,29 +240,29 @@ export function MarketplaceView() {
     <div className="mp-filterbar" ref={filtersRef}>
       {/* Чипы категорий сырья — те же цвета, что круги на карте. */}
       <div aria-label="Категории сырья" className="mp-material-chips" role="group">
-          {nomenclatureGroups.map((group) => {
-            const state = groupSelectionState(group, selectedNomenclature);
-            const color = materialColor(group.slug);
-            const selectedCount = group.options.filter((option) => selectedNomenclature.includes(option.id)).length;
-            return (
-              <button
-                aria-pressed={state !== "none"}
-                className={`mp-material-chip${state === "all" ? " is-active" : ""}${state === "partial" ? " is-partial" : ""}`}
-                key={group.slug}
-                style={state !== "none" ? { borderColor: color, color, backgroundColor: `${color}14` } : undefined}
-                type="button"
-                onClick={() => toggleGroup(group)}
-              >
-                <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
-                {group.name}
-                {state === "partial" ? (
-                  <span className="mp-material-chip-count" style={{ backgroundColor: color }}>
-                    {selectedCount}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
+        {nomenclatureGroups.map((group) => {
+          const state = groupSelectionState(group, selectedNomenclature);
+          const color = materialColor(group.slug);
+          const selectedCount = group.options.filter((option) => selectedNomenclature.includes(option.id)).length;
+          return (
+            <button
+              aria-pressed={state !== "none"}
+              className={`mp-material-chip${state === "all" ? " is-active" : ""}${state === "partial" ? " is-partial" : ""}`}
+              key={group.slug}
+              style={state !== "none" ? { borderColor: color, color, backgroundColor: `${color}14` } : undefined}
+              type="button"
+              onClick={() => toggleGroup(group)}
+            >
+              <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
+              {group.name}
+              {state === "partial" ? (
+                <span className="mp-material-chip-count" style={{ backgroundColor: color }}>
+                  {selectedCount}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
       <div className="mp-filterbar-group">
@@ -594,11 +584,7 @@ export function MarketplaceView() {
         </div>
 
         {selectedId ? (
-          <ListingModal
-            listingId={selectedId}
-            onClose={() => setSelectedId(null)}
-            onChanged={reload}
-          />
+          <ListingModal listingId={selectedId} onClose={() => setSelectedId(null)} onChanged={reload} />
         ) : null}
       </section>
     </AppShell>

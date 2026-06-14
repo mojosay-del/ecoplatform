@@ -8,14 +8,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-import {
-  RU_MONTHS,
-  RU_WEEKDAYS,
-  buildMonthGrid,
-  formatRuDate,
-  parseIsoDate,
-  toIsoDate,
-} from "./date-picker-utils";
+import { RU_MONTHS, RU_WEEKDAYS, buildMonthGrid, formatRuDate, parseIsoDate, toIsoDate } from "./date-picker-utils";
 
 export function DatePicker({
   value,
@@ -125,15 +118,31 @@ export function DatePicker({
       ) : null}
 
       {open ? (
-        <div ref={popoverRef} className="date-picker-popover" role="dialog" aria-modal="false" aria-labelledby={labelId}>
+        <div
+          ref={popoverRef}
+          className="date-picker-popover"
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby={labelId}
+        >
           <div className="date-picker-head">
-            <button type="button" className="date-picker-nav" aria-label="Предыдущий месяц" onClick={() => shiftMonth(-1)}>
+            <button
+              type="button"
+              className="date-picker-nav"
+              aria-label="Предыдущий месяц"
+              onClick={() => shiftMonth(-1)}
+            >
               <ChevronLeft size={16} />
             </button>
             <span className="date-picker-title" id={labelId}>
               {RU_MONTHS[view.month]} {view.year}
             </span>
-            <button type="button" className="date-picker-nav" aria-label="Следующий месяц" onClick={() => shiftMonth(1)}>
+            <button
+              type="button"
+              className="date-picker-nav"
+              aria-label="Следующий месяц"
+              onClick={() => shiftMonth(1)}
+            >
               <ChevronRight size={16} />
             </button>
           </div>

@@ -50,7 +50,10 @@ export function ReviewForm({
       {criteria.map((criterion) => (
         <div className="mp-review-criterion" key={criterion}>
           <span>{REVIEW_CRITERION_LABEL[criterion]}</span>
-          <StarInput value={scores[criterion] ?? 0} onChange={(value) => setScores((prev) => ({ ...prev, [criterion]: value }))} />
+          <StarInput
+            value={scores[criterion] ?? 0}
+            onChange={(value) => setScores((prev) => ({ ...prev, [criterion]: value }))}
+          />
         </div>
       ))}
       <textarea

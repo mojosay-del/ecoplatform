@@ -21,7 +21,11 @@ export function reviewOverall(scores: { score: number }[]): number {
   return round2(scores.reduce((sum, score) => sum + score.score, 0) / scores.length);
 }
 
-export function toReviewItem(review: ReviewWithRelations, viewer: { companyId: string | null }, now = new Date()): ReviewItem {
+export function toReviewItem(
+  review: ReviewWithRelations,
+  viewer: { companyId: string | null },
+  now = new Date(),
+): ReviewItem {
   const isAuthor = viewer.companyId === review.fromCompanyId;
   const isRecipient = viewer.companyId === review.toCompanyId;
   const withinResponseWindow = now.getTime() - review.createdAt.getTime() < RESPONSE_WINDOW_MS;

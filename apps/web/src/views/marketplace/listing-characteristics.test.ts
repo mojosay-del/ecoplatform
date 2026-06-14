@@ -7,8 +7,6 @@ describe("marketplace listing characteristics", () => {
   });
 
   it("formats contamination from the text condition", () => {
-    expect(contaminationLabel({ contaminationCondition: "may_have_inclusions" })).toBe(
-      "Могут быть иные включения",
-    );
+    expect(contaminationLabel({ contaminationCondition: "may_have_inclusions" })).toBe("Могут быть иные включения");
   });
 });

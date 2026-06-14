@@ -30,11 +30,11 @@ function countLabel(count: number): string {
 }
 
 export function DocumentationView() {
-  const { data: tree, state, errorMessage } = useApiQuery(
-    "doc-tree",
-    () => api.documentation.tree(),
-    [] as DocumentationNode[],
-  );
+  const {
+    data: tree,
+    state,
+    errorMessage,
+  } = useApiQuery("doc-tree", () => api.documentation.tree(), [] as DocumentationNode[]);
   const pinned = useApiQuery("doc-pinned", () => api.documentation.pinned(), [] as DocumentationNode[]);
   const recent = useApiQuery("doc-recent", () => api.documentation.recent(8), [] as DocumentationNode[]);
 
@@ -93,7 +93,7 @@ export function DocumentationView() {
 
   const searching = debouncedQuery.length >= 2;
   const baseGrid: DocumentationNode[] = searching
-    ? searchResults ?? []
+    ? (searchResults ?? [])
     : activeCategory
       ? (activeCategory.children ?? []).filter((child) => child.iconType !== "category")
       : topDocuments;

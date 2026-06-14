@@ -20,7 +20,7 @@ const ParagraphIndent = Extension.create({
         attributes: {
           indent: {
             default: false,
-            parseHTML: (element) => (element as HTMLElement).style?.textIndent ? true : false,
+            parseHTML: (element) => ((element as HTMLElement).style?.textIndent ? true : false),
             renderHTML: (attributes) => (attributes.indent ? { style: `text-indent: ${PARAGRAPH_INDENT}` } : {}),
           },
         },

@@ -117,7 +117,9 @@ export class MarketplaceReviewsService {
       throw new ForbiddenException("Это не ваш отзыв.");
     }
     if (review.editableUntil.getTime() < Date.now()) {
-      throw new BadRequestException("Окно изменения истекло (3 минуты). Снятие отзыва — только через жалобу модератору.");
+      throw new BadRequestException(
+        "Окно изменения истекло (3 минуты). Снятие отзыва — только через жалобу модератору.",
+      );
     }
     await this.prisma.marketplaceReview.delete({ where: { id: reviewId } });
     await this.recomputeCompanyRating(review.toCompanyId);
@@ -144,7 +146,10 @@ export class MarketplaceReviewsService {
     await this.prisma.marketplaceReviewResponse.create({
       data: { reviewId, createdById: user.id, text: dto.text.trim() },
     });
-    const updated = await this.prisma.marketplaceReview.findUniqueOrThrow({ where: { id: reviewId }, include: reviewInclude });
+    const updated = await this.prisma.marketplaceReview.findUniqueOrThrow({
+      where: { id: reviewId },
+      include: reviewInclude,
+    });
     await this.notifyCompanyOwner(
       review.fromCompanyId,
       "marketplace.review.answered",
@@ -237,7 +242,13 @@ export class MarketplaceReviewsService {
     }));
   }
 
-  private async notifyCompanyOwner(companyId: string, eventType: string, title: string, body: string, sourceId: string) {
+  private async notifyCompanyOwner(
+    companyId: string,
+    eventType: string,
+    title: string,
+    body: string,
+    sourceId: string,
+  ) {
     const owner = await this.prisma.user.findFirst({
       where: { companyId, companyRole: "owner" },
       select: { id: true },

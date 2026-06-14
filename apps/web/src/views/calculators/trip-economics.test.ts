@@ -93,10 +93,7 @@ describe("crew: схемы оплаты", () => {
       40,
       500,
       ctx({
-        workers: [
-          worker({ type: "hour", value: 300 }),
-          worker({ type: "percent", value: 10, base: "margin" }),
-        ],
+        workers: [worker({ type: "hour", value: 300 }), worker({ type: "percent", value: 10, base: "margin" })],
       }),
     );
     expect(r.perWorker[0]?.cost).toBeCloseTo(630, 5);

@@ -328,9 +328,7 @@ describe("Marketplace — объявления (фаза 1)", () => {
     const archived = await ctx.http.post(`/api/marketplace/listings/${draft.body.id}/archive`).set(bearer(token));
     expect(archived.body.status).toBe("archived");
 
-    const republished = await ctx.http
-      .post(`/api/marketplace/listings/${draft.body.id}/republish`)
-      .set(bearer(token));
+    const republished = await ctx.http.post(`/api/marketplace/listings/${draft.body.id}/republish`).set(bearer(token));
     expect(republished.status).toBe(201);
     expect(republished.body.status).toBe("draft");
     expect(republished.body.id).not.toBe(draft.body.id);
@@ -528,7 +526,7 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
           items: [
             {
               full_name: "Россия, Московская область, Мытищи",
-              point: { lat: 55.910483, lon: 37.736330 },
+              point: { lat: 55.910483, lon: 37.73633 },
               adm_div: [
                 { type: "country", name: "Россия" },
                 { type: "region", name: "Московская область" },
@@ -550,18 +548,14 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
         expect(offer.status).toBe(201);
         expect(offer.body.city).toBe("Мытищи");
 
-        const sellerView = await ctx.http
-          .get(`/api/marketplace/listings/${listingId}/offers`)
-          .set(bearer(sellerToken));
+        const sellerView = await ctx.http.get(`/api/marketplace/listings/${listingId}/offers`).set(bearer(sellerToken));
         expect(sellerView.status).toBe(200);
         expect(sellerView.body[0].buyerContact).toBeNull();
         expect(sellerView.body[0].city).toBeNull();
         expect(sellerView.body[0].region).toBe("Московская область");
         expect(JSON.stringify(sellerView.body[0])).not.toContain("Мытищи");
 
-        const accept = await ctx.http
-          .post(`/api/marketplace/offers/${offer.body.id}/accept`)
-          .set(bearer(sellerToken));
+        const accept = await ctx.http.post(`/api/marketplace/offers/${offer.body.id}/accept`).set(bearer(sellerToken));
         expect(accept.status).toBe(201);
         expect(accept.body.city).toBeNull();
         expect(accept.body.buyerContact?.city).toBe("Мытищи");
@@ -1191,9 +1185,7 @@ describe("Marketplace — модерация (фаза 5)", () => {
     expect(feed.body.items.find((item) => item.id === listingId)).toBeUndefined();
 
     // Снятое модератором объявление переподать нельзя (обход модерации).
-    const republish = await ctx.http
-      .post(`/api/marketplace/listings/${listingId}/republish`)
-      .set(bearer(seller.token));
+    const republish = await ctx.http.post(`/api/marketplace/listings/${listingId}/republish`).set(bearer(seller.token));
     expect(republish.status).toBe(403);
   });
 

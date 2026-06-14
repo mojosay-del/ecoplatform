@@ -168,7 +168,10 @@ export function ListingMap({
           coordinates,
         });
       } else {
-        objectsRef.current.set(listing.id, createDot(listing.id, coordinates, color, isFreshListing(listing.publishedAt)));
+        objectsRef.current.set(
+          listing.id,
+          createDot(listing.id, coordinates, color, isFreshListing(listing.publishedAt)),
+        );
       }
     }
 

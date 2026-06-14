@@ -14,7 +14,12 @@ import { ApiError, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
-import { DOC_CATEGORY_ICON_TYPE, EMPTY_CATEGORY_DRAFT, EMPTY_DOCUMENT_DRAFT, UNCATEGORIZED_GROUP_ID } from "./constants";
+import {
+  DOC_CATEGORY_ICON_TYPE,
+  EMPTY_CATEGORY_DRAFT,
+  EMPTY_DOCUMENT_DRAFT,
+  UNCATEGORIZED_GROUP_ID,
+} from "./constants";
 import { DocCategoryCreateForm } from "./create-category-form";
 import { DocDetailForm } from "./detail-form";
 import { DocEmptyDetail } from "./empty-detail";
@@ -288,9 +293,7 @@ export function AdminDocumentationView() {
       const result = await persistDocDraft();
       setMessage(draft.id ? `${label} обновлён.` : `${label} создан как черновик.`);
       if (wasNew && draft.kind === "document" && parentId) {
-        const nextPosition = result.items.filter(
-          (item) => !isDocCategory(item) && item.parentId === parentId,
-        ).length;
+        const nextPosition = result.items.filter((item) => !isDocCategory(item) && item.parentId === parentId).length;
         startNewDocument(parentId, nextPosition);
       }
     } catch (error) {

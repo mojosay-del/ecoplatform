@@ -10,7 +10,13 @@ import { AppShell } from "../../components/AppShell";
 import { ApiError, api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
-import { ListingStatusBadge, archiveReasonLabel, formatWeight, positionsSummaryText, totalWeightKg } from "./listing-ui";
+import {
+  ListingStatusBadge,
+  archiveReasonLabel,
+  formatWeight,
+  positionsSummaryText,
+  totalWeightKg,
+} from "./listing-ui";
 
 export function MyListingsView() {
   const [refresh, setRefresh] = useState(0);
@@ -76,8 +82,7 @@ export function MyListingsView() {
           </p>
         ) : listings.length === 0 ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            У вас пока нет объявлений.{" "}
-            <Link href="/marketplace/new">Разместить первое</Link>.
+            У вас пока нет объявлений. <Link href="/marketplace/new">Разместить первое</Link>.
           </p>
         ) : (
           <div className="mp-mylist">

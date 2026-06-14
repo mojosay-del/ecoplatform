@@ -142,7 +142,11 @@ export class VideoTranscodeService {
     }
   }
 
-  private async setStatus(assetId: string, status: "processing" | "ready" | "failed", renditions: StoredVideoRendition[]) {
+  private async setStatus(
+    assetId: string,
+    status: "processing" | "ready" | "failed",
+    renditions: StoredVideoRendition[],
+  ) {
     await this.prisma.fileAsset.update({
       where: { id: assetId },
       data: {

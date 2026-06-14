@@ -167,7 +167,11 @@ describe("Documentation: pinned & recent", () => {
     const uploader = await adminId();
 
     const pinnedFile = await createDocFileAsset(uploader, "akt.xlsx");
-    const pinned = await createDraftDocument(adminToken, { title: "Акт приёма-передачи", fileAssetId: pinnedFile.id, isPinned: true });
+    const pinned = await createDraftDocument(adminToken, {
+      title: "Акт приёма-передачи",
+      fileAssetId: pinnedFile.id,
+      isPinned: true,
+    });
     await publishDocument(adminToken, pinned.id);
 
     const plainFile = await createDocFileAsset(uploader, "spec.pdf");
