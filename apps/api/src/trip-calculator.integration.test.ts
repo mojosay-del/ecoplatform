@@ -60,11 +60,16 @@ describe("Калькулятор рейса: настройки компании
 
   it("повторное сохранение перезаписывает блок (upsert), компания делит один набор", async () => {
     const { token } = await registerCompany("911");
+    const twoVehicleSettings = {
+      ...validSettings,
+      selectedVehicleId: "v2",
+      vehicles: [...validSettings.vehicles, { id: "v2", name: "Грузовик 5т", fuel: "25", deprec: "15", speed: "55" }],
+    };
 
     await ctx.http
       .patch("/api/trip-calculator/settings")
       .set("Authorization", `Bearer ${token}`)
-      .send(validSettings);
+      .send(twoVehicleSettings);
 
     const updated = await ctx.http
       .patch("/api/trip-calculator/settings")
@@ -72,7 +77,16 @@ describe("Калькулятор рейса: настройки компании
       .send({ ...validSettings, fuelPrice: "62", workers: [{ ...validSettings.workers[0], value: "350" }] });
     expect(updated.status).toBe(200);
     expect(updated.body.fuelPrice).toBe("62");
+    expect(updated.body.vehicles).toHaveLength(1);
+    expect(updated.body.vehicles[0].id).toBe("v1");
+    expect(updated.body.selectedVehicleId).toBe("v1");
     expect(updated.body.workers[0].value).toBe("350");
+
+    const reread = await ctx.http.get("/api/trip-calculator/settings").set("Authorization", `Bearer ${token}`);
+    expect(reread.status).toBe(200);
+    expect(reread.body.settings.vehicles).toHaveLength(1);
+    expect(reread.body.settings.vehicles[0].id).toBe("v1");
+    expect(reread.body.settings.selectedVehicleId).toBe("v1");
   });
 
   it("трейдер не имеет доступа: 403 на чтение и сохранение", async () => {

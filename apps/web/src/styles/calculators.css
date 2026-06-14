@@ -55,45 +55,111 @@
   gap: 8px;
 }
 
-.tc-vehicle-chip,
-.tc-vehicle-add {
+.tc-vehicle-pill {
+  display: inline-flex;
+  align-items: stretch;
   min-height: 36px;
-  padding: 7px 14px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-chip);
   background: var(--surface-elevated);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.tc-vehicle-chip,
+.tc-vehicle-remove,
+.tc-vehicle-add {
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
   transition:
     background 120ms ease,
     color 120ms ease,
     border-color 120ms ease;
 }
 
-.tc-vehicle-chip:hover {
+.tc-vehicle-chip {
+  min-height: 36px;
+  padding: 7px 12px 7px 14px;
+  border: none;
+  background: transparent;
+}
+
+.tc-vehicle-pill:hover {
   border-color: var(--border-strong);
 }
 
-.tc-vehicle-chip.is-active {
+.tc-vehicle-pill.is-active {
   background: var(--text-strong);
   border-color: var(--text-strong);
+}
+
+.tc-vehicle-pill.is-active .tc-vehicle-chip {
   color: var(--text-inverse);
+}
+
+.tc-vehicle-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-disabled);
+}
+
+.tc-vehicle-pill.is-active .tc-vehicle-remove {
+  border-left-color: color-mix(in srgb, var(--text-inverse) 22%, transparent);
+  color: color-mix(in srgb, var(--text-inverse) 72%, transparent);
+}
+
+.tc-vehicle-remove:hover {
+  background: var(--danger-soft);
+  color: var(--danger-text);
 }
 
 .tc-vehicle-add {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 36px;
   padding: 7px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-chip);
+  background: var(--surface-elevated);
   color: var(--text-muted);
+  box-shadow: var(--shadow-sm);
 }
 
 .tc-vehicle-add:hover {
   color: var(--brand);
   border-color: var(--brand-muted-border);
+}
+
+.tc-vehicle-chip:focus-visible,
+.tc-vehicle-remove:focus-visible,
+.tc-vehicle-add:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tc-vehicle-remove:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
+.tc-main-grid,
+.tc-primary-stack,
+.tc-side-stack {
+  display: grid;
+  gap: 14px;
 }
 
 /* Карточка-вердикт */
@@ -623,6 +689,24 @@
   color: var(--text-muted);
 }
 
+@media (min-width: 1024px) {
+  .tc-shell {
+    max-width: 1120px;
+    gap: 16px;
+  }
+
+  .tc-main-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+    align-items: start;
+    gap: 16px;
+  }
+
+  .tc-settings-body {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr) minmax(260px, 0.8fr);
+    align-items: start;
+  }
+}
+
 @media (max-width: 380px) {
   .tc-material-chips {
     grid-template-columns: repeat(2, 1fr);
@@ -630,7 +714,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .tc-vehicle-pill,
   .tc-vehicle-chip,
+  .tc-vehicle-remove,
   .tc-material-chip,
   .tc-field-control,
   .tc-chevron,
