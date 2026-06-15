@@ -91,11 +91,10 @@ function referencePrisma(overrides: Record<string, unknown> = {}) {
     learningModule: { count: vi.fn().mockResolvedValue(0) },
     lesson: { count: vi.fn().mockResolvedValue(0) },
     knowledgeBaseArticle: { count: vi.fn().mockResolvedValue(0) },
+    documentationArticle: { count: vi.fn().mockResolvedValue(0) },
+    listingMedia: { count: vi.fn().mockResolvedValue(0) },
     lessonAttachment: { count: vi.fn().mockResolvedValue(0) },
     commentAttachment: { count: vi.fn().mockResolvedValue(0) },
-    newsContentBlock: { findMany: vi.fn().mockResolvedValue([]) },
-    lessonContentBlock: { findMany: vi.fn().mockResolvedValue([]) },
-    knowledgeBaseBlock: { findMany: vi.fn().mockResolvedValue([]) },
     fileReference: { count: vi.fn().mockResolvedValue(0) },
     user: {
       count: vi.fn().mockResolvedValue(0),
@@ -189,17 +188,45 @@ describe("FilesService cleanup", () => {
     expect(prisma.fileAsset.delete).not.toHaveBeenCalled();
   });
 
-  it("сохраняет файл, если он встречается в payload блока контента", async () => {
+  it("сохраняет файл, если он указан как основной файл документации", async () => {
     const prisma = referencePrisma({
-      lessonContentBlock: {
-        findMany: vi.fn().mockResolvedValue([{ payload: { images: [{ fileId: "file-1" }] } }]),
-      },
+      documentationArticle: { count: vi.fn().mockResolvedValue(1) },
     });
     const service = serviceWithPrisma(prisma);
 
     await service.deleteIfUnreferenced(["file-1"]);
 
     expect(prisma.fileAsset.delete).not.toHaveBeenCalled();
+  });
+
+  it("сохраняет файл, если он указан в медиа объявления", async () => {
+    const prisma = referencePrisma({
+      listingMedia: { count: vi.fn().mockResolvedValue(1) },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await service.deleteIfUnreferenced(["file-1"]);
+
+    expect(prisma.fileAsset.delete).not.toHaveBeenCalled();
+  });
+
+  it("не сканирует payload content-блоков при удалении файла", async () => {
+    const newsContentBlock = { findMany: vi.fn().mockRejectedValue(new Error("Не должен сканировать блоки.")) };
+    const lessonContentBlock = { findMany: vi.fn().mockRejectedValue(new Error("Не должен сканировать блоки.")) };
+    const knowledgeBaseBlock = { findMany: vi.fn().mockRejectedValue(new Error("Не должен сканировать блоки.")) };
+    const prisma = referencePrisma({
+      newsContentBlock,
+      lessonContentBlock,
+      knowledgeBaseBlock,
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await service.deleteIfUnreferenced(["file-1"]);
+
+    expect(newsContentBlock.findMany).not.toHaveBeenCalled();
+    expect(lessonContentBlock.findMany).not.toHaveBeenCalled();
+    expect(knowledgeBaseBlock.findMany).not.toHaveBeenCalled();
+    expect(prisma.fileAsset.delete).toHaveBeenCalledWith({ where: { id: "file-1" } });
   });
 
   it("запрещает content manager удалять чужой неиспользуемый файл", async () => {

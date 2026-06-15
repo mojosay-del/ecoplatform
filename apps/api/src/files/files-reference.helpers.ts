@@ -24,23 +24,6 @@ export function collectFileIdsFromPayload(payload: unknown, fileIds = new Set<st
   return fileIds;
 }
 
-export function payloadContainsFileId(payload: unknown, fileId: string): boolean {
-  if (!payload || typeof payload !== "object") {
-    return false;
-  }
-
-  if (Array.isArray(payload)) {
-    return payload.some((value) => payloadContainsFileId(value, fileId));
-  }
-
-  const record = payload as Record<string, unknown>;
-  if (record.fileId === fileId) {
-    return true;
-  }
-
-  return Object.values(record).some((value) => payloadContainsFileId(value, fileId));
-}
-
 export async function replaceEntityFileReferences(
   deps: FilesReferenceDeps,
   entityType: string,
@@ -81,69 +64,102 @@ export async function clearEntityFileReferences(
   await deps.prisma.fileReference.deleteMany({ where: { entityType, entityId } });
 }
 
-export async function backfillFileReferences(deps: FilesReferenceDeps): Promise<{ scanned: number }> {
-  const existing = await deps.prisma.fileReference.count();
-  if (existing > 0) {
-    return { scanned: 0 };
-  }
+async function shouldBackfillEntityType(deps: FilesReferenceDeps, entityType: string): Promise<boolean> {
+  const existing = await deps.prisma.fileReference.count({ where: { entityType } });
+  return existing === 0;
+}
 
+export async function backfillFileReferences(deps: FilesReferenceDeps): Promise<{ scanned: number }> {
   let scanned = 0;
 
-  const newsPosts = await deps.prisma.newsPost.findMany({ include: { blocks: true } });
-  for (const post of newsPosts) {
-    const fileIds = compactFileIds([
-      post.coverImageId,
-      ...post.blocks.flatMap((block) => Array.from(collectFileIdsFromPayload(block.payload))),
-    ]);
-    if (fileIds.length === 0) {
-      continue;
+  if (await shouldBackfillEntityType(deps, "news_post")) {
+    const newsPosts = await deps.prisma.newsPost.findMany({ include: { blocks: true } });
+    for (const post of newsPosts) {
+      const fileIds = compactFileIds([
+        post.coverImageId,
+        ...post.blocks.flatMap((block) => Array.from(collectFileIdsFromPayload(block.payload))),
+      ]);
+      if (fileIds.length === 0) {
+        continue;
+      }
+      await replaceEntityFileReferences(deps, "news_post", post.id, fileIds);
+      scanned += 1;
     }
-    await replaceEntityFileReferences(deps, "news_post", post.id, fileIds);
-    scanned += 1;
   }
 
-  const articles = await deps.prisma.knowledgeBaseArticle.findMany({ include: { blocks: true } });
-  for (const article of articles) {
-    const fileIds = compactFileIds([
-      article.coverImageId,
-      ...article.blocks.flatMap((block) => Array.from(collectFileIdsFromPayload(block.payload))),
-    ]);
-    if (fileIds.length === 0) {
-      continue;
+  if (await shouldBackfillEntityType(deps, "knowledge_base_article")) {
+    const articles = await deps.prisma.knowledgeBaseArticle.findMany({ include: { blocks: true } });
+    for (const article of articles) {
+      const fileIds = compactFileIds([
+        article.coverImageId,
+        ...article.blocks.flatMap((block) => Array.from(collectFileIdsFromPayload(block.payload))),
+      ]);
+      if (fileIds.length === 0) {
+        continue;
+      }
+      await replaceEntityFileReferences(deps, "knowledge_base_article", article.id, fileIds);
+      scanned += 1;
     }
-    await replaceEntityFileReferences(deps, "knowledge_base_article", article.id, fileIds);
-    scanned += 1;
   }
 
-  const modules = await deps.prisma.learningModule.findMany({
-    include: {
-      chapters: {
-        include: {
-          lessons: {
-            include: { blocks: true, attachments: true },
+  if (await shouldBackfillEntityType(deps, "learning_module")) {
+    const modules = await deps.prisma.learningModule.findMany({
+      include: {
+        chapters: {
+          include: {
+            lessons: {
+              include: { blocks: true, attachments: true },
+            },
           },
         },
       },
-    },
-  });
-  for (const module of modules) {
-    const fileIds = compactFileIds([
-      module.coverImageId,
-      ...module.chapters.flatMap((chapter) =>
-        chapter.lessons.flatMap((lesson) => [
-          lesson.coverImageId,
-          ...Array.from(
-            lesson.blocks.reduce((ids, block) => collectFileIdsFromPayload(block.payload, ids), new Set<string>()),
-          ),
-          ...lesson.attachments.map((attachment) => attachment.fileId),
-        ]),
-      ),
-    ]);
-    if (fileIds.length === 0) {
-      continue;
+    });
+    for (const module of modules) {
+      const fileIds = compactFileIds([
+        module.coverImageId,
+        ...module.chapters.flatMap((chapter) =>
+          chapter.lessons.flatMap((lesson) => [
+            lesson.coverImageId,
+            ...Array.from(
+              lesson.blocks.reduce((ids, block) => collectFileIdsFromPayload(block.payload, ids), new Set<string>()),
+            ),
+            ...lesson.attachments.map((attachment) => attachment.fileId),
+          ]),
+        ),
+      ]);
+      if (fileIds.length === 0) {
+        continue;
+      }
+      await replaceEntityFileReferences(deps, "learning_module", module.id, fileIds);
+      scanned += 1;
     }
-    await replaceEntityFileReferences(deps, "learning_module", module.id, fileIds);
-    scanned += 1;
+  }
+
+  if (await shouldBackfillEntityType(deps, "documentation_article")) {
+    const documents = await deps.prisma.documentationArticle.findMany({ include: { blocks: true } });
+    for (const document of documents) {
+      const fileIds = compactFileIds([
+        document.fileAssetId,
+        ...document.blocks.flatMap((block) => Array.from(collectFileIdsFromPayload(block.payload))),
+      ]);
+      if (fileIds.length === 0) {
+        continue;
+      }
+      await replaceEntityFileReferences(deps, "documentation_article", document.id, fileIds);
+      scanned += 1;
+    }
+  }
+
+  if (await shouldBackfillEntityType(deps, "marketplace_listing")) {
+    const listings = await deps.prisma.marketplaceListing.findMany({ include: { media: true } });
+    for (const listing of listings) {
+      const fileIds = compactFileIds(listing.media.map((item) => item.fileId));
+      if (fileIds.length === 0) {
+        continue;
+      }
+      await replaceEntityFileReferences(deps, "marketplace_listing", listing.id, fileIds);
+      scanned += 1;
+    }
   }
 
   return { scanned };

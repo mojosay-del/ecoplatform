@@ -656,18 +656,20 @@ model FileAsset {
   avatarUsers     User[]          @relation("UserAvatar")
 }
 
-// Полиморфная таблица «кто на какой файл ссылается». Заменяет старый
-// scan всех NewsContentBlock/LessonContentBlock/KnowledgeBaseBlock в
-// `deleteIfUnreferenced` — теперь это `count({ where: { fileId } })`.
+// Полиморфная таблица «кто на какой файл ссылается». Content-блоки,
+// документация и медиа объявлений ведут ссылки явно, поэтому
+// `deleteIfUnreferenced` проверяет индексный `count({ where: { fileId } })`
+// вместо scan всех JSON-payload.
 //
 // Поддерживается сервисами явно через `FilesService.replaceFileReferences()`.
-// На прод-стенде заполняется backfill'ом при первом запуске (если таблица
-// пустая, но есть существующий контент).
+// На прод-стенде дозаполняется backfill'ом по типам сущностей: новый тип
+// не пропускается только из-за того, что в таблице уже есть строки других типов.
 model FileReference {
   id         String    @id @default(cuid())
   fileId     String
   file       FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  // 'news_post' | 'learning_module' | 'lesson' | 'knowledge_base_article' | 'comment'
+  // Сейчас: news_post, learning_module, knowledge_base_article,
+  // documentation_article, marketplace_listing.
   entityType String
   entityId   String
   createdAt  DateTime  @default(now())

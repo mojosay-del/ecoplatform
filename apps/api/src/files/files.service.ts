@@ -26,7 +26,6 @@ import {
 import {
   backfillFileReferences,
   clearEntityFileReferences,
-  payloadContainsFileId,
   replaceEntityFileReferences,
   type FilesReferenceDeps,
 } from "./files-reference.helpers";
@@ -58,8 +57,6 @@ export type UploadedMemoryFile = {
   buffer: Buffer;
 };
 export type FileUploadRestriction = "media_only";
-
-type FileReferenceBlock = { payload: unknown };
 
 type ValidatedUpload = {
   buffer: Buffer;
@@ -475,31 +472,19 @@ export class FilesService {
   }
 
   private async hasStructuredReference(fileId: string) {
-    const [newsCovers, learningCovers, lessonCovers, knowledgeCovers, lessonAttachments, commentAttachments, avatars] =
-      await Promise.all([
-        this.prisma.newsPost.count({ where: { coverImageId: fileId } }),
-        this.prisma.learningModule.count({ where: { coverImageId: fileId } }),
-        this.prisma.lesson.count({ where: { coverImageId: fileId } }),
-        this.prisma.knowledgeBaseArticle.count({ where: { coverImageId: fileId } }),
-        this.prisma.lessonAttachment.count({ where: { fileId } }),
-        this.prisma.commentAttachment.count({ where: { fileId } }),
-        this.prisma.user.count({ where: { avatarFileId: fileId } }),
-      ]);
-
-    return (
-      newsCovers + learningCovers + lessonCovers + knowledgeCovers + lessonAttachments + commentAttachments + avatars >
-      0
-    );
-  }
-
-  private async hasBlockReference(fileId: string) {
-    const blockGroups: FileReferenceBlock[][] = await Promise.all([
-      this.prisma.newsContentBlock.findMany({ select: { payload: true } }),
-      this.prisma.lessonContentBlock.findMany({ select: { payload: true } }),
-      this.prisma.knowledgeBaseBlock.findMany({ select: { payload: true } }),
+    const counts = await Promise.all([
+      this.prisma.newsPost.count({ where: { coverImageId: fileId } }),
+      this.prisma.learningModule.count({ where: { coverImageId: fileId } }),
+      this.prisma.lesson.count({ where: { coverImageId: fileId } }),
+      this.prisma.knowledgeBaseArticle.count({ where: { coverImageId: fileId } }),
+      this.prisma.documentationArticle.count({ where: { fileAssetId: fileId } }),
+      this.prisma.listingMedia.count({ where: { fileId } }),
+      this.prisma.lessonAttachment.count({ where: { fileId } }),
+      this.prisma.commentAttachment.count({ where: { fileId } }),
+      this.prisma.user.count({ where: { avatarFileId: fileId } }),
     ]);
 
-    return blockGroups.some((blocks) => blocks.some((block) => payloadContainsFileId(block.payload, fileId)));
+    return counts.some((count) => count > 0);
   }
 
   private canDeleteAsset(asset: FileAsset, actor?: RequestUser): boolean {
@@ -515,14 +500,13 @@ export class FilesService {
     let deleted = 0;
 
     for (const fileId of uniqueIds) {
-      const [asset, referenceCount, hasStructuredReference, hasBlockReference] = await Promise.all([
+      const [asset, referenceCount, hasStructuredReference] = await Promise.all([
         this.prisma.fileAsset.findUnique({ where: { id: fileId } }),
         this.prisma.fileReference.count({ where: { fileId } }),
         this.hasStructuredReference(fileId),
-        this.hasBlockReference(fileId),
       ]);
 
-      if (!asset || referenceCount > 0 || hasStructuredReference || hasBlockReference) {
+      if (!asset || referenceCount > 0 || hasStructuredReference) {
         continue;
       }
 
