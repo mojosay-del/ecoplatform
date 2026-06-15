@@ -6,79 +6,30 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MarketplaceListingListItem, MarketplaceNomenclatureOption } from "@ecoplatform/shared";
-import { haversineKm } from "@ecoplatform/shared";
-import { Check, ChevronDown, X } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
-import { api, preferredFileAssetImageUrl } from "../../lib/api";
+import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
-import { ListingCard, ListingCardSkeleton, totalWeightKg, useNomenclatureOptions } from "./listing-ui";
+import { useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
-import { MATERIAL_LEGEND, materialColor } from "./materials";
-import { type MapViewBounds, ListingMap } from "./ListingMap";
-
-type SortMode = "date" | "distance" | "weight" | "expires";
-type FilterPopover = "nomenclature" | "region" | "sort";
-
-// Категория сырья со своими номенклатурами — чип фильтра + группа в «Точнее».
-type NomenclatureGroup = {
-  slug: string;
-  name: string;
-  options: MarketplaceNomenclatureOption[];
-};
-
-// Состояние чипа категории: не выбрана / выбрана часть номенклатур / вся.
-function groupSelectionState(group: NomenclatureGroup, selected: string[]): "none" | "partial" | "all" {
-  const count = group.options.filter((option) => selected.includes(option.id)).length;
-  if (count === 0) return "none";
-  return count === group.options.length ? "all" : "partial";
-}
-
-type SortOption = {
-  value: SortMode;
-  label: string;
-  description: string;
-  requiresCompanyPoint?: boolean;
-};
-
-const DEFAULT_SORT_OPTION: SortOption = {
-  value: "date",
-  label: "Сначала новые",
-  description: "Свежие объявления выше остальных.",
-};
-
-const SORT_OPTIONS: SortOption[] = [
+import { MATERIAL_LEGEND } from "./materials";
+import { ListingMap } from "./ListingMap";
+import {
+  type CompanyPoint,
+  type FilterPopover,
+  type SortMode,
   DEFAULT_SORT_OPTION,
-  {
-    value: "distance",
-    label: "Ближе ко мне",
-    description: "Сначала партии рядом с вашей компанией.",
-    requiresCompanyPoint: true,
-  },
-  { value: "weight", label: "Больше объём", description: "Крупные партии показываются первыми." },
-  { value: "expires", label: "Скоро истекают", description: "Объявления с ближайшим окончанием выше." },
-];
-
-const MARKETPLACE_FEED_PAGE_SIZE = 40;
-
-function toggle(list: string[], value: string): string[] {
-  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
-}
-
-function dateValue(value: string | null, fallback: number): number {
-  if (!value) return fallback;
-  const timestamp = Date.parse(value);
-  return Number.isNaN(timestamp) ? fallback : timestamp;
-}
-
-// Границы карты → bbox-параметр API. 5 знаков ≈ метровая точность.
-function formatBbox(bounds: MapViewBounds): string {
-  const fixed = (value: number) => value.toFixed(5);
-  return `${fixed(bounds.south)},${fixed(bounds.west)},${fixed(bounds.north)},${fixed(bounds.east)}`;
-}
+  MARKETPLACE_FEED_PAGE_SIZE,
+  availableSortOptions,
+  distanceByListingId,
+  formatBbox,
+  groupNomenclatureOptions,
+  sortMarketplaceListings,
+} from "./marketplace-feed";
+import { MarketplaceFeedList } from "./marketplace-feed-list";
+import { MarketplaceActiveFilters, MarketplaceFilterBar, useMarketplaceFilterDismiss } from "./marketplace-filters";
 
 export function MarketplaceView() {
   const { ready, token, user } = useAuth();
@@ -91,7 +42,7 @@ export function MarketplaceView() {
   const [selectedNomenclature, setSelectedNomenclature] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortMode>("date");
   const [openPopover, setOpenPopover] = useState<FilterPopover | null>(null);
-  const [companyPoint, setCompanyPoint] = useState<{ lat: number; lon: number } | null>(null);
+  const [companyPoint, setCompanyPoint] = useState<CompanyPoint | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Hover-синхронизация ленты и карты (id объявления под курсором).
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -102,6 +53,8 @@ export function MarketplaceView() {
   // Узкие экраны: сплит сворачивается, активна либо лента, либо карта.
   const [mobileView, setMobileView] = useState<"list" | "map">("list");
   const filtersRef = useRef<HTMLDivElement>(null);
+
+  useMarketplaceFilterDismiss(filtersRef, setOpenPopover);
 
   useEffect(() => {
     if (!ready || !token) return;
@@ -120,25 +73,6 @@ export function MarketplaceView() {
       })
       .catch(() => undefined);
   }, [ready, token]);
-
-  useEffect(() => {
-    function closeOnOutsideClick(event: PointerEvent) {
-      if (filtersRef.current && !filtersRef.current.contains(event.target as Node)) {
-        setOpenPopover(null);
-      }
-    }
-
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpenPopover(null);
-    }
-
-    document.addEventListener("pointerdown", closeOnOutsideClick);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, []);
 
   useEffect(() => {
     if (sortBy === "distance" && !companyPoint) {
@@ -160,73 +94,14 @@ export function MarketplaceView() {
       }),
   );
 
-  // Расстояния от адреса компании до отображаемых центров кругов — для
-  // сортировки «Ближе ко мне» и подписи «≈ N км» на карточках.
-  const distanceById = useMemo(() => {
-    if (!companyPoint) return null;
-    const map = new Map<string, number>();
-    for (const listing of items) {
-      if (listing.circleLat != null && listing.circleLon != null) {
-        map.set(listing.id, haversineKm(companyPoint, { lat: listing.circleLat, lon: listing.circleLon }));
-      }
-    }
-    return map;
-  }, [items, companyPoint]);
+  const distanceById = useMemo(() => distanceByListingId(items, companyPoint), [items, companyPoint]);
+  const listings = useMemo(() => sortMarketplaceListings(items, sortBy, distanceById), [items, sortBy, distanceById]);
 
-  const listings = useMemo(() => {
-    const sortedItems = [...items];
-    const newestFirst = (a: MarketplaceListingListItem, b: MarketplaceListingListItem) =>
-      dateValue(b.publishedAt, 0) - dateValue(a.publishedAt, 0);
-    const distance = (listing: MarketplaceListingListItem) => distanceById?.get(listing.id) ?? Number.POSITIVE_INFINITY;
-
-    if (sortBy === "distance") {
-      sortedItems.sort((a, b) => distance(a) - distance(b) || newestFirst(a, b));
-    } else if (sortBy === "weight") {
-      sortedItems.sort((a, b) => totalWeightKg(b.positions) - totalWeightKg(a.positions) || newestFirst(a, b));
-    } else if (sortBy === "expires") {
-      sortedItems.sort(
-        (a, b) =>
-          dateValue(a.expiresAt, Number.POSITIVE_INFINITY) - dateValue(b.expiresAt, Number.POSITIVE_INFINITY) ||
-          newestFirst(a, b),
-      );
-    } else {
-      sortedItems.sort(newestFirst);
-    }
-    return sortedItems;
-  }, [items, sortBy, distanceById]);
-
-  const sortOptions = useMemo(
-    () => SORT_OPTIONS.filter((option) => !option.requiresCompanyPoint || companyPoint),
-    [companyPoint],
-  );
+  const sortOptions = useMemo(() => availableSortOptions(companyPoint), [companyPoint]);
   const selectedSort = sortOptions.find((option) => option.value === sortBy) ?? DEFAULT_SORT_OPTION;
   const hasActiveFilters = selectedRegions.length > 0 || selectedNomenclature.length > 0 || mapBbox !== null;
 
-  // Номенклатура, сгруппированная по категориям (порядок справочника сохранён).
-  const nomenclatureGroups = useMemo<NomenclatureGroup[]>(() => {
-    const groups: NomenclatureGroup[] = [];
-    const bySlug = new Map<string, NomenclatureGroup>();
-    for (const option of nomenclature) {
-      let group = bySlug.get(option.categorySlug);
-      if (!group) {
-        group = { slug: option.categorySlug, name: option.category, options: [] };
-        bySlug.set(option.categorySlug, group);
-        groups.push(group);
-      }
-      group.options.push(option);
-    }
-    return groups;
-  }, [nomenclature]);
-
-  // Чип категории: «вся выбрана» → снять; «нет/часть» → выбрать целиком.
-  function toggleGroup(group: NomenclatureGroup) {
-    const ids = group.options.map((option) => option.id);
-    setSelectedNomenclature((prev) => {
-      const allSelected = ids.every((id) => prev.includes(id));
-      if (allSelected) return prev.filter((id) => !ids.includes(id));
-      return [...new Set([...prev, ...ids])];
-    });
-  }
+  const nomenclatureGroups = useMemo(() => groupNomenclatureOptions(nomenclature), [nomenclature]);
 
   function resetFilters() {
     setSelectedRegions([]);
@@ -236,208 +111,6 @@ export function MarketplaceView() {
 
   const coverIds = listings.map((listing) => listing.coverFileId).filter((id): id is string => Boolean(id));
   const assets = useFileAssetsByIds(coverIds);
-  const filterBar = (
-    <div className="mp-filterbar" ref={filtersRef}>
-      {/* Чипы категорий сырья — те же цвета, что круги на карте. */}
-      <div aria-label="Категории сырья" className="mp-material-chips" role="group">
-        {nomenclatureGroups.map((group) => {
-          const state = groupSelectionState(group, selectedNomenclature);
-          const color = materialColor(group.slug);
-          const selectedCount = group.options.filter((option) => selectedNomenclature.includes(option.id)).length;
-          return (
-            <button
-              aria-pressed={state !== "none"}
-              className={`mp-material-chip${state === "all" ? " is-active" : ""}${state === "partial" ? " is-partial" : ""}`}
-              key={group.slug}
-              style={state !== "none" ? { borderColor: color, color, backgroundColor: `${color}14` } : undefined}
-              type="button"
-              onClick={() => toggleGroup(group)}
-            >
-              <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
-              {group.name}
-              {state === "partial" ? (
-                <span className="mp-material-chip-count" style={{ backgroundColor: color }}>
-                  {selectedCount}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mp-filterbar-group">
-        <div className={`mp-filter-popover${openPopover === "nomenclature" ? " is-open" : ""}`}>
-          <button
-            aria-controls="marketplace-nomenclature-popover"
-            aria-expanded={openPopover === "nomenclature"}
-            className="mp-filter-trigger"
-            type="button"
-            onClick={() => setOpenPopover((value) => (value === "nomenclature" ? null : "nomenclature"))}
-          >
-            <span>Точнее</span>
-            <ChevronDown aria-hidden="true" size={16} />
-          </button>
-          {openPopover === "nomenclature" ? (
-            <div className="mp-filter-menu mp-filter-menu-grouped" id="marketplace-nomenclature-popover">
-              {nomenclatureGroups.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
-              {nomenclatureGroups.map((group) => (
-                <div className="mp-filter-group" key={group.slug}>
-                  <div className="mp-filter-group-title">
-                    <i
-                      aria-hidden="true"
-                      className="mp-material-dot"
-                      style={{ backgroundColor: materialColor(group.slug) }}
-                    />
-                    {group.name}
-                  </div>
-                  {group.options.map((option) => (
-                    <label className="mp-filter-option" key={option.id}>
-                      <input
-                        type="checkbox"
-                        checked={selectedNomenclature.includes(option.id)}
-                        onChange={() => setSelectedNomenclature((prev) => toggle(prev, option.id))}
-                      />
-                      <span>{option.name}</span>
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className={`mp-filter-popover${openPopover === "region" ? " is-open" : ""}`}>
-          <button
-            aria-controls="marketplace-region-popover"
-            aria-expanded={openPopover === "region"}
-            className="mp-filter-trigger"
-            type="button"
-            onClick={() => setOpenPopover((value) => (value === "region" ? null : "region"))}
-          >
-            <span>Регион{selectedRegions.length ? ` · ${selectedRegions.length}` : ""}</span>
-            <ChevronDown aria-hidden="true" size={16} />
-          </button>
-          {openPopover === "region" ? (
-            <div className="mp-filter-menu" id="marketplace-region-popover">
-              {regions.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
-              {regions.map((region) => (
-                <label className="mp-filter-option" key={region}>
-                  <input
-                    type="checkbox"
-                    checked={selectedRegions.includes(region)}
-                    onChange={() => setSelectedRegions((prev) => toggle(prev, region))}
-                  />
-                  <span>{region}</span>
-                </label>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className={`mp-filter-popover mp-filter-popover-sort${openPopover === "sort" ? " is-open" : ""}`}>
-        <button
-          aria-controls="marketplace-sort-popover"
-          aria-expanded={openPopover === "sort"}
-          className="mp-filter-trigger"
-          type="button"
-          onClick={() => setOpenPopover((value) => (value === "sort" ? null : "sort"))}
-        >
-          <span>{selectedSort.label}</span>
-          <ChevronDown aria-hidden="true" size={16} />
-        </button>
-        {openPopover === "sort" ? (
-          <div className="mp-filter-menu mp-sort-menu" id="marketplace-sort-popover">
-            {sortOptions.map((option) => (
-              <button
-                className={`mp-sort-option${sortBy === option.value ? " is-active" : ""}`}
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  setSortBy(option.value);
-                  setOpenPopover(null);
-                }}
-              >
-                <span>
-                  <strong>{option.label}</strong>
-                  <small>{option.description}</small>
-                </span>
-                {sortBy === option.value ? <Check aria-hidden="true" size={16} /> : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-
-  // Ряд активных фильтров: целиком выбранная категория сворачивается в один чип,
-  // частичный выбор разворачивается в чипы отдельных номенклатур.
-  const activeFiltersRow = hasActiveFilters ? (
-    <div className="mp-active-filters">
-      {nomenclatureGroups.flatMap((group) => {
-        const state = groupSelectionState(group, selectedNomenclature);
-        if (state === "none") return [];
-        const color = materialColor(group.slug);
-        if (state === "all") {
-          return [
-            <button
-              aria-label={`Убрать фильтр ${group.name}`}
-              className="mp-active-chip"
-              key={`group:${group.slug}`}
-              type="button"
-              onClick={() => toggleGroup(group)}
-            >
-              <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
-              {group.name}
-              <X aria-hidden="true" size={14} />
-            </button>,
-          ];
-        }
-        return group.options
-          .filter((option) => selectedNomenclature.includes(option.id))
-          .map((option) => (
-            <button
-              aria-label={`Убрать фильтр ${option.name}`}
-              className="mp-active-chip"
-              key={`nom:${option.id}`}
-              type="button"
-              onClick={() => setSelectedNomenclature((prev) => toggle(prev, option.id))}
-            >
-              <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
-              {option.name}
-              <X aria-hidden="true" size={14} />
-            </button>
-          ));
-      })}
-      {selectedRegions.map((region) => (
-        <button
-          aria-label={`Убрать регион ${region}`}
-          className="mp-active-chip"
-          key={`region:${region}`}
-          type="button"
-          onClick={() => setSelectedRegions((prev) => toggle(prev, region))}
-        >
-          {region}
-          <X aria-hidden="true" size={14} />
-        </button>
-      ))}
-      {mapBbox ? (
-        <button
-          aria-label="Убрать фильтр по области карты"
-          className="mp-active-chip"
-          type="button"
-          onClick={() => setMapBbox(null)}
-        >
-          Область карты
-          <X aria-hidden="true" size={14} />
-        </button>
-      ) : null}
-      <button className="mp-active-clear" type="button" onClick={resetFilters}>
-        Сбросить всё
-      </button>
-    </div>
-  ) : null;
 
   if (ready && !token) {
     return <AuthRequired title="Торговая площадка" />;
@@ -498,57 +171,49 @@ export function MarketplaceView() {
 
         <div className="mp-split">
           <div className={`mp-split-list${mobileView === "map" ? " is-mobile-hidden" : ""}`}>
-            {filterBar}
-            {activeFiltersRow}
-            {state === "idle" || state === "loading" ? (
-              <div aria-busy="true" className="mp-grid">
-                {Array.from({ length: 8 }, (_, index) => (
-                  <ListingCardSkeleton key={index} />
-                ))}
-              </div>
-            ) : listings.length === 0 ? (
-              <div className="mp-empty">
-                <strong>По заданным фильтрам объявлений нет.</strong>
-                <p>Попробуйте смягчить условия — или загляните позже, объявления появляются каждый день.</p>
-                {hasActiveFilters ? (
-                  <button className="button secondary" type="button" onClick={resetFilters}>
-                    Сбросить фильтры
-                  </button>
-                ) : null}
-              </div>
-            ) : (
-              <>
-                <div className="mp-grid">
-                  {listings.map((listing) => (
-                    <ListingCard
-                      key={listing.id}
-                      listing={listing}
-                      coverUrl={
-                        listing.coverFileId ? preferredFileAssetImageUrl(assets.get(listing.coverFileId)) : null
-                      }
-                      distanceKm={distanceById?.get(listing.id) ?? null}
-                      highlighted={hoveredId === listing.id}
-                      onOpen={setSelectedId}
-                      onHover={setHoveredId}
-                    />
-                  ))}
-                </div>
-                <div ref={sentinelRef} aria-hidden="true" />
-                <p className="page-subtitle" style={{ textAlign: "center", marginTop: 18 }}>
-                  Показано {items.length} из {total}
-                </p>
-                {isLoadingMore ? (
-                  <p className="page-subtitle" style={{ textAlign: "center" }}>
-                    Загружаем ещё…
-                  </p>
-                ) : null}
-                {!hasMore ? (
-                  <p className="page-subtitle" style={{ textAlign: "center" }}>
-                    Это все объявления.
-                  </p>
-                ) : null}
-              </>
-            )}
+            <MarketplaceFilterBar
+              containerRef={filtersRef}
+              nomenclatureGroups={nomenclatureGroups}
+              selectedNomenclature={selectedNomenclature}
+              setSelectedNomenclature={setSelectedNomenclature}
+              regions={regions}
+              selectedRegions={selectedRegions}
+              setSelectedRegions={setSelectedRegions}
+              sortBy={sortBy}
+              setSortBy={setSortBy}
+              openPopover={openPopover}
+              setOpenPopover={setOpenPopover}
+              sortOptions={sortOptions}
+              selectedSort={selectedSort}
+            />
+            {hasActiveFilters ? (
+              <MarketplaceActiveFilters
+                nomenclatureGroups={nomenclatureGroups}
+                selectedNomenclature={selectedNomenclature}
+                setSelectedNomenclature={setSelectedNomenclature}
+                selectedRegions={selectedRegions}
+                setSelectedRegions={setSelectedRegions}
+                mapBbox={mapBbox}
+                onClearMapBbox={() => setMapBbox(null)}
+                onResetFilters={resetFilters}
+              />
+            ) : null}
+            <MarketplaceFeedList
+              listings={listings}
+              assets={assets}
+              distanceById={distanceById}
+              state={state}
+              total={total}
+              loadedCount={items.length}
+              hasMore={hasMore}
+              isLoadingMore={isLoadingMore}
+              hasActiveFilters={hasActiveFilters}
+              hoveredId={hoveredId}
+              sentinelRef={sentinelRef}
+              onOpenListing={setSelectedId}
+              onHoverListing={setHoveredId}
+              onResetFilters={resetFilters}
+            />
           </div>
 
           {/* Карта живёт всегда (и при загрузке, и при пустой выдаче) — нет
