@@ -18,6 +18,8 @@ import { AddressGeocoderService } from "../../geo/address-geocoder.service";
 import { type OfferWithRelations, offerInclude, toListingOfferItem, toMyOfferItem } from "./marketplace-offers.helpers";
 
 const DECISION_WINDOW_MS = 24 * 60 * 60 * 1000;
+const CREATE_OFFER_TRANSACTION_RETRIES = 3;
+const DUPLICATE_ACTIVE_OFFER_MESSAGE = "У вас уже есть активное предложение по этому объявлению — измените его.";
 type ListParams = { limit?: number; offset?: number };
 
 // Сервис предложений (закрытый аукцион). Покупатель (трейдер/переработчик) шлёт
@@ -76,19 +78,6 @@ export class MarketplaceOffersService {
       throw new ForbiddenException("Нельзя делать предложение на собственное объявление.");
     }
 
-    const existing = await this.prisma.offer.findFirst({
-      where: {
-        listingId,
-        buyerCompanyId,
-        status: { in: ["active", "accepted"] },
-        positions: { some: { pricePerTonRub: { gt: 0 } } },
-      },
-      select: { id: true },
-    });
-    if (existing) {
-      throw new BadRequestException("У вас уже есть активное предложение по этому объявлению — измените его.");
-    }
-
     this.assertOfferPositions(
       dto,
       listing.positions.map((position) => position.id),
@@ -96,15 +85,19 @@ export class MarketplaceOffersService {
 
     const city = offerCity(dto);
     const region = await this.resolveOfferRegion(city);
-    const offer = await this.createOfferWithRaceGuard({
+    const offer = await this.createOfferAtomically({
       listingId,
       buyerCompanyId,
-      createdById: user.id,
-      priceCondition: dto.priceCondition,
-      city,
-      region,
-      contactPhone: dto.contactPhone.trim(),
-      positions: { create: offerPositionCreateData(dto) },
+      data: {
+        listingId,
+        buyerCompanyId,
+        createdById: user.id,
+        priceCondition: dto.priceCondition,
+        city,
+        region,
+        contactPhone: dto.contactPhone.trim(),
+        positions: { create: offerPositionCreateData(dto) },
+      },
     });
 
     await this.notify(
@@ -377,14 +370,40 @@ export class MarketplaceOffersService {
     return offer;
   }
 
-  private async createOfferWithRaceGuard(data: Prisma.OfferCreateArgs["data"]): Promise<OfferWithRelations> {
-    try {
-      return await this.prisma.offer.create({ data, include: offerInclude });
-    } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        throw new BadRequestException("У вас уже есть активное предложение по этому объявлению — измените его.");
+  private async createOfferAtomically(params: {
+    listingId: string;
+    buyerCompanyId: string;
+    data: Prisma.OfferCreateArgs["data"];
+  }): Promise<OfferWithRelations> {
+    let attempts = 0;
+
+    while (true) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            const existing = await tx.offer.findFirst({
+              where: {
+                listingId: params.listingId,
+                buyerCompanyId: params.buyerCompanyId,
+                status: { in: ["active", "accepted"] },
+                positions: { some: { pricePerTonRub: { gt: 0 } } },
+              },
+              select: { id: true },
+            });
+            if (existing) {
+              throw new BadRequestException(DUPLICATE_ACTIVE_OFFER_MESSAGE);
+            }
+
+            return tx.offer.create({ data: params.data, include: offerInclude });
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+      } catch (error) {
+        attempts += 1;
+        if (!isTransactionWriteConflictError(error) || attempts >= CREATE_OFFER_TRANSACTION_RETRIES) {
+          throw error;
+        }
       }
-      throw error;
     }
   }
 
@@ -464,4 +483,8 @@ function offerPositionCreateData(dto: CreateOfferDto) {
 
 function isUniqueConstraintError(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+function isTransactionWriteConflictError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
 }

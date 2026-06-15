@@ -597,6 +597,8 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
     const nomenclatureId = await seedNomenclature();
     const { listingId, positionId } = await createPublishedListing(sellerToken, nomenclatureId);
     const buyerToken = await registerTrader("0009213");
+    const buyerMe = await ctx.http.get("/api/auth/me").set(bearer(buyerToken));
+    const buyerCompanyId = buyerMe.body.companyId as string;
 
     const [first, second] = await Promise.all([
       ctx.http
@@ -609,9 +611,12 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
         .send(offerPayload(positionId)),
     ]);
 
-    expect([first.status, second.status].sort((left, right) => left - right)).toEqual([201, 400]);
+    const responses = [first, second].sort((left, right) => left.status - right.status);
+    expect(responses[0].status).toBe(201);
+    expect(responses[1].status).toBe(400);
+    expect(responses[1].body.message).toBe("У вас уже есть активное предложение по этому объявлению — измените его.");
     const activeOffers = await ctx.prisma.offer.count({
-      where: { listingId, status: { in: ["active", "accepted"] } },
+      where: { listingId, buyerCompanyId, status: { in: ["active", "accepted"] } },
     });
     expect(activeOffers).toBe(1);
   });
