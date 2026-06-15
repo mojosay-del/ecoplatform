@@ -1040,6 +1040,7 @@ model DocumentationArticle {
   @@unique([parentId, position])
   @@index([parentId, status, position])
   @@index([status, position])
+  @@index([fileAssetId])
   // «Часто нужные» (status+isPinned) и «Недавно обновлено» (status+revisedAt).
   @@index([status, isPinned])
   @@index([status, revisedAt])
