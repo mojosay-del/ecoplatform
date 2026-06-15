@@ -7,6 +7,8 @@ import type {
   MarketplaceListingPositionSummary,
   MyMarketplaceListingItem,
 } from "@ecoplatform/shared";
+import { publicUrl } from "../../files/files-storage.helpers";
+import type { PrismaService } from "../../prisma/prisma.service";
 
 // Единый include для объявления: адрес, позиции (с названием номенклатуры),
 // медиа и тип компании-продавца. Используется во всех выборках, чтобы мапперы
@@ -192,6 +194,30 @@ export function mapToDetail(
     offerCount: listing._count.offers,
     isOwner: options.isOwner,
   };
+}
+
+export async function mapToDetailWithSellerStats(
+  prisma: PrismaService,
+  listing: ListingWithRelations,
+  options: { canSeeContacts: boolean; isOwner: boolean },
+): Promise<MarketplaceListingDetail> {
+  // Аватар продавца — загруженное создателем объявления фото. Публичный файл →
+  // прямой URL; нет фото → null (фронт покажет нейтральную иконку). Пол больше
+  // не используется для аватара (приватность, A2).
+  const [sellerUser, dealsCompleted] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: listing.createdById },
+      select: { avatarFile: { select: { storageKey: true, accessLevel: true } } },
+    }),
+    // Блок доверия: состоявшиеся сделки продавца по всем его объявлениям.
+    prisma.offer.count({
+      where: { dealResult: "agreed", listing: { sellerCompanyId: listing.sellerCompanyId } },
+    }),
+  ]);
+  const sellerAvatarUrl = sellerUser?.avatarFile
+    ? publicUrl(sellerUser.avatarFile.storageKey, sellerUser.avatarFile.accessLevel)
+    : null;
+  return mapToDetail(listing, { ...options, sellerAvatarUrl, dealsCompleted });
 }
 
 // Готовит данные Address для снимка адреса объявления. formatted собирается из

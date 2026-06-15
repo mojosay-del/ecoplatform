@@ -1,15 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
 import {
   type CreateListingDto,
-  LISTING_LIFETIME_DAYS,
   LISTING_MAX_ACTIVE,
-  LISTING_MAX_PHOTOS,
-  LISTING_MAX_VIDEOS,
-  LISTING_MIN_PHOTOS,
-  LISTING_MIN_WEIGHT_KG,
-  type ListingMediaInput,
-  type ListingPositionInput,
   type MarketplaceListingDetail,
   type MarketplaceListingListItem,
   type MarketplaceNomenclatureOption,
@@ -26,44 +18,35 @@ import {
 import { ModuleAccessService } from "../../common/module-access.service";
 import { paginatedResponse, resolvePagination } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
-import { publicUrl } from "../../files/files-storage.helpers";
 import { FilesService } from "../../files/files.service";
 import { AddressGeocoderService } from "../../geo/address-geocoder.service";
 import { PrismaService } from "../../prisma/prisma.service";
-import type { MarketplaceFeedBbox } from "../marketplace.schemas";
-import { generateCircleCenter } from "./marketplace-geo.helpers";
 import {
   type ListingWithRelations,
   buildAddressCreateData,
   listingInclude,
-  mapToDetail,
+  mapToDetailWithSellerStats,
   mapToListItem,
   mapToMyItem,
 } from "./marketplace-listings.helpers";
-
-const LISTING_FILE_ENTITY = "marketplace_listing";
-const DAY_MS = 24 * 60 * 60 * 1000;
-type ListParams = { limit?: number; offset?: number };
-type FeedParams = ListParams & { region?: string[]; nomenclatureId?: string[]; bbox?: MarketplaceFeedBbox };
-
-// Условие «центр круга внутри видимой области карты». NULL-координаты
-// (негеокодированный адрес) не проходят сравнение и отсекаются сами.
-function bboxWhere(bbox: MarketplaceFeedBbox): Prisma.MarketplaceListingWhereInput {
-  const latWhere: Prisma.MarketplaceListingWhereInput = { circleLat: { gte: bbox.south, lte: bbox.north } };
-  if (bbox.west <= bbox.east) {
-    return { ...latWhere, circleLon: { gte: bbox.west, lte: bbox.east } };
-  }
-  // Запад > востока — окно пересекает антимеридиан (Чукотка): долгота двумя ветками.
-  return { AND: [latWhere, { OR: [{ circleLon: { gte: bbox.west } }, { circleLon: { lte: bbox.east } }] }] };
-}
-
-// Координаты адреса + отображаемый центр круга для записи в БД (после геокодинга).
-type AddressGeo = {
-  coords: { latitude?: Prisma.Decimal; longitude?: Prisma.Decimal; region?: string | null };
-  circleLat: Prisma.Decimal | null;
-  circleLon: Prisma.Decimal | null;
-};
-type AddressCreateData = ReturnType<typeof buildAddressCreateData>;
+import {
+  type FeedParams,
+  LISTING_FILE_ENTITY,
+  LISTING_LIFETIME_MS,
+  type ListParams,
+  addressCreateDataFromSource,
+  archiveExpiredListings,
+  assertListingMediaValid,
+  assertListingNomenclatureValid,
+  assertListingPublishable,
+  listingFeedWhere,
+  listingMediaCreateData,
+  listingOptionalText,
+  listingPatchOptionalText,
+  listingPositionCreateData,
+  resolveListingAddressGeo,
+  resolveStoredOrFreshListingAddressGeo,
+} from "./marketplace-listings-logic.helpers";
 
 // Сервис объявлений торговой площадки: жизненный цикл (черновик → публикация →
 // архив/переподача), позиции, медиа (через FileReference), снимок адреса. Точные
@@ -77,42 +60,6 @@ export class MarketplaceListingsService {
     private readonly geocoder: AddressGeocoderService,
     private readonly moduleAccess: ModuleAccessService,
   ) {}
-
-  // Геокодит formatted-адрес (вне транзакции — сетевой вызов) и готовит координаты
-  // адреса + отображаемый центр круга. Без ключа/при ошибке геокодера — пусто
-  // (объявление сохраняется без круга, как требует geo-logic.md).
-  private async resolveAddressGeo(addressData: AddressCreateData): Promise<AddressGeo> {
-    const result = await this.geocoder.geocode(addressData.formatted);
-    if (!result) {
-      return { coords: {}, circleLat: null, circleLon: null };
-    }
-    const center = generateCircleCenter(result.lat, result.lon);
-    return {
-      coords: {
-        latitude: new Prisma.Decimal(result.lat),
-        longitude: new Prisma.Decimal(result.lon),
-        region: result.region ?? addressData.region,
-      },
-      circleLat: new Prisma.Decimal(center.lat),
-      circleLon: new Prisma.Decimal(center.lon),
-    };
-  }
-
-  private async resolveStoredOrFreshAddressGeo(
-    addressData: AddressCreateData,
-    stored: { latitude: Prisma.Decimal | null; longitude: Prisma.Decimal | null },
-  ): Promise<AddressGeo> {
-    if (stored.latitude !== null && stored.longitude !== null) {
-      const center = generateCircleCenter(Number(stored.latitude), Number(stored.longitude));
-      return {
-        coords: { latitude: stored.latitude, longitude: stored.longitude },
-        circleLat: new Prisma.Decimal(center.lat),
-        circleLon: new Prisma.Decimal(center.lon),
-      };
-    }
-
-    return this.resolveAddressGeo(addressData);
-  }
 
   // ── Гейты доступа ─────────────────────────────────────────────────────────
 
@@ -145,14 +92,7 @@ export class MarketplaceListingsService {
   async listPublic(user: RequestUser, params: FeedParams): Promise<PaginatedResponse<MarketplaceListingListItem>> {
     this.assertCanUse(user);
     const { limit, offset } = resolvePagination(params, { defaultLimit: 100, maxLimit: 200 });
-    const where: Prisma.MarketplaceListingWhereInput = {
-      status: "active",
-      ...(params.region && params.region.length ? { address: { region: { in: params.region } } } : {}),
-      ...(params.nomenclatureId && params.nomenclatureId.length
-        ? { positions: { some: { nomenclatureId: { in: params.nomenclatureId } } } }
-        : {}),
-      ...(params.bbox ? bboxWhere(params.bbox) : {}),
-    };
+    const where = listingFeedWhere(params);
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.marketplaceListing.count({ where }),
@@ -196,7 +136,7 @@ export class MarketplaceListingsService {
       throw new NotFoundException("Объявление не найдено.");
     }
 
-    return this.mapDetail(listing, { canSeeContacts, isOwner });
+    return mapToDetailWithSellerStats(this.prisma, listing, { canSeeContacts, isOwner });
   }
 
   // Справочник активной номенклатуры для селектов в форме объявления.
@@ -242,11 +182,14 @@ export class MarketplaceListingsService {
     const companyId = this.assertSeller(user);
     // Санкция модерации module_restriction("marketplace") блокирует размещение.
     await this.moduleAccess.assertModuleAccess(user.id, "marketplace");
-    await this.assertNomenclatureValid(dto.positions.map((position) => position.nomenclatureId));
-    await this.assertMediaValid(dto.media);
+    await assertListingNomenclatureValid(
+      this.prisma,
+      dto.positions.map((position) => position.nomenclatureId),
+    );
+    await assertListingMediaValid(this.prisma, dto.media);
 
     const addressData = buildAddressCreateData(dto.address);
-    const geo = await this.resolveAddressGeo(addressData);
+    const geo = await resolveListingAddressGeo(this.geocoder, addressData);
 
     const listing = await this.prisma.$transaction(async (tx) => {
       const address = await tx.address.create({ data: { ...addressData, ...geo.coords } });
@@ -259,13 +202,13 @@ export class MarketplaceListingsService {
           circleLat: geo.circleLat,
           circleLon: geo.circleLon,
           contactPhone: dto.contactPhone.trim(),
-          description: optionalText(dto.description),
-          paymentTerms: optionalText(dto.paymentTerms),
+          description: listingOptionalText(dto.description),
+          paymentTerms: listingOptionalText(dto.paymentTerms),
           typicalLoadKg: dto.typicalLoadKg ?? null,
           readyNow: dto.readyNow,
           readinessDate: dto.readinessDate ? new Date(dto.readinessDate) : null,
-          positions: { create: positionCreateData(dto.positions) },
-          media: { create: mediaCreateData(dto.media) },
+          positions: { create: listingPositionCreateData(dto.positions) },
+          media: { create: listingMediaCreateData(dto.media) },
         },
         include: listingInclude,
       });
@@ -276,7 +219,7 @@ export class MarketplaceListingsService {
       listing.id,
       dto.media.map((item) => item.fileId),
     );
-    return this.mapDetail(listing, { canSeeContacts: true, isOwner: true });
+    return mapToDetailWithSellerStats(this.prisma, listing, { canSeeContacts: true, isOwner: true });
   }
 
   async update(user: RequestUser, id: string, dto: UpdateListingDto): Promise<MarketplaceListingDetail> {
@@ -286,14 +229,17 @@ export class MarketplaceListingsService {
       throw new BadRequestException("Архивное объявление нельзя редактировать — используйте переподачу.");
     }
     if (dto.positions) {
-      await this.assertNomenclatureValid(dto.positions.map((position) => position.nomenclatureId));
+      await assertListingNomenclatureValid(
+        this.prisma,
+        dto.positions.map((position) => position.nomenclatureId),
+      );
     }
     if (dto.media) {
-      await this.assertMediaValid(dto.media);
+      await assertListingMediaValid(this.prisma, dto.media);
     }
 
     const addressData = dto.address ? buildAddressCreateData(dto.address) : null;
-    const geo = addressData ? await this.resolveAddressGeo(addressData) : null;
+    const geo = addressData ? await resolveListingAddressGeo(this.geocoder, addressData) : null;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (addressData && geo) {
@@ -302,21 +248,21 @@ export class MarketplaceListingsService {
       if (dto.positions) {
         await tx.listingPosition.deleteMany({ where: { listingId: id } });
         await tx.listingPosition.createMany({
-          data: positionCreateData(dto.positions).map((position) => ({ ...position, listingId: id })),
+          data: listingPositionCreateData(dto.positions).map((position) => ({ ...position, listingId: id })),
         });
       }
       if (dto.media) {
         await tx.listingMedia.deleteMany({ where: { listingId: id } });
         await tx.listingMedia.createMany({
-          data: mediaCreateData(dto.media).map((item) => ({ ...item, listingId: id })),
+          data: listingMediaCreateData(dto.media).map((item) => ({ ...item, listingId: id })),
         });
       }
       return tx.marketplaceListing.update({
         where: { id },
         data: {
           contactPhone: dto.contactPhone?.trim(),
-          description: patchOptionalText(dto.description),
-          paymentTerms: patchOptionalText(dto.paymentTerms),
+          description: listingPatchOptionalText(dto.description),
+          paymentTerms: listingPatchOptionalText(dto.paymentTerms),
           typicalLoadKg: dto.typicalLoadKg === undefined ? undefined : (dto.typicalLoadKg ?? null),
           readyNow: dto.readyNow,
           readinessDate:
@@ -335,7 +281,7 @@ export class MarketplaceListingsService {
         dto.media.map((item) => item.fileId),
       );
     }
-    return this.mapDetail(updated, { canSeeContacts: true, isOwner: true });
+    return mapToDetailWithSellerStats(this.prisma, updated, { canSeeContacts: true, isOwner: true });
   }
 
   async publish(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {
@@ -343,13 +289,13 @@ export class MarketplaceListingsService {
     await this.moduleAccess.assertModuleAccess(user.id, "marketplace");
     const listing = await this.findOwnedOr404(companyId, id);
     if (listing.status === "active") {
-      return this.mapDetail(listing, { canSeeContacts: true, isOwner: true });
+      return mapToDetailWithSellerStats(this.prisma, listing, { canSeeContacts: true, isOwner: true });
     }
     if (listing.status === "archived") {
       throw new BadRequestException("Архивное объявление нельзя опубликовать — используйте переподачу.");
     }
 
-    this.assertPublishable(listing);
+    assertListingPublishable(listing);
 
     const activeCount = await this.prisma.marketplaceListing.count({
       where: { sellerCompanyId: companyId, status: "active" },
@@ -364,20 +310,20 @@ export class MarketplaceListingsService {
       data: {
         status: "active",
         publishedAt: now,
-        expiresAt: new Date(now.getTime() + LISTING_LIFETIME_DAYS * DAY_MS),
+        expiresAt: new Date(now.getTime() + LISTING_LIFETIME_MS),
         archivedAt: null,
         archiveReason: null,
       },
       include: listingInclude,
     });
-    return this.mapDetail(updated, { canSeeContacts: true, isOwner: true });
+    return mapToDetailWithSellerStats(this.prisma, updated, { canSeeContacts: true, isOwner: true });
   }
 
   async archive(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {
     const companyId = this.assertSeller(user);
     const listing = await this.findOwnedOr404(companyId, id);
     if (listing.status === "archived") {
-      return this.mapDetail(listing, { canSeeContacts: true, isOwner: true });
+      return mapToDetailWithSellerStats(this.prisma, listing, { canSeeContacts: true, isOwner: true });
     }
 
     const now = new Date();
@@ -394,7 +340,7 @@ export class MarketplaceListingsService {
       });
       return result;
     });
-    return this.mapDetail(updated, { canSeeContacts: true, isOwner: true });
+    return mapToDetailWithSellerStats(this.prisma, updated, { canSeeContacts: true, isOwner: true });
   }
 
   async republish(user: RequestUser, id: string): Promise<MarketplaceListingDetail> {
@@ -414,7 +360,7 @@ export class MarketplaceListingsService {
     // триангуляции по нескольким объявлениям одной партии, geo-logic.md 7.4).
     // Если старое объявление создавалось без координат, пробуем догеокодить
     // сохранённую строку адреса перед созданием новой копии.
-    const geo = await this.resolveStoredOrFreshAddressGeo(addressData, source.address);
+    const geo = await resolveStoredOrFreshListingAddressGeo(this.geocoder, addressData, source.address);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const address = await tx.address.create({
@@ -461,151 +407,13 @@ export class MarketplaceListingsService {
       created.id,
       created.media.map((item) => item.fileId),
     );
-    return this.mapDetail(created, { canSeeContacts: true, isOwner: true });
+    return mapToDetailWithSellerStats(this.prisma, created, { canSeeContacts: true, isOwner: true });
   }
 
   // Cron: переводит истёкшие активные объявления в архив и закрывает их активные
   // предложения. Объявления с принятым предложением в 24ч-окне НЕ трогаем — их
   // разрешает отдельный cron предложений. Возвращает число обработанных.
   async archiveExpired(now = new Date()): Promise<number> {
-    const expiring = await this.prisma.marketplaceListing.findMany({
-      where: {
-        status: "active",
-        expiresAt: { lt: now },
-        offers: { none: { status: "accepted", dealResult: null } },
-      },
-      select: { id: true },
-    });
-    if (expiring.length === 0) return 0;
-
-    const ids = expiring.map((listing) => listing.id);
-    await this.prisma.$transaction([
-      this.prisma.marketplaceListing.updateMany({
-        where: { id: { in: ids } },
-        data: { status: "archived", archivedAt: now, archiveReason: "expired" },
-      }),
-      this.prisma.offer.updateMany({
-        where: { listingId: { in: ids }, status: "active" },
-        data: { status: "declined", resolvedAt: now },
-      }),
-    ]);
-    return ids.length;
+    return archiveExpiredListings(this.prisma, now);
   }
-
-  // ── Валидация ─────────────────────────────────────────────────────────────
-
-  private async mapDetail(
-    listing: ListingWithRelations,
-    options: { canSeeContacts: boolean; isOwner: boolean },
-  ): Promise<MarketplaceListingDetail> {
-    // Аватар продавца — загруженное создателем объявления фото. Публичный файл →
-    // прямой URL; нет фото → null (фронт покажет нейтральную иконку). Пол больше
-    // не используется для аватара (приватность, A2).
-    const [sellerUser, dealsCompleted] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { id: listing.createdById },
-        select: { avatarFile: { select: { storageKey: true, accessLevel: true } } },
-      }),
-      // Блок доверия: состоявшиеся сделки продавца по всем его объявлениям.
-      this.prisma.offer.count({
-        where: { dealResult: "agreed", listing: { sellerCompanyId: listing.sellerCompanyId } },
-      }),
-    ]);
-    const sellerAvatarUrl = sellerUser?.avatarFile
-      ? publicUrl(sellerUser.avatarFile.storageKey, sellerUser.avatarFile.accessLevel)
-      : null;
-    return mapToDetail(listing, { ...options, sellerAvatarUrl, dealsCompleted });
-  }
-
-  private assertPublishable(listing: ListingWithRelations) {
-    const totalWeight = listing.positions.reduce((sum, position) => sum + Number(position.weightKg), 0);
-    if (totalWeight < LISTING_MIN_WEIGHT_KG) {
-      throw new BadRequestException(`Суммарный вес объявления — не меньше ${LISTING_MIN_WEIGHT_KG} кг.`);
-    }
-
-    const photos = listing.media.filter((item) => item.kind === "photo").length;
-    const videos = listing.media.filter((item) => item.kind === "video").length;
-    if (photos < LISTING_MIN_PHOTOS || photos > LISTING_MAX_PHOTOS) {
-      throw new BadRequestException(`Нужно от ${LISTING_MIN_PHOTOS} до ${LISTING_MAX_PHOTOS} фотографий.`);
-    }
-    if (videos > LISTING_MAX_VIDEOS) {
-      throw new BadRequestException(`Не больше ${LISTING_MAX_VIDEOS} видео.`);
-    }
-
-    if (!listing.readyNow) {
-      if (!listing.readinessDate) {
-        throw new BadRequestException("Укажите дату готовности или отметьте «готово сейчас».");
-      }
-      const maxDate = new Date(Date.now() + LISTING_LIFETIME_DAYS * DAY_MS);
-      if (listing.readinessDate.getTime() > maxDate.getTime()) {
-        throw new BadRequestException(`Дата готовности — не дальше ${LISTING_LIFETIME_DAYS} дней.`);
-      }
-    }
-  }
-
-  private async assertNomenclatureValid(ids: string[]) {
-    const unique = Array.from(new Set(ids));
-    const found = await this.prisma.nomenclature.count({ where: { id: { in: unique }, isActive: true } });
-    if (found !== unique.length) {
-      throw new BadRequestException("В позициях указана неизвестная номенклатура.");
-    }
-  }
-
-  private async assertMediaValid(media: ListingMediaInput[]) {
-    if (media.length === 0) return;
-    const photos = media.filter((item) => item.kind === "photo").length;
-    const videos = media.filter((item) => item.kind === "video").length;
-    if (photos > LISTING_MAX_PHOTOS) {
-      throw new BadRequestException(`Не больше ${LISTING_MAX_PHOTOS} фотографий.`);
-    }
-    if (videos > LISTING_MAX_VIDEOS) {
-      throw new BadRequestException(`Не больше ${LISTING_MAX_VIDEOS} видео.`);
-    }
-    const ids = Array.from(new Set(media.map((item) => item.fileId)));
-    const found = await this.prisma.fileAsset.count({ where: { id: { in: ids } } });
-    if (found !== ids.length) {
-      throw new BadRequestException("Некоторые прикреплённые файлы не найдены.");
-    }
-  }
-}
-
-function optionalText(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
-
-// Для PATCH: undefined — поле не трогаем, иначе нормализуем пустую строку в null.
-function patchOptionalText(value: string | null | undefined): string | null | undefined {
-  if (value === undefined) return undefined;
-  return optionalText(value);
-}
-
-function positionCreateData(positions: ListingPositionInput[]) {
-  return positions.map((position, index) => ({
-    nomenclatureId: position.nomenclatureId,
-    position: index,
-    weightKg: new Prisma.Decimal(position.weightKg),
-    form: position.form,
-    packaging: optionalText(position.packaging),
-    moistureCondition: position.moistureCondition ?? null,
-    contaminationCondition: position.contaminationCondition ?? null,
-  }));
-}
-
-function mediaCreateData(media: ListingMediaInput[]) {
-  return media.map((item, index) => ({ fileId: item.fileId, kind: item.kind, position: index }));
-}
-
-function addressCreateDataFromSource(address: ListingWithRelations["address"]): AddressCreateData {
-  return {
-    country: address.country,
-    region: address.region,
-    city: address.city,
-    street: address.street,
-    building: address.building,
-    apartment: address.apartment,
-    postcode: address.postcode,
-    formatted: address.formatted,
-    source: address.source,
-  };
 }
