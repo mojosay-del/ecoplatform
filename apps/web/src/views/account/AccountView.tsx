@@ -397,6 +397,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           onOpenPayment={() => setPaymentDialogOpen(true)}
           onOpenSessions={() => setSessionsDialogOpen(true)}
           onOpenSubscription={() => setSubscriptionDialogOpen(true)}
+          onProfileSaved={refreshMe}
           sessionsCount={sessions.length}
           user={user}
         />

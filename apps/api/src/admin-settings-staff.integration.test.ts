@@ -276,6 +276,33 @@ describe("Admin staff panel", () => {
     expect(me.body.avatarUrl).toBeNull();
   });
 
+  it("создаёт сотрудника без пола и отдаёт gender=null", async () => {
+    const adminToken = await loginAdmin();
+
+    const res = await ctx.http
+      .post("/api/admin/staff")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        email: "staff.no-gender@test.local",
+        phone: "+79991234568",
+        firstName: "Нейтральный",
+        lastName: "Сотрудник",
+        password: "Staff1234567!",
+        roles: ["moderator"],
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.gender).toBeNull();
+
+    const login = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "staff.no-gender@test.local", password: "Staff1234567!" });
+    expect(login.status).toBe(201);
+
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${login.body.accessToken}`);
+    expect(me.status).toBe(200);
+    expect(me.body.gender).toBeNull();
+  });
+
   it("отбивает создание с занятым email/phone", async () => {
     const adminToken = await loginAdmin();
 

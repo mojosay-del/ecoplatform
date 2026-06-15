@@ -1,6 +1,8 @@
+import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, Bell, Check, CreditCard, FileText, Smartphone } from "lucide-react";
-import type { BillingStatus } from "@ecoplatform/shared";
+import type { BillingStatus, UserGender } from "@ecoplatform/shared";
 import type { User } from "../../lib/auth";
+import { api } from "../../lib/api";
 import {
   COMPANY_STATUS_LABELS,
   COMPANY_TYPE_LABELS,
@@ -23,6 +25,7 @@ export function AccountProfileSection({
   onOpenPayment,
   onOpenSessions,
   onOpenSubscription,
+  onProfileSaved,
   sessionsCount,
   user,
 }: {
@@ -36,6 +39,7 @@ export function AccountProfileSection({
   onOpenPayment: () => void;
   onOpenSessions: () => void;
   onOpenSubscription: () => void;
+  onProfileSaved: () => Promise<void>;
   sessionsCount: number;
   user: User | null;
 }) {
@@ -182,7 +186,7 @@ export function AccountProfileSection({
           <AccountDetailList
             rows={[
               { label: "Имя", value: fullName },
-              { label: "Пол", value: user?.gender ? (USER_GENDER_LABELS[user.gender] ?? user.gender) : null },
+              { label: "Пол", value: <AccountGenderValue value={user?.gender ?? null} onSaved={onProfileSaved} /> },
               { label: "Email", value: <AccountEditableValue value={user?.email} label="Email" /> },
               { label: "Пароль", value: <AccountPasswordValue onEdit={onOpenPassword} /> },
               { label: "Телефон", value: <AccountEditableValue value={user?.phone} label="Телефон" /> },
@@ -205,5 +209,58 @@ export function AccountProfileSection({
         ) : null}
       </div>
     </AccountScrollSection>
+  );
+}
+
+function AccountGenderValue({ onSaved, value }: { onSaved: () => Promise<void>; value: User["gender"] | null }) {
+  const currentValue = value ?? "";
+  const [selected, setSelected] = useState(currentValue);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const dirty = selected !== currentValue;
+
+  useEffect(() => {
+    setSelected(currentValue);
+    setMessage(null);
+  }, [currentValue]);
+
+  async function submitGender(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!dirty) return;
+
+    setSaving(true);
+    setMessage(null);
+    try {
+      await api.account.updateProfile({ gender: selected ? (selected as UserGender) : null });
+      await onSaved();
+      setMessage({ type: "ok", text: "Сохранено." });
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Не удалось сохранить." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className="account-inline-form" onSubmit={submitGender}>
+      <select
+        aria-label="Пол"
+        className="select account-inline-select"
+        disabled={saving}
+        onChange={(event) => setSelected(event.currentTarget.value)}
+        value={selected}
+      >
+        <option value="">Не указано</option>
+        <option value="male">{USER_GENDER_LABELS.male}</option>
+        <option value="female">{USER_GENDER_LABELS.female}</option>
+      </select>
+      <button className="button secondary account-inline-save" disabled={!dirty || saving} type="submit">
+        <Check aria-hidden="true" size={14} />
+        {saving ? "Сохраняем..." : "Сохранить"}
+      </button>
+      {message ? (
+        <span className={`account-form-message account-form-message-${message.type}`}>{message.text}</span>
+      ) : null}
+    </form>
   );
 }

@@ -73,7 +73,7 @@ export type AuthUser = {
   email: string;
   firstName: string;
   lastName: string;
-  gender: UserGender;
+  gender: UserGender | null;
   avatarUrl: string | null;
   phone: string;
   companyId: string | null;

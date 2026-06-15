@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { FormEvent, useMemo, useState } from "react";
-import { RotateCcw, Search } from "lucide-react";
+import { RotateCcw, Search, UserRound } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, platformRoles } from "@ecoplatform/shared";
 import { AdminSortButton } from "../../../components/AdminSortButton";
 import { AppShell } from "../../../components/AppShell";
@@ -30,7 +30,7 @@ type StaffItem = {
     phone: string;
     firstName: string;
     lastName: string;
-    gender: "male" | "female";
+    gender: "male" | "female" | null;
     status: string;
     createdAt: string;
   };
@@ -41,6 +41,7 @@ type PlatformRole = (typeof allRoles)[number];
 type StaffSortKey = "name" | "status" | "role" | "email" | "createdAt";
 
 const genderOptions = [
+  { value: "", label: "Не указано" },
   { value: "male", label: USER_GENDER_LABELS.male },
   { value: "female", label: USER_GENDER_LABELS.female },
 ] as const;
@@ -103,7 +104,7 @@ export function AdminStaffView() {
     phone: "",
     firstName: "",
     lastName: "",
-    gender: "male",
+    gender: "",
     password: "",
     roles: ["moderator"] as string[],
   });
@@ -112,14 +113,18 @@ export function AdminStaffView() {
     event.preventDefault();
     if (!token) return;
     try {
-      await apiFetch("/admin/staff", { method: "POST", token, body: createForm });
+      await apiFetch("/admin/staff", {
+        method: "POST",
+        token,
+        body: { ...createForm, gender: createForm.gender || null },
+      });
       setCreateOpen(false);
       setCreateForm({
         email: "",
         phone: "",
         firstName: "",
         lastName: "",
-        gender: "male",
+        gender: "",
         password: "",
         roles: ["moderator"],
       });
@@ -225,7 +230,6 @@ export function AdminStaffView() {
               <select
                 className="select"
                 onChange={(event) => setCreateForm((form) => ({ ...form, gender: event.target.value }))}
-                required
                 value={createForm.gender}
               >
                 {genderOptions.map((option) => (
@@ -360,13 +364,19 @@ export function AdminStaffView() {
                   <tr key={staff.id}>
                     <td>
                       <div className="staff-profile">
-                        <Image
-                          className="staff-avatar"
-                          alt=""
-                          src={resolvePlatformAvatarUrl(staff.roles, staff.user.gender)}
-                          width={36}
-                          height={36}
-                        />
+                        {staff.user.gender ? (
+                          <Image
+                            className="staff-avatar"
+                            alt=""
+                            src={resolvePlatformAvatarUrl(staff.roles, staff.user.gender)}
+                            width={36}
+                            height={36}
+                          />
+                        ) : (
+                          <span className="staff-avatar staff-avatar-placeholder" aria-hidden="true">
+                            <UserRound size={18} />
+                          </span>
+                        )}
                         <div className="admin-table-cell-main">
                           <strong>
                             {staff.user.firstName} {staff.user.lastName}
@@ -439,7 +449,7 @@ export function AdminStaffView() {
   );
 }
 
-function resolvePlatformAvatarUrl(roles: string[], gender: string): string {
+function resolvePlatformAvatarUrl(roles: string[], gender: "male" | "female"): string {
   const suffix = gender === "female" ? "woman" : "man";
   const prefix = roles.includes("admin") ? "a" : "m";
 

@@ -6,11 +6,6 @@ export const companyTypeOptions = [
   { value: "processor", label: "Переработчик" },
 ];
 
-export const genderOptions = [
-  { value: "male", label: "Мужской" },
-  { value: "female", label: "Женский" },
-];
-
 export const PHONE_COUNTRIES: PhoneCountry[] = [
   {
     id: "ru",
@@ -111,7 +106,6 @@ export const INITIAL_REGISTER_VALUES: RegisterFormValues = {
   companyType: "collector",
   lastName: "",
   firstName: "",
-  gender: "male",
   phoneCountryId: DEFAULT_PHONE_COUNTRY.id as PhoneCountryId,
   phoneDigits: "",
   email: "",

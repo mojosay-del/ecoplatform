@@ -250,7 +250,7 @@ model User {
   phone                      String                       @unique
   firstName                  String
   lastName                   String
-  gender                     UserGender                   @default(male)
+  gender                     UserGender?
   passwordHash               String
   status                     UserStatus                   @default(active)
   failedLoginAttempts        Int                          @default(0)
@@ -302,7 +302,7 @@ model EmailVerificationChallenge {
   companyType         CompanyType
   firstName           String
   lastName            String
-  gender              UserGender
+  gender              UserGender?
   passwordHash        String
   acceptedDocumentIds String[]    @default([])
   codeHash            String

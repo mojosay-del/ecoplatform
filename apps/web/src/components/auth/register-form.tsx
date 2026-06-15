@@ -178,7 +178,6 @@ export function RegisterForm() {
       companyType: values.companyType,
       lastName: values.lastName.trim(),
       firstName: values.firstName.trim(),
-      gender: values.gender,
       phone: formatPhoneFull(selectedPhoneCountry, values.phoneDigits),
       email: normalizeEmailValue(values.email),
       password: values.password,

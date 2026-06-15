@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { FileAccessLevel } from "@prisma/client";
-import type { AuthMeUser } from "@ecoplatform/shared";
+import type { AccountProfileUpdateDto, AuthMeUser } from "@ecoplatform/shared";
 import { getAuthMeUser } from "../auth/auth-profile.helpers";
 import { FilesService } from "../files/files.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -15,6 +15,15 @@ export class AccountService {
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
   ) {}
+
+  async updateProfile(userId: string, input: AccountProfileUpdateDto): Promise<AuthMeUser> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { gender: input.gender },
+    });
+
+    return getAuthMeUser({ prisma: this.prisma }, userId);
+  }
 
   async setAvatar(userId: string, fileId: string): Promise<AuthMeUser> {
     const asset = await this.prisma.fileAsset.findUnique({

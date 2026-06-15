@@ -16,7 +16,6 @@ export type RegisterFormValues = {
   companyType: string;
   lastName: string;
   firstName: string;
-  gender: string;
   phoneCountryId: PhoneCountryId;
   phoneDigits: string;
   email: string;

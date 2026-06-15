@@ -432,7 +432,7 @@ export type AuthMeUser = {
   phone: string;
   firstName: string;
   lastName: string;
-  gender: UserGender;
+  gender: UserGender | null;
   status: UserStatus;
   avatarUrl: string | null;
   companyId: string | null;

@@ -9,6 +9,7 @@
 
 import type {
   AuthMeUser,
+  AccountProfileUpdateDto,
   BillingStatus,
   BillingSubscriptionActivationResponse,
   CompanyProfileUpdateDto,
@@ -140,6 +141,8 @@ export const api = {
 
   // ── Аккаунт ───────────────────────────────────────────────────────────────
   account: {
+    updateProfile: (input: AccountProfileUpdateDto) =>
+      apiFetch<AuthMeUser>("/account/profile", { method: "PATCH", body: input }),
     // fileId — id уже загруженного через api.files.upload публичного изображения.
     setAvatar: (fileId: string) => apiFetch<AuthMeUser>("/account/avatar", { method: "POST", body: { fileId } }),
     removeAvatar: () => apiFetch<AuthMeUser>("/account/avatar", { method: "DELETE" }),

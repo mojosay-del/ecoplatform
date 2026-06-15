@@ -1,9 +1,9 @@
 "use client";
 
 import type { KeyboardEvent, MutableRefObject } from "react";
-import { Building2, Check, Mail, Tag, User, Users, X } from "lucide-react";
+import { Building2, Check, Mail, Tag, User, X } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
-import { companyTypeOptions, genderOptions, VERIFICATION_CODE_LENGTH } from "./constants";
+import { companyTypeOptions, VERIFICATION_CODE_LENGTH } from "./constants";
 import { AuthSelect } from "./auth-select";
 import { ConsentRow } from "./consent-row";
 import {
@@ -91,28 +91,15 @@ export function PersonStepFields({
             </FieldAffix>
           </AuthField>
         </div>
-        <div className="auth-grid-2">
-          <div className="auth-field">
-            <span className="auth-field-label">Пол</span>
-            <AuthSelect
-              icon={Users}
-              label="Пол"
-              name="gender"
-              value={values.gender}
-              options={genderOptions}
-              onChange={(value) => setField("gender", value)}
-            />
-          </div>
-          <AuthField label="Телефон">
-            <PhoneInput
-              name="phone"
-              countryId={values.phoneCountryId}
-              digits={values.phoneDigits}
-              onCountryChange={(countryId: PhoneCountryId) => setField("phoneCountryId", countryId)}
-              onDigitsChange={(digits) => setField("phoneDigits", digits)}
-            />
-          </AuthField>
-        </div>
+        <AuthField label="Телефон">
+          <PhoneInput
+            name="phone"
+            countryId={values.phoneCountryId}
+            digits={values.phoneDigits}
+            onCountryChange={(countryId: PhoneCountryId) => setField("phoneCountryId", countryId)}
+            onDigitsChange={(digits) => setField("phoneDigits", digits)}
+          />
+        </AuthField>
       </fieldset>
 
       <fieldset className="auth-section">

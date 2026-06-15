@@ -45,7 +45,6 @@ async function registerSmokeUser(page: Page, user: SmokeUser): Promise<boolean> 
   await expect(page.getByText("Шаг 2 из 3")).toBeVisible();
   await form.locator("input[name='lastName']").fill(user.lastName);
   await form.locator("input[name='firstName']").fill(user.firstName);
-  await form.locator("select[name='gender']").selectOption("male");
   await form.locator("input[type='tel']").fill(user.phone);
   await form.locator("input[name='email']").fill(user.email);
   await form.locator("input[name='password']").fill(user.password);

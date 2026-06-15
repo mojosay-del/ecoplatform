@@ -7158,9 +7158,40 @@ body.news-modal-open .app-shell {
   grid-column: span 2;
 }
 
+.account-form-message {
+  display: inline-flex;
+  margin: 0;
+  border-radius: var(--radius-button);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .account-form-message-ok {
   background: rgb(var(--success-rgb) / 0.1);
   color: var(--success-text);
+}
+
+.account-form-message-error {
+  background: rgb(var(--danger-rgb) / 0.1);
+  color: var(--danger-text);
+}
+
+.account-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-inline-select {
+  max-width: 180px;
+}
+
+.account-inline-save {
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 13px;
 }
 
 .account-plan.is-current {

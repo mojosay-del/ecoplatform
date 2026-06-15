@@ -25,7 +25,7 @@ export const adminStaffCreateInputSchema = z.object({
     .regex(/^\+?[0-9 ()-]+$/, "Телефон должен содержать только цифры и допустимые символы."),
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
-  gender: z.enum(userGenders),
+  gender: z.enum(userGenders).nullable().optional(),
   // Делегируем общей passwordSchema, чтобы политика не разошлась.
   // Дополнительно max(120) против DoS на bcrypt (он линейно растёт).
   password: passwordSchema.max(120, `Пароль должен быть короче 120 символов.`),

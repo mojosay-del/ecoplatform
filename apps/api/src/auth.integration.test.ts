@@ -155,7 +155,7 @@ describe("Auth", () => {
     const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
 
     expect(me.status).toBe(200);
-    expect(me.body.gender).toBe("male");
+    expect(me.body.gender).toBeNull();
     expect(me.body.avatarUrl).toBeNull();
     expect(me.body.company).toBeNull();
     expect(me.body.companyId).toBeNull();
@@ -182,6 +182,36 @@ describe("Auth", () => {
     expect(me.body.avatarUrl).toBeNull();
     const company = await ctx.prisma.company.findUniqueOrThrow({ where: { id: me.body.company.id } });
     expect(company.billingInn).toBeNull();
+  });
+
+  it("регистрация без пола оставляет gender пустым, а профиль позволяет заполнить и очистить его", async () => {
+    const token = await registerWithBody({
+      organizationName: "ООО Без Пола",
+      companyType: "collector",
+      firstName: "Ольга",
+      lastName: "Добровольная",
+      phone: "+79000001001",
+      email: "without-gender@test.local",
+      password: "User12345678",
+    });
+
+    const initialMe = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(initialMe.status).toBe(200);
+    expect(initialMe.body.gender).toBeNull();
+
+    const setGender = await ctx.http
+      .patch("/api/account/profile")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ gender: "female" });
+    expect(setGender.status).toBe(200);
+    expect(setGender.body.gender).toBe("female");
+
+    const clearGender = await ctx.http
+      .patch("/api/account/profile")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ gender: null });
+    expect(clearGender.status).toBe(200);
+    expect(clearGender.body.gender).toBeNull();
   });
 
   it("повторная регистрация с тем же email отбивается 409", async () => {

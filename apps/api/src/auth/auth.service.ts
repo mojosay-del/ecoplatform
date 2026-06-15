@@ -84,7 +84,7 @@ export class AuthService {
         companyType: input.companyType,
         firstName: input.firstName,
         lastName: input.lastName,
-        gender: input.gender,
+        gender: input.gender ?? null,
         passwordHash: prepared.passwordHash,
         acceptedDocumentIds: prepared.consentDocumentIds,
         codeHash: this.hashEmailVerificationCode(verificationId, prepared.email, code),

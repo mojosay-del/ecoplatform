@@ -6,6 +6,7 @@ import {
   createListingDtoSchema,
   createOfferDtoSchema,
   legalDocumentCreateDtoSchema,
+  registerDtoSchema,
 } from "../src";
 
 function listingPositions(count: number) {
@@ -23,6 +24,21 @@ function offerPositions(count: number) {
 }
 
 describe("DTO size limits", () => {
+  it("allows registration without gender", () => {
+    const result = registerDtoSchema.safeParse({
+      organizationName: "ООО Тест",
+      companyType: "collector",
+      firstName: "Иван",
+      lastName: "Тестов",
+      phone: "+79991234567",
+      email: "user@test.local",
+      password: "Password1234",
+      acceptedDocumentIds: [],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("limits listing positions to the configured maximum", () => {
     const baseListing = {
       address: { city: "Moscow", formatted: "Moscow" },
