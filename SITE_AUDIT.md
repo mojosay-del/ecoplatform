@@ -341,7 +341,8 @@ N+1 в ленте нет (один `findMany` + `_count`).
 
 ### [ARCH-3] 🟡 Крупные admin/web view-файлы [проверено]
 - [ ] **Исполнитель:** Codex (идёт по одному файлу)
-- **Где:** `AdminUsersView.tsx` (513 → 258, slice выполнен), `content-blocks/ContentBlocks.tsx` (512),
+- **Где:** `AdminUsersView.tsx` (513 → 258, slice выполнен),
+  `content-blocks/ContentBlocks.tsx` (512 → 168, slice выполнен),
   `AdminDocumentationView.tsx` (500), `AdminKnowledgeView.tsx` (497),
   `admin/home/dashboard.tsx` (489), `MarketplaceView.tsx` (592),
   `lib/api/core.ts` (504) + `endpoints.ts` (413).
@@ -350,6 +351,9 @@ N+1 в ленте нет (один `findMany` + `_count`).
 - **Выполнено Codex (2026-06-15):** `admin/users/AdminUsersView.tsx` оставлен
   контейнером auth/state/API, а фильтры, таблица и detail-панель вынесены в соседние
   `filter-bar.tsx`, `users-table.tsx`, `detail-panel.tsx`. Поведение не менялось.
+- **Выполнено Codex (2026-06-15):** `content-blocks/ContentBlocks.tsx` оставлен
+  тонким рендерером, а типы, загрузка файлов, медиа-блоки, чеклисты и quiz вынесены
+  в соседние модули. Поведение не менялось.
 
 ### [ARCH-4] 🟢 Большие интеграционные тесты [проверено]
 - [ ] **Исполнитель:** ___
