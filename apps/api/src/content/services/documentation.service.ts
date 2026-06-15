@@ -1,6 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { ContentStatus } from "@prisma/client";
-import { validateContentBlocks } from "@ecoplatform/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { paginatedResponse, resolvePagination, type PaginationInput } from "../../common/pagination";
@@ -10,8 +9,14 @@ import type { z } from "zod";
 import type { documentationArticleInputSchema } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
 import { buildDocumentationTreeInclude } from "./documentation-tree.helpers";
-import { assertDocumentationDepth, isDocumentationCategory } from "./documentation-depth.helpers";
-import { compactDocumentationAfterRemoval, repositionDocumentationInGroup } from "./documentation-position.helpers";
+import {
+  createDocumentationArticle,
+  deleteDocumentationArticle,
+  moveDocumentationArticle,
+  publishDocumentationArticle,
+  unpublishDocumentationArticle,
+  updateDocumentationArticle,
+} from "./documentation-admin-workflow.helpers";
 import {
   DOCUMENT_LEAF_FILTER,
   mapDocumentationDetail,
@@ -182,311 +187,34 @@ export class DocumentationService {
   }
 
   async createDocument(input: DocumentationInput, user: RequestUser) {
-    const isCategory = isDocumentationCategory(input.iconType);
-    const blocks = isCategory ? [] : input.blocks;
-    const fileAssetId = isCategory ? null : (input.fileAssetId ?? null);
-    const check = this.validateDraftableBlocks(blocks);
-
-    if (!check.ok) {
-      throw new ForbiddenException(check.message);
-    }
-    if (isCategory && (input.parentId ?? null) !== null) {
-      throw new ForbiddenException("Раздел документации должен быть верхним узлом.");
-    }
-    await this.assertFileExists(fileAssetId);
-    await assertDocumentationDepth(this.prisma, input.parentId ?? null);
-
-    const slug =
-      input.slug ??
-      (await this.common.uniqueSlug(input.title, async (candidate) =>
-        Boolean(await this.prisma.documentationArticle.findUnique({ where: { slug: candidate } })),
-      ));
-
-    const document = await this.prisma.documentationArticle.create({
-      data: {
-        parentId: input.parentId ?? null,
-        title: input.title,
-        subtitle: input.subtitle ?? null,
-        slug,
-        position: input.position,
-        iconType: input.iconType,
-        createdById: user.id,
-        fileAssetId,
-        version: isCategory ? null : (input.version ?? null),
-        effectiveDate: isCategory ? null : this.parseDate(input.effectiveDate),
-        isPinned: isCategory ? false : (input.isPinned ?? false),
-        blocks: {
-          create: blocks.map((block, position) => ({
-            position,
-            type: block.type,
-            payload: this.common.payload(block),
-          })),
-        },
-      },
-      include: { file: true, blocks: { orderBy: { position: "asc" } } },
-    });
-
-    await this.common.recordEntityReferences("documentation_article", document.id, [
-      fileAssetId,
-      ...blocks.flatMap((block) => Array.from(this.common.collectFileIdsFromPayload(block.payload))),
-    ]);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "documentation.create",
-      entityType: "DocumentationArticle",
-      entityId: document.id,
-    });
-
-    return mapDocumentationNode(document as DocumentationArticleRow, { includeBlocks: true });
+    return createDocumentationArticle(this.workflowDeps(), input, user);
   }
 
   async updateDocument(id: string, input: DocumentationInput, user: RequestUser) {
-    const existing = await this.prisma.documentationArticle.findUnique({
-      where: { id },
-      include: { blocks: true },
-    });
-    if (!existing) {
-      throw new NotFoundException("Документ не найден.");
-    }
-
-    const isCategory = isDocumentationCategory(input.iconType);
-    const blocks = isCategory ? [] : input.blocks;
-    const fileAssetId = isCategory ? null : (input.fileAssetId ?? null);
-    const check = this.validateDraftableBlocks(blocks);
-
-    if (!check.ok) {
-      throw new ForbiddenException(check.message);
-    }
-    if (isCategory && (input.parentId ?? existing.parentId) !== null) {
-      throw new ForbiddenException("Раздел документации должен быть верхним узлом.");
-    }
-    if (!isCategory && existing.status === ContentStatus.published && blocks.length === 0 && !fileAssetId) {
-      throw new ForbiddenException("Нельзя сохранить опубликованный документ без файла и описания.");
-    }
-    await this.assertFileExists(fileAssetId);
-
-    // revisedAt («Обновлено») бампим только у опубликованного документа при смене
-    // файла или явной отметке «это обновление». У черновика revisedAt проставит
-    // публикация.
-    const fileChanged = fileAssetId !== existing.fileAssetId;
-    const shouldRevise =
-      !isCategory && existing.status === ContentStatus.published && (fileChanged || input.markRevised === true);
-
-    const previousFileIds = this.common.compactFileIds([
-      existing.fileAssetId,
-      ...this.common.collectFileIdsFromBlocks(existing.blocks),
-    ]);
-
-    const document = await this.prisma.$transaction(async (tx) => {
-      await tx.documentationBlock.deleteMany({ where: { articleId: id } });
-      await tx.documentationArticle.update({
-        where: { id },
-        data: {
-          title: input.title,
-          subtitle: input.subtitle ?? null,
-          iconType: input.iconType,
-          fileAssetId,
-          version: isCategory ? null : (input.version ?? null),
-          effectiveDate: isCategory ? null : this.parseDate(input.effectiveDate),
-          isPinned: isCategory ? false : (input.isPinned ?? false),
-          ...(shouldRevise ? { revisedAt: new Date() } : {}),
-          blocks: {
-            create: blocks.map((block, position) => ({
-              position,
-              type: block.type,
-              payload: this.common.payload(block),
-            })),
-          },
-        },
-      });
-      return tx.documentationArticle.findUniqueOrThrow({
-        where: { id },
-        include: { file: true, blocks: { orderBy: { position: "asc" } } },
-      });
-    });
-
-    await this.common.recordEntityReferences("documentation_article", id, [
-      fileAssetId,
-      ...blocks.flatMap((block) => Array.from(this.common.collectFileIdsFromPayload(block.payload))),
-    ]);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "documentation.update",
-      entityType: "DocumentationArticle",
-      entityId: id,
-    });
-
-    await this.common.cleanupDetachedFiles(previousFileIds);
-
-    return mapDocumentationNode(document as DocumentationArticleRow, { includeBlocks: true });
+    return updateDocumentationArticle(this.workflowDeps(), id, input, user);
   }
 
   async publishDocument(id: string, user: RequestUser) {
-    const existing = await this.prisma.documentationArticle.findUnique({
-      where: { id },
-      include: { _count: { select: { blocks: true } } },
-    });
-    if (!existing) {
-      throw new NotFoundException("Документ не найден.");
-    }
-    if (!isDocumentationCategory(existing.iconType) && existing._count.blocks === 0 && !existing.fileAssetId) {
-      throw new ForbiddenException("Нельзя опубликовать документ без файла или описания.");
-    }
-
-    const now = new Date();
-    const firstPublishedAt = existing.firstPublishedAt ?? now;
-    const document = await this.prisma.documentationArticle.update({
-      where: { id },
-      data: {
-        status: ContentStatus.published,
-        firstPublishedAt,
-        revisedAt: existing.revisedAt ?? firstPublishedAt,
-      },
-      include: { file: true, blocks: { orderBy: { position: "asc" } } },
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "documentation.publish",
-      entityType: "DocumentationArticle",
-      entityId: id,
-    });
-
-    return mapDocumentationNode(document as DocumentationArticleRow, { includeBlocks: true });
+    return publishDocumentationArticle(this.workflowDeps(), id, user);
   }
 
   async unpublishDocument(id: string, user: RequestUser, reason?: string) {
-    const existing = await this.prisma.documentationArticle.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException("Документ не найден.");
-    }
-
-    const document = await this.prisma.documentationArticle.update({
-      where: { id },
-      data: { status: ContentStatus.draft },
-      include: { file: true, blocks: { orderBy: { position: "asc" } } },
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "documentation.unpublish",
-      entityType: "DocumentationArticle",
-      entityId: id,
-      comment: reason,
-    });
-
-    return mapDocumentationNode(document as DocumentationArticleRow, { includeBlocks: true });
+    return unpublishDocumentationArticle(this.workflowDeps(), id, user, reason);
   }
 
   async moveDocument(id: string, input: { parentId: string | null; position: number }, user: RequestUser) {
-    const existing = await this.prisma.documentationArticle.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException("Документ не найден.");
-    }
-
-    if (input.parentId === id) {
-      throw new ForbiddenException("Узел не может быть собственным родителем.");
-    }
-    if (isDocumentationCategory(existing.iconType) && input.parentId !== null) {
-      throw new ForbiddenException("Раздел документации должен оставаться верхним узлом.");
-    }
-
-    await assertDocumentationDepth(this.prisma, input.parentId, id);
-
-    const parentChanged = existing.parentId !== input.parentId;
-    const positionChanged = existing.position !== input.position;
-
-    const document = await this.prisma.$transaction(async (tx) => {
-      if (parentChanged) {
-        await tx.documentationArticle.update({
-          where: { id },
-          data: { position: -1_000_000 - existing.position },
-        });
-        await compactDocumentationAfterRemoval(tx, existing.parentId, existing.position);
-        await repositionDocumentationInGroup(tx, input.parentId, id, input.position, true);
-      } else if (positionChanged) {
-        await repositionDocumentationInGroup(tx, input.parentId, id, input.position, false);
-      }
-
-      if (parentChanged) {
-        return tx.documentationArticle.update({
-          where: { id },
-          data: { parentId: input.parentId },
-          include: { file: true, blocks: { orderBy: { position: "asc" } } },
-        });
-      }
-      return tx.documentationArticle.findUniqueOrThrow({
-        where: { id },
-        include: { file: true, blocks: { orderBy: { position: "asc" } } },
-      });
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "documentation.move",
-      entityType: "DocumentationArticle",
-      entityId: id,
-      payload: {
-        from: { parentId: existing.parentId, position: existing.position },
-        to: { parentId: input.parentId, position: input.position },
-      },
-    });
-
-    return mapDocumentationNode(document as DocumentationArticleRow, { includeBlocks: true });
+    return moveDocumentationArticle(this.workflowDeps(), id, input, user);
   }
 
   async deleteDocument(id: string, user: RequestUser, reason?: string) {
-    const existing = await this.prisma.documentationArticle.findUnique({
-      where: { id },
-      include: { blocks: true, _count: { select: { children: true } } },
-    });
-    if (!existing) {
-      throw new NotFoundException("Документ не найден.");
-    }
-    if (existing._count.children > 0) {
-      throw new ForbiddenException("Нельзя удалить узел с дочерними. Сначала переместите или удалите их.");
-    }
-    const deletedFileIds = this.common.compactFileIds([
-      existing.fileAssetId,
-      ...this.common.collectFileIdsFromBlocks(existing.blocks),
-    ]);
-
-    await this.prisma.documentationArticle.delete({ where: { id } });
-    await this.common.clearEntityReferences("documentation_article", id);
-    await this.common.cleanupDetachedFiles(deletedFileIds);
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "documentation.delete",
-      entityType: "DocumentationArticle",
-      entityId: id,
-      comment: reason,
-      payload: { title: existing.title, slug: existing.slug, parentId: existing.parentId },
-    });
-
-    return { ok: true };
+    return deleteDocumentationArticle(this.workflowDeps(), id, user, reason);
   }
 
-  private parseDate(value: string | null | undefined): Date | null {
-    return value ? new Date(value) : null;
-  }
-
-  private async assertFileExists(fileAssetId: string | null): Promise<void> {
-    if (!fileAssetId) {
-      return;
-    }
-    const file = await this.prisma.fileAsset.findUnique({ where: { id: fileAssetId }, select: { id: true } });
-    if (!file) {
-      throw new BadRequestException("Прикреплённый файл не найден.");
-    }
-  }
-
-  private validateDraftableBlocks(blocks: DocumentationInput["blocks"]) {
-    if (blocks.length === 0) {
-      return { ok: true as const };
-    }
-    return validateContentBlocks(blocks);
+  private workflowDeps() {
+    return {
+      prisma: this.prisma,
+      auditLog: this.auditLog,
+      common: this.common,
+    };
   }
 }
