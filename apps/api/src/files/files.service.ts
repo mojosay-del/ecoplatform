@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from "@nestjs/common";
-import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 // file-type ≥17 поставляется только как ESM. apps/api собирается в CommonJS:
@@ -16,7 +16,6 @@ import {
   buildStorageKey,
   canonicalMimeType,
   contentDisposition,
-  downloadContentDisposition,
   hasBlockedExtension,
   isAllowedDetectedMime,
   isDeclaredMimeCompatible,
@@ -33,20 +32,15 @@ import { assertDailyUploadQuota, type FilesQuotaDeps } from "./files-quota.helpe
 import {
   bucketForAccessLevel,
   getS3Client,
-  getS3Config,
-  publicUrl,
   readS3HealthConfig,
   s3PingBucket,
   signS3DownloadUrls,
 } from "./files-storage.helpers";
-import {
-  parseImageVariants,
-  toFileAssetResponse,
-  type FileAssetResponse,
-  type FileAssetVideoSource,
-} from "./files-response.helpers";
-import { isVideoMime, parseVideoRenditions, serializeVideoRenditions } from "./video-renditions";
+import { toFileAssetResponse } from "./files-response.helpers";
+import { isVideoMime, serializeVideoRenditions } from "./video-renditions";
 import { VideoTranscodeService } from "./video-transcode.service";
+import { deleteUnreferencedFiles, type FilesCleanupDeps } from "./files-cleanup.helpers";
+import { buildFileAssetResponses, isPlayableMedia, SIGNED_URL_TTL_SECONDS } from "./files-delivery.helpers";
 
 export type { FileAssetResponse } from "./files-response.helpers";
 
@@ -74,16 +68,6 @@ const DEFAULT_MAX_COVER_MB = 10;
 const DEFAULT_DAILY_QUOTA_MB = 500;
 const MB_IN_BYTES = 1024 * 1024;
 const S3_HEALTH_TIMEOUT_MS = 1_000;
-// Срок жизни presigned-ссылки на приватный файл. Час — достаточно, чтобы открыть
-// урок и скачать материалы за сессию; по истечении фронт перезапрашивает урок,
-// и доступ перепроверяется заново (истёкшая подписка ссылку уже не получит).
-const SIGNED_URL_TTL_SECONDS = 60 * 60;
-
-// Медиа, которое проигрывается в плеере прямо на странице (видео/аудио уроков).
-// Для таких файлов считаем inline-ссылку (streamUrl) без attachment-расположения.
-function isPlayableMedia(mimeType: string): boolean {
-  return mimeType.startsWith("video/") || mimeType.startsWith("audio/");
-}
 
 @Injectable()
 export class FilesService {
@@ -146,6 +130,10 @@ export class FilesService {
   }
 
   private get referenceDeps(): FilesReferenceDeps {
+    return { prisma: this.prisma };
+  }
+
+  private get cleanupDeps(): FilesCleanupDeps {
     return { prisma: this.prisma };
   }
 
@@ -220,11 +208,6 @@ export class FilesService {
       ...input,
       mimeType,
     };
-  }
-
-  private fileStorageKeys(asset: FileAsset): string[] {
-    const variants = Object.values(parseImageVariants(asset.variants)).map((variant) => variant.storageKey);
-    return Array.from(new Set([asset.storageKey, ...variants]));
   }
 
   private get quotaDeps(): FilesQuotaDeps {
@@ -411,129 +394,12 @@ export class FilesService {
       orderBy: { createdAt: "desc" },
     });
 
-    const signed = await this.signDownloadUrls(assets);
-    // Для медиа (video/audio) дополнительно считаем inline-ссылку для плеера —
-    // без attachment-расположения, иначе Safari/iOS не воспроизводят файл.
-    const mediaAssets = assets.filter((asset) => isPlayableMedia(asset.mimeType));
-    const streamed =
-      mediaAssets.length > 0
-        ? await this.signDownloadUrls(mediaAssets, SIGNED_URL_TTL_SECONDS, { inline: true })
-        : new Map<string, string | null>();
-    const videoSources = await this.buildVideoSourcesMap(assets);
-    return assets.map((asset) => {
-      const base = {
-        ...toFileAssetResponse(asset),
-        downloadUrl: signed.get(asset.id) ?? null,
-        streamUrl: streamed.get(asset.id) ?? null,
-      };
-      const sources = videoSources.get(asset.id);
-      if (base.videoRenditions && sources) {
-        base.videoRenditions = { ...base.videoRenditions, sources };
-      }
-      return base;
-    });
-  }
-
-  // Подписывает inline-ссылки на готовые видео-ренишены (по убыванию высоты —
-  // лучшее качество первым, как дефолт плеера). Для public-видео это прямые
-  // ссылки, для приватных — короткоживущие presigned (та же логика, что у
-  // streamUrl). Возвращает Map<assetId, sources>.
-  private async buildVideoSourcesMap(
-    assets: Array<Pick<FileAsset, "id" | "accessLevel" | "originalName" | "videoRenditions">>,
-  ): Promise<Map<string, FileAssetVideoSource[]>> {
-    const result = new Map<string, FileAssetVideoSource[]>();
-    const synthetic: Array<Pick<FileAsset, "id" | "storageKey" | "accessLevel" | "originalName">> = [];
-    const back: Array<{ synthId: string; assetId: string; width: number; height: number }> = [];
-
-    for (const asset of assets) {
-      const data = parseVideoRenditions(asset.videoRenditions);
-      if (!data || data.status !== "ready" || data.renditions.length === 0) continue;
-      const sorted = [...data.renditions].sort((a, b) => b.height - a.height);
-      for (const rendition of sorted) {
-        const synthId = `${asset.id}::${rendition.height}`;
-        synthetic.push({
-          id: synthId,
-          storageKey: rendition.storageKey,
-          accessLevel: asset.accessLevel,
-          originalName: asset.originalName,
-        });
-        back.push({ synthId, assetId: asset.id, width: rendition.width, height: rendition.height });
-      }
-    }
-
-    if (synthetic.length === 0) return result;
-    const signed = await this.signDownloadUrls(synthetic, SIGNED_URL_TTL_SECONDS, { inline: true });
-    for (const item of back) {
-      const list = result.get(item.assetId) ?? [];
-      list.push({ src: signed.get(item.synthId) ?? null, width: item.width, height: item.height, type: "video/mp4" });
-      result.set(item.assetId, list);
-    }
-    return result;
-  }
-
-  private async hasStructuredReference(fileId: string) {
-    const counts = await Promise.all([
-      this.prisma.newsPost.count({ where: { coverImageId: fileId } }),
-      this.prisma.learningModule.count({ where: { coverImageId: fileId } }),
-      this.prisma.lesson.count({ where: { coverImageId: fileId } }),
-      this.prisma.knowledgeBaseArticle.count({ where: { coverImageId: fileId } }),
-      this.prisma.documentationArticle.count({ where: { fileAssetId: fileId } }),
-      this.prisma.listingMedia.count({ where: { fileId } }),
-      this.prisma.lessonAttachment.count({ where: { fileId } }),
-      this.prisma.commentAttachment.count({ where: { fileId } }),
-      this.prisma.user.count({ where: { avatarFileId: fileId } }),
-    ]);
-
-    return counts.some((count) => count > 0);
-  }
-
-  private canDeleteAsset(asset: FileAsset, actor?: RequestUser): boolean {
-    if (!actor) {
-      return true;
-    }
-
-    return actor.platformRoles.includes("admin") || asset.uploadedById === actor.id;
+    return buildFileAssetResponses(assets, (signedAssets, ttlSeconds, options) =>
+      this.signDownloadUrls(signedAssets, ttlSeconds, options),
+    );
   }
 
   async deleteIfUnreferenced(fileIds: string[], actor?: RequestUser): Promise<number> {
-    const uniqueIds = Array.from(new Set(fileIds.filter(Boolean)));
-    let deleted = 0;
-
-    for (const fileId of uniqueIds) {
-      const [asset, referenceCount, hasStructuredReference] = await Promise.all([
-        this.prisma.fileAsset.findUnique({ where: { id: fileId } }),
-        this.prisma.fileReference.count({ where: { fileId } }),
-        this.hasStructuredReference(fileId),
-      ]);
-
-      if (!asset || referenceCount > 0 || hasStructuredReference) {
-        continue;
-      }
-
-      if (!this.canDeleteAsset(asset, actor)) {
-        throw new ForbiddenException("Можно удалить только файл, загруженный вами.");
-      }
-
-      const config = getS3Config();
-      if (config) {
-        // Удаляем из того же бакета, куда объект был загружен по его уровню доступа.
-        const objectBucket = bucketForAccessLevel(asset.accessLevel, config.bucket);
-        await Promise.all(
-          this.fileStorageKeys(asset).map((key) =>
-            config.client.send(
-              new DeleteObjectCommand({
-                Bucket: objectBucket,
-                Key: key,
-              }),
-            ),
-          ),
-        );
-      }
-
-      await this.prisma.fileAsset.delete({ where: { id: fileId } });
-      deleted += 1;
-    }
-
-    return deleted;
+    return deleteUnreferencedFiles(this.cleanupDeps, fileIds, actor);
   }
 }
