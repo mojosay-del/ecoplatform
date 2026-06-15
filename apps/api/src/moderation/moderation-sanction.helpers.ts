@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { CompanyStatus, ModerationCaseStatus, SanctionType, UserStatus, type Prisma } from "@prisma/client";
 import type { z } from "zod";
+import { isPlatformAdmin } from "../common/access-policy";
 import type { AdminActionLogService } from "../common/admin-action-log.service";
 import type { RequestUser } from "../common/request-user";
 import { swallowAndLog } from "../common/silent-catch";
@@ -36,7 +37,7 @@ export async function applyAdminSanction(
   input: AdminSanctionInput,
   user: RequestUser,
 ): Promise<ModerationSanctionCaseWithRelations> {
-  if (!isAdmin(user)) {
+  if (!isPlatformAdmin(user)) {
     throw new ForbiddenException("Применить эту санкцию может только администратор.");
   }
 
@@ -199,7 +200,7 @@ export async function liftSanction(
   input: SanctionLiftInput,
   user: RequestUser,
 ) {
-  if (!isAdmin(user)) {
+  if (!isPlatformAdmin(user)) {
     throw new ForbiddenException("Снять санкцию может только администратор.");
   }
 
@@ -325,8 +326,4 @@ async function invalidateCacheForSanction(deps: ModerationSanctionDeps, type: Sa
   } else if (type === SanctionType.company_block) {
     await deps.sessionCache.invalidateCompany(targetId);
   }
-}
-
-function isAdmin(user: RequestUser) {
-  return user.platformRoles.includes("admin");
 }

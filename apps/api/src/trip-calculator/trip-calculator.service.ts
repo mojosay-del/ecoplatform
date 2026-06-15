@@ -1,10 +1,11 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import {
   tripCalculatorSettingsSchema,
   type TripCalculatorSettings,
   type TripCalculatorSettingsGetResponse,
 } from "@ecoplatform/shared";
+import { assertCompanyTypeIn } from "../common/access-policy";
 import { PrismaService } from "../prisma/prisma.service";
 import type { RequestUser } from "../common/request-user";
 
@@ -17,10 +18,7 @@ export class TripCalculatorService {
   // имеет — для него калькулятор недоступен (пункт меню виден, данных нет).
   // Возвращает companyId для скоупинга запроса.
   private assertCollector(user: RequestUser): string {
-    if (!user.companyId || user.company?.type !== "collector") {
-      throw new ForbiddenException("Калькулятор доступен только компаниям-заготовителям.");
-    }
-    return user.companyId;
+    return assertCompanyTypeIn(user, ["collector"], "Калькулятор доступен только компаниям-заготовителям.");
   }
 
   async getSettings(user: RequestUser): Promise<TripCalculatorSettingsGetResponse> {

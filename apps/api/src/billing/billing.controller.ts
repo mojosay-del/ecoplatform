@@ -1,10 +1,10 @@
 import { Body, Controller, ForbiddenException, Get, Headers, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { CompanyRole } from "@prisma/client";
 import {
   companyProfileUpdateDtoSchema,
   manualSubscriptionDtoSchema,
   selfSubscriptionDtoSchema,
 } from "@ecoplatform/shared";
+import { assertCompanyOwner } from "../common/access-policy";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
@@ -65,16 +65,4 @@ export class BillingController {
     const input = parseBody(manualSubscriptionDtoSchema, body);
     return this.billing.activateManually(input, user.id, idempotencyKey);
   }
-}
-
-function assertCompanyOwner(user: RequestUser, noCompanyMessage: string): string {
-  if (!user.companyId) {
-    throw new ForbiddenException(noCompanyMessage);
-  }
-
-  if (user.companyRole !== CompanyRole.owner) {
-    throw new ForbiddenException("Управлять биллингом может только владелец компании.");
-  }
-
-  return user.companyId;
 }

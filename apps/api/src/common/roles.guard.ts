@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
+import { hasAnyPlatformRole } from "@ecoplatform/shared";
 import type { PlatformRole } from "@ecoplatform/shared";
 import { ROLES_KEY } from "./roles.decorator";
 import type { RequestUser } from "./request-user";
@@ -24,7 +25,7 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const roles = request.user?.platformRoles ?? [];
 
-    if (expected.some((role) => roles.includes(role))) {
+    if (hasAnyPlatformRole(roles, expected)) {
       return true;
     }
 

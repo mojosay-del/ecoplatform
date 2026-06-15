@@ -16,8 +16,13 @@ import {
   type MyMarketplaceListingItem,
   type PaginatedResponse,
   type UpdateListingDto,
-  canOpenFunctionalSections,
 } from "@ecoplatform/shared";
+import {
+  assertCompanyTypeIn,
+  assertFunctionalAccess,
+  canSeeListingContacts,
+  isListingOwner,
+} from "../../common/access-policy";
 import { ModuleAccessService } from "../../common/module-access.service";
 import { paginatedResponse, resolvePagination } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
@@ -114,20 +119,14 @@ export class MarketplaceListingsService {
   // Площадка — функциональный раздел: нужен demo или активная подписка
   // (как в content-домене). Платформенный персонал проходит всегда.
   private assertCanUse(user: RequestUser) {
-    if (user.platformRoles.length > 0) return;
-    if (!user.company || !canOpenFunctionalSections(user.company)) {
-      throw new ForbiddenException("Доступ к площадке ограничен. Активируйте подписку в кабинете.");
-    }
+    assertFunctionalAccess(user, "Доступ к площадке ограничен. Активируйте подписку в кабинете.");
   }
 
   // Действия продавца (создать/опубликовать/архив/переподать) доступны только
   // заготовителям с активным доступом. Возвращает companyId продавца.
   private assertSeller(user: RequestUser): string {
     this.assertCanUse(user);
-    if (!user.companyId || user.company?.type !== "collector") {
-      throw new ForbiddenException("Публиковать объявления могут только компании-заготовители.");
-    }
-    return user.companyId;
+    return assertCompanyTypeIn(user, ["collector"], "Публиковать объявления могут только компании-заготовители.");
   }
 
   private async findOwnedOr404(companyId: string, id: string): Promise<ListingWithRelations> {
@@ -190,14 +189,14 @@ export class MarketplaceListingsService {
       throw new NotFoundException("Объявление не найдено.");
     }
 
-    const isOwner = Boolean(user.companyId && listing.sellerCompanyId === user.companyId);
-    const isAdmin = user.platformRoles.includes("admin");
+    const isOwner = isListingOwner(user, listing.sellerCompanyId);
+    const canSeeContacts = canSeeListingContacts(user, listing.sellerCompanyId);
     // Чужим показываем только активную карточку; черновики/архив — лишь владельцу/админу.
-    if (!isOwner && !isAdmin && listing.status !== "active") {
+    if (!canSeeContacts && listing.status !== "active") {
       throw new NotFoundException("Объявление не найдено.");
     }
 
-    return this.mapDetail(listing, { canSeeContacts: isOwner || isAdmin, isOwner });
+    return this.mapDetail(listing, { canSeeContacts, isOwner });
   }
 
   // Справочник активной номенклатуры для селектов в форме объявления.

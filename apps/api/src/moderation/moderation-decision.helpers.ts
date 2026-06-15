@@ -14,6 +14,7 @@ import {
   type Prisma,
 } from "@prisma/client";
 import type { z } from "zod";
+import { isPlatformAdmin } from "../common/access-policy";
 import type { AdminActionLogService } from "../common/admin-action-log.service";
 import type { RequestUser } from "../common/request-user";
 import { swallowAndLog } from "../common/silent-catch";
@@ -57,12 +58,12 @@ export async function createDecision(
   if (found.status === ModerationCaseStatus.resolved || found.status === ModerationCaseStatus.closed_by_admin) {
     throw new BadRequestException("По закрытому кейсу нельзя вынести новое решение.");
   }
-  if (found.status === ModerationCaseStatus.escalated && !isAdmin(user)) {
+  if (found.status === ModerationCaseStatus.escalated && !isPlatformAdmin(user)) {
     throw new ForbiddenException("Эскалированный кейс решает администратор.");
   }
 
   const now = new Date();
-  if (!isAdmin(user) && (found.lockedById !== user.id || !found.lockedUntil || found.lockedUntil <= now)) {
+  if (!isPlatformAdmin(user) && (found.lockedById !== user.id || !found.lockedUntil || found.lockedUntil <= now)) {
     throw new ForbiddenException("Перед решением модератор должен взять кейс в работу.");
   }
 
@@ -71,7 +72,7 @@ export async function createDecision(
       data: {
         caseId: found.id,
         actorId: user.id,
-        actorRole: isAdmin(user) ? "admin" : "moderator",
+        actorRole: isPlatformAdmin(user) ? "admin" : "moderator",
         type: input.type,
         reasonCode: input.reasonCode,
         comment: input.comment,
@@ -391,8 +392,4 @@ async function getModerationEntity(
 
 function isModeratedEntityType(value: string): value is ModeratedEntityType {
   return (moderatedEntityTypes as readonly string[]).includes(value);
-}
-
-function isAdmin(user: RequestUser) {
-  return user.platformRoles.includes("admin");
 }

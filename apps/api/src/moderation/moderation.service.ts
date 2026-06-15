@@ -7,7 +7,7 @@ import {
   ModerationCaseStatus,
   ReviewStatus,
 } from "@prisma/client";
-import { canOpenFunctionalSections } from "@ecoplatform/shared";
+import { companyHasFunctionalAccess } from "../common/access-policy";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { AdminActionLogService } from "../common/admin-action-log.service";
 import type { PaginationInput } from "../common/pagination";
@@ -194,8 +194,11 @@ export class ModerationService {
     };
   }
 
+  // Подать жалобу может только пользователь компании с активным доступом
+  // (НЕ платформенный стафф — он модерирует, а не жалуется). Поэтому используем
+  // companyHasFunctionalAccess (без staff-исключения), а не общий гейт разделов.
   private assertFunctionalAccess(user: RequestUser) {
-    if (!user.company || !canOpenFunctionalSections(user.company)) {
+    if (!companyHasFunctionalAccess(user)) {
       throw new ForbiddenException("Доступ к разделу ограничен. Активируйте подписку в кабинете.");
     }
   }

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { CommentStatus, ContentStatus, DiscussionTargetType, ModerationCaseStatus, type Prisma } from "@prisma/client";
 import type { PlatformSettingsService } from "../admin/settings/platform-settings.service";
+import { isPlatformAdmin } from "../common/access-policy";
 import type { AdminActionLogService } from "../common/admin-action-log.service";
 import { paginatedResponse, resolvePagination, type PaginationInput } from "../common/pagination";
 import type { RequestUser } from "../common/request-user";
@@ -100,7 +101,7 @@ export async function takeCaseLock(deps: ModerationCaseDeps, id: string, user: R
   const maxLocks = await deps.settings.getValue("moderation.max_locks_per_moderator");
   const lockDurationMs = (await deps.settings.getValue("moderation.lock_duration_minutes")) * 60 * 1000;
 
-  if (!isAdmin(user)) {
+  if (!isPlatformAdmin(user)) {
     const activeLocks = await deps.prisma.moderationCase.count({
       where: {
         lockedById: user.id,
@@ -141,7 +142,7 @@ export async function releaseCaseLock(deps: ModerationCaseDeps, id: string, user
   if (!found) {
     throw new NotFoundException("Кейс модерации не найден.");
   }
-  if (found.lockedById && found.lockedById !== user.id && !isAdmin(user)) {
+  if (found.lockedById && found.lockedById !== user.id && !isPlatformAdmin(user)) {
     throw new ForbiddenException("Освободить чужой lock может только администратор.");
   }
 
@@ -367,8 +368,4 @@ function buildEntitySummary(
     };
   }
   return null;
-}
-
-function isAdmin(user: RequestUser) {
-  return user.platformRoles.includes("admin");
 }

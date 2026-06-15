@@ -8,8 +8,8 @@ import {
   type ReviewDirection,
   type ReviewItem,
   type ReviewResponseDto,
-  canOpenFunctionalSections,
 } from "@ecoplatform/shared";
+import { assertFunctionalAccess } from "../../common/access-policy";
 import { ModuleAccessService } from "../../common/module-access.service";
 import type { RequestUser } from "../../common/request-user";
 import { swallowAndLog } from "../../common/silent-catch";
@@ -33,10 +33,7 @@ export class MarketplaceReviewsService {
   ) {}
 
   private assertCanUse(user: RequestUser) {
-    if (user.platformRoles.length > 0) return;
-    if (!user.company || !canOpenFunctionalSections(user.company)) {
-      throw new ForbiddenException("Доступ к площадке ограничен. Активируйте подписку в кабинете.");
-    }
+    assertFunctionalAccess(user, "Доступ к площадке ограничен. Активируйте подписку в кабинете.");
   }
 
   async createReview(user: RequestUser, offerId: string, dto: CreateReviewDto): Promise<ReviewItem> {

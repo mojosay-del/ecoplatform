@@ -1,6 +1,7 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { canOpenFunctionalSections, slugify } from "@ecoplatform/shared";
+import { slugify } from "@ecoplatform/shared";
+import { assertFunctionalAccess } from "../../common/access-policy";
 import { sanitizeParagraphHtml } from "../../common/sanitize-html";
 import type { RequestUser } from "../../common/request-user";
 import { FilesService } from "../../files/files.service";
@@ -16,12 +17,7 @@ export class ContentCommonService {
   // войти в кабинет, но рабочие разделы закрываются до активации подписки.
   // Платформенные сотрудники проходят всегда.
   assertFunctionalAccess(user: RequestUser) {
-    if (user.platformRoles.length > 0) {
-      return;
-    }
-    if (!user.company || !canOpenFunctionalSections(user.company)) {
-      throw new ForbiddenException("Доступ к разделу ограничен. Активируйте подписку в кабинете.");
-    }
+    assertFunctionalAccess(user);
   }
 
   // Готовит payload блока для записи в БД. Для paragraph — сначала прогоняет

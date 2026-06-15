@@ -6,8 +6,13 @@ import {
   type ListingOfferItem,
   type MyOfferItem,
   type PaginatedResponse,
-  canOpenFunctionalSections,
 } from "@ecoplatform/shared";
+import {
+  assertCompanyTypeIn,
+  assertFunctionalAccess,
+  isListingOwner,
+  isPlatformAdmin,
+} from "../../common/access-policy";
 import { ModuleAccessService } from "../../common/module-access.service";
 import { paginatedResponse, resolvePagination } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
@@ -38,19 +43,17 @@ export class MarketplaceOffersService {
   // ── Гейты ─────────────────────────────────────────────────────────────────
 
   private assertCanUse(user: RequestUser) {
-    if (user.platformRoles.length > 0) return;
-    if (!user.company || !canOpenFunctionalSections(user.company)) {
-      throw new ForbiddenException("Доступ к площадке ограничен. Активируйте подписку в кабинете.");
-    }
+    assertFunctionalAccess(user, "Доступ к площадке ограничен. Активируйте подписку в кабинете.");
   }
 
   // Предложения делают покупатели — трейдеры и переработчики (по докам).
   private assertBuyer(user: RequestUser): string {
     this.assertCanUse(user);
-    if (!user.companyId || (user.company?.type !== "trader" && user.company?.type !== "processor")) {
-      throw new ForbiddenException("Делать предложения могут покупатели — трейдеры и переработчики.");
-    }
-    return user.companyId;
+    return assertCompanyTypeIn(
+      user,
+      ["trader", "processor"],
+      "Делать предложения могут покупатели — трейдеры и переработчики.",
+    );
   }
 
   private async findOwnOfferOr404(buyerCompanyId: string, offerId: string): Promise<OfferWithRelations> {
@@ -208,8 +211,7 @@ export class MarketplaceOffersService {
     if (!listing) {
       throw new NotFoundException("Объявление не найдено.");
     }
-    const isOwner = listing.sellerCompanyId === user.companyId;
-    if (!isOwner && !user.platformRoles.includes("admin")) {
+    if (!isListingOwner(user, listing.sellerCompanyId) && !isPlatformAdmin(user)) {
       throw new ForbiddenException("Это не ваше объявление.");
     }
     const offers = await this.prisma.offer.findMany({
@@ -364,7 +366,7 @@ export class MarketplaceOffersService {
     if (!offer) {
       throw new NotFoundException("Предложение не найдено.");
     }
-    if (offer.listing.sellerCompanyId !== user.companyId && !user.platformRoles.includes("admin")) {
+    if (!isListingOwner(user, offer.listing.sellerCompanyId) && !isPlatformAdmin(user)) {
       throw new ForbiddenException("Это предложение не по вашему объявлению.");
     }
     return offer;
