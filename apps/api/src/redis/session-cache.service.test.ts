@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { CompanyRole } from "@prisma/client";
 import type { RequestUser } from "../common/request-user";
 import { SessionCacheService } from "./session-cache.service";
 
@@ -33,6 +34,7 @@ function requestUser(overrides: Partial<RequestUser> = {}): RequestUser {
     lastName: "Иванов",
     phone: "+70000000000",
     companyId: "company-1",
+    companyRole: CompanyRole.owner,
     platformRoles: [],
     company: {
       type: "collector",

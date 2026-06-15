@@ -37,6 +37,7 @@ const {
   verifyRegistration,
   registerWithBody,
   registerCompany,
+  createCompanyMember,
   createPublishedNewsWithComment,
   createPublishedNews,
   createCoverAsset,
@@ -649,6 +650,27 @@ describe("Demo gating", () => {
     expect(payload.after.subscriptionPlan).toBe("basic");
     expect(payload.durationDays).toBe(30);
     expect(payload.source).toBe("subscription_page");
+  });
+
+  it("участник компании не может самостоятельно активировать подписку", async () => {
+    const { companyId } = await registerCompany("0000020");
+    const member = await createCompanyMember(companyId, "0000020");
+    await ctx.prisma.company.update({
+      where: { id: companyId },
+      data: { demoEndsAt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    });
+
+    const res = await ctx.http
+      .post("/api/billing/subscriptions")
+      .set("Authorization", `Bearer ${member.token}`)
+      .set("Idempotency-Key", `self-member-reject-${companyId}`)
+      .send({ plan: "basic" });
+
+    expect(res.status).toBe(403);
+    await expect(ctx.prisma.subscription.count({ where: { companyId } })).resolves.toBe(0);
+    await expect(
+      ctx.prisma.adminActionLog.count({ where: { action: "self_subscription_activation", entityId: companyId } }),
+    ).resolves.toBe(0);
   });
 
   it("самостоятельная активация Расширенной подписки работает после истечения платной подписки", async () => {

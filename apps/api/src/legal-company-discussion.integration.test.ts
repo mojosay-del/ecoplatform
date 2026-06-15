@@ -37,6 +37,7 @@ const {
   verifyRegistration,
   registerWithBody,
   registerCompany,
+  createCompanyMember,
   createPublishedNewsWithComment,
   createPublishedNews,
   createCoverAsset,
@@ -508,6 +509,21 @@ describe("Company profile (Волна 7.2/7.3 — Address, расширенны�
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ websiteUrl: "https://x.test" });
     expect(res.status).toBe(403);
+  });
+
+  it("PATCH /billing/company от участника компании → 403 без изменения данных", async () => {
+    const { companyId } = await registerCompany("0700104");
+    const member = await createCompanyMember(companyId, "0700104");
+
+    const res = await ctx.http.patch("/api/billing/company").set("Authorization", `Bearer ${member.token}`).send({
+      websiteUrl: "https://member-update.test",
+      billingInn: "7707083893",
+    });
+
+    expect(res.status).toBe(403);
+    const company = await ctx.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    expect(company.websiteUrl).toBeNull();
+    expect(company.billingInn).toBeNull();
   });
 
   it("PATCH с битым ИНН → 400", async () => {

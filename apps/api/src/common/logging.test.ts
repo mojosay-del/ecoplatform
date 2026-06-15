@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CompanyRole } from "@prisma/client";
 import { normalizeTraceId, resolveActorRole, resolveLogLevel, shouldUsePrettyLogger } from "./logging";
 import type { RequestUser } from "./request-user";
 
@@ -9,6 +10,7 @@ const baseUser: RequestUser = {
   lastName: "Иванов",
   phone: "+70000000000",
   companyId: "company-1",
+  companyRole: CompanyRole.owner,
   platformRoles: [],
   company: null,
   sessionId: "session-1",

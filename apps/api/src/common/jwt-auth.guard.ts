@@ -38,7 +38,7 @@ export class JwtAuthGuard implements CanActivate {
       });
 
       const cached = await this.sessionCache?.get(payload.sessionId);
-      if (cached?.id === payload.sub) {
+      if (cached?.id === payload.sub && isCurrentRequestUser(cached)) {
         recordAuthCacheHit();
         request.user = cached;
         this.assignUserLogFields(cached);
@@ -82,6 +82,7 @@ export class JwtAuthGuard implements CanActivate {
         lastName: user.lastName,
         phone: user.phone,
         companyId: user.companyId,
+        companyRole: user.companyRole,
         platformRoles,
         company: user.company
           ? {
@@ -116,4 +117,8 @@ export class JwtAuthGuard implements CanActivate {
       actorRole: resolveActorRole(user),
     });
   }
+}
+
+function isCurrentRequestUser(user: RequestUser): boolean {
+  return typeof user.companyRole === "string";
 }

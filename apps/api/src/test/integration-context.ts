@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect } from "vitest";
 import { hash } from "bcryptjs";
-import { FileAccessLevel, LegalDocumentType, PlatformRole } from "@prisma/client";
+import { CompanyRole, FileAccessLevel, LegalDocumentType, PlatformRole } from "@prisma/client";
 import { createTestApp, resetDb, type TestApp } from "./test-app";
 import type { PrismaService } from "../prisma/prisma.service";
 import { REQUIRED_DOC_IDS_FOR_TESTS, TEST_EMAIL_VERIFICATION_CODE } from "./integration-helpers";
@@ -179,6 +179,25 @@ export function setupIntegrationContext() {
     return { token, companyId: me.body.company.id, userId: me.body.id };
   }
 
+  async function createCompanyMember(companyId: string, suffix: string): Promise<{ token: string; userId: string }> {
+    const password = "Member12345678";
+    const member = await testApp.prisma.user.create({
+      data: {
+        email: `member${suffix}@test.local`,
+        firstName: "Пётр",
+        lastName: "Сотрудников",
+        phone: `+7910${suffix}`,
+        passwordHash: await hash(password, 4),
+        companyId,
+        companyRole: CompanyRole.member,
+      },
+    });
+
+    const login = await testApp.http.post("/api/auth/login").send({ email: member.email, password });
+    expect(login.status).toBe(201);
+    return { token: login.body.accessToken as string, userId: member.id };
+  }
+
   async function createPublishedNewsWithComment(adminToken: string, authorToken: string) {
     const draft = await testApp.http
       .post("/api/admin/content/news")
@@ -277,6 +296,7 @@ export function setupIntegrationContext() {
     verifyRegistration,
     registerWithBody,
     registerCompany,
+    createCompanyMember,
     createPublishedNewsWithComment,
     createPublishedNews,
     createCoverAsset,

@@ -1,4 +1,5 @@
 import { Body, Controller, ForbiddenException, Get, Headers, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { CompanyRole } from "@prisma/client";
 import {
   companyProfileUpdateDtoSchema,
   manualSubscriptionDtoSchema,
@@ -30,11 +31,9 @@ export class BillingController {
 
   @Patch("billing/company")
   async updateCompanyProfile(@CurrentUser() user: RequestUser, @Body() body: unknown) {
-    if (!user.companyId) {
-      throw new ForbiddenException("Профиль компании доступен только пользователям компаний.");
-    }
+    const companyId = assertCompanyOwner(user, "Профиль компании доступен только пользователям компаний.");
     const input = parseBody(companyProfileUpdateDtoSchema, body);
-    return this.billing.updateOwnProfile(user.companyId, input);
+    return this.billing.updateOwnProfile(companyId, input);
   }
 
   @Post("billing/subscriptions")
@@ -43,11 +42,9 @@ export class BillingController {
     @CurrentUser() user: RequestUser,
     @Headers("idempotency-key") idempotencyKey: string | undefined,
   ) {
-    if (!user.companyId) {
-      throw new ForbiddenException("Подписка доступна только пользователям компаний.");
-    }
+    const companyId = assertCompanyOwner(user, "Подписка доступна только пользователям компаний.");
     const input = parseBody(selfSubscriptionDtoSchema, body);
-    return this.billing.activateSelf(input, user.id, user.companyId, idempotencyKey);
+    return this.billing.activateSelf(input, user.id, companyId, idempotencyKey);
   }
 
   @UseGuards(RolesGuard)
@@ -68,4 +65,16 @@ export class BillingController {
     const input = parseBody(manualSubscriptionDtoSchema, body);
     return this.billing.activateManually(input, user.id, idempotencyKey);
   }
+}
+
+function assertCompanyOwner(user: RequestUser, noCompanyMessage: string): string {
+  if (!user.companyId) {
+    throw new ForbiddenException(noCompanyMessage);
+  }
+
+  if (user.companyRole !== CompanyRole.owner) {
+    throw new ForbiddenException("Управлять биллингом может только владелец компании.");
+  }
+
+  return user.companyId;
 }
