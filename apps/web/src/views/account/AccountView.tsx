@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { BillingStatus } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
@@ -8,7 +8,6 @@ import {
   ACCOUNT_SECTION_NAVIGATE_EVENT,
   type AccountProfileModalId,
   accountSectionHref,
-  isAccountBusinessSection,
   normalizeAccountProfileModal,
   type AccountSectionId,
 } from "../../components/app-shell-nav";
@@ -16,7 +15,7 @@ import { api, clearAccessToken } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useApiQuery } from "../shared";
 import { accountNotificationRowsForRoles } from "../account-notification-rows";
-import { ACCOUNT_BUSINESS_VIEW_SECTIONS, ACCOUNT_SCROLL_OFFSET, ACCOUNT_SETTINGS_SECTIONS } from "./constants";
+import { ACCOUNT_SCROLL_OFFSET, ACCOUNT_SETTINGS_SECTIONS } from "./constants";
 import { accountSectionDomId, dispatchActiveAccountSection, scrollAccountSectionIntoView } from "./dom";
 import { accountGreeting, formatAccountDate } from "./format";
 import { AccountProfileSection } from "./AccountProfileSection";
@@ -69,12 +68,8 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   const [greeting, setGreeting] = useState("Добрый день");
   useEffect(() => setGreeting(accountGreeting()), []);
   const [sessionsShown, setSessionsShown] = useState(3);
-  const targetSection = isPlatformStaff && isAccountBusinessSection(section) ? "profile" : section;
-  const visibleSections = useMemo(
-    () =>
-      isPlatformStaff ? ACCOUNT_SETTINGS_SECTIONS : [...ACCOUNT_SETTINGS_SECTIONS, ...ACCOUNT_BUSINESS_VIEW_SECTIONS],
-    [isPlatformStaff],
-  );
+  const targetSection = section;
+  const visibleSections = ACCOUNT_SETTINGS_SECTIONS;
   const visibleSectionsKey = visibleSections.join("|");
   // Высота секций зависит от асинхронно подгружаемых данных; включаем все
   // релевантные состояния, чтобы при их догрузке заново «доводить» прокрутку
@@ -101,12 +96,6 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     setSessionsDialogOpen(profileModal === "sessions");
     setNotificationsDialogOpen(profileModal === "notifications");
   }, [isPlatformStaff, profileModal, rawProfileModal, router, user]);
-
-  useEffect(() => {
-    if (isPlatformStaff && isAccountBusinessSection(section)) {
-      router.replace(accountSectionHref("profile"));
-    }
-  }, [isPlatformStaff, router, section]);
 
   useEffect(() => {
     const timeouts: number[] = [];

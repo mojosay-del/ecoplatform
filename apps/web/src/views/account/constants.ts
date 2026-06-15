@@ -2,7 +2,6 @@ import type { AccountSectionId } from "../../components/app-shell-nav";
 import type { CompanyEditableField } from "./types";
 
 export const ACCOUNT_SETTINGS_SECTIONS: AccountSectionId[] = ["profile", "data-privacy"];
-export const ACCOUNT_BUSINESS_VIEW_SECTIONS: AccountSectionId[] = [];
 export const ACCOUNT_SCROLL_OFFSET = 124;
 
 export const COMPANY_FIELD_CONFIG: Record<

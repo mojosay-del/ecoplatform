@@ -78,8 +78,8 @@ describe("AppShell future navigation teasers", () => {
     expect(hrefs).not.toContain("/notifications");
   });
 
-  it("builds the account settings sidebar with business links for regular users", () => {
-    const sections = getAccountNavSections(true);
+  it("builds the account settings sidebar", () => {
+    const sections = getAccountNavSections();
 
     expect(sections.map((section) => section.title)).toEqual(["Переход", "Настройки"]);
     expect(sections[0]?.items.map((item) => item.label)).toEqual(["К платформе"]);
@@ -99,8 +99,8 @@ describe("AppShell future navigation teasers", () => {
     ]);
   });
 
-  it("hides business account links for platform staff", () => {
-    const sections = getAccountNavSections(false);
+  it("keeps legacy business account links out of the settings sidebar", () => {
+    const sections = getAccountNavSections();
 
     expect(sections.map((section) => section.title)).toEqual(["Переход", "Настройки"]);
     expect(sections.flatMap((section) => section.items.map((item) => item.href))).not.toContain("/account/support");
@@ -143,7 +143,7 @@ describe("AppShell future navigation teasers", () => {
   });
 
   it("builds account breadcrumbs and detects account routes", () => {
-    const trail = getBreadcrumbTrail(getAccountNavSections(true), "/account/data-privacy");
+    const trail = getBreadcrumbTrail(getAccountNavSections(), "/account/data-privacy");
 
     expect(isAccountPath("/account/security")).toBe(true);
     expect(isAccountPath("/news")).toBe(false);

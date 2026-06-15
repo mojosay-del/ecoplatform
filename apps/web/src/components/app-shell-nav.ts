@@ -146,10 +146,7 @@ const accountProfileMenuItems: NavItem[] = [
 
 const accountStaffMenuItems: NavItem[] = [{ href: "/account/profile", label: "Профиль", icon: UserRound }];
 
-export const accountBusinessSections: AccountSectionId[] = [];
-
-export function getAccountNavSections(includeBusiness: boolean): NavSection[] {
-  void includeBusiness;
+export function getAccountNavSections(): NavSection[] {
   return [
     {
       title: "Переход",
@@ -173,10 +170,6 @@ export function getAccountMenuSections(includeBusiness: boolean): NavSection[] {
 
 export function isAccountPath(pathname: string): boolean {
   return pathname === "/account" || pathname.startsWith("/account/");
-}
-
-export function isAccountBusinessSection(section: AccountSectionId): boolean {
-  return accountBusinessSections.includes(section);
 }
 
 export function normalizeAccountSection(value: string): AccountSectionId | null {
