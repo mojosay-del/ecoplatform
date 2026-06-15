@@ -1189,6 +1189,68 @@ describe("Marketplace — модерация (фаза 5)", () => {
     expect(republish.status).toBe(403);
   });
 
+  it("снятие объявления модератором отклоняет незавершённые офферы и блокирует их изменение", async () => {
+    const seller = await registerCompany("0009505");
+    const nomenclatureId = await seedNomenclature();
+    const { listingId, positionId } = await createPublishedListing(seller.token, nomenclatureId);
+    const buyerA = await registerTrader("0009505");
+    const buyerB = await registerProcessor("0009505");
+
+    const acceptedOffer = (
+      await ctx.http
+        .post(`/api/marketplace/listings/${listingId}/offers`)
+        .set(bearer(buyerA))
+        .send(offerPayload(positionId))
+    ).body;
+    await ctx.http.post(`/api/marketplace/offers/${acceptedOffer.id}/accept`).set(bearer(seller.token));
+
+    const activeOffer = (
+      await ctx.http
+        .post(`/api/marketplace/listings/${listingId}/offers`)
+        .set(bearer(buyerB))
+        .send(offerPayload(positionId))
+    ).body;
+
+    const complaint = await ctx.http
+      .post("/api/moderation/complaints")
+      .set(bearer(buyerB))
+      .send({ entityType: "marketplace_listing", entityId: listingId, reasonCode: "spam" });
+    expect(complaint.status).toBe(201);
+
+    const adminToken = await loginAdmin();
+    const cases = await ctx.http.get("/api/admin/moderation/cases?limit=100").set(bearer(adminToken));
+    const theCase = cases.body.items.find(
+      (item) => item.entityType === "marketplace_listing" && item.entityId === listingId,
+    );
+    expect(theCase).toBeTruthy();
+
+    await ctx.http.post(`/api/admin/moderation/cases/${theCase.id}/lock`).set(bearer(adminToken));
+    const decision = await ctx.http
+      .post(`/api/admin/moderation/cases/${theCase.id}/decisions`)
+      .set(bearer(adminToken))
+      .send({ type: "remove_content", reasonCode: "valid_complaint" });
+    expect(decision.status).toBe(201);
+
+    const offers = await ctx.prisma.offer.findMany({
+      where: { id: { in: [acceptedOffer.id, activeOffer.id] } },
+      select: { id: true, status: true, dealResult: true, resolvedAt: true },
+    });
+    const offersById = new Map(offers.map((offer) => [offer.id, offer]));
+    expect(offersById.get(acceptedOffer.id)?.status).toBe("declined");
+    expect(offersById.get(activeOffer.id)?.status).toBe("declined");
+    expect(offersById.get(acceptedOffer.id)?.dealResult).toBeNull();
+    expect(offersById.get(activeOffer.id)?.dealResult).toBeNull();
+    expect(offersById.get(acceptedOffer.id)?.resolvedAt).toBeInstanceOf(Date);
+    expect(offersById.get(activeOffer.id)?.resolvedAt).toBeInstanceOf(Date);
+
+    const update = await ctx.http
+      .patch(`/api/marketplace/offers/${activeOffer.id}`)
+      .set(bearer(buyerB))
+      .send(offerPayload(positionId, { contactPhone: "+79990000000" }));
+    expect(update.status).toBe(400);
+    expect(update.body.message).toBe("Объявление неактивно.");
+  });
+
   it("жалоба на отзыв: модератор скрывает — отзыв исчезает, рейтинг компании пересчитан", async () => {
     const deal = await agreedDeal("0009502", "0009502");
     const review = await ctx.http

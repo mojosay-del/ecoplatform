@@ -8,6 +8,7 @@ import {
   ModerationCaseStatus,
   ModerationDecisionType,
   NotificationCategory,
+  OfferStatus,
   ReviewStatus,
   SanctionType,
   type Prisma,
@@ -196,9 +197,18 @@ async function removeModeratedEntity(tx: Prisma.TransactionClient, found: Modera
       throw new BadRequestException("Объявление уже удалено.");
     }
     // archived убирает объявление из ленты; archiveReason запрещает переподачу.
+    const now = new Date();
     await tx.marketplaceListing.update({
       where: { id: found.entityId },
-      data: { status: ListingStatus.archived, archiveReason: "removed_by_moderator", archivedAt: new Date() },
+      data: { status: ListingStatus.archived, archiveReason: "removed_by_moderator", archivedAt: now },
+    });
+    await tx.offer.updateMany({
+      where: {
+        listingId: found.entityId,
+        status: { in: [OfferStatus.active, OfferStatus.accepted] },
+        dealResult: null,
+      },
+      data: { status: OfferStatus.declined, resolvedAt: now },
     });
     return;
   }

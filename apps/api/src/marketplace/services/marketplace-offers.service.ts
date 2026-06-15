@@ -121,6 +121,9 @@ export class MarketplaceOffersService {
   async updateOffer(user: RequestUser, offerId: string, dto: CreateOfferDto): Promise<MyOfferItem> {
     const buyerCompanyId = this.assertBuyer(user);
     const offer = await this.findOwnOfferOr404(buyerCompanyId, offerId);
+    if (offer.listing.status !== "active") {
+      throw new BadRequestException("Объявление неактивно.");
+    }
     if (offer.status !== "active") {
       throw new BadRequestException("Изменить можно только активное предложение (до его принятия).");
     }
