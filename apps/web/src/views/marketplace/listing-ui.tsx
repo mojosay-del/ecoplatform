@@ -15,8 +15,12 @@ import type {
 import { Mail, Star } from "lucide-react";
 import { api } from "../../lib/api";
 import { expiryLabel, formatDistanceKm, isExpiringSoon } from "./listing-card-meta";
+import { formatWeight } from "./listing-format";
 import { materialColor } from "./materials";
 import { formatRatingValue } from "./review-rating";
+
+// Re-export, чтобы существующие импортёры `formatWeight` из ./listing-ui работали.
+export { formatWeight } from "./listing-format";
 
 export const LISTING_STATUS_LABEL: Record<ListingStatus, string> = {
   draft: "Черновик",
@@ -46,14 +50,6 @@ export function archiveReasonLabel(reason: string | null): string | null {
     return null;
   }
   return LISTING_ARCHIVE_REASON_LABEL[reason as keyof typeof LISTING_ARCHIVE_REASON_LABEL];
-}
-
-export function formatWeight(kg: number): string {
-  if (kg >= 1000) {
-    const tons = kg / 1000;
-    return `${Number.isInteger(tons) ? tons : tons.toFixed(1)} т`;
-  }
-  return `${Math.round(kg)} кг`;
 }
 
 export function formatLocation(city: string, region: string | null): string {
