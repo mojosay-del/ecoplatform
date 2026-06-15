@@ -598,6 +598,8 @@ model AdminActionLog {
   payload    Json?
   createdAt  DateTime @default(now())
 
+  // Ретеншен: крон cleanup-stale-records удаляет записи старше 2 лет по createdAt.
+  @@index([createdAt])
   @@index([action, createdAt])
   @@index([entityType, createdAt])
   @@index([actorId, createdAt])
@@ -1078,6 +1080,9 @@ model InAppNotification {
   @@unique([domainEventId, userId])
   @@index([userId, archivedAt, readAt])
   @@index([userId, createdAt])
+  // Ретеншен: крон cleanup-stale-records удаляет прочитанные/архивные старше 180 дней.
+  @@index([readAt])
+  @@index([archivedAt])
 }
 
 model UserNotificationPreferences {

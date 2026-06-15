@@ -42,6 +42,12 @@ const IDEMPOTENCY_KEY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 //  - NotificationDelivery: к 90 дням все доставки терминальные; связанные
 //    InAppNotification не теряются (FK onDelete: SetNull лишь обнулит ссылку).
 const NOTIFICATION_DELIVERY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+//  - AdminActionLog: журнал нужен для расследований и аудита, но не должен
+//    расти бесконечно; храним два года.
+const ADMIN_ACTION_LOG_RETENTION_MS = 730 * 24 * 60 * 60 * 1000;
+//  - InAppNotification: непрочитанные активные уведомления не трогаем, старые
+//    прочитанные/архивные удаляем через полгода.
+const IN_APP_NOTIFICATION_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 
 type AdvisoryLockRow = {
   ok: boolean;
@@ -65,7 +71,7 @@ type AccountDeletionCleanupResult = {
  *  - ночью удаляются осиротевшие загрузки (файлы без единой ссылки);
  *  - ночью удаляются отработавшие регистрационные challenge (хэш пароля + ПДн);
  *  - ночью чистятся «копящиеся» таблицы: истёкшие сессии, старые ключи
- *    идемпотентности, журнал доставки нотификаций и осиротевшие адреса
+ *    идемпотентности, журналы действий/нотификаций и осиротевшие адреса
  *    (cleanup-stale-records).
  *
  * Запуск задач можно полностью отключить переменной SCHEDULER_DISABLED=1
@@ -247,11 +253,13 @@ export class SchedulerService {
   async handleStaleRecordCleanup() {
     if (this.disabled) return;
     try {
-      // Три удаления под одним advisory lock: вторая реплика пропустит tick.
+      // Все удаления под одним advisory lock: вторая реплика пропустит tick.
       await this.runWithPostgresAdvisoryLock(STALE_RECORD_CLEANUP_LOCK_KEY, async () => {
         await this.cleanupExpiredSessions();
         await this.cleanupStaleIdempotencyKeys();
         await this.cleanupStaleNotificationDeliveries();
+        await this.cleanupStaleInAppNotifications();
+        await this.cleanupStaleAdminActionLogs();
         await this.cleanupOrphanAddresses();
       });
     } catch (error) {
@@ -307,6 +315,40 @@ export class SchedulerService {
     });
     if (count > 0) {
       this.logger.log(`Notification delivery cleanup: deleted ${count} old deliveries`);
+    }
+    return { deleted: count };
+  }
+
+  /**
+   * Удаляет старые пользовательские уведомления, которые уже не требуют
+   * внимания: прочитаны или отправлены в архив больше 180 дней назад. Активные
+   * непрочитанные уведомления, даже старые, остаются видимыми пользователю.
+   */
+  async cleanupStaleInAppNotifications(now = new Date()): Promise<{ deleted: number }> {
+    const cutoff = new Date(now.getTime() - IN_APP_NOTIFICATION_RETENTION_MS);
+    const { count } = await this.prisma.inAppNotification.deleteMany({
+      where: {
+        OR: [{ readAt: { lt: cutoff } }, { archivedAt: { lt: cutoff } }],
+      },
+    });
+    if (count > 0) {
+      this.logger.log(`In-app notification cleanup: deleted ${count} old read/archived notifications`);
+    }
+    return { deleted: count };
+  }
+
+  /**
+   * Удаляет старые записи admin audit log. Два года оставляют запас для
+   * расследований и клиентских вопросов, но ограничивают бесконечный рост
+   * append-only таблицы.
+   */
+  async cleanupStaleAdminActionLogs(now = new Date()): Promise<{ deleted: number }> {
+    const cutoff = new Date(now.getTime() - ADMIN_ACTION_LOG_RETENTION_MS);
+    const { count } = await this.prisma.adminActionLog.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+    if (count > 0) {
+      this.logger.log(`Admin action log cleanup: deleted ${count} old entries`);
     }
     return { deleted: count };
   }

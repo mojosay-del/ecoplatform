@@ -24,6 +24,12 @@ function buildService(lockAcquired = true) {
     notificationDelivery: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    inAppNotification: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    adminActionLog: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     address: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
@@ -316,6 +322,49 @@ describe("SchedulerService", () => {
     expect(result).toEqual({ deleted: 11 });
   });
 
+  it("удаляет прочитанные или архивные уведомления старше 180 дней", async () => {
+    const now = new Date("2026-06-04T02:00:00.000Z");
+    const prisma = {
+      inAppNotification: { deleteMany: vi.fn().mockResolvedValue({ count: 13 }) },
+    };
+    const service = new SchedulerService(
+      { runHourlyCheck: vi.fn() } as any,
+      prisma as any,
+      { deleteIfUnreferenced: vi.fn() } as any,
+    );
+
+    const result = await service.cleanupStaleInAppNotifications(now);
+
+    expect(prisma.inAppNotification.deleteMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { readAt: { lt: new Date("2025-12-06T02:00:00.000Z") } },
+          { archivedAt: { lt: new Date("2025-12-06T02:00:00.000Z") } },
+        ],
+      },
+    });
+    expect(result).toEqual({ deleted: 13 });
+  });
+
+  it("удаляет записи admin action log старше двух лет по createdAt", async () => {
+    const now = new Date("2026-06-04T02:00:00.000Z");
+    const prisma = {
+      adminActionLog: { deleteMany: vi.fn().mockResolvedValue({ count: 17 }) },
+    };
+    const service = new SchedulerService(
+      { runHourlyCheck: vi.fn() } as any,
+      prisma as any,
+      { deleteIfUnreferenced: vi.fn() } as any,
+    );
+
+    const result = await service.cleanupStaleAdminActionLogs(now);
+
+    expect(prisma.adminActionLog.deleteMany).toHaveBeenCalledWith({
+      where: { createdAt: { lt: new Date("2024-06-04T02:00:00.000Z") } },
+    });
+    expect(result).toEqual({ deleted: 17 });
+  });
+
   it("удаляет адреса без привязки к компании или объявлению", async () => {
     const prisma = {
       address: { deleteMany: vi.fn().mockResolvedValue({ count: 4 }) },
@@ -347,6 +396,8 @@ describe("SchedulerService", () => {
     expect(prisma.session.deleteMany).toHaveBeenCalledTimes(1);
     expect(prisma.idempotencyKey.deleteMany).toHaveBeenCalledTimes(1);
     expect(prisma.notificationDelivery.deleteMany).toHaveBeenCalledTimes(1);
+    expect(prisma.inAppNotification.deleteMany).toHaveBeenCalledTimes(1);
+    expect(prisma.adminActionLog.deleteMany).toHaveBeenCalledTimes(1);
     expect(prisma.address.deleteMany).toHaveBeenCalledTimes(1);
   });
 
@@ -358,6 +409,8 @@ describe("SchedulerService", () => {
     expect(prisma.session.deleteMany).not.toHaveBeenCalled();
     expect(prisma.idempotencyKey.deleteMany).not.toHaveBeenCalled();
     expect(prisma.notificationDelivery.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.inAppNotification.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.adminActionLog.deleteMany).not.toHaveBeenCalled();
     expect(prisma.address.deleteMany).not.toHaveBeenCalled();
   });
 
@@ -369,6 +422,8 @@ describe("SchedulerService", () => {
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.session.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.inAppNotification.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.adminActionLog.deleteMany).not.toHaveBeenCalled();
     expect(prisma.address.deleteMany).not.toHaveBeenCalled();
   });
 });
