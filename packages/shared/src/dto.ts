@@ -59,15 +59,27 @@ export const consentSubmitDtoSchema = z.object({
 
 export type ConsentSubmitDto = z.infer<typeof consentSubmitDtoSchema>;
 
+export const LEGAL_DOCUMENT_TITLE_MAX_LENGTH = 200;
+export const LEGAL_DOCUMENT_BODY_MAX_LENGTH = 100_000;
+
 export const legalDocumentCreateDtoSchema = z.object({
   type: z.enum(legalDocumentTypes),
   version: z
     .string()
     .trim()
     .regex(/^\d+\.\d+\.\d+$/, "Версия должна быть в формате semver, например 1.0.0"),
-  title: z.string().trim().min(2),
+  title: z
+    .string()
+    .trim()
+    .min(2)
+    .max(LEGAL_DOCUMENT_TITLE_MAX_LENGTH, {
+      error: `Название не длиннее ${LEGAL_DOCUMENT_TITLE_MAX_LENGTH} символов.`,
+    }),
   summary: z.string().trim().max(500).optional(),
-  body: z.string().min(1),
+  body: z
+    .string()
+    .min(1)
+    .max(LEGAL_DOCUMENT_BODY_MAX_LENGTH, { error: `Текст не длиннее ${LEGAL_DOCUMENT_BODY_MAX_LENGTH} символов.` }),
   isRequired: z.boolean().default(true),
 });
 
@@ -217,6 +229,7 @@ export const LISTING_LIFETIME_DAYS = 14;
 export const LISTING_MIN_PHOTOS = 4;
 export const LISTING_MAX_PHOTOS = 10;
 export const LISTING_MAX_VIDEOS = 2;
+export const LISTING_MAX_POSITIONS = 50;
 
 export const listingPositionInputSchema = z.object({
   nomenclatureId: z.string().min(1),
@@ -238,7 +251,10 @@ export const listingMediaInputSchema = z.object({
 export type ListingMediaInput = z.infer<typeof listingMediaInputSchema>;
 
 export const createListingDtoSchema = z.object({
-  positions: z.array(listingPositionInputSchema).min(1, "Добавьте хотя бы одну позицию"),
+  positions: z
+    .array(listingPositionInputSchema)
+    .min(1, "Добавьте хотя бы одну позицию")
+    .max(LISTING_MAX_POSITIONS, { error: `Не больше ${LISTING_MAX_POSITIONS} позиций в объявлении.` }),
   address: addressDtoSchema,
   contactPhone: z
     .string()
@@ -280,7 +296,10 @@ export const createOfferDtoSchema = z.object({
     .string()
     .trim()
     .regex(/^\+?\d[\d\s()-]{6,30}$/, "Телефон в формате +7XXXXXXXXXX"),
-  positions: z.array(offerPositionInputSchema).min(1, "Добавьте хотя бы одну позицию"),
+  positions: z
+    .array(offerPositionInputSchema)
+    .min(1, "Добавьте хотя бы одну позицию")
+    .max(LISTING_MAX_POSITIONS, { error: `Не больше ${LISTING_MAX_POSITIONS} позиций в предложении.` }),
 });
 
 export type CreateOfferDto = z.infer<typeof createOfferDtoSchema>;
