@@ -1,10 +1,15 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { createHash } from "crypto";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import type { MarketplaceAddressSuggestion } from "@ecoplatform/shared";
+import { RedisService } from "../redis/redis.service";
 
 export type GeocodeResult = { lat: number; lon: number; region: string | null };
 
 const GEOCODER_TIMEOUT_MS = 3_000;
 const GEOCODER_URL = "https://catalog.api.2gis.com/3.0/items/geocode";
+const GEOCODER_CACHE_PREFIX = "geo:2gis:v1";
+const GEOCODER_CACHE_HIT_TTL_SECONDS = 7 * 24 * 60 * 60;
+const GEOCODER_CACHE_EMPTY_TTL_SECONDS = 24 * 60 * 60;
 // Поля, без которых из ответа не собрать адрес: координаты, адм. деление
 // (регион/город) и компоненты улица/дом + полная строка для отображения.
 const GEOCODER_FIELDS = "items.point,items.adm_div,items.address,items.full_name";
@@ -30,6 +35,8 @@ type DgisItem = {
 @Injectable()
 export class AddressGeocoderService {
   private readonly logger = new Logger(AddressGeocoderService.name);
+
+  constructor(@Optional() private readonly redis?: RedisService) {}
 
   async geocode(addressLine: string): Promise<GeocodeResult | null> {
     const items = await this.fetchItems(addressLine, 1);
@@ -66,8 +73,14 @@ export class AddressGeocoderService {
       return [];
     }
 
+    const pageSize = Math.min(Math.max(results, 1), 10);
+    const cacheKey = geocoderCacheKey(addressLine, pageSize);
+    const cached = await this.redis?.getJson<DgisItem[]>(cacheKey);
+    if (cached !== undefined && cached !== null) {
+      return cached;
+    }
+
     try {
-      const pageSize = Math.min(Math.max(results, 1), 10);
       const params = new URLSearchParams({
         q: addressLine.trim(),
         fields: GEOCODER_FIELDS,
@@ -82,6 +95,7 @@ export class AddressGeocoderService {
       // 2ГИС отвечает 404, когда по запросу ничего не найдено — это штатная
       // ситуация автокомплита (промежуточный ввод), не ошибка: тихо отдаём [].
       if (response.status === 404) {
+        await this.redis?.setJson(cacheKey, [], GEOCODER_CACHE_EMPTY_TTL_SECONDS);
         return [];
       }
       if (!response.ok) {
@@ -90,12 +104,20 @@ export class AddressGeocoderService {
       }
 
       const data = (await response.json()) as { result?: { items?: DgisItem[] } };
-      return data.result?.items ?? [];
+      const items = data.result?.items ?? [];
+      await this.redis?.setJson(cacheKey, items, GEOCODER_CACHE_HIT_TTL_SECONDS);
+      return items;
     } catch (error) {
       this.logger.warn(`Geocode failed: ${(error as Error).message}`);
       return [];
     }
   }
+}
+
+function geocoderCacheKey(addressLine: string, pageSize: number): string {
+  const normalized = addressLine.trim().toLocaleLowerCase("ru-RU").replace(/\s+/g, " ");
+  const hash = createHash("sha256").update(normalized).digest("hex");
+  return `${GEOCODER_CACHE_PREFIX}:${pageSize}:${hash}`;
 }
 
 function parsePoint(item: DgisItem): Pick<GeocodeResult, "lat" | "lon"> | null {
