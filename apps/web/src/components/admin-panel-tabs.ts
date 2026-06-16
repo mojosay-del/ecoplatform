@@ -7,6 +7,7 @@ import {
   Gauge,
   GraduationCap,
   Headphones,
+  Megaphone,
   Newspaper,
   ScrollText,
   ShieldAlert,
@@ -92,7 +93,7 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
       },
       {
         ...indicesTab,
-        description: "Ценовые категории, номенклатура и значения.",
+        description: "Номенклатура и значения ценовых индексов.",
         icon: TrendingUp,
       },
       {
@@ -146,6 +147,14 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         roles: ["admin"],
         description: "Обращения клиентов и ответы поддержки.",
         icon: Headphones,
+      },
+      {
+        href: "/admin/broadcast",
+        label: "Рассылка",
+        pathname: "/admin/broadcast",
+        roles: ["admin"],
+        description: "Уведомления пользователям от платформы с фильтрами по аудитории.",
+        icon: Megaphone,
       },
       {
         href: "/admin/billing",

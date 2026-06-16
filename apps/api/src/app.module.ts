@@ -3,6 +3,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule, seconds } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { AccountModule } from "./account/account.module";
+import { AdminBroadcastModule } from "./admin/broadcast/admin-broadcast.module";
 import { AdminCompaniesModule } from "./admin/companies/admin-companies.module";
 import { AdminDashboardModule } from "./admin/dashboard/admin-dashboard.module";
 import { AdminJournalsModule } from "./admin/journals/admin-journals.module";
@@ -73,6 +74,7 @@ function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
     AccountModule,
     AdminCompaniesModule,
     AdminDashboardModule,
+    AdminBroadcastModule,
     AdminJournalsModule,
     AdminStaffModule,
     AdminUsersModule,
