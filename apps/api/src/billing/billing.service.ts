@@ -26,6 +26,7 @@ import {
 import {
   composeFormattedAddress,
   normaliseOptionalString,
+  toBillingStatus,
   upsertCompanyAddress,
   type CompanyAddressGeo,
 } from "./billing-company.helpers";
@@ -69,7 +70,7 @@ export class BillingService {
       throw new NotFoundException("Компания не найдена.");
     }
 
-    return company;
+    return toBillingStatus(company);
   }
 
   // PATCH /api/billing/company — обновление профиля компании текущим
@@ -148,7 +149,7 @@ export class BillingService {
         },
       });
 
-      return updated;
+      return toBillingStatus(updated);
     });
   }
 

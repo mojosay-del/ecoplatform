@@ -331,6 +331,10 @@ describe("Legal documents & consents", () => {
 describe("Company profile (Волна 7.2/7.3 — Address, расширенные поля)", () => {
   it("PATCH /billing/company сохраняет контакты, реквизиты и factualAddress", async () => {
     const { token, companyId } = await registerCompany("0700100");
+    await ctx.prisma.company.update({
+      where: { id: companyId },
+      data: { logoFileId: "legacy-logo-file-id" },
+    });
 
     const res = await ctx.http
       .patch("/api/billing/company")
@@ -364,6 +368,7 @@ describe("Company profile (Волна 7.2/7.3 — Address, расширенны�
     expect(res.body.corporatePhone).toBe("+74951234567");
     expect(res.body.about).toBe("Принимаем макулатуру и ПЭТ");
     expect(res.body.billingInn).toBe("7707083893");
+    expect(res.body).not.toHaveProperty("logoFileId");
     expect(res.body.factualAddress).toMatchObject({
       country: "Россия",
       region: "Московская область",
@@ -383,6 +388,7 @@ describe("Company profile (Волна 7.2/7.3 — Address, расширенны�
     expect(status.body.corporateEmail).toBe("info@example.ru");
     expect(status.body.factualAddress.city).toBe("Подольск");
     expect(status.body.structuredLegalAddress).toBeNull();
+    expect(status.body).not.toHaveProperty("logoFileId");
 
     // sanity: в БД Address действительно создан
     const company = await ctx.prisma.company.findUnique({

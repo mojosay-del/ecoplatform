@@ -374,7 +374,7 @@ export type BillingSubscriptionActivationResponse = {
   subscription: BillingSubscription;
 };
 
-// `/billing/status` отдаёт полный Company (с реквизитами) + список подписок.
+// `/billing/status` отдаёт данные компании (с реквизитами) + список подписок.
 // Не вырезаем поля, потому что AccountView отображает и реквизиты, и историю.
 export type BillingStatus = {
   id: string;
@@ -397,7 +397,6 @@ export type BillingStatus = {
   corporatePhone: string | null;
   corporateEmail: string | null;
   about: string | null;
-  logoFileId: string | null;
   contactPersonName: string | null;
   contactPersonPhone: string | null;
   contactPersonEmail: string | null;
