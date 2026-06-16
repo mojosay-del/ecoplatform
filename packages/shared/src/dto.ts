@@ -27,7 +27,6 @@ export const registerDtoSchema = z.object({
   billingInn: z.never({ error: "ИНН заполняется в профиле компании после регистрации." }).optional(),
   firstName: z.string().trim().min(1),
   lastName: z.string().trim().min(1),
-  gender: z.enum(userGenders).optional(),
   phone: z
     .string()
     .trim()

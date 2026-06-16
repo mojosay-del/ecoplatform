@@ -84,7 +84,6 @@ export class AuthService {
         companyType: input.companyType,
         firstName: input.firstName,
         lastName: input.lastName,
-        gender: input.gender ?? null,
         passwordHash: prepared.passwordHash,
         acceptedDocumentIds: prepared.consentDocumentIds,
         codeHash: this.hashEmailVerificationCode(verificationId, prepared.email, code),
@@ -188,7 +187,6 @@ export class AuthService {
           phone: challenge.phone,
           firstName: challenge.firstName,
           lastName: challenge.lastName,
-          gender: challenge.gender,
           passwordHash: challenge.passwordHash,
           companyId: company.id,
           // Создатель компании при регистрации — её владелец. Приглашённые

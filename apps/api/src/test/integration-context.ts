@@ -161,7 +161,6 @@ export function setupIntegrationContext() {
       companyType: "collector",
       firstName: "Иван",
       lastName: "Тестов",
-      gender: "male",
       phone: `+7900${suffix}`,
       email: `user${suffix}@test.local`,
       password: "User12345678",

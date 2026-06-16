@@ -7,8 +7,8 @@ import { GripVertical, Package } from "lucide-react";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";
 import type { Nomenclature } from "./types";
 
-// Строка номенклатуры в дереве каталога: drag-handle, индикатор статуса индекса
-// и выбор записи. Перетаскивание обслуживает dnd-kit (sortable).
+// Строка номенклатуры в плоском списке каталога: drag-handle, индикатор статуса
+// индекса и выбор записи. Перетаскивание обслуживает dnd-kit (sortable).
 export function SortableNomenclatureRow({
   nomenclature,
   active,
@@ -36,7 +36,7 @@ export function SortableNomenclatureRow({
       role="treeitem"
       className={isDragging ? "indices-sortable-item is-dragging" : "indices-sortable-item"}
     >
-      <div className={`tree-row has-drag-handle depth-1${active ? " is-active" : ""}`}>
+      <div className={`tree-row has-drag-handle depth-0${active ? " is-active" : ""}`}>
         <span className="tree-row-drag">
           <button
             type="button"
@@ -48,7 +48,6 @@ export function SortableNomenclatureRow({
             <GripVertical size={14} />
           </button>
         </span>
-        <button type="button" className="tree-row-chevron" disabled aria-hidden />
         <button type="button" className="tree-row-main" onClick={onSelect}>
           <span className="tree-row-icon">
             <Package size={16} />

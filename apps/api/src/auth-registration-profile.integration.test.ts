@@ -24,7 +24,6 @@ describe("Auth — регистрация и профиль", () => {
       companyType: "collector",
       firstName: "Иван",
       lastName: "Тестов",
-      gender: "male",
       phone: "+79000001000",
       email: "pending-code@test.local",
       password: "User12345678",
@@ -56,13 +55,12 @@ describe("Auth — регистрация и профиль", () => {
     expect(me.body.requiresReConsent).toBe(false);
   });
 
-  it("регистрация сохраняет тип компании и пол", async () => {
+  it("регистрация сохраняет тип компании и не запрашивает пол", async () => {
     const token = await registerWithBody({
       organizationName: "ООО Трейд Жен",
       companyType: "trader",
       firstName: "Анна",
       lastName: "Тестова",
-      gender: "female",
       phone: "+375291234567",
       email: "trader-female@test.local",
       password: "User12345678",
@@ -70,7 +68,7 @@ describe("Auth — регистрация и профиль", () => {
 
     const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
     expect(me.status).toBe(200);
-    expect(me.body.gender).toBe("female");
+    expect(me.body.gender).toBeNull();
     expect(me.body.company.type).toBe("trader");
     expect(me.body.company.organizationName).toBe("ООО Трейд Жен");
     expect(me.body.avatarUrl).toBeNull();
@@ -115,7 +113,6 @@ describe("Auth — регистрация и профиль", () => {
       companyType: "collector",
       firstName: "А",
       lastName: "Б",
-      gender: "male",
       phone: "+71111111111",
       email: "user0000002@test.local",
       password: "User12345678",
@@ -131,7 +128,6 @@ describe("Auth — регистрация и профиль", () => {
       billingInn: "7707083893",
       firstName: "Иван",
       lastName: "Тестов",
-      gender: "male",
       phone: "+71111111113",
       email: "bad-inn@test.local",
       password: "User12345678",

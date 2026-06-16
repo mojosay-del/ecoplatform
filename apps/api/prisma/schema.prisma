@@ -302,7 +302,6 @@ model EmailVerificationChallenge {
   companyType         CompanyType
   firstName           String
   lastName            String
-  gender              UserGender?
   passwordHash        String
   acceptedDocumentIds String[]    @default([])
   codeHash            String
@@ -815,35 +814,21 @@ model CommentLike {
   @@index([commentId])
 }
 
-model NomenclatureCategory {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  slug          String         @unique
-  position      Int            @unique
-  isActive      Boolean        @default(true)
-  nomenclatures Nomenclature[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-}
-
 model Nomenclature {
-  id               String               @id @default(cuid())
-  code             String               @unique
+  id               String            @id @default(cuid())
+  code             String            @unique
   name             String
-  unit             String               @default("₽/т")
+  unit             String            @default("₽/т")
   description      String?
-  categoryId       String
-  category         NomenclatureCategory @relation(fields: [categoryId], references: [id])
-  position         Int                  @default(0)
-  isActive         Boolean              @default(true)
+  position         Int               @default(0)
+  isActive         Boolean           @default(true)
   priceIndex       PriceIndex?
   listingPositions ListingPosition[]
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
-  // FK + порядок: список номенклатур категории и публичная сортировка /indices.
-  @@index([categoryId])
-  @@index([categoryId, position])
+  // Единый плоский список номенклатур: глобальный порядок для /indices и админки.
+  @@index([position])
 }
 
 model PriceIndex {

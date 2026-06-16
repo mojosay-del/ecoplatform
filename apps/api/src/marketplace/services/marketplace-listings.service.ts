@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import {
   type CreateListingDto,
   LISTING_MAX_ACTIVE,
+  materialFromNomenclatureCode,
   type MarketplaceListingDetail,
   type MarketplaceListingListItem,
   type MarketplaceNomenclatureOption,
@@ -144,15 +145,17 @@ export class MarketplaceListingsService {
     this.assertCanUse(user);
     const rows = await this.prisma.nomenclature.findMany({
       where: { isActive: true },
-      orderBy: [{ category: { position: "asc" } }, { position: "asc" }],
-      include: { category: { select: { name: true, slug: true } } },
+      orderBy: [{ position: "asc" }, { name: "asc" }],
     });
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      category: row.category.name,
-      categorySlug: row.category.slug,
-    }));
+    return rows.map((row) => {
+      const material = materialFromNomenclatureCode(row.code);
+      return {
+        id: row.id,
+        name: row.name,
+        category: material.label,
+        categorySlug: material.slug,
+      };
+    });
   }
 
   // ── Кабинет заготовителя ──────────────────────────────────────────────────

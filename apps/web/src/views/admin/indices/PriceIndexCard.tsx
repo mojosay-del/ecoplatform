@@ -10,15 +10,13 @@ import { DatePicker } from "../../../components/DatePicker";
 import { normalizeIntegerPriceInput, parseIntegerPriceInput } from "../../../components/admin-indices-price";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";
 import { formatIndexPrice } from "./format";
-import type { Category, MutateFn, Nomenclature } from "./types";
+import type { MutateFn, Nomenclature } from "./types";
 
 export function PriceIndexCard({
-  category,
   nomenclature,
   onMutate,
   onDeleteNomenclature,
 }: {
-  category: Category;
   nomenclature: Nomenclature;
   onMutate: MutateFn;
   onDeleteNomenclature: (nomenclature: Nomenclature) => Promise<void>;
@@ -102,9 +100,7 @@ export function PriceIndexCard({
     <div className="form news-form indices-editor-form">
       <div className="news-form-head indices-editor-head">
         <div>
-          <span className="news-form-mode">
-            {category.name} · {nomenclature.code}
-          </span>
+          <span className="news-form-mode">{nomenclature.code}</span>
         </div>
         <StatusPill variant={indexStatusVariant}>{indexStatusLabel}</StatusPill>
       </div>

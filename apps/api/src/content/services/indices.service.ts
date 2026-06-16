@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { ContentStatus, Prisma } from "@prisma/client";
-import { slugify, summarizePriceIndex } from "@ecoplatform/shared";
+import { ContentStatus } from "@prisma/client";
+import { summarizePriceIndex } from "@ecoplatform/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { PlatformSettingsService } from "../../admin/settings/platform-settings.service";
@@ -8,8 +8,6 @@ import { paginatedResponse, resolvePagination, type PaginationInput } from "../.
 import type { RequestUser } from "../../common/request-user";
 import type { z } from "zod";
 import type {
-  categoryInputSchema,
-  categoryUpdateInputSchema,
   nomenclatureInputSchema,
   nomenclatureMoveInputSchema,
   nomenclatureUpdateInputSchema,
@@ -20,16 +18,14 @@ import { ContentCommonService } from "./content-common.service";
 import { buildPriceIndexChart } from "./indices-chart.helpers";
 import { nextNomenclaturePosition, reorderNomenclature } from "./indices-position.helpers";
 
-type CategoryInput = z.infer<typeof categoryInputSchema>;
-type CategoryUpdateInput = z.infer<typeof categoryUpdateInputSchema>;
 type NomenclatureInput = z.infer<typeof nomenclatureInputSchema>;
 type NomenclatureMoveInput = z.infer<typeof nomenclatureMoveInputSchema>;
 type NomenclatureUpdateInput = z.infer<typeof nomenclatureUpdateInputSchema>;
 type PriceIndexInput = z.infer<typeof priceIndexInputSchema>;
 type PriceIndexValueInput = z.infer<typeof priceIndexValueInputSchema>;
 
-// Раздел «Индексы цен»: категории номенклатуры, индексы, временные ряды.
-// Вынесен из ContentService. assertFunctionalAccess делегируется в ContentCommonService.
+// Раздел «Индексы цен»: единый плоский список номенклатуры, индексы, временные
+// ряды. Вынесен из ContentService. assertFunctionalAccess делегируется в ContentCommonService.
 @Injectable()
 export class IndicesService {
   constructor(
@@ -44,43 +40,34 @@ export class IndicesService {
 
     const stagnationThreshold = await this.settings.getValue("indices.stagnation_threshold_percent");
     const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 100 });
-    const where = { isActive: true };
+    const where = { isActive: true, priceIndex: { is: { status: ContentStatus.published } } };
 
-    const [total, categories] = await this.prisma.$transaction([
-      this.prisma.nomenclatureCategory.count({ where }),
-      this.prisma.nomenclatureCategory.findMany({
+    const [total, nomenclatures] = await this.prisma.$transaction([
+      this.prisma.nomenclature.count({ where }),
+      this.prisma.nomenclature.findMany({
         where,
-        orderBy: { position: "asc" },
+        orderBy: [{ position: "asc" }, { name: "asc" }],
         take: pagination.limit,
         skip: pagination.offset,
-        include: {
-          nomenclatures: {
-            where: { isActive: true, priceIndex: { is: { status: ContentStatus.published } } },
-            include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } },
-            orderBy: [{ position: "asc" }, { name: "asc" }],
-          },
-        },
+        include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } },
       }),
     ]);
 
-    const items = categories.map((category) => ({
-      ...category,
-      nomenclatures: category.nomenclatures
-        .map((item) => {
-          const values =
-            item.priceIndex?.values.map((value) => ({ date: value.date, price: Number(value.price) })) ?? [];
-          const summary = summarizePriceIndex(values, new Date(), stagnationThreshold);
-          return summary
-            ? {
-                ...item,
-                priceIndex: item.priceIndex,
-                summary,
-                chart: buildPriceIndexChart(values),
-              }
-            : null;
-        })
-        .filter(Boolean),
-    }));
+    const items = nomenclatures
+      .map((item) => {
+        const values =
+          item.priceIndex?.values.map((value) => ({ date: value.date, price: Number(value.price) })) ?? [];
+        const summary = summarizePriceIndex(values, new Date(), stagnationThreshold);
+        return summary
+          ? {
+              ...item,
+              priceIndex: item.priceIndex,
+              summary,
+              chart: buildPriceIndexChart(values),
+            }
+          : null;
+      })
+      .filter(Boolean);
 
     return paginatedResponse(items, total, pagination);
   }
@@ -88,89 +75,16 @@ export class IndicesService {
   async adminListIndices(paginationInput: PaginationInput = {}) {
     const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 200 });
     const [total, items] = await this.prisma.$transaction([
-      this.prisma.nomenclatureCategory.count(),
-      this.prisma.nomenclatureCategory.findMany({
-        orderBy: { position: "asc" },
+      this.prisma.nomenclature.count(),
+      this.prisma.nomenclature.findMany({
+        orderBy: [{ position: "asc" }, { name: "asc" }],
         take: pagination.limit,
         skip: pagination.offset,
-        include: {
-          nomenclatures: {
-            include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } },
-            orderBy: [{ position: "asc" }, { name: "asc" }],
-          },
-        },
+        include: { priceIndex: { include: { values: { orderBy: { date: "asc" } } } } },
       }),
     ]);
 
     return paginatedResponse(items, total, pagination);
-  }
-
-  async createCategory(input: CategoryInput, user: RequestUser) {
-    const category = await this.prisma.nomenclatureCategory.create({
-      data: { name: input.name, slug: slugify(input.name), position: input.position },
-    });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "indices.category.create",
-      entityType: "NomenclatureCategory",
-      entityId: category.id,
-    });
-
-    return category;
-  }
-
-  async updateCategory(id: string, input: CategoryUpdateInput, user: RequestUser) {
-    const existing = await this.prisma.nomenclatureCategory.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException("Категория не найдена.");
-    }
-
-    const data: Prisma.NomenclatureCategoryUpdateInput = {};
-    if (input.name !== undefined) {
-      data.name = input.name;
-      data.slug = slugify(input.name);
-    }
-    if (input.position !== undefined) data.position = input.position;
-    if (input.isActive !== undefined) data.isActive = input.isActive;
-
-    const category = await this.prisma.nomenclatureCategory.update({ where: { id }, data });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "indices.category.update",
-      entityType: "NomenclatureCategory",
-      entityId: id,
-      payload: input,
-    });
-
-    return category;
-  }
-
-  async deleteCategory(id: string, user: RequestUser, reason?: string) {
-    const existing = await this.prisma.nomenclatureCategory.findUnique({
-      where: { id },
-      include: { _count: { select: { nomenclatures: true } } },
-    });
-    if (!existing) {
-      throw new NotFoundException("Категория не найдена.");
-    }
-    if (existing._count.nomenclatures > 0) {
-      throw new ForbiddenException("Нельзя удалить категорию с привязанной номенклатурой.");
-    }
-
-    await this.prisma.nomenclatureCategory.delete({ where: { id } });
-
-    await this.auditLog.record({
-      actorId: user.id,
-      action: "indices.category.delete",
-      entityType: "NomenclatureCategory",
-      entityId: id,
-      comment: reason,
-      payload: { name: existing.name, slug: existing.slug },
-    });
-
-    return { ok: true };
   }
 
   async createNomenclature(input: NomenclatureInput, user: RequestUser) {
@@ -178,7 +92,7 @@ export class IndicesService {
     const nomenclature = await this.prisma.nomenclature.create({
       data: {
         ...rest,
-        position: position ?? (await nextNomenclaturePosition(this.prisma, rest.categoryId)),
+        position: position ?? (await nextNomenclaturePosition(this.prisma)),
       },
     });
 
@@ -197,12 +111,9 @@ export class IndicesService {
     if (!existing) {
       throw new NotFoundException("Номенклатура не найдена.");
     }
-    if (existing.categoryId !== input.categoryId) {
-      throw new ForbiddenException("Номенклатуру можно перемещать только внутри текущей категории.");
-    }
 
     const nomenclature = await this.prisma.$transaction(async (tx) => {
-      await reorderNomenclature(tx, existing.categoryId, id, input.position);
+      await reorderNomenclature(tx, id, input.position);
       return tx.nomenclature.findUniqueOrThrow({ where: { id } });
     });
 
@@ -212,8 +123,8 @@ export class IndicesService {
       entityType: "Nomenclature",
       entityId: id,
       payload: {
-        from: { categoryId: existing.categoryId, position: existing.position },
-        to: { categoryId: input.categoryId, position: input.position },
+        from: { position: existing.position },
+        to: { position: input.position },
       },
     });
 

@@ -1,55 +1,26 @@
 "use client";
 
-// «Пульс рынка» — hero-сводка по активной категории: средняя цена + недельная
-// динамика, настроение (растут/падают/стоят) и лидер недели. Отвечает на главный
-// вопрос «что с рынком прямо сейчас?» одним взглядом. Метрики недельные (из
-// summary), согласованы с чипами карточек.
+// «Пульс рынка» — hero-сводка по рынку: настроение (растут/падают/стоят) и
+// лидер недели. Отвечает на главный вопрос «что с рынком прямо сейчас?» одним
+// взглядом. Метрики недельные (из summary), согласованы с чипами карточек.
 
 import { useMemo } from "react";
 import type { NomenclatureListItem } from "@ecoplatform/shared";
 import { formatIndexMovementChange, getIndexMarketPulse } from "../index-movement-summary";
-import { materialColor } from "../marketplace/materials";
-import { formatIndexPrice, pickRecentSeries } from "./format";
+import { pickRecentSeries } from "./format";
 import { IndexSparkline } from "./IndexSparkline";
 import { directionFromChange } from "./trend";
 import { TrendArrow } from "./TrendChip";
 
-export function IndexMarketPulse({
-  items,
-  categorySlug,
-  categoryName,
-}: {
-  items: NomenclatureListItem[];
-  categorySlug?: string;
-  categoryName?: string;
-}) {
+export function IndexMarketPulse({ items }: { items: NomenclatureListItem[] }) {
   const pulse = useMemo(() => getIndexMarketPulse(items), [items]);
   if (pulse.count === 0) return null;
 
-  const accent = materialColor(categorySlug);
-  const unit = items.find((item) => item.unit)?.unit ?? "₽/т";
-  const avgDir = directionFromChange(pulse.averageWeeklyChange);
   const leaderDir = directionFromChange(pulse.leader?.change ?? null);
   const total = pulse.risingCount + pulse.fallingCount + pulse.flatCount;
 
   return (
-    <section className="index-pulse" aria-label={`Пульс рынка${categoryName ? `: ${categoryName}` : ""}`}>
-      <article className="index-pulse-card" style={{ borderTopColor: accent, borderTopWidth: 3 }}>
-        <span className="index-pulse-label">Средняя цена{categoryName ? ` · ${categoryName.toLowerCase()}` : ""}</span>
-        <div className="index-pulse-price index-num">
-          {pulse.averagePrice !== null ? formatIndexPrice(pulse.averagePrice) : "—"}
-          <span className="index-pulse-unit">{unit}</span>
-        </div>
-        {pulse.averageWeeklyChange !== null ? (
-          <span className={`index-delta ${avgDir} index-num`}>
-            <TrendArrow direction={avgDir} />
-            {formatIndexMovementChange(pulse.averageWeeklyChange)} за неделю
-          </span>
-        ) : (
-          <span className="index-delta flat">нет недельных данных</span>
-        )}
-      </article>
-
+    <section className="index-pulse" aria-label="Пульс рынка">
       <article className="index-pulse-card">
         <span className="index-pulse-label">Настроение рынка</span>
         <div className="index-pulse-sentiment index-num">

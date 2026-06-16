@@ -22,14 +22,11 @@ describe("Marketplace — карта и фильтры (фаза 2)", () => {
   it("фильтры по региону/сырью + список регионов; без ключа геокодера круг пуст", async () => {
     await withEnv({ DGIS_GEOCODER_API_KEY: undefined }, async () => {
       const { token } = await registerCompany("0009401");
-      const category = await ctx.prisma.nomenclatureCategory.create({
-        data: { name: "Макулатура", slug: "makulatura", position: 1 },
-      });
       const cardboard = await ctx.prisma.nomenclature.create({
-        data: { code: "MS-5B", name: "МС-5Б", categoryId: category.id },
+        data: { code: "MS-5B", name: "МС-5Б" },
       });
       const pet = await ctx.prisma.nomenclature.create({
-        data: { code: "PET", name: "ПЭТ", categoryId: category.id },
+        data: { code: "PET", name: "ПЭТ" },
       });
 
       const photosMoscow = await seedPhotos(4);

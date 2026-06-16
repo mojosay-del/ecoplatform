@@ -10,11 +10,10 @@ export function createMarketplaceTestHelpers(ctx: MarketplaceIntegrationContext)
   const { registerCompany, registerWithBody } = ctx;
 
   async function seedNomenclature(): Promise<string> {
-    const category = await ctx.prisma.nomenclatureCategory.create({
-      data: { name: "Макулатура", slug: "makulatura", position: 1 },
-    });
+    // Код с префиксом МКЛ → материал «Макулатура» (см. materialFromNomenclatureCode):
+    // площадка выводит categorySlug/цвет из кода номенклатуры.
     const nomenclature = await ctx.prisma.nomenclature.create({
-      data: { code: "MS-5B", name: "МС-5Б", categoryId: category.id },
+      data: { code: "МКЛ-5Б", name: "МС-5Б" },
     });
     return nomenclature.id;
   }
@@ -63,7 +62,6 @@ export function createMarketplaceTestHelpers(ctx: MarketplaceIntegrationContext)
       companyType: "trader",
       firstName: "Пётр",
       lastName: "Покупатель",
-      gender: "male",
       phone: `+7901${suffix}`,
       email: `trader${suffix}@test.local`,
       password: "User12345678",
@@ -76,7 +74,6 @@ export function createMarketplaceTestHelpers(ctx: MarketplaceIntegrationContext)
       companyType: "processor",
       firstName: "Семён",
       lastName: "Переработкин",
-      gender: "male",
       phone: `+7902${suffix}`,
       email: `proc${suffix}@test.local`,
       password: "User12345678",

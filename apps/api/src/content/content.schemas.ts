@@ -47,19 +47,7 @@ export const newsInputSchema = z.object({
   tags: z.array(z.string().min(1)).default([]),
 });
 
-export const categoryInputSchema = z.object({
-  name: z.string().min(1),
-  position: z.number().int().nonnegative(),
-});
-
-export const categoryUpdateInputSchema = z.object({
-  name: z.string().min(1).optional(),
-  position: z.number().int().nonnegative().optional(),
-  isActive: z.boolean().optional(),
-});
-
 export const nomenclatureInputSchema = z.object({
-  categoryId: z.string().min(1),
   code: z.string().min(1),
   name: z.string().min(1),
   unit: z.string().min(1).default("₽/т"),
@@ -68,7 +56,6 @@ export const nomenclatureInputSchema = z.object({
 });
 
 export const nomenclatureUpdateInputSchema = z.object({
-  categoryId: z.string().min(1).optional(),
   code: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
   unit: z.string().min(1).optional(),
@@ -78,7 +65,6 @@ export const nomenclatureUpdateInputSchema = z.object({
 });
 
 export const nomenclatureMoveInputSchema = z.object({
-  categoryId: z.string().min(1),
   position: z.number().int().nonnegative(),
 });
 

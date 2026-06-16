@@ -1,11 +1,12 @@
 import { Prisma } from "@prisma/client";
-import type {
-  AddressDto,
-  CompanyAddress,
-  MarketplaceListingDetail,
-  MarketplaceListingListItem,
-  MarketplaceListingPositionSummary,
-  MyMarketplaceListingItem,
+import {
+  materialFromNomenclatureCode,
+  type AddressDto,
+  type CompanyAddress,
+  type MarketplaceListingDetail,
+  type MarketplaceListingListItem,
+  type MarketplaceListingPositionSummary,
+  type MyMarketplaceListingItem,
 } from "@ecoplatform/shared";
 import { publicUrl } from "../../files/files-storage.helpers";
 import type { PrismaService } from "../../prisma/prisma.service";
@@ -17,7 +18,7 @@ export const listingInclude = {
   address: true,
   positions: {
     orderBy: { position: "asc" },
-    include: { nomenclature: { select: { name: true, category: { select: { slug: true } } } } },
+    include: { nomenclature: { select: { name: true, code: true } } },
   },
   media: { orderBy: { position: "asc" } },
   sellerCompany: {
@@ -69,7 +70,7 @@ function positionSummaries(listing: ListingWithRelations): MarketplaceListingPos
   return listing.positions.map((position) => ({
     nomenclatureId: position.nomenclatureId,
     nomenclatureName: position.nomenclature.name,
-    categorySlug: position.nomenclature.category.slug,
+    categorySlug: materialFromNomenclatureCode(position.nomenclature.code).slug,
     weightKg: Number(position.weightKg),
     form: position.form,
   }));
@@ -176,7 +177,7 @@ export function mapToDetail(
       id: position.id,
       nomenclatureId: position.nomenclatureId,
       nomenclatureName: position.nomenclature.name,
-      categorySlug: position.nomenclature.category.slug,
+      categorySlug: materialFromNomenclatureCode(position.nomenclature.code).slug,
       weightKg: Number(position.weightKg),
       form: position.form,
       packaging: position.packaging,

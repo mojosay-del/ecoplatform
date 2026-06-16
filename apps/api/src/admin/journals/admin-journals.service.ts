@@ -32,7 +32,6 @@ const JOURNAL_ENTITY_TYPE_LABELS: Record<string, string> = {
   ModerationCase: "Кейс модерации",
   NewsPost: "Новость",
   Nomenclature: "Номенклатура",
-  NomenclatureCategory: "Категория номенклатуры",
   PlatformSetting: "Настройка платформы",
   PriceIndex: "Индекс цен",
   PriceIndexValue: "Значение индекса",
@@ -96,7 +95,6 @@ export class AdminJournalsService {
       chapters,
       lessons,
       articles,
-      categories,
       nomenclatures,
       priceIndices,
       priceIndexValues,
@@ -150,16 +148,10 @@ export class AdminJournalsService {
           select: { id: true, title: true, slug: true },
         }),
       ),
-      fetchIfAny(ids("NomenclatureCategory"), (itemIds) =>
-        this.prisma.nomenclatureCategory.findMany({
-          where: { id: { in: itemIds } },
-          select: { id: true, name: true },
-        }),
-      ),
       fetchIfAny(ids("Nomenclature"), (itemIds) =>
         this.prisma.nomenclature.findMany({
           where: { id: { in: itemIds } },
-          select: { id: true, code: true, name: true, category: { select: { name: true } } },
+          select: { id: true, code: true, name: true },
         }),
       ),
       fetchIfAny(ids("PriceIndex"), (itemIds) =>
@@ -216,9 +208,8 @@ export class AdminJournalsService {
     for (const item of articles) {
       addSummary(map, "KnowledgeBaseArticle", item.id, item.title, `/knowledge-base/${item.slug}`);
     }
-    for (const item of categories) addSummary(map, "NomenclatureCategory", item.id, item.name);
     for (const item of nomenclatures) {
-      addSummary(map, "Nomenclature", item.id, item.name, `${item.code} · ${item.category.name}`);
+      addSummary(map, "Nomenclature", item.id, item.name, item.code);
     }
     for (const item of priceIndices) {
       addSummary(map, "PriceIndex", item.id, item.nomenclature.name, item.nomenclature.code);

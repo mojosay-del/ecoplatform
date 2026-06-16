@@ -1,27 +1,10 @@
 /* indices.css — извлечено из globals.css (route-scoped, импортируется в корне вью indices). */
 
-/* Индексы цен: список категорий + сетка карточек.
+/* Индексы цен: единый плоский список карточек.
    Каждая карточка — отдельный индекс со своим периодом и графиком. */
-
-.indices-categories {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 22px;
-}
 
 .indices-loading-shell {
   display: grid;
-}
-
-.indices-category-tab-skeleton {
-  display: inline-flex;
-  width: 112px;
-  height: 36px;
-  border-radius: var(--radius-chip);
-  background: linear-gradient(90deg, var(--surface-muted), var(--surface-elevated), var(--surface-muted));
-  background-size: 220% 100%;
-  animation: app-shell-loading-shimmer 1200ms ease-in-out infinite;
 }
 
 .indices-loading-title {
@@ -53,69 +36,6 @@
 
 .indices-loading-chart {
   min-height: 220px;
-}
-
-.indices-category-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--text-secondary);
-  padding: 7px 14px;
-  border-radius: var(--radius-chip);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    color 120ms ease,
-    border-color 120ms ease,
-    box-shadow 120ms ease;
-}
-
-.indices-category-tab:hover {
-  color: var(--text);
-  border-color: var(--line-strong);
-}
-
-/* Активная вкладка — мягкая заливка цветом материала (макулатура/плёнки/…) с
-   тёмным текстом: идентичность категории + контраст на любом материале (в т.ч.
-   жёлтом). Цвет приходит инлайном через --cat-color (см. materials.ts). */
-.indices-category-tab.active {
-  background: var(--panel);
-  background: color-mix(in srgb, var(--cat-color, var(--primary)) 14%, var(--panel));
-  border-color: var(--cat-color, var(--primary));
-  box-shadow: inset 0 0 0 1px var(--cat-color, var(--primary));
-  color: var(--text);
-  font-weight: 700;
-}
-
-.indices-category-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-  background: var(--cat-color, var(--primary));
-}
-
-.indices-category-name {
-  white-space: nowrap;
-}
-
-.indices-category-counts {
-  display: inline-flex;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.indices-category-counts .up {
-  color: var(--success-text);
-}
-
-.indices-category-counts .down {
-  color: var(--danger-text);
 }
 
 .indices-grid {
@@ -420,10 +340,6 @@
   color: var(--white);
 }
 
-.index-combined-periods.index-period-tabs {
-  margin: 0 0 0 auto;
-}
-
 @container (max-width: 430px) {
   .index-card .index-period-tab {
     min-width: 44px;
@@ -515,131 +431,6 @@
   text-align: center;
   color: var(--muted);
   font-size: 14px;
-}
-
-/* Совмещённый график всех номенклатур — плашка во всю ширину между сводкой
-   «Движение индексов» и сеткой карточек. */
-
-.index-combined {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-  margin: 0 0 22px;
-  padding: 18px 20px 20px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-}
-
-.index-combined-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.index-combined-heading {
-  min-width: 0;
-}
-
-.index-combined-eyebrow {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.index-combined-head h2 {
-  margin: 4px 0 0;
-  color: var(--text);
-  font-size: var(--text-xl);
-  line-height: 1.25;
-  letter-spacing: 0;
-}
-
-.index-combined-periods {
-  margin: 0;
-}
-
-.index-combined-chart-wrap {
-  min-width: 0;
-  width: 100%;
-  overflow: hidden;
-}
-
-.index-combined-chart {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1080 / 360;
-  display: block;
-  touch-action: pan-y;
-}
-
-.index-combined-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  gap: 8px 18px;
-  margin: 0;
-  padding: 12px 0 0;
-  border-top: 1px solid var(--line);
-  list-style: none;
-}
-
-.index-combined-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: default;
-  transition: color 120ms ease;
-}
-
-.index-combined-legend-item:hover,
-.index-combined-legend-item.is-active {
-  color: var(--text);
-}
-
-.index-combined-legend-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-  box-shadow: 0 0 0 3px rgb(var(--white-rgb) / 0.9);
-}
-
-.index-combined-legend-name {
-  overflow-wrap: anywhere;
-}
-
-.index-combined-legend-value {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.index-combined-legend-delta {
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.index-combined-legend-delta.up {
-  color: var(--success-text);
-}
-
-.index-combined-legend-delta.down {
-  color: var(--danger-text);
-}
-
-.index-combined-legend-delta.flat {
-  color: var(--muted);
 }
 
 /* ── Общие элементы редизайна ─────────────────────────────────────────────── */
@@ -940,18 +731,5 @@
   }
   .index-chart-empty {
     min-height: 240px;
-  }
-  .index-combined {
-    padding: 16px 14px 18px;
-  }
-  .index-combined-periods .index-period-label-full {
-    display: none;
-  }
-  .index-combined-periods .index-period-label-short {
-    display: inline;
-  }
-  .index-combined-chart {
-    /* На узком экране вытягиваем график выше, чтобы кривые не сливались. */
-    aspect-ratio: 3 / 2;
   }
 }

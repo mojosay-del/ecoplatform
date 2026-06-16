@@ -128,86 +128,64 @@ async function main() {
     },
   });
 
-  // Категории номенклатуры и их позиции в выдаче.
-  // Все категории upsert по slug, чтобы повторный seed не падал.
-  const paperCategory = await prisma.nomenclatureCategory.upsert({
-    where: { slug: "makulatura" },
-    update: { name: "Макулатура", position: 0 },
-    create: { name: "Макулатура", slug: "makulatura", position: 0 },
-  });
-
-  const filmsCategory = await prisma.nomenclatureCategory.upsert({
-    where: { slug: "plenki" },
-    update: { name: "Плёнки", position: 1 },
-    create: { name: "Плёнки", slug: "plenki", position: 1 },
-  });
-
-  const plasticsCategory = await prisma.nomenclatureCategory.upsert({
-    where: { slug: "plastiki" },
-    update: { name: "Пластики", position: 2 },
-    create: { name: "Пластики", slug: "plastiki", position: 2 },
-  });
-
-  // Полная номенклатура трёх категорий. Коды детерминированные, чтобы при
-  // повторном seed не дублировались записи (upsert по code).
-  const nomenclatureSeed: Array<{ code: string; name: string; categoryId: string }> = [
-    // Макулатура
-    { code: "МКР-КРТ-001", name: "Гофрокартон", categoryId: paperCategory.id },
-    { code: "МКЛ-001", name: "Картон", categoryId: paperCategory.id },
-    { code: "МКЛ-002", name: "Бумага", categoryId: paperCategory.id },
-    { code: "МКЛ-003", name: "Архив", categoryId: paperCategory.id },
-    { code: "МКЛ-004", name: "Газета", categoryId: paperCategory.id },
-    { code: "МКЛ-005", name: "МС6-Б", categoryId: paperCategory.id },
-    { code: "МКЛ-006", name: "МС9-В", categoryId: paperCategory.id },
-    { code: "МКЛ-007", name: "МС11-В", categoryId: paperCategory.id },
-    { code: "МКЛ-008", name: "МС13-В", categoryId: paperCategory.id },
-    // Плёнки
-    { code: "ПЛН-001", name: "Стрейч первичный", categoryId: filmsCategory.id },
-    { code: "ПЛН-002", name: "Стрейч вторичный", categoryId: filmsCategory.id },
-    { code: "ПЛН-003", name: "ПВД прозрачный", categoryId: filmsCategory.id },
-    { code: "ПЛН-004", name: "ПВД цветной", categoryId: filmsCategory.id },
-    { code: "ПЛН-005", name: "Микс прозрачный", categoryId: filmsCategory.id },
-    { code: "ПЛН-006", name: "Микс цветной", categoryId: filmsCategory.id },
-    { code: "ПЛН-007", name: "ПНД плёнка", categoryId: filmsCategory.id },
-    { code: "ПЛН-008", name: "ПП плёнка", categoryId: filmsCategory.id },
-    { code: "ПЛН-009", name: "БОПП", categoryId: filmsCategory.id },
-    // Пластики
-    { code: "ПЛС-001", name: "Труба ГОСТ", categoryId: plasticsCategory.id },
-    { code: "ПЛС-002", name: "Биг-Бэг 2", categoryId: plasticsCategory.id },
-    { code: "ПЛС-003", name: "Биг-Бэг 4", categoryId: plasticsCategory.id },
-    { code: "ПЛС-004", name: "Биг-Бэг микс", categoryId: plasticsCategory.id },
-    { code: "ПЛС-005", name: "Канистра", categoryId: plasticsCategory.id },
-    { code: "ПЛС-006", name: "Флакон", categoryId: plasticsCategory.id },
-    { code: "ПЛС-007", name: "ПЭТ бутылка", categoryId: plasticsCategory.id },
-    { code: "ПЛС-008", name: "ПЭТ масло", categoryId: plasticsCategory.id },
-    { code: "ПЛС-009", name: "ПЭТ молочный", categoryId: plasticsCategory.id },
-    { code: "ПЛС-010", name: "Преформа голубая", categoryId: plasticsCategory.id },
-    { code: "ПЛС-011", name: "Преформа зелёная", categoryId: plasticsCategory.id },
-    { code: "ПЛС-012", name: "Преформа коричневая", categoryId: plasticsCategory.id },
-    { code: "ПЛС-013", name: "Преформа прозрачная", categoryId: plasticsCategory.id },
-    { code: "ПЛС-014", name: "ПП Ящик", categoryId: plasticsCategory.id },
-    { code: "ПЛС-015", name: "ПНД Ящик", categoryId: plasticsCategory.id },
-    { code: "ПЛС-016", name: "Капля однолетняя", categoryId: plasticsCategory.id },
+  // Единый плоский список номенклатуры. Коды детерминированные, чтобы при
+  // повторном seed не дублировались записи (upsert по code). Порядок в массиве
+  // задаёт глобальную позицию (position) в выдаче /indices и в админке.
+  const nomenclatureSeed: Array<{ code: string; name: string }> = [
+    { code: "МКР-КРТ-001", name: "Гофрокартон" },
+    { code: "МКЛ-001", name: "Картон" },
+    { code: "МКЛ-002", name: "Бумага" },
+    { code: "МКЛ-003", name: "Архив" },
+    { code: "МКЛ-004", name: "Газета" },
+    { code: "МКЛ-005", name: "МС6-Б" },
+    { code: "МКЛ-006", name: "МС9-В" },
+    { code: "МКЛ-007", name: "МС11-В" },
+    { code: "МКЛ-008", name: "МС13-В" },
+    { code: "ПЛН-001", name: "Стрейч первичный" },
+    { code: "ПЛН-002", name: "Стрейч вторичный" },
+    { code: "ПЛН-003", name: "ПВД прозрачный" },
+    { code: "ПЛН-004", name: "ПВД цветной" },
+    { code: "ПЛН-005", name: "Микс прозрачный" },
+    { code: "ПЛН-006", name: "Микс цветной" },
+    { code: "ПЛН-007", name: "ПНД плёнка" },
+    { code: "ПЛН-008", name: "ПП плёнка" },
+    { code: "ПЛН-009", name: "БОПП" },
+    { code: "ПЛС-001", name: "Труба ГОСТ" },
+    { code: "ПЛС-002", name: "Биг-Бэг 2" },
+    { code: "ПЛС-003", name: "Биг-Бэг 4" },
+    { code: "ПЛС-004", name: "Биг-Бэг микс" },
+    { code: "ПЛС-005", name: "Канистра" },
+    { code: "ПЛС-006", name: "Флакон" },
+    { code: "ПЛС-007", name: "ПЭТ бутылка" },
+    { code: "ПЛС-008", name: "ПЭТ масло" },
+    { code: "ПЛС-009", name: "ПЭТ молочный" },
+    { code: "ПЛС-010", name: "Преформа голубая" },
+    { code: "ПЛС-011", name: "Преформа зелёная" },
+    { code: "ПЛС-012", name: "Преформа коричневая" },
+    { code: "ПЛС-013", name: "Преформа прозрачная" },
+    { code: "ПЛС-014", name: "ПП Ящик" },
+    { code: "ПЛС-015", name: "ПНД Ящик" },
+    { code: "ПЛС-016", name: "Капля однолетняя" },
   ];
 
   const nomenclatureByCode: Record<string, { id: string }> = {};
-  for (const item of nomenclatureSeed) {
+  for (let position = 0; position < nomenclatureSeed.length; position += 1) {
+    const item = nomenclatureSeed[position]!;
     const created = await prisma.nomenclature.upsert({
       where: { code: item.code },
-      update: { name: item.name, categoryId: item.categoryId },
+      update: { name: item.name, position },
       create: {
         code: item.code,
         name: item.name,
         unit: "₽/т",
-        categoryId: item.categoryId,
+        position,
       },
     });
     nomenclatureByCode[item.code] = created;
   }
 
-  // Демо-индексы с историей — по одному в каждой категории, чтобы публичные
-  // /indices сразу что-то показывали. Реальные индексы для остальных
-  // номенклатур заводит контент-менеджер через CMS.
+  // Демо-индексы с историей, чтобы публичные /indices сразу что-то показывали.
+  // Реальные индексы для остальных номенклатур заводит контент-менеджер через CMS.
   type DemoIndex = { code: string; basePrice: number; description: string };
   const demoIndexes: DemoIndex[] = [
     { code: "МКР-КРТ-001", basePrice: 12000, description: "Гофрокартон — рыночный индекс закупки." },

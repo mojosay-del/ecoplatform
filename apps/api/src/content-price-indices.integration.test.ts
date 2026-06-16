@@ -5,27 +5,22 @@ const ctx = setupIntegrationContext();
 const { loginAdmin, registerCompany } = ctx;
 
 describe("Content lifecycle: price indices", () => {
-  async function createPriceIndexWithValue(adminToken: string, suffix: string) {
-    const category = await ctx.http
-      .post("/api/admin/content/indices/categories")
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({ name: `Категория ${suffix}`, position: 0 });
-    expect(category.status).toBe(201);
-
+  async function createNomenclature(adminToken: string, code: string, name: string) {
     const nomenclature = await ctx.http
       .post("/api/admin/content/indices/nomenclature")
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({
-        categoryId: category.body.id,
-        code: `CODE-${suffix}`,
-        name: `Номенклатура ${suffix}`,
-      });
+      .send({ code, name });
     expect(nomenclature.status).toBe(201);
+    return nomenclature.body.id as string;
+  }
+
+  async function createPriceIndexWithValue(adminToken: string, suffix: string) {
+    const nomenclatureId = await createNomenclature(adminToken, `CODE-${suffix}`, `Номенклатура ${suffix}`);
 
     const indexRes = await ctx.http
       .post("/api/admin/content/indices")
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ nomenclatureId: nomenclature.body.id });
+      .send({ nomenclatureId });
     expect(indexRes.status).toBe(201);
 
     const valueRes = await ctx.http
@@ -34,29 +29,20 @@ describe("Content lifecycle: price indices", () => {
       .send({ date: "2026-05-19T00:00:00.000Z", price: 12000 });
     expect(valueRes.status).toBe(201);
 
-    return { indexId: indexRes.body.id as string, nomenclatureId: nomenclature.body.id as string };
+    return { indexId: indexRes.body.id as string, nomenclatureId };
   }
 
-  it("move номенклатуры меняет порядок внутри категории в админке и на /indices", async () => {
+  it("move номенклатуры меняет глобальный порядок в админке и на /indices", async () => {
     const adminToken = await loginAdmin();
     const reader = await registerCompany("0800019");
-    const category = await ctx.http
-      .post("/api/admin/content/indices/categories")
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({ name: "Категория reorder", position: 0 });
-    expect(category.status).toBe(201);
 
     async function createPublishedNomenclature(code: string, name: string, price: number) {
-      const nomenclature = await ctx.http
-        .post("/api/admin/content/indices/nomenclature")
-        .set("Authorization", `Bearer ${adminToken}`)
-        .send({ categoryId: category.body.id, code, name });
-      expect(nomenclature.status).toBe(201);
+      const nomenclatureId = await createNomenclature(adminToken, code, name);
 
       const indexRes = await ctx.http
         .post("/api/admin/content/indices")
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({ nomenclatureId: nomenclature.body.id });
+        .send({ nomenclatureId });
       expect(indexRes.status).toBe(201);
 
       const valueRes = await ctx.http
@@ -70,35 +56,33 @@ describe("Content lifecycle: price indices", () => {
         .set("Authorization", `Bearer ${adminToken}`);
       expect(publish.status).toBe(201);
 
-      return nomenclature.body.id as string;
+      return nomenclatureId;
     }
 
     const firstId = await createPublishedNomenclature("REORDER-1", "Первая", 12000);
     const secondId = await createPublishedNomenclature("REORDER-2", "Вторая", 13000);
     const thirdId = await createPublishedNomenclature("REORDER-3", "Третья", 14000);
 
+    const ourIds = new Set([firstId, secondId, thirdId]);
+    const onlyOurs = (items: Array<{ id: string }>) => items.map((item) => item.id).filter((id) => ourIds.has(id));
+
     const move = await ctx.http
       .patch(`/api/admin/content/indices/nomenclature/${thirdId}/move`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ categoryId: category.body.id, position: 0 });
+      .send({ position: 0 });
     expect(move.status).toBe(200);
     expect(move.body.position).toBe(0);
 
     const adminList = await ctx.http.get("/api/admin/content/indices").set("Authorization", `Bearer ${adminToken}`);
-    const adminCategory = adminList.body.items.find((item: { id: string }) => item.id === category.body.id);
-    expect(adminCategory.nomenclatures.map((item: { id: string }) => item.id)).toEqual([thirdId, firstId, secondId]);
+    expect(onlyOurs(adminList.body.items)).toEqual([thirdId, firstId, secondId]);
 
     const publicList = await ctx.http.get("/api/indices").set("Authorization", `Bearer ${reader.token}`);
-    const publicCategory = publicList.body.items.find((item: { id: string }) => item.id === category.body.id);
-    expect(publicCategory.nomenclatures.map((item: { id: string }) => item.id)).toEqual([thirdId, firstId, secondId]);
+    expect(onlyOurs(publicList.body.items)).toEqual([thirdId, firstId, secondId]);
 
     const log = await ctx.prisma.adminActionLog.findFirst({
       where: { entityId: thirdId, action: "indices.nomenclature.move" },
     });
-    expect(log?.payload).toMatchObject({
-      from: { categoryId: category.body.id, position: 2 },
-      to: { categoryId: category.body.id, position: 0 },
-    });
+    expect(log?.payload).toMatchObject({ to: { position: 0 } });
   });
 
   it("publish индекса делает его видимым в /indices, unpublish скрывает, delete удаляет", async () => {
@@ -106,9 +90,9 @@ describe("Content lifecycle: price indices", () => {
     const reader = await registerCompany("0800020");
     const { indexId, nomenclatureId } = await createPriceIndexWithValue(adminToken, "lifecycle");
 
+    const findIndex = (body: Array<{ id: string }>) => body.some((nom) => nom.id === nomenclatureId);
+
     const beforePublish = await ctx.http.get("/api/indices").set("Authorization", `Bearer ${reader.token}`);
-    const findIndex = (body: Array<{ nomenclatures: Array<{ id: string }> }>) =>
-      body.some((cat) => cat.nomenclatures.some((nom) => nom.id === nomenclatureId));
     expect(findIndex(beforePublish.body.items)).toBe(false);
 
     const publish = await ctx.http
@@ -140,26 +124,12 @@ describe("Content lifecycle: price indices", () => {
 
   it("add/update значения индекса валидирует индекс и пишет audit log", async () => {
     const adminToken = await loginAdmin();
-    const category = await ctx.http
-      .post("/api/admin/content/indices/categories")
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({ name: "Категория audit value", position: 0 });
-    expect(category.status).toBe(201);
-
-    const nomenclature = await ctx.http
-      .post("/api/admin/content/indices/nomenclature")
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({
-        categoryId: category.body.id,
-        code: "AUDIT-VALUE",
-        name: "Номенклатура audit value",
-      });
-    expect(nomenclature.status).toBe(201);
+    const nomenclatureId = await createNomenclature(adminToken, "AUDIT-VALUE", "Номенклатура audit value");
 
     const indexRes = await ctx.http
       .post("/api/admin/content/indices")
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ nomenclatureId: nomenclature.body.id });
+      .send({ nomenclatureId });
     expect(indexRes.status).toBe(201);
 
     const missing = await ctx.http

@@ -9,7 +9,7 @@ import type {
   NewsListItem,
   NewsPostDetail,
   NewsTagSummary,
-  NomenclatureCategoryListItem,
+  NomenclatureListItem,
   PaginatedResponse,
 } from "@ecoplatform/shared";
 import { apiFetch } from "./requests";
@@ -50,7 +50,7 @@ export const newsApi = {
 
 export const indicesApi = {
   list: (pagination: PaginationInput = {}) =>
-    apiFetch<PaginatedResponse<NomenclatureCategoryListItem>>(`/indices${paginationSuffix(pagination)}`),
+    apiFetch<PaginatedResponse<NomenclatureListItem>>(`/indices${paginationSuffix(pagination)}`),
 };
 
 export const learningApi = {

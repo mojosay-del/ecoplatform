@@ -5,6 +5,7 @@ export * from "./domain";
 export * from "./dto";
 export * from "./geo";
 export * from "./knowledge-base-icons";
+export * from "./nomenclature-material";
 export * from "./price-index";
 export * from "./slug";
 export * from "./trip-calculator";

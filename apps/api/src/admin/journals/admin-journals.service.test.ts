@@ -124,7 +124,6 @@ function createPrismaMock({
     chapter: { findMany: emptyFindMany },
     lesson: { findMany: vi.fn().mockResolvedValue(lessons) },
     knowledgeBaseArticle: { findMany: emptyFindMany },
-    nomenclatureCategory: { findMany: emptyFindMany },
     nomenclature: { findMany: emptyFindMany },
     priceIndex: { findMany: emptyFindMany },
     priceIndexValue: { findMany: emptyFindMany },

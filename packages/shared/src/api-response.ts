@@ -146,15 +146,6 @@ export type NomenclatureListItem = {
   chart: PriceIndexChart;
 };
 
-export type NomenclatureCategoryListItem = {
-  id: string;
-  slug: string;
-  name: string;
-  position: number;
-  isActive: boolean;
-  nomenclatures: NomenclatureListItem[];
-};
-
 // ── Learning ──────────────────────────────────────────────────────────────
 export type LearningLessonSummary = {
   id: string;

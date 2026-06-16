@@ -7,8 +7,6 @@ import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
 import {
   adminContentListQuerySchema,
-  categoryInputSchema,
-  categoryUpdateInputSchema,
   nomenclatureInputSchema,
   nomenclatureMoveInputSchema,
   nomenclatureUpdateInputSchema,
@@ -33,31 +31,6 @@ export class ContentIndicesController {
   @Get("admin/content/indices")
   async adminIndices(@Query() query: Record<string, unknown>) {
     return this.indices.adminListIndices(parseBody(adminContentListQuerySchema, query));
-  }
-
-  @UseGuards(RolesGuard)
-  @Roles("admin")
-  @Post("admin/content/indices/categories")
-  async createCategory(@Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.indices.createCategory(parseBody(categoryInputSchema, body), user);
-  }
-
-  @UseGuards(RolesGuard)
-  @Roles("admin")
-  @Patch("admin/content/indices/categories/:id")
-  async updateCategory(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
-    return this.indices.updateCategory(id, parseBody(categoryUpdateInputSchema, body), user);
-  }
-
-  @UseGuards(RolesGuard)
-  @Roles("admin")
-  @Delete("admin/content/indices/categories/:id")
-  async deleteCategory(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.indices.deleteCategory(id, user, body?.reason);
   }
 
   @UseGuards(RolesGuard)
