@@ -58,10 +58,19 @@ ssh root@81.200.158.7
 cd /root/ecoplatform
 git pull
 docker compose -f docker-compose.prod.yml --env-file deploy/.env.prod up -d --build
+docker image prune -f   # снять untagged-образы от прошлого деплоя (кэш не трогаем)
 ```
 `up -d --build` пересоберёт изменённые образы и перезапустит контейнеры.
 При старте `api` сам прогонит `prisma migrate deploy` — **новые миграции
-применятся автоматически**.
+применятся автоматически**. `docker image prune -f` сразу убирает образы
+прошлого деплоя (рабочие и build-cache не затрагивает).
+
+> **Диск.** Каждый `--build` копит образы и build-cache. Чтобы VPS не забивался,
+> на сервере стоит еженедельный cron (вс 04:00):
+> `docker builder prune -f --keep-storage=10GB && docker image prune -af`
+> — срезает build-cache до 10 ГБ (свежий кэш для быстрых сборок остаётся) и
+> удаляет старые образы. Контейнеры не трогает. Разовая ручная чистка при
+> необходимости: `docker system prune -af` (БЕЗ `--volumes` — там данные).
 
 **3. Проверка:**
 ```bash
