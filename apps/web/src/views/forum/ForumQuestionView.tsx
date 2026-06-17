@@ -5,7 +5,7 @@ import "../../styles/forum.css";
 // правка/удаление своего, жалоба) + композер ответа + подписка. Тело — простой
 // текст (абзацы). Данные обновляются точечно (голос) или перезагрузкой (ответ/принятие).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -41,6 +41,8 @@ const REPORT_REASONS: { value: string; label: string }[] = [
 ];
 
 const DEFAULT_REPORT_REASON = "spam";
+const VIEW_RECORD_WINDOW_MS = 10_000;
+const recentlyRecordedViews = new Map<string, number>();
 
 type Flash = { text: string; error?: boolean } | null;
 
@@ -56,6 +58,24 @@ export function ForumQuestionView({ id }: { id: string }) {
   const [answerBody, setAnswerBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [flash, setFlash] = useState<Flash>(null);
+
+  useEffect(() => {
+    if (state !== "ready" || !data || data.id !== id) return;
+    if (!shouldRecordQuestionView(id)) return;
+
+    let isActive = true;
+    api.forum
+      .recordView(id)
+      .then((result) => {
+        if (!isActive) return;
+        setData((current) => (current && current.id === id ? { ...current, views: result.views } : current));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isActive = false;
+    };
+  }, [data, id, setData, state]);
 
   const refresh = async () => {
     const fresh = await api.forum.question(id);
@@ -426,6 +446,16 @@ function pluralAnswers(count: number): string {
   if (mod10 === 1 && mod100 !== 11) return "ответ";
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "ответа";
   return "ответов";
+}
+
+function shouldRecordQuestionView(questionId: string): boolean {
+  const now = Date.now();
+  const lastRecordedAt = recentlyRecordedViews.get(questionId);
+  if (lastRecordedAt && now - lastRecordedAt < VIEW_RECORD_WINDOW_MS) {
+    return false;
+  }
+  recentlyRecordedViews.set(questionId, now);
+  return true;
 }
 
 function messageFrom(error: unknown): string {

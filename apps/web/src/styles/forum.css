@@ -437,15 +437,16 @@ section.forum-page .forum-hero .forum-title {
   flex-shrink: 0;
 }
 .forum-stat-grid {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 .forum-stat-cell {
-  flex: 1;
+  min-width: 0;
   background: var(--surface-muted);
   border-radius: var(--radius-md);
-  min-height: 72px;
-  padding: 12px 14px;
+  min-height: 56px;
+  padding: 9px 12px;
 }
 .forum-stat-cell span {
   font-size: var(--text-xs);
@@ -455,10 +456,13 @@ section.forum-page .forum-hero .forum-title {
   letter-spacing: 0.06em;
 }
 .forum-stat-cell b {
-  font-size: 28px;
-  line-height: 1.2;
+  display: block;
+  font-size: 24px;
+  line-height: 1.05;
   font-weight: 600;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .forum-profile-card {
   display: flex;

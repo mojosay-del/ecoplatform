@@ -59,6 +59,10 @@ export type ForumSummary = {
   weeklyExperts: ForumWeeklyExpert[];
 };
 
+export type ForumQuestionViewRecord = {
+  views: number;
+};
+
 // Карточка вопроса в ленте.
 export type ForumQuestionListItem = {
   id: string;

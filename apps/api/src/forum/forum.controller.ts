@@ -42,6 +42,11 @@ export class ForumController {
     return this.forum.getQuestion(id, user);
   }
 
+  @Post("q/:id/view")
+  async recordQuestionView(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.forum.recordQuestionView(id, user);
+  }
+
   @Post("q")
   async ask(@Body() body: unknown, @CurrentUser() user: RequestUser) {
     return this.forum.ask(parseBody(forumQuestionInputSchema, body), user);

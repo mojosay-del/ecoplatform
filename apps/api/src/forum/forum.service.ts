@@ -101,9 +101,6 @@ export class ForumService {
       throw new NotFoundException("Вопрос не найден.");
     }
 
-    // Счётчик просмотров (метрика потребления) — best-effort, не роняет ответ.
-    await this.prisma.forumQuestion.update({ where: { id }, data: { views: { increment: 1 } } }).catch(() => undefined);
-
     const authorIds = [row.authorId, ...row.answers.map((answer) => answer.authorId)];
     const [reputation, votes, subscription] = await Promise.all([
       buildForumReputationMap(this.prisma, authorIds),
@@ -128,6 +125,25 @@ export class ForumService {
       votedAnswerIds,
       canManageAnswer,
     });
+  }
+
+  async recordQuestionView(id: string, user: RequestUser) {
+    assertFunctionalAccess(user);
+    const row = await this.prisma.forumQuestion.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+    const staff = isPlatformStaff(user);
+    if (!row || (row.status === ForumQuestionStatus.hidden && !staff)) {
+      throw new NotFoundException("Вопрос не найден.");
+    }
+
+    const updated = await this.prisma.forumQuestion.update({
+      where: { id },
+      data: { views: { increment: 1 } },
+      select: { views: true },
+    });
+    return { views: updated.views };
   }
 
   async taxonomy(user: RequestUser) {

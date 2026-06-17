@@ -15,7 +15,6 @@ import {
   Newspaper,
   Pin,
   Plus,
-  Store,
 } from "lucide-react";
 import type {
   ForumAuthorReputation,
@@ -89,7 +88,7 @@ export function Reputation({ author }: { author: ForumAuthorReputation }) {
 export function QuestionCard({ question }: { question: ForumQuestionListItem }) {
   const variant = forumStatusVariant(question.status);
   return (
-    <Link href={`/forum/q/${question.id}`} className={`forum-card forum-card--${variant}`}>
+    <Link href={`/forum/q/${question.id}`} className={`forum-card forum-card--${variant}`} prefetch={false}>
       <div className="forum-tags">
         <StatusBadge status={question.status} />
         <TagChips rawMaterial={question.rawMaterial} questionType={question.questionType} />
@@ -209,9 +208,6 @@ export function AsideProfile({
           </Link>
           <Link href="/indices">
             <LineChart size={18} /> Индексы цен <span className="sub">цифры</span>
-          </Link>
-          <Link href="/marketplace">
-            <Store size={18} /> Объявления <span className="sub">сделки</span>
           </Link>
         </div>
       </div>

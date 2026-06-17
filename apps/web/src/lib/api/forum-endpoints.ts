@@ -2,6 +2,7 @@ import type {
   ForumPinnedNews,
   ForumQuestionDetail,
   ForumQuestionListItem,
+  ForumQuestionViewRecord,
   ForumSummary,
   ForumTaxonomy,
   PaginatedResponse,
@@ -42,6 +43,7 @@ export const forumApi = {
   questions: (input: ForumListInput = {}) =>
     apiFetch<PaginatedResponse<ForumQuestionListItem>>(`/forum${forumListSuffix(input)}`),
   question: (id: string) => apiFetch<ForumQuestionDetail>(`/forum/q/${enc(id)}`),
+  recordView: (id: string) => apiFetch<ForumQuestionViewRecord>(`/forum/q/${enc(id)}/view`, { method: "POST" }),
   taxonomy: () => apiFetch<ForumTaxonomy>("/forum/taxonomy"),
   pinnedNews: () => apiFetch<ForumPinnedNews[]>("/forum/pinned-news"),
   summary: () => apiFetch<ForumSummary>("/forum/summary"),

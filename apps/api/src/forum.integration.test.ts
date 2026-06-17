@@ -189,6 +189,40 @@ describe("Forum: таксономия", () => {
   });
 });
 
+describe("Forum: просмотры", () => {
+  it("лента и чтение деталей не накручивают просмотры, просмотр фиксируется отдельным действием", async () => {
+    const adminToken = await loginAdmin();
+    const asker = await registerCompany("0900025");
+    const reader = await registerCompany("0900026");
+    const rawMaterialId = await createRawMaterial(adminToken, "ПП биг-бэг");
+    const questionTypeId = await createQuestionType(adminToken, "Практика");
+    const questionId = await ask(asker.token, {
+      title: "Как подготовить биг-бэг к отгрузке?",
+      rawMaterialId,
+      questionTypeId,
+    });
+
+    const list = await ctx.http.get("/api/forum").set(auth(reader.token));
+    expect(list.status).toBe(200);
+    expect(list.body.items.find((item: { id: string }) => item.id === questionId)?.views).toBe(0);
+    await expectQuestionViews(questionId, 0);
+
+    const detail = await ctx.http.get(`/api/forum/q/${questionId}`).set(auth(reader.token));
+    expect(detail.status).toBe(200);
+    expect(detail.body.views).toBe(0);
+    await expectQuestionViews(questionId, 0);
+
+    const view = await ctx.http.post(`/api/forum/q/${questionId}/view`).set(auth(reader.token));
+    expect(view.status).toBe(201);
+    expect(view.body.views).toBe(1);
+
+    const afterView = await ctx.http.get(`/api/forum/q/${questionId}`).set(auth(reader.token));
+    expect(afterView.status).toBe(200);
+    expect(afterView.body.views).toBe(1);
+    await expectQuestionViews(questionId, 1);
+  });
+});
+
 describe("Forum: закреплённые новости", () => {
   it("новость с флагом pinnedInForum показывается в /forum/pinned-news", async () => {
     const adminToken = await loginAdmin();
@@ -213,6 +247,14 @@ describe("Forum: закреплённые новости", () => {
     expect(pinned.body.some((item: { id: string }) => item.id === create.body.id)).toBe(true);
   });
 });
+
+async function expectQuestionViews(questionId: string, views: number) {
+  const question = await ctx.prisma.forumQuestion.findUnique({
+    where: { id: questionId },
+    select: { views: true },
+  });
+  expect(question?.views).toBe(views);
+}
 
 describe("Forum: модерация и уведомления", () => {
   it("жалоба на вопрос создаёт кейс модерации, removed → вопрос скрыт", async () => {
