@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Check, ChevronDown, MailCheck } from "lucide-react";
 import type { CreateOfferDto, MarketplaceListingDetail, PriceCondition } from "@ecoplatform/shared";
+import { SendActionIcon } from "../../components/app-shell/nav-icons";
 import { DEFAULT_PHONE_COUNTRY } from "../../components/auth/constants";
 import { PhoneInput } from "../../components/auth/phone-input";
 import type { PhoneCountryId } from "../../components/auth/types";
@@ -191,6 +192,7 @@ export function MakeOfferForm({
         </p>
       ) : null}
       <button className="button" type="button" disabled={saving} onClick={submit}>
+        <SendActionIcon size={18} />
         Отправить предложение
       </button>
     </div>

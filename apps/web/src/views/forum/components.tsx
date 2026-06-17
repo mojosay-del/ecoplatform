@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  ArrowUp,
   Award,
   BadgeCheck,
   CircleCheck,
@@ -24,6 +23,7 @@ import type {
   ForumSummary,
   ForumTaxonomyValue,
 } from "@ecoplatform/shared";
+import { LikeActionIcon } from "../../components/app-shell/nav-icons";
 import {
   companyRoleLabel,
   forumStatusLabel,
@@ -111,7 +111,7 @@ export function QuestionCard({ question }: { question: ForumQuestionListItem }) 
         <Reputation author={question.author} />
         {question.topVotes > 0 ? (
           <span className="forum-stat">
-            <ArrowUp size={15} /> {question.topVotes}
+            <LikeActionIcon size={17} /> {question.topVotes}
           </span>
         ) : null}
         <span className="forum-stat">

@@ -1,7 +1,12 @@
 import Image from "next/image";
-import { useEffect, useState, type FormEvent } from "react";
-import { MessageCircle, ThumbsUp } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { MessageCircle } from "lucide-react";
 import type { NewsPostDetail } from "@ecoplatform/shared";
+import {
+  LikeActionIcon,
+  type AnimatedNavIconHandle,
+  useAnimatedNavIconPlayback,
+} from "../../components/app-shell/nav-icons";
 import { api, preferredFileAssetImageUrl, type FileAsset } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { ContentBlocks } from "../content-blocks";
@@ -118,17 +123,20 @@ export function NewsLikeButton({
   onToggle: () => void;
 }) {
   const likesCount = post._count?.likes ?? 0;
+  const iconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const iconPlayback = useAnimatedNavIconPlayback(iconRef);
 
   return (
     <button
       className={`news-like-button ${post.likedByMe ? "active" : ""}`}
       disabled={pending}
       onClick={onToggle}
+      {...iconPlayback}
       type="button"
       aria-label={post.likedByMe ? `Убрать лайк, сейчас ${likesCount}` : `Поставить лайк, сейчас ${likesCount}`}
       aria-pressed={Boolean(post.likedByMe)}
     >
-      <ThumbsUp aria-hidden="true" size={16} strokeWidth={2.2} />
+      <LikeActionIcon ref={iconRef} size={20} />
       <strong>{likesCount}</strong>
     </button>
   );

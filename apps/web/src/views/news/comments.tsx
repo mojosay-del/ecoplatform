@@ -1,6 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type FormEvent } from "react";
-import { Flag, MessageCircleOff, Send, ThumbsUp } from "lucide-react";
+import { Flag, MessageCircleOff } from "lucide-react";
 import type { NewsCommentDecorated } from "@ecoplatform/shared";
+import {
+  LikeActionIcon,
+  SendActionIcon,
+  type AnimatedNavIconHandle,
+  useAnimatedNavIconPlayback,
+} from "../../components/app-shell/nav-icons";
 import { useAuth } from "../../lib/auth";
 import { CommentAvatar, formatCommentDate, getCommentAuthor } from "../shared";
 
@@ -130,7 +136,7 @@ export function CommentsSection({
               disabled={!commentText.trim()}
               type="submit"
             >
-              <Send aria-hidden="true" size={17} />
+              <SendActionIcon size={20} />
             </button>
           </div>
         </form>
@@ -178,6 +184,8 @@ function CommentCard({
     currentUserName.length > 0 && currentUserName === author && currentUserAvatarUrl === comment.user.avatarUrl;
   const isOwn = currentUserId === comment.user.id || isSameVisibleUser;
   const canUseCommentActions = !isOwn;
+  const likeIconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const likeIconPlayback = useAnimatedNavIconPlayback(likeIconRef);
 
   function closeReportForm() {
     setReportingCommentId(null);
@@ -210,13 +218,14 @@ function CommentCard({
                 className={`comment-like-button ${comment.likedByMe ? "active" : ""}`}
                 disabled={commentLikePendingId === comment.id}
                 onClick={() => onToggleCommentLike(comment.id)}
+                {...likeIconPlayback}
                 type="button"
                 aria-label={
                   comment.likedByMe ? `Убрать лайк, сейчас ${likesCount}` : `Поставить лайк, сейчас ${likesCount}`
                 }
                 aria-pressed={Boolean(comment.likedByMe)}
               >
-                <ThumbsUp aria-hidden="true" size={14} />
+                <LikeActionIcon ref={likeIconRef} size={18} />
                 <span>{likesCount}</span>
               </button>
             ) : null}
@@ -258,6 +267,7 @@ function CommentCard({
             />
             <div className="report-actions">
               <button className="button" type="submit">
+                <SendActionIcon size={18} />
                 Отправить жалобу
               </button>
               <button className="button ghost" onClick={closeReportForm} type="button">

@@ -1,7 +1,11 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronsLeft, ChevronsRight, X } from "lucide-react";
+import { useRef } from "react";
+import { X } from "lucide-react";
 import type { AccountSectionId, NavSection } from "../app-shell-nav";
+import { HideMenuIcon, type AnimatedNavIconHandle, useAnimatedNavIconPlayback } from "./nav-icons";
 import { NavEntry } from "./NavEntry";
 
 export function AppSidebar({
@@ -21,6 +25,9 @@ export function AppSidebar({
   pathname: string;
   visibleNav: NavSection[];
 }) {
+  const collapseIconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const collapseIconPlayback = useAnimatedNavIconPlayback(collapseIconRef);
+
   return (
     <aside
       className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}
@@ -43,8 +50,9 @@ export function AppSidebar({
           onClick={onToggleCollapsed}
           aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
           title={collapsed ? "Развернуть меню" : "Свернуть меню"}
+          {...collapseIconPlayback}
         >
-          {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+          <HideMenuIcon ref={collapseIconRef} size={22} />
         </button>
       </div>
       {visibleNav.map((section) => (

@@ -8,9 +8,10 @@ import "../../styles/forum.css";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Lock, Search, Send } from "lucide-react";
+import { ArrowLeft, Lock, Search } from "lucide-react";
 import type { ForumTaxonomy } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
+import { SendActionIcon } from "../../components/app-shell/nav-icons";
 import { api } from "../../lib/api";
 import { ApiError } from "../../lib/api";
 import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
@@ -145,7 +146,7 @@ export function ForumAskView() {
 
           <div className="forum-form-actions">
             <button type="button" className="button" onClick={submit} disabled={submitting}>
-              <Send size={16} /> Опубликовать вопрос
+              <SendActionIcon size={18} /> Опубликовать вопрос
             </button>
             <Link href="/forum" className="button secondary">
               Отмена

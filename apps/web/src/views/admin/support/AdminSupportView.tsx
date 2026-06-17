@@ -6,6 +6,7 @@ import { RotateCcw, Search } from "lucide-react";
 import { AdminSortButton } from "../../../components/AdminSortButton";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, supportStatusPillVariant } from "../../../components/StatusPill";
+import { SendActionIcon } from "../../../components/app-shell/nav-icons";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
 import { apiFetch } from "../../../lib/api";
 import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../../../lib/display-labels";
@@ -289,6 +290,7 @@ export function AdminSupportView() {
                 <form className="support-inbox-reply" onSubmit={(event) => onReply(event, selectedTicket.id)}>
                   <textarea className="textarea" name="text" placeholder="Ответ клиенту" required rows={3} />
                   <button className="button" type="submit" disabled={sending}>
+                    <SendActionIcon size={18} />
                     {sending ? "Отправляю…" : "Ответить"}
                   </button>
                 </form>

@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { useRef } from "react";
 import { getBreadcrumbTrail, type BreadcrumbItem, type NavSection } from "../app-shell-nav";
+import { AnimatedNavIcon, type AnimatedNavIconHandle, useAnimatedNavIconPlayback } from "./nav-icons";
 
 // Хлебные крошки в топбаре: для обычных разделов берём активный пункт меню,
 // а для админки показываем вложенный путь внутри единой панели управления.
@@ -25,10 +27,14 @@ export function Breadcrumb({
 }
 
 function BreadcrumbCrumb({ crumb, current }: { crumb: BreadcrumbItem; current: boolean }) {
-  const Icon = crumb.icon;
+  const iconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const iconPlayback = useAnimatedNavIconPlayback(iconRef);
+  const AnimatedIcon = typeof crumb.icon === "string" ? crumb.icon : null;
+  const StaticIcon = typeof crumb.icon === "function" ? crumb.icon : null;
   const content = (
     <>
-      {Icon ? <Icon size={15} /> : null}
+      {AnimatedIcon ? <AnimatedNavIcon name={AnimatedIcon} ref={iconRef} size={17} /> : null}
+      {StaticIcon ? <StaticIcon size={17} /> : null}
       <span>{crumb.label}</span>
     </>
   );
@@ -36,7 +42,7 @@ function BreadcrumbCrumb({ crumb, current }: { crumb: BreadcrumbItem; current: b
   return (
     <>
       {crumb.href && !current ? (
-        <Link className="topbar-breadcrumb-link" href={crumb.href}>
+        <Link className="topbar-breadcrumb-link" href={crumb.href} {...iconPlayback}>
           {content}
         </Link>
       ) : (

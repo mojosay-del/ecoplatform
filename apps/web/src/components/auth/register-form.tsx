@@ -6,6 +6,7 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Lock, ShieldCheck } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
+import { SendActionIcon } from "../app-shell/nav-icons";
 import { api, ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { AuthShell } from "./auth-shell";
@@ -471,6 +472,7 @@ export function RegisterForm() {
                 onClick={requestVerificationCode}
                 disabled={submitting}
               >
+                <SendActionIcon size={16} />
                 Отправить код ещё раз
               </button>
             </div>

@@ -6,6 +6,7 @@
 
 import Image from "next/image";
 import { UserRound, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 export type LikeResult = {
   liked: boolean;
@@ -117,10 +118,20 @@ export function withUpdatedCommentLike<P extends { comments?: CommentLikeNode[] 
   } as P;
 }
 
-export function NewsMetaItem({ count, icon: Icon, label }: { count: number; icon: LucideIcon; label: string }) {
+export function NewsMetaItem({
+  children,
+  count,
+  icon: Icon,
+  label,
+}: {
+  children?: ReactNode;
+  count: number;
+  icon?: LucideIcon;
+  label: string;
+}) {
   return (
     <span className="news-meta-item" aria-label={`${label}: ${count}`}>
-      <Icon aria-hidden="true" size={14} strokeWidth={2} />
+      {children ?? (Icon ? <Icon aria-hidden="true" size={14} strokeWidth={2} /> : null)}
       <span>{count}</span>
     </span>
   );

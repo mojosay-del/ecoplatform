@@ -3,8 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { HelpCircle, Menu } from "lucide-react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Menu } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import {
   AccountMenu,
@@ -25,6 +25,7 @@ import {
 import { DemoBanner } from "./DemoBanner";
 import { NotificationBell } from "./NotificationBell";
 import { UserSupportDrawer } from "./UserSupportDrawer";
+import { SupportTopbarIcon, type AnimatedNavIconHandle, useAnimatedNavIconPlayback } from "./app-shell/nav-icons";
 
 export type { AppShellChrome };
 
@@ -45,6 +46,8 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
   const [collapsed, setCollapsed] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [activeAccountSection, setActiveAccountSection] = useState<AccountSectionId | null>(null);
+  const supportIconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const supportIconPlayback = useAnimatedNavIconPlayback(supportIconRef);
   // У админов своя полноценная страница /admin/support — drawer им
   // показывать не нужно, иначе двойная сущность.
   const isAdminUser = (user?.platformRoles?.length ?? 0) > 0;
@@ -185,8 +188,9 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
               onClick={() => setSupportOpen(true)}
               title="Поддержка"
               aria-label="Открыть поддержку"
+              {...supportIconPlayback}
             >
-              <HelpCircle size={20} />
+              <SupportTopbarIcon ref={supportIconRef} size={26} />
             </button>
           )}
           <AccountMenu

@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { BellRing } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
 import type { InfinitePage } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
 import { NotificationsPopover } from "./NotificationsPopover";
+import { AnimatedNavIcon, type AnimatedNavIconHandle, useAnimatedNavIconPlayback } from "./app-shell/nav-icons";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -28,6 +28,8 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const iconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const iconPlayback = useAnimatedNavIconPlayback(iconRef);
   const badgeLabel = count > 99 ? "99+" : String(count);
 
   // Запросить непрочитанный счётчик. Запускается по таймеру и по событию
@@ -84,9 +86,10 @@ export function NotificationBell() {
         aria-label="Открыть уведомления"
         aria-expanded={open}
         data-notification-bell-trigger="true"
+        {...iconPlayback}
         onClick={() => setOpen((value) => !value)}
       >
-        <BellRing className="notification-bell-icon" size={21} strokeWidth={2.15} />
+        <AnimatedNavIcon name="notifications" ref={iconRef} size={25} />
         {count > 0 ? <span className={`notification-badge ${count > 9 ? "wide" : ""}`}>{badgeLabel}</span> : null}
       </button>
       <NotificationsPopover

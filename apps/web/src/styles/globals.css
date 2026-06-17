@@ -171,6 +171,7 @@ input[type="checkbox"]:focus-visible {
   justify-content: center;
   padding: 8px;
   gap: 0;
+  margin-right: 0;
 }
 
 .app-shell[data-collapsed="true"] .nav-section {
@@ -424,7 +425,7 @@ input[type="checkbox"]:focus-visible {
 
 .nav-title {
   margin: 0 0 6px;
-  padding: 0 12px;
+  padding: 0 10px;
   color: var(--text-subtle);
   font-size: 11px;
   font-weight: 700;
@@ -441,10 +442,11 @@ input[type="checkbox"]:focus-visible {
   display: flex;
   align-items: center;
   position: relative;
-  gap: 12px;
-  min-height: 36px;
-  padding: 7px 12px;
-  border-radius: 8px;
+  gap: 9px;
+  min-height: 34px;
+  margin-right: 8px;
+  padding: 6px 10px;
+  border-radius: 7px;
   color: var(--text-secondary);
   font-weight: 500;
   font-size: 14px;
@@ -457,8 +459,138 @@ input[type="checkbox"]:focus-visible {
   flex-shrink: 0;
 }
 
+.nav-link:not(.disabled):focus-visible {
+  outline: 0;
+  box-shadow: var(--focus-ring);
+}
+
+.eco-nav-icon {
+  --eco-nav-icon-render-size: var(--eco-nav-icon-size, 21px);
+  --eco-nav-icon-slot-size: var(--eco-nav-icon-render-size);
+  width: var(--eco-nav-icon-slot-size);
+  height: var(--eco-nav-icon-slot-size);
+  flex: 0 0 var(--eco-nav-icon-slot-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  top: var(--eco-nav-icon-offset-y, 0);
+  overflow: hidden;
+  color: currentColor;
+  transform-origin: center;
+  transition: transform 160ms ease;
+}
+
+.eco-nav-icon .animated-lucide-icon,
+.eco-nav-icon-svg,
+.eco-nav-icon-lottie {
+  display: block;
+  width: var(--eco-nav-icon-render-size) !important;
+  height: var(--eco-nav-icon-render-size) !important;
+  overflow: visible;
+}
+
+.eco-nav-icon-lottie svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: visible;
+}
+
+.eco-nav-icon .animated-lucide-icon,
+.eco-nav-icon-svg {
+  color: currentColor;
+}
+
+.nav-link .eco-nav-icon {
+  --eco-nav-icon-slot-size: 26px;
+}
+
+.nav-link .eco-nav-icon[data-icon-name="knowledge"] {
+  --eco-nav-icon-offset-y: -1px;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-fill {
+  fill-opacity: 0.18;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-draw {
+  animation: al-draw-in 600ms ease var(--al-delay, 0ms) both;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-draw-line {
+  animation: al-draw-line 500ms ease var(--al-delay, 0ms) both;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-fade {
+  animation: al-fade-pop 500ms ease var(--al-delay, 0ms) both;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-dot-appear {
+  animation: al-dot-pop 500ms ease 200ms both;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-bar {
+  animation: al-bar-grow 600ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--al-delay, 0ms) both;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-scale-pop {
+  animation: al-scale-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--al-delay, 0ms) both;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-pulse-element {
+  animation: al-pulse 0.7s ease-in-out;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-gear {
+  transform: rotate(var(--al-rotation, 90deg));
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-nudge {
+  transform: translate(var(--al-tx, 0), var(--al-ty, 0));
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-bell-ring {
+  animation: al-bell-ring 0.7s ease;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-heart-beat {
+  animation: al-heart-beat 0.8s ease;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-rocket-lift {
+  transform: translate(1px, -1.5px);
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-handle-lift {
+  transform: translateY(-1.5px);
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-page-turn {
+  transform: rotateY(-12deg);
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-menu-line {
+  transform: scaleX(var(--al-scale-x, 0.7));
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-mail-flap {
+  animation: al-mail-flap 700ms ease var(--al-delay, 0ms) both;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-shake {
+  animation: al-shake 600ms ease var(--al-delay, 0ms) both;
+}
+
+.eco-nav-icon[data-playing="true"] .al-anim-spin {
+  animation: al-spin 700ms cubic-bezier(0.4, 0, 0.2, 1) var(--al-delay, 0ms) both;
+}
+
 .nav-label {
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
+  line-height: 1.15;
 }
 
 .nav-label-disabled {
@@ -486,9 +618,34 @@ input[type="checkbox"]:focus-visible {
   font-weight: 500;
 }
 
+.nav-link-child .eco-nav-icon {
+  --eco-nav-icon-slot-size: 18px;
+}
+
 .nav-link:not(.disabled):hover {
   background: var(--panel-soft);
   color: var(--text);
+}
+
+.nav-link:not(.disabled):is(:hover, :focus-visible) .eco-nav-icon,
+.account-menu-link:is(:hover, :focus-visible) .eco-nav-icon,
+.account-menu-logout:is(:hover, :focus-visible) .eco-nav-icon,
+.topbar-breadcrumb-link:is(:hover, :focus-visible) .eco-nav-icon {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eco-nav-icon,
+  .eco-nav-icon .animated-lucide-icon,
+  .eco-nav-icon .animated-lucide-icon * {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .eco-nav-icon .al-anim-fill {
+    fill-opacity: 0 !important;
+  }
 }
 
 .nav-link.active {
@@ -560,6 +717,13 @@ input[type="checkbox"]:focus-visible {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
   visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eco-nav-icon {
+    transform: none !important;
+    transition: none !important;
+  }
 }
 
 .main {
@@ -711,7 +875,7 @@ input[type="checkbox"]:focus-visible {
   padding: 24px 32px 32px;
   min-height: 0;
   /* Отступ от сайдбара — в этом промежутке проявляется белая подложка. */
-  margin-left: 16px;
+  margin-left: 8px;
 }
 
 .icon-button {
@@ -3134,6 +3298,9 @@ body.news-modal-open .app-shell {
 }
 
 .auth-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -5228,8 +5395,10 @@ body.news-modal-open .app-shell {
   color: var(--primary);
 }
 
-.topbar-breadcrumb-link svg,
-.topbar-breadcrumb-current svg {
+.topbar-breadcrumb-link .eco-nav-icon,
+.topbar-breadcrumb-current .eco-nav-icon,
+.topbar-breadcrumb-link > svg,
+.topbar-breadcrumb-current > svg {
   color: var(--primary);
 }
 
@@ -8157,8 +8326,9 @@ body.news-modal-open .app-shell {
 
   .app-shell[data-collapsed="true"] .nav-link {
     justify-content: flex-start;
-    padding: 7px 12px;
-    gap: 12px;
+    gap: 9px;
+    margin-right: 8px;
+    padding: 6px 10px;
   }
 
   /* Мобильное меню-драуэр: верх под вырезом, низ над домашней полосой. */

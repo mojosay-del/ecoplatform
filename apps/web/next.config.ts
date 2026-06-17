@@ -99,6 +99,9 @@ const nextConfig: NextConfig = {
   // Так как мы внутри Turborepo, standalone должен искать workspace-зависимости
   // относительно корня проекта, а не apps/web.
   outputFileTracingRoot: projectRoot,
+  // Пакет анимированных иконок публикует JSX-файлы, поэтому Next должен
+  // прогонять его через свой сборщик так же, как код приложения.
+  transpilePackages: ["@animated-color-icons/lucide-react"],
   // DOMPurify на сервере поднимает jsdom. Next должен грузить эти пакеты как
   // обычные Node-зависимости, иначе dev/bundle может падать на страницах с HTML.
   serverExternalPackages: ["isomorphic-dompurify", "jsdom"],

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { ChevronLeft, MessageSquare, Plus, X } from "lucide-react";
 import { supportTicketCategories } from "@ecoplatform/shared";
+import { SendActionIcon } from "./app-shell/nav-icons";
 import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { api, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -231,6 +232,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                   />
                 </label>
                 <button className="button" type="submit" disabled={submitting}>
+                  <SendActionIcon size={18} />
                   {submitting ? "Отправляю…" : "Отправить обращение"}
                 </button>
                 {message ? <p className="support-drawer-flash">{message}</p> : null}
@@ -298,6 +300,7 @@ function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => 
           rows={3}
         />
         <button className="button" type="submit" disabled={sending || !reply.trim()}>
+          <SendActionIcon size={18} />
           {sending ? "Отправляю…" : "Ответить"}
         </button>
       </form>

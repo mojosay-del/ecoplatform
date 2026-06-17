@@ -1,9 +1,10 @@
 "use client";
 
-import { MessageCircle, ThumbsUp } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import type { NewsListItem } from "@ecoplatform/shared";
 import { AudioMessagePlayer } from "../../components/AudioMessagePlayer";
+import { LikeActionIcon } from "../../components/app-shell/nav-icons";
 import { preferredFileAssetImageUrl, preferredFileAssetMediaUrl, type FileAsset } from "../../lib/api";
 import { CoverImage } from "../../components/CoverImage";
 import { NewsMetaItem, formatNewsDate } from "../shared";
@@ -90,7 +91,9 @@ export function NewsCard({
               <p className="news-tile-lead">{post.lead}</p>
             )}
             <div className="news-tile-meta">
-              <NewsMetaItem count={post._count?.likes ?? 0} icon={ThumbsUp} label="Лайки" />
+              <NewsMetaItem count={post._count?.likes ?? 0} label="Лайки">
+                <LikeActionIcon size={17} />
+              </NewsMetaItem>
               <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
               {publishedDate ? (
                 <time className="news-tile-date" dateTime={publishedDate.toISOString()}>

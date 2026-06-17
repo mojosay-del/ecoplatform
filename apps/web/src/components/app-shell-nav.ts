@@ -1,30 +1,32 @@
 import { EDUCATION_COMPANY_TYPES, type AuthMeFeatures, type CompanyType } from "@ecoplatform/shared";
 import type { LucideIcon } from "lucide-react";
-import {
-  ArrowLeft,
-  Bell,
-  BookOpen,
-  Calculator,
-  CreditCard,
-  Database,
-  FileText,
-  GraduationCap,
-  LayoutDashboard,
-  LineChart,
-  Map as MapIcon,
-  MessageCircle,
-  Smartphone,
-  Store,
-  Newspaper,
-  UserRound,
-} from "lucide-react";
+
+export type NavIconKey =
+  | "admin"
+  | "back"
+  | "calculator"
+  | "data-privacy"
+  | "docs"
+  | "education"
+  | "forum"
+  | "indices"
+  | "knowledge"
+  | "logout"
+  | "map"
+  | "marketplace"
+  | "news"
+  | "notifications"
+  | "profile"
+  | "sessions"
+  | "settings"
+  | "subscription";
 
 export type NavItem = {
   // Стабильный ключ пункта app-меню; у account-меню не нужен.
   key?: string;
   href?: string;
   label: string;
-  icon: LucideIcon;
+  icon: NavIconKey;
   activePathPrefixes?: string[];
   disabled?: boolean;
   disabledHint?: string;
@@ -42,7 +44,7 @@ export type NavSection = {
 export type BreadcrumbItem = {
   href?: string;
   label: string;
-  icon?: LucideIcon;
+  icon?: LucideIcon | NavIconKey;
 };
 
 export type AccountSectionId = "profile" | "data-privacy";
@@ -51,7 +53,7 @@ export type AccountProfileModalId = "subscription" | "sessions" | "notifications
 export const ACCOUNT_SECTION_CHANGE_EVENT = "account:section-change";
 export const ACCOUNT_SECTION_NAVIGATE_EVENT = "account:section-navigate";
 
-const futureItem = (key: string, label: string, icon: LucideIcon, disabledHint: string): NavItem => ({
+const futureItem = (key: string, label: string, icon: NavIconKey, disabledHint: string): NavItem => ({
   key,
   label,
   icon,
@@ -63,13 +65,13 @@ export const appNavSections: NavSection[] = [
   {
     title: "Главная",
     items: [
-      { key: "news", href: "/news", label: "Новости", icon: Newspaper },
-      { key: "indices", href: "/indices", label: "Индексы цен", icon: LineChart },
+      { key: "news", href: "/news", label: "Новости", icon: "news" },
+      { key: "indices", href: "/indices", label: "Индексы цен", icon: "indices" },
       {
         key: "education",
         href: "/education",
         label: "Обучение",
-        icon: GraduationCap,
+        icon: "education",
         companyTypes: EDUCATION_COMPANY_TYPES,
       },
     ],
@@ -81,25 +83,25 @@ export const appNavSections: NavSection[] = [
         key: "marketplace",
         href: "/marketplace",
         label: "Объявления",
-        icon: Store,
+        icon: "marketplace",
         feature: "marketplace",
       },
     ],
   },
   {
     title: "Сообщество",
-    items: [{ key: "forum", href: "/forum", label: "Форум", icon: MessageCircle }],
+    items: [{ key: "forum", href: "/forum", label: "Форум", icon: "forum" }],
   },
   {
     title: "Базы знаний",
     items: [
-      { key: "knowledge-base", href: "/knowledge-base", label: "Сырьё", icon: BookOpen },
-      { key: "docs", href: "/documentation", label: "Документация", icon: FileText },
+      { key: "knowledge-base", href: "/knowledge-base", label: "Сырьё", icon: "knowledge" },
+      { key: "docs", href: "/documentation", label: "Документация", icon: "docs" },
     ],
   },
   {
     title: "Инструменты",
-    items: [futureItem("maps", "Карты", MapIcon, "Карты — география переработчиков, складов и логистики.")],
+    items: [futureItem("maps", "Карты", "map", "Карты — география переработчиков, складов и логистики.")],
   },
   {
     // Калькуляторы — категория (заголовок секции) с набором инструментов.
@@ -112,7 +114,7 @@ export const appNavSections: NavSection[] = [
         key: "calculator-retail",
         href: "/calculators/retail",
         label: "Розничный",
-        icon: Calculator,
+        icon: "calculator",
         companyTypes: ["collector"],
       },
     ],
@@ -126,7 +128,7 @@ export const appNavSections: NavSection[] = [
         key: "admin",
         href: "/admin",
         label: "Панель управления",
-        icon: LayoutDashboard,
+        icon: "admin",
         activePathPrefixes: ["/admin"],
         roles: ["admin", "content_manager", "moderator"],
       },
@@ -135,24 +137,24 @@ export const appNavSections: NavSection[] = [
 ];
 
 const accountSettingsItems: NavItem[] = [
-  { href: "/account/profile", label: "Профиль", icon: UserRound },
-  { href: "/account/data-privacy", label: "Данные и приватность", icon: Database },
+  { href: "/account/profile", label: "Профиль", icon: "profile" },
+  { href: "/account/data-privacy", label: "Данные и приватность", icon: "data-privacy" },
 ];
 
 const accountProfileMenuItems: NavItem[] = [
-  { href: "/account/profile", label: "Профиль", icon: UserRound },
-  { href: accountProfileModalHref("subscription"), label: "Подписка", icon: CreditCard },
-  { href: accountProfileModalHref("sessions"), label: "Сессии", icon: Smartphone },
-  { href: accountProfileModalHref("notifications"), label: "Уведомления", icon: Bell },
+  { href: "/account/profile", label: "Профиль", icon: "profile" },
+  { href: accountProfileModalHref("subscription"), label: "Подписка", icon: "subscription" },
+  { href: accountProfileModalHref("sessions"), label: "Сессии", icon: "sessions" },
+  { href: accountProfileModalHref("notifications"), label: "Уведомления", icon: "notifications" },
 ];
 
-const accountStaffMenuItems: NavItem[] = [{ href: "/account/profile", label: "Профиль", icon: UserRound }];
+const accountStaffMenuItems: NavItem[] = [{ href: "/account/profile", label: "Профиль", icon: "profile" }];
 
 export function getAccountNavSections(): NavSection[] {
   return [
     {
       title: "Переход",
-      items: [{ href: "/news", label: "К платформе", icon: ArrowLeft }],
+      items: [{ href: "/news", label: "К платформе", icon: "back" }],
     },
     {
       title: "Настройки",
@@ -248,7 +250,7 @@ function flattenItems(items: NavItem[]): NavItem[] {
 const adminPanelRoot: BreadcrumbItem = {
   href: "/admin",
   label: "Панель управления",
-  icon: LayoutDashboard,
+  icon: "admin",
 };
 
 const adminContentRoot: BreadcrumbItem = {
@@ -302,7 +304,7 @@ function getAdminBreadcrumbTrail(pathname: string): BreadcrumbItem[] | null {
 const accountRoot: BreadcrumbItem = {
   href: "/account/profile",
   label: "Настройки аккаунта",
-  icon: UserRound,
+  icon: "profile",
 };
 
 const accountBreadcrumbs: { prefix: string; section: AccountSectionId; label: string }[] = [

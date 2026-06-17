@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { LogOut, Settings, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { User } from "../../lib/auth";
 import {
@@ -13,7 +13,9 @@ import {
   isNavItemActive,
   type AccountProfileModalId,
   type AccountSectionId,
+  type NavItem,
 } from "../app-shell-nav";
+import { AnimatedNavIcon, type AnimatedNavIconHandle, useAnimatedNavIconPlayback } from "./nav-icons";
 
 export function AccountMenu({
   activeAccountSection,
@@ -33,6 +35,8 @@ export function AccountMenu({
   user: User | null;
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const settingsIconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const settingsIconPlayback = useAnimatedNavIconPlayback(settingsIconRef);
   const [open, setOpen] = useState(false);
   const sections = getAccountMenuSections(includeBusiness);
   const fullName = user ? `${user.firstName} ${user.lastName}` : "Аккаунт";
@@ -68,9 +72,10 @@ export function AccountMenu({
         title="Настройки аккаунта"
         aria-label="Открыть настройки аккаунта"
         aria-expanded={open}
+        {...settingsIconPlayback}
         onClick={() => setOpen((value) => !value)}
       >
-        <Settings size={20} />
+        <AnimatedNavIcon name="settings" ref={settingsIconRef} size={24} />
       </button>
       {open ? (
         <div className="account-menu-popover" role="menu" aria-label="Меню аккаунта">
@@ -79,7 +84,7 @@ export function AccountMenu({
               {user?.avatarUrl ? (
                 <Image alt="" src={user.avatarUrl} width={40} height={40} />
               ) : (
-                <UserRound size={20} aria-hidden="true" />
+                <UserRound size={22} aria-hidden="true" />
               )}
             </span>
             <span className="account-menu-head-text">
@@ -91,7 +96,6 @@ export function AccountMenu({
             <div className="account-menu-section" key={section.title}>
               <p>{section.title}</p>
               {section.items.map((item) => {
-                const Icon = item.icon;
                 const accountSection = activeAccountSection ? accountSectionFromHref(item.href) : null;
                 const accountModal = accountProfileModalFromHref(item.href);
                 const active = accountModal
@@ -99,35 +103,77 @@ export function AccountMenu({
                   : accountSection
                     ? accountSection === activeAccountSection && !activeAccountModal
                     : isNavItemActive(item, pathname);
-                return item.href ? (
-                  <Link
-                    className={`account-menu-link ${active ? "active" : ""}`}
-                    href={item.href}
+                return (
+                  <AccountMenuLink
+                    accountSection={accountSection}
+                    active={active}
+                    item={item}
                     key={item.href}
-                    onClick={() => {
-                      setOpen(false);
-                      if (accountSection) {
-                        window.dispatchEvent(
-                          new CustomEvent(ACCOUNT_SECTION_NAVIGATE_EVENT, { detail: { section: accountSection } }),
-                        );
-                      }
-                    }}
-                    role="menuitem"
-                    scroll={accountSection ? false : undefined}
-                  >
-                    <Icon size={16} />
-                    <span>{item.label}</span>
-                  </Link>
-                ) : null;
+                    onClose={() => setOpen(false)}
+                  />
+                );
               })}
             </div>
           ))}
-          <button className="account-menu-logout" type="button" onClick={() => void onLogout()} role="menuitem">
-            <LogOut size={16} />
-            <span>Выйти</span>
-          </button>
+          <AccountMenuLogout onLogout={onLogout} />
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AccountMenuLink({
+  accountSection,
+  active,
+  item,
+  onClose,
+}: {
+  accountSection: AccountSectionId | null;
+  active: boolean;
+  item: NavItem;
+  onClose: () => void;
+}) {
+  const iconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const iconPlayback = useAnimatedNavIconPlayback(iconRef);
+
+  if (!item.href) return null;
+
+  return (
+    <Link
+      className={`account-menu-link ${active ? "active" : ""}`}
+      href={item.href}
+      {...iconPlayback}
+      onClick={() => {
+        onClose();
+        if (accountSection) {
+          window.dispatchEvent(
+            new CustomEvent(ACCOUNT_SECTION_NAVIGATE_EVENT, { detail: { section: accountSection } }),
+          );
+        }
+      }}
+      role="menuitem"
+      scroll={accountSection ? false : undefined}
+    >
+      <AnimatedNavIcon name={item.icon} ref={iconRef} size={20} />
+      <span>{item.label}</span>
+    </Link>
+  );
+}
+
+function AccountMenuLogout({ onLogout }: { onLogout: () => Promise<void> }) {
+  const iconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const iconPlayback = useAnimatedNavIconPlayback(iconRef);
+
+  return (
+    <button
+      className="account-menu-logout"
+      type="button"
+      {...iconPlayback}
+      onClick={() => void onLogout()}
+      role="menuitem"
+    >
+      <AnimatedNavIcon name="logout" ref={iconRef} size={20} />
+      <span>Выйти</span>
+    </button>
   );
 }

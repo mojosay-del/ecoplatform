@@ -5,8 +5,8 @@
 // можно посмотреть охват. Канал доставки — только in-app (категория system).
 
 import { FormEvent, useState } from "react";
-import { Megaphone } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
+import { SendActionIcon } from "../../../components/app-shell/nav-icons";
 import { apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { COMPANY_TYPE_LABELS, SUBSCRIPTION_PLAN_LABELS, USER_GENDER_LABELS } from "../../../lib/display-labels";
@@ -236,7 +236,7 @@ export function AdminBroadcastView() {
                 {previewing ? "Считаю…" : "Показать получателей"}
               </button>
               <button className="button" type="submit" disabled={sending || !title.trim() || !body.trim()}>
-                <Megaphone size={15} /> {sending ? "Отправляю…" : "Отправить"}
+                <SendActionIcon size={18} /> {sending ? "Отправляю…" : "Отправить"}
               </button>
             </div>
           </div>

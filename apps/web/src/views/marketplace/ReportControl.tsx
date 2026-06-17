@@ -6,6 +6,7 @@
 
 import { FormEvent, useState } from "react";
 import { Flag } from "lucide-react";
+import { SendActionIcon } from "../../components/app-shell/nav-icons";
 import { api, ApiError } from "../../lib/api";
 
 const REASON_OPTIONS: { value: string; label: string }[] = [
@@ -95,6 +96,7 @@ export function ReportControl({
               Отмена
             </button>
             <button type="submit" className="button secondary" disabled={status === "submitting"}>
+              <SendActionIcon size={18} />
               {status === "submitting" ? "Отправка…" : "Отправить"}
             </button>
           </div>

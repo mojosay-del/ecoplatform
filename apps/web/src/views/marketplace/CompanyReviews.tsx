@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { CompanyRatingSummary, ReviewItem } from "@ecoplatform/shared";
+import { SendActionIcon } from "../../components/app-shell/nav-icons";
 import { ApiError, api } from "../../lib/api";
 import { useApiQuery } from "../shared";
 import { ReportControl } from "./ReportControl";
@@ -79,6 +80,7 @@ export function CompanyReviews({ companyId }: { companyId: string }) {
                   onChange={(event) => setResponseText(event.target.value)}
                 />
                 <button className="button secondary" type="button" onClick={() => respond(review.id)}>
+                  <SendActionIcon size={18} />
                   Ответить
                 </button>
               </div>

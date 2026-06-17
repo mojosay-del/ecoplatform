@@ -8,22 +8,15 @@ import "../../styles/forum.css";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowUp,
-  Bell,
-  BellOff,
-  CircleCheck,
-  Clock,
-  Eye,
-  Flag,
-  MessageSquare,
-  Pencil,
-  Send,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, Bell, BellOff, CircleCheck, Clock, Eye, Flag, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import type { ForumAnswerItem, ForumAnswerReplyItem, ForumQuestionDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
+import {
+  LikeActionIcon,
+  SendActionIcon,
+  type AnimatedNavIconHandle,
+  useAnimatedNavIconPlayback,
+} from "../../components/app-shell/nav-icons";
 import { api } from "../../lib/api";
 import { ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -263,7 +256,7 @@ export function ForumQuestionView({ id }: { id: string }) {
                 aria-label="Опубликовать ответ"
                 title="Опубликовать ответ"
               >
-                <Send size={17} aria-hidden="true" />
+                <SendActionIcon size={20} />
               </button>
             </form>
           </div>
@@ -301,6 +294,8 @@ function AnswerItem({
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyBody, setReplyBody] = useState("");
   const [replyBusy, setReplyBusy] = useState(false);
+  const voteIconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const voteIconPlayback = useAnimatedNavIconPlayback(voteIconRef);
   const repliesCount = answer.replies.length;
 
   const saveEdit = async () => {
@@ -356,8 +351,9 @@ function AnswerItem({
           aria-label="Отметить этот ответ как наиболее подходящий"
           title="Отметить этот ответ, как наиболее подходящий."
           onClick={onVote}
+          {...voteIconPlayback}
         >
-          <ArrowUp size={18} />
+          <LikeActionIcon ref={voteIconRef} size={20} />
         </button>
         <b>{answer.votesCount}</b>
       </div>
@@ -441,7 +437,7 @@ function AnswerItem({
             />
             <div className="forum-answer-actions">
               <button type="submit" className="button forum-inline-submit" disabled={replyBusy || !replyBody.trim()}>
-                <Send size={16} aria-hidden="true" /> <span>Опубликовать</span>
+                <SendActionIcon size={18} /> <span>Опубликовать</span>
               </button>
               <button type="button" className="forum-text-button" onClick={() => setReplyOpen(false)}>
                 Отмена
@@ -650,6 +646,7 @@ function ReportControl({
       />
       <div className="forum-report__row">
         <button type="button" className="button" onClick={submit} disabled={busy}>
+          <SendActionIcon size={18} />
           Отправить жалобу
         </button>
         <button type="button" className="forum-text-button" onClick={() => setOpen(false)}>

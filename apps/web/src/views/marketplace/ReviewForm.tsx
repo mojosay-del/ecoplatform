@@ -6,6 +6,7 @@
 import { useState } from "react";
 import type { CreateReviewDto, ReviewDirection } from "@ecoplatform/shared";
 import { REVIEW_CRITERIA_BY_DIRECTION } from "@ecoplatform/shared";
+import { SendActionIcon } from "../../components/app-shell/nav-icons";
 import { ApiError, api } from "../../lib/api";
 import { REVIEW_CRITERION_LABEL, StarInput } from "./review-ui";
 
@@ -65,6 +66,7 @@ export function ReviewForm({
       />
       {error ? <p className="mp-error">{error}</p> : null}
       <button className="button" type="button" disabled={saving} onClick={submit}>
+        <SendActionIcon size={18} />
         Отправить отзыв
       </button>
     </div>
