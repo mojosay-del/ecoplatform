@@ -429,9 +429,14 @@ export type AuthMeUser = {
   companyId: string | null;
   company: AuthMeCompany | null;
   platformRoles: PlatformRole[];
+  features: AuthMeFeatures;
   requiresReConsent: boolean;
   deletionRequestedAt: IsoDateString | null;
   deletionScheduledFor: IsoDateString | null;
+};
+
+export type AuthMeFeatures = {
+  marketplace: boolean;
 };
 
 export type AuthMeCompany = {

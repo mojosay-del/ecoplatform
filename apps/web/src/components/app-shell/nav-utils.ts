@@ -1,9 +1,10 @@
-import type { CompanyType } from "@ecoplatform/shared";
+import type { AuthMeFeatures, CompanyType } from "@ecoplatform/shared";
 import type { NavItem } from "../app-shell-nav";
 
 export type NavAccessContext = {
   roles: readonly string[];
   companyType?: CompanyType | null;
+  features?: AuthMeFeatures;
 };
 
 export function filterVisibleItems(items: NavItem[], access: NavAccessContext): NavItem[] {
@@ -16,6 +17,10 @@ export function filterVisibleItems(items: NavItem[], access: NavAccessContext): 
 }
 
 function isNavItemVisible(item: NavItem, access: NavAccessContext): boolean {
+  if (item.feature && !access.features?.[item.feature]) {
+    return false;
+  }
+
   if (item.roles && !item.roles.some((role) => access.roles.includes(role))) {
     return false;
   }

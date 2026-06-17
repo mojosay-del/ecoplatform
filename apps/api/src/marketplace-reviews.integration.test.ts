@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { setupIntegrationContext } from "./test/integration-context";
 import { bearer, createMarketplaceTestHelpers } from "./test/marketplace-integration-helpers";
 
@@ -8,11 +8,14 @@ const {
   agreedDeal,
   buyerScores,
   createPublishedListing,
+  enableMarketplace,
   offerPayload,
   registerTrader,
   seedNomenclature,
   sellerScores,
 } = createMarketplaceTestHelpers(ctx);
+
+beforeEach(enableMarketplace);
 
 describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
   it("покупатель оценивает продавца; рейтинг считается по-яндексовски (старт-5★)", async () => {

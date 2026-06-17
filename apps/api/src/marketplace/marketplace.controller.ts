@@ -15,6 +15,7 @@ import { parseBody } from "../common/zod";
 import { AddressGeocoderService } from "../geo/address-geocoder.service";
 import { marketplaceListQuerySchema } from "./marketplace.schemas";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
+import { MarketplaceEnabledGuard } from "./marketplace-enabled.guard";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
 import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
 
@@ -22,9 +23,9 @@ const addressSuggestQuerySchema = z.object({
   q: z.string().trim().min(3).max(200),
 });
 
-// Маршруты торговой площадки доступны авторизованным пользователям. Доступ по
-// подписке и роли продавца/покупателя проверяет уже сервис.
-@UseGuards(JwtAuthGuard)
+// Маршруты торговой площадки доступны только когда модуль включён настройкой.
+// Доступ по подписке и роли продавца/покупателя проверяет уже сервис.
+@UseGuards(JwtAuthGuard, MarketplaceEnabledGuard)
 @Controller()
 export class MarketplaceController {
   constructor(

@@ -1,4 +1,4 @@
-import { EDUCATION_COMPANY_TYPES, type CompanyType } from "@ecoplatform/shared";
+import { EDUCATION_COMPANY_TYPES, type AuthMeFeatures, type CompanyType } from "@ecoplatform/shared";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
@@ -30,6 +30,7 @@ export type NavItem = {
   disabledHint?: string;
   roles?: string[];
   companyTypes?: readonly CompanyType[];
+  feature?: keyof AuthMeFeatures;
   children?: NavItem[];
 };
 
@@ -81,6 +82,7 @@ export const appNavSections: NavSection[] = [
         href: "/marketplace",
         label: "Объявления",
         icon: Store,
+        feature: "marketplace",
       },
     ],
   },

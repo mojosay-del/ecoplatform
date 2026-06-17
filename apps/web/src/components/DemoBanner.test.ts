@@ -23,6 +23,7 @@ function demoUser(demoEndsAt: string): AuthMeUser {
       subscriptionEndsAt: null,
     },
     platformRoles: [],
+    features: { marketplace: false },
     requiresReConsent: false,
     deletionRequestedAt: null,
     deletionScheduledFor: null,

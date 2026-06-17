@@ -130,12 +130,16 @@ describe("Platform settings", () => {
         "moderation.lock_duration_minutes",
         "moderation.max_locks_per_moderator",
         "demo.duration_hours",
+        "marketplace.enabled",
         "indices.stagnation_threshold_percent",
       ]),
     );
     const lockDuration = res.body.find((item: { key: string }) => item.key === "moderation.lock_duration_minutes");
     expect(lockDuration.value).toBe(15);
     expect(lockDuration.defaultValue).toBe(15);
+    const marketplace = res.body.find((item: { key: string }) => item.key === "marketplace.enabled");
+    expect(marketplace.value).toBe(false);
+    expect(marketplace.defaultValue).toBe(false);
   });
 
   it("PATCH меняет значение настройки и пишет audit log", async () => {

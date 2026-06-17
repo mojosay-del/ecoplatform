@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { FileAccessLevel } from "@prisma/client";
 import type { AccountProfileUpdateDto, AuthMeUser } from "@ecoplatform/shared";
+import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { getAuthMeUser } from "../auth/auth-profile.helpers";
 import { FilesService } from "../files/files.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -14,6 +15,7 @@ export class AccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
+    private readonly settings: PlatformSettingsService,
   ) {}
 
   async updateProfile(userId: string, input: AccountProfileUpdateDto): Promise<AuthMeUser> {
@@ -22,7 +24,7 @@ export class AccountService {
       data: { gender: input.gender },
     });
 
-    return getAuthMeUser({ prisma: this.prisma }, userId);
+    return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
   }
 
   async setAvatar(userId: string, fileId: string): Promise<AuthMeUser> {
@@ -53,7 +55,7 @@ export class AccountService {
       }
     }
 
-    return getAuthMeUser({ prisma: this.prisma }, userId);
+    return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
   }
 
   async removeAvatar(userId: string): Promise<AuthMeUser> {
@@ -65,6 +67,6 @@ export class AccountService {
       await this.prisma.user.update({ where: { id: userId }, data: { avatarFileId: null } });
       await this.files.deleteIfUnreferenced([current.avatarFileId]);
     }
-    return getAuthMeUser({ prisma: this.prisma }, userId);
+    return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
   }
 }

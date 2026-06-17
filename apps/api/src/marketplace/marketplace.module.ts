@@ -5,6 +5,7 @@ import { FilesModule } from "../files/files.module";
 import { GeocodingModule } from "../geo/geocoding.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { MarketplaceController } from "./marketplace.controller";
+import { MarketplaceEnabledGuard } from "./marketplace-enabled.guard";
 import { MarketplaceListingsService } from "./services/marketplace-listings.service";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
 import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
@@ -16,7 +17,13 @@ import { MarketplaceReviewsService } from "./services/marketplace-reviews.servic
 @Module({
   imports: [AuthModule, FilesModule, GeocodingModule, NotificationsModule],
   controllers: [MarketplaceController],
-  providers: [ModuleAccessService, MarketplaceListingsService, MarketplaceOffersService, MarketplaceReviewsService],
+  providers: [
+    ModuleAccessService,
+    MarketplaceEnabledGuard,
+    MarketplaceListingsService,
+    MarketplaceOffersService,
+    MarketplaceReviewsService,
+  ],
   exports: [MarketplaceListingsService, MarketplaceOffersService, MarketplaceReviewsService],
 })
 export class MarketplaceModule {}

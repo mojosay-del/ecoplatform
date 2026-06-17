@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MarketplaceOffersService } from "./marketplace/services/marketplace-offers.service";
 import { setupIntegrationContext } from "./test/integration-context";
 import { withEnv } from "./test/integration-helpers";
@@ -6,8 +6,10 @@ import { bearer, createMarketplaceTestHelpers } from "./test/marketplace-integra
 
 const ctx = setupIntegrationContext();
 const { registerCompany } = ctx;
-const { createPublishedListing, offerPayload, registerProcessor, registerTrader, seedNomenclature } =
+const { createPublishedListing, enableMarketplace, offerPayload, registerProcessor, registerTrader, seedNomenclature } =
   createMarketplaceTestHelpers(ctx);
+
+beforeEach(enableMarketplace);
 
 describe("Marketplace — предложения и аукцион (фаза 3)", () => {
   it("полный цикл: предложение → принятие (раскрытие контактов) → «Договорились» → продано", async () => {

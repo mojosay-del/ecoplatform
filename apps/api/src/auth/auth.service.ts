@@ -404,6 +404,7 @@ export class AuthService {
   private get profileDeps(): AuthProfileDeps {
     return {
       prisma: this.prisma,
+      settings: this.settings,
     };
   }
 }

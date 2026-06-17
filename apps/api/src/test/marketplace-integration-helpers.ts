@@ -7,7 +7,18 @@ export function bearer(token: string) {
 }
 
 export function createMarketplaceTestHelpers(ctx: MarketplaceIntegrationContext) {
-  const { registerCompany, registerWithBody } = ctx;
+  const { loginAdmin, registerCompany, registerWithBody } = ctx;
+
+  async function enableMarketplace() {
+    const adminToken = await loginAdmin();
+    const response = await ctx.http
+      .patch("/api/admin/settings/marketplace.enabled")
+      .set(bearer(adminToken))
+      .send({ value: true });
+    if (response.status !== 200) {
+      throw new Error(`Не удалось включить marketplace в тесте: HTTP ${response.status}`);
+    }
+  }
 
   async function seedNomenclature(): Promise<string> {
     // Код с префиксом МКЛ → материал «Макулатура» (см. materialFromNomenclatureCode):
@@ -148,6 +159,7 @@ export function createMarketplaceTestHelpers(ctx: MarketplaceIntegrationContext)
     agreedDeal,
     buyerScores,
     createPublishedListing,
+    enableMarketplace,
     listingPayload,
     offerPayload,
     registerProcessor,

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MarketplaceListingsService } from "./marketplace/services/marketplace-listings.service";
 import { setupIntegrationContext } from "./test/integration-context";
 import { expectPaginatedEnvelope, withEnv } from "./test/integration-helpers";
@@ -6,8 +6,10 @@ import { bearer, createMarketplaceTestHelpers } from "./test/marketplace-integra
 
 const ctx = setupIntegrationContext();
 const { loginAdmin, registerCompany } = ctx;
-const { createPublishedListing, listingPayload, registerTrader, seedNomenclature, seedPhotos } =
+const { createPublishedListing, enableMarketplace, listingPayload, registerTrader, seedNomenclature, seedPhotos } =
   createMarketplaceTestHelpers(ctx);
+
+beforeEach(enableMarketplace);
 
 describe("Marketplace — публичный доступ", () => {
   it("требует авторизацию", async () => {

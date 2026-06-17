@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { AuthMeUser } from "@ecoplatform/shared";
+import type { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { publicUrl } from "../files/files-storage.helpers";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -32,6 +33,7 @@ const authMeUserSelect = {
 
 export type AuthProfileDeps = {
   prisma: PrismaService;
+  settings: PlatformSettingsService;
 };
 
 export async function getAuthMeUser(deps: AuthProfileDeps, userId: string): Promise<AuthMeUser> {
@@ -64,6 +66,9 @@ export async function getAuthMeUser(deps: AuthProfileDeps, userId: string): Prom
         }
       : null,
     platformRoles,
+    features: {
+      marketplace: await deps.settings.getValue("marketplace.enabled"),
+    },
     requiresReConsent: await hasPendingRequiredConsent(deps, userId),
     deletionRequestedAt: user.deletionRequestedAt?.toISOString() ?? null,
     deletionScheduledFor: user.deletionRequestedAt

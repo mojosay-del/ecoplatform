@@ -129,6 +129,7 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
       items: filterVisibleItems(section.items, {
         roles: user?.platformRoles ?? [],
         companyType: user?.company?.type ?? null,
+        features: user?.features,
       }),
     }))
     // Если в секции не осталось ни одного пункта (например, «Служебное»

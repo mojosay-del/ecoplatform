@@ -25,16 +25,20 @@ describe("AppShell future navigation teasers", () => {
     }
   });
 
-  it("shows marketplace listings to every signed-in profile", () => {
-    const labelsFor = (companyType: CompanyType | null, roles: string[] = []) =>
+  it("hides marketplace listings while the feature is disabled", () => {
+    const labelsFor = (companyType: CompanyType | null, roles: string[] = [], marketplace = false) =>
       appNavSections.flatMap((section) =>
-        filterVisibleItems(section.items, { roles, companyType }).map((item) => item.label),
+        filterVisibleItems(section.items, { roles, companyType, features: { marketplace } }).map((item) => item.label),
       );
 
-    expect(labelsFor("collector")).toContain("Объявления");
-    expect(labelsFor("trader")).toContain("Объявления");
-    expect(labelsFor("processor")).toContain("Объявления");
-    expect(labelsFor(null, ["content_manager"])).toContain("Объявления");
+    expect(labelsFor("collector")).not.toContain("Объявления");
+    expect(labelsFor("trader")).not.toContain("Объявления");
+    expect(labelsFor("processor")).not.toContain("Объявления");
+    expect(labelsFor(null, ["content_manager"])).not.toContain("Объявления");
+    expect(labelsFor("collector", [], true)).toContain("Объявления");
+    expect(labelsFor("trader", [], true)).toContain("Объявления");
+    expect(labelsFor("processor", [], true)).toContain("Объявления");
+    expect(labelsFor(null, ["content_manager"], true)).toContain("Объявления");
   });
 
   it("keeps admin routes behind one panel entry in the sidebar", () => {

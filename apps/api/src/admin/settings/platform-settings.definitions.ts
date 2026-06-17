@@ -47,6 +47,13 @@ export const platformSettingDefinitions = {
     schema: z.boolean(),
     default: true,
   },
+  "marketplace.enabled": {
+    label: "Торговая площадка",
+    description:
+      "Когда выключено — раздел скрыт из меню и API площадки недоступен всем пользователям, включая персонал. Данные объявлений, предложений и отзывов сохраняются.",
+    schema: z.boolean(),
+    default: false,
+  },
   "indices.stagnation_threshold_percent": {
     label: "Порог стагнации индексов (%)",
     description: "Если недельное изменение цены меньше этого порога по модулю — индекс показывает «стагнацию».",

@@ -1,11 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { setupIntegrationContext } from "./test/integration-context";
 import { withEnv } from "./test/integration-helpers";
 import { bearer, createMarketplaceTestHelpers } from "./test/marketplace-integration-helpers";
 
 const ctx = setupIntegrationContext();
 const { registerCompany } = ctx;
-const { createPublishedListing, listingPayload, seedNomenclature, seedPhotos } = createMarketplaceTestHelpers(ctx);
+const { createPublishedListing, enableMarketplace, listingPayload, seedNomenclature, seedPhotos } =
+  createMarketplaceTestHelpers(ctx);
+
+beforeEach(enableMarketplace);
 
 describe("Marketplace — карта и фильтры (фаза 2)", () => {
   it("адресные подсказки без ключа геокодера мягко возвращают пустой список", async () => {

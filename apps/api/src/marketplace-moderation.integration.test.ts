@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { setupIntegrationContext } from "./test/integration-context";
 import { bearer, createMarketplaceTestHelpers } from "./test/marketplace-integration-helpers";
 
@@ -8,6 +8,7 @@ const {
   agreedDeal,
   buyerScores,
   createPublishedListing,
+  enableMarketplace,
   listingPayload,
   offerPayload,
   registerProcessor,
@@ -15,6 +16,8 @@ const {
   seedNomenclature,
   seedPhotos,
 } = createMarketplaceTestHelpers(ctx);
+
+beforeEach(enableMarketplace);
 
 describe("Marketplace — модерация (фаза 5)", () => {
   it("жалоба на объявление: модератор снимает — оно уходит из ленты, переподача запрещена", async () => {
