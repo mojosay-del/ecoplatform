@@ -15,6 +15,9 @@ function buildService(lockAcquired = true) {
     emailVerificationChallenge: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    accountContactChangeChallenge: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     session: {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
@@ -235,6 +238,27 @@ describe("SchedulerService", () => {
     expect(result).toEqual({ deleted: 7 });
   });
 
+  it("удаляет отработавшие challenge смены контактов старше суток по expiresAt", async () => {
+    const now = new Date("2026-06-02T04:00:00.000Z");
+    const prisma = {
+      accountContactChangeChallenge: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 3 }),
+      },
+    };
+    const service = new SchedulerService(
+      { runHourlyCheck: vi.fn() } as any,
+      prisma as any,
+      { deleteIfUnreferenced: vi.fn() } as any,
+    );
+
+    const result = await service.cleanupExpiredAccountContactChangeChallenges(now);
+
+    expect(prisma.accountContactChangeChallenge.deleteMany).toHaveBeenCalledWith({
+      where: { expiresAt: { lt: new Date("2026-06-01T04:00:00.000Z") } },
+    });
+    expect(result).toEqual({ deleted: 3 });
+  });
+
   it("запускает очистку email-challenge только под Postgres advisory lock", async () => {
     const { prisma, service, tx } = buildService(true);
 
@@ -242,6 +266,7 @@ describe("SchedulerService", () => {
 
     expect(tx.$queryRaw.mock.calls[0][1]).toBe("cron:cleanup-email-challenges");
     expect(prisma.emailVerificationChallenge.deleteMany).toHaveBeenCalledTimes(1);
+    expect(prisma.accountContactChangeChallenge.deleteMany).toHaveBeenCalledTimes(1);
   });
 
   it("пропускает очистку email-challenge, если advisory lock держит другая реплика", async () => {

@@ -10,6 +10,7 @@ import { MarketplaceOffersService } from "../marketplace/services/marketplace-of
 import { PrismaService } from "../prisma/prisma.service";
 import {
   cleanupDeletedAccountsInTransaction as cleanupDeletedAccountsInTransactionHelper,
+  cleanupExpiredAccountContactChangeChallenges as cleanupExpiredAccountContactChangeChallengesHelper,
   cleanupExpiredEmailChallenges as cleanupExpiredEmailChallengesHelper,
   cleanupExpiredSessions as cleanupExpiredSessionsHelper,
   cleanupOrphanAddresses as cleanupOrphanAddressesHelper,
@@ -185,9 +186,10 @@ export class SchedulerService {
   async handleEmailChallengeCleanup() {
     if (this.disabled) return;
     try {
-      await this.runWithPostgresAdvisoryLock(EMAIL_CHALLENGE_CLEANUP_LOCK_KEY, () =>
-        this.cleanupExpiredEmailChallenges(),
-      );
+      await this.runWithPostgresAdvisoryLock(EMAIL_CHALLENGE_CLEANUP_LOCK_KEY, async () => {
+        await this.cleanupExpiredEmailChallenges();
+        await this.cleanupExpiredAccountContactChangeChallenges();
+      });
     } catch (error) {
       this.logger.error("Email challenge cleanup failed", error as Error);
     }
@@ -207,6 +209,10 @@ export class SchedulerService {
    */
   async cleanupExpiredEmailChallenges(now = new Date()): Promise<{ deleted: number }> {
     return cleanupExpiredEmailChallengesHelper(this.prisma, this.logger, now);
+  }
+
+  async cleanupExpiredAccountContactChangeChallenges(now = new Date()): Promise<{ deleted: number }> {
+    return cleanupExpiredAccountContactChangeChallengesHelper(this.prisma, this.logger, now);
   }
 
   @Cron("0 2 * * *", { name: "cleanup-stale-records" })

@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable 
 import { JwtService } from "@nestjs/jwt";
 import { CompanyRole, CompanyStatus, NotificationCategory } from "@prisma/client";
 import { hash } from "bcryptjs";
-import { createHmac, randomInt, randomUUID, timingSafeEqual } from "crypto";
+import { randomUUID } from "crypto";
 import { type LoginDto, type RegisterDto, type RegistrationVerifyDto } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { swallowAndLog } from "../common/silent-catch";
@@ -11,6 +11,13 @@ import { recordUserRegistered } from "../observability/metrics.registry";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
 import { loginAuthUser, type AuthLoginWorkflowDeps } from "./auth-login-workflow.helpers";
+import {
+  EMAIL_VERIFICATION_MAX_ATTEMPTS,
+  EMAIL_VERIFICATION_TTL_MS,
+  emailVerificationCodeMatches,
+  generateEmailVerificationCode,
+  hashEmailVerificationCode,
+} from "./email-verification-code.helpers";
 import { changeAuthUserPassword, type AuthPasswordWorkflowDeps } from "./auth-password-workflow.helpers";
 import { getAuthMeUser, type AuthProfileDeps } from "./auth-profile.helpers";
 import {
@@ -31,9 +38,6 @@ import {
   type AuthSessionWorkflowDeps,
 } from "./auth-session-workflow.helpers";
 import { PasswordPolicyService } from "./password-policy.service";
-
-const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000;
-const EMAIL_VERIFICATION_MAX_ATTEMPTS = 5;
 
 type RegistrationVerificationStart = {
   verificationId: string;
@@ -62,7 +66,7 @@ export class AuthService {
   ): Promise<RegistrationVerificationStart> {
     const prepared = await this.prepareRegistration(input);
     const verificationId = randomUUID();
-    const code = this.generateEmailVerificationCode();
+    const code = generateEmailVerificationCode();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS);
 
@@ -86,7 +90,7 @@ export class AuthService {
         lastName: input.lastName,
         passwordHash: prepared.passwordHash,
         acceptedDocumentIds: prepared.consentDocumentIds,
-        codeHash: this.hashEmailVerificationCode(verificationId, prepared.email, code),
+        codeHash: hashEmailVerificationCode(verificationId, prepared.email, code),
         expiresAt,
       },
     });
@@ -124,7 +128,7 @@ export class AuthService {
       throw new BadRequestException("Слишком много попыток. Отправьте новый код подтверждения.");
     }
 
-    if (!this.emailVerificationCodeMatches(challenge.id, challenge.email, input.code, challenge.codeHash)) {
+    if (!emailVerificationCodeMatches(challenge.id, challenge.email, input.code, challenge.codeHash)) {
       const nextAttempts = challenge.attempts + 1;
       const tooManyAttempts = nextAttempts >= EMAIL_VERIFICATION_MAX_ATTEMPTS;
       await this.prisma.emailVerificationChallenge.update({
@@ -276,46 +280,6 @@ export class AuthService {
         })
       : [];
     return Array.from(new Set(optionalAcceptedActive.map((d) => d.id)));
-  }
-
-  private generateEmailVerificationCode(): string {
-    const fixedCode = process.env.EMAIL_VERIFICATION_TEST_CODE;
-    if (fixedCode && process.env.NODE_ENV !== "production") {
-      if (!/^\d{4}$/.test(fixedCode)) {
-        throw new Error("EMAIL_VERIFICATION_TEST_CODE должен состоять из 4 цифр.");
-      }
-      return fixedCode;
-    }
-    if (fixedCode && process.env.NODE_ENV === "production") {
-      throw new Error("EMAIL_VERIFICATION_TEST_CODE нельзя использовать в production.");
-    }
-    return randomInt(0, 10_000).toString().padStart(4, "0");
-  }
-
-  private hashEmailVerificationCode(verificationId: string, email: string, code: string): string {
-    return createHmac("sha256", this.emailVerificationSecret())
-      .update(`${verificationId}:${email}:${code}`)
-      .digest("hex");
-  }
-
-  private emailVerificationCodeMatches(
-    verificationId: string,
-    email: string,
-    code: string,
-    storedHash: string,
-  ): boolean {
-    const expectedHash = this.hashEmailVerificationCode(verificationId, email, code);
-    const expected = Buffer.from(expectedHash, "hex");
-    const actual = Buffer.from(storedHash, "hex");
-    return expected.length === actual.length && timingSafeEqual(expected, actual);
-  }
-
-  private emailVerificationSecret(): string {
-    const secret = process.env.EMAIL_VERIFICATION_SECRET ?? process.env.JWT_ACCESS_SECRET;
-    if (!secret || secret.length < 32) {
-      throw new Error("EMAIL_VERIFICATION_SECRET или JWT_ACCESS_SECRET должен быть не короче 32 символов.");
-    }
-    return secret;
   }
 
   async login(input: LoginDto, meta: { userAgent?: string; ipAddress?: string }): Promise<AuthSessionTokens> {

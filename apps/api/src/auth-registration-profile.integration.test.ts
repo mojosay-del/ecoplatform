@@ -1,7 +1,7 @@
 import { CompanyStatus } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { setupIntegrationContext } from "./test/integration-context";
-import { REQUIRED_DOC_IDS_FOR_TESTS } from "./test/integration-helpers";
+import { REQUIRED_DOC_IDS_FOR_TESTS, TEST_EMAIL_VERIFICATION_CODE } from "./test/integration-helpers";
 
 const ctx = setupIntegrationContext();
 const { loginAdmin, submitRegistration, verifyRegistration, registerWithBody, registerCompany } = ctx;
@@ -104,6 +104,143 @@ describe("Auth — регистрация и профиль", () => {
       .send({ gender: null });
     expect(clearGender.status).toBe(200);
     expect(clearGender.body.gender).toBeNull();
+  });
+
+  it("профиль позволяет изменить имя, фамилию и пол, а auth/me сразу отдаёт свежие данные", async () => {
+    const token = await registerWithBody({
+      organizationName: "ООО Профиль",
+      companyType: "collector",
+      firstName: "Ирина",
+      lastName: "Старая",
+      phone: "+79000001002",
+      email: "profile-edit@test.local",
+      password: "User12345678",
+    });
+
+    const emptyPatch = await ctx.http.patch("/api/account/profile").set("Authorization", `Bearer ${token}`).send({});
+    expect(emptyPatch.status).toBe(400);
+
+    const updated = await ctx.http
+      .patch("/api/account/profile")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ firstName: "Иван", lastName: "Ферум", gender: "male" });
+    expect(updated.status).toBe(200);
+    expect(updated.body.firstName).toBe("Иван");
+    expect(updated.body.lastName).toBe("Ферум");
+    expect(updated.body.gender).toBe("male");
+
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(me.status).toBe(200);
+    expect(me.body.firstName).toBe("Иван");
+    expect(me.body.lastName).toBe("Ферум");
+    expect(me.body.gender).toBe("male");
+  });
+
+  it("смена телефона требует код с текущей почты и не даёт применить challenge дважды", async () => {
+    const token = await registerWithBody({
+      organizationName: "ООО Телефон",
+      companyType: "collector",
+      firstName: "Олег",
+      lastName: "Телефонов",
+      phone: "+79000001003",
+      email: "phone-change@test.local",
+      password: "User12345678",
+    });
+
+    const start = await ctx.http
+      .post("/api/account/contact-change/start")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ field: "phone" });
+    expect(start.status).toBe(201);
+    expect(start.body.email).toBe("phone-change@test.local");
+
+    const wrongCode = await ctx.http
+      .post("/api/account/contact-change/verify")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ verificationId: start.body.verificationId, code: "0000" });
+    expect(wrongCode.status).toBe(400);
+
+    const unchanged = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(unchanged.body.phone).toBe("+79000001003");
+
+    const verified = await ctx.http
+      .post("/api/account/contact-change/verify")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ verificationId: start.body.verificationId, code: TEST_EMAIL_VERIFICATION_CODE });
+    expect(verified.status).toBe(201);
+    expect(verified.body).toEqual({ ok: true });
+
+    const applied = await ctx.http
+      .post("/api/account/contact-change/apply")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ field: "phone", verificationId: start.body.verificationId, phone: "+79000009999" });
+    expect(applied.status).toBe(201);
+    expect(applied.body.phone).toBe("+79000009999");
+
+    const repeat = await ctx.http
+      .post("/api/account/contact-change/apply")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ field: "phone", verificationId: start.body.verificationId, phone: "+79000008888" });
+    expect(repeat.status).toBe(400);
+  });
+
+  it("смена email подтверждается текущей почтой, нормализует новый адрес и проверяет уникальность", async () => {
+    const token = await registerWithBody({
+      organizationName: "ООО Email",
+      companyType: "collector",
+      firstName: "Елена",
+      lastName: "Почтовая",
+      phone: "+79000001004",
+      email: "email-change@test.local",
+      password: "User12345678",
+    });
+    await registerWithBody({
+      organizationName: "ООО Email Дубль",
+      companyType: "collector",
+      firstName: "Пётр",
+      lastName: "Дубль",
+      phone: "+79000001005",
+      email: "email-busy@test.local",
+      password: "User12345678",
+    });
+
+    const start = await ctx.http
+      .post("/api/account/contact-change/start")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ field: "email" });
+    expect(start.status).toBe(201);
+    expect(start.body.email).toBe("email-change@test.local");
+
+    const verified = await ctx.http
+      .post("/api/account/contact-change/verify")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ verificationId: start.body.verificationId, code: TEST_EMAIL_VERIFICATION_CODE });
+    expect(verified.status).toBe(201);
+
+    const applied = await ctx.http
+      .post("/api/account/contact-change/apply")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ field: "email", verificationId: start.body.verificationId, email: "New.Email@TEST.Local" });
+    expect(applied.status).toBe(201);
+    expect(applied.body.email).toBe("new.email@test.local");
+
+    const conflictStart = await ctx.http
+      .post("/api/account/contact-change/start")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ field: "email" });
+    expect(conflictStart.status).toBe(201);
+
+    await ctx.http
+      .post("/api/account/contact-change/verify")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ verificationId: conflictStart.body.verificationId, code: TEST_EMAIL_VERIFICATION_CODE })
+      .expect(201);
+
+    const conflict = await ctx.http
+      .post("/api/account/contact-change/apply")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ field: "email", verificationId: conflictStart.body.verificationId, email: "email-busy@test.local" });
+    expect(conflict.status).toBe(409);
   });
 
   it("повторная регистрация с тем же email отбивается 409", async () => {

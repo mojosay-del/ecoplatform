@@ -46,6 +46,11 @@ enum UserGender {
   female
 }
 
+enum AccountContactChangeField {
+  email
+  phone
+}
+
 enum PlatformRole {
   admin
   moderator
@@ -245,45 +250,46 @@ enum DiscussionTargetType {
 }
 
 model User {
-  id                         String                       @id @default(cuid())
-  email                      String                       @unique
-  phone                      String                       @unique
+  id                         String                          @id @default(cuid())
+  email                      String                          @unique
+  phone                      String                          @unique
   firstName                  String
   lastName                   String
   gender                     UserGender?
   passwordHash               String
-  status                     UserStatus                   @default(active)
-  failedLoginAttempts        Int                          @default(0)
+  status                     UserStatus                      @default(active)
+  failedLoginAttempts        Int                             @default(0)
   failedLoginWindowStartedAt DateTime?
   lockedUntil                DateTime?
   deletionRequestedAt        DateTime?
   companyId                  String?
-  company                    Company?                     @relation(fields: [companyId], references: [id])
+  company                    Company?                        @relation(fields: [companyId], references: [id])
   // Аватар пользователя — загруженное им публичное изображение (FileAsset).
   // null → нейтральная иконка-заглушка на фронте. Пол (gender) больше НЕ
   // участвует в выборе аватара: аватар либо свой, либо обезличенная иконка.
   avatarFileId               String?
-  avatarFile                 FileAsset?                   @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+  avatarFile                 FileAsset?                      @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
   // Роль внутри компании. По умолчанию `member` (минимум прав): владельцем
   // становится только тот, кто создаёт компанию при регистрации, и
   // приглашающий явно проставляет роль приглашённому. Существующие
   // пользователи переведены в `owner` бэкфиллом в миграции (каждый из них —
   // единственный пользователь своей компании).
-  companyRole                CompanyRole                  @default(member)
+  companyRole                CompanyRole                     @default(member)
   platformStaff              PlatformStaff?
   sessions                   Session[]
   newsLikes                  NewsLike[]
   comments                   Comment[]
   commentLikes               CommentLike[]
   lessonProgress             LessonProgress[]
-  supportTickets             SupportTicket[]              @relation("SupportTicketAuthor")
+  supportTickets             SupportTicket[]                 @relation("SupportTicketAuthor")
   notifications              InAppNotification[]
-  notificationDeliveries     NotificationDelivery[]       @relation("NotificationRecipient")
+  notificationDeliveries     NotificationDelivery[]          @relation("NotificationRecipient")
   notificationPreferences    UserNotificationPreferences?
+  contactChangeChallenges    AccountContactChangeChallenge[]
   moduleRestrictions         UserModuleRestriction[]
   consents                   ConsentRecord[]
-  createdAt                  DateTime                     @default(now())
-  updatedAt                  DateTime                     @updatedAt
+  createdAt                  DateTime                        @default(now())
+  updatedAt                  DateTime                        @updatedAt
 
   // FK на компанию. Postgres не индексирует FK автоматически. Нужен для
   // списка сотрудников компании (мультиюзер) и ускорения операций по companyId.
@@ -313,6 +319,26 @@ model EmailVerificationChallenge {
 
   @@index([email, createdAt(sort: Desc)])
   @@index([phone, createdAt(sort: Desc)])
+  @@index([expiresAt])
+}
+
+model AccountContactChangeChallenge {
+  id         String                    @id @default(cuid())
+  userId     String
+  user       User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  field      AccountContactChangeField
+  // Текущая почта, на которую отправлен код. Новое значение хранится только в
+  // запросе apply, чтобы не держать лишние персональные данные в ожидании кода.
+  email      String
+  codeHash   String
+  attempts   Int                       @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  consumedAt DateTime?
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+
+  @@index([userId, field, createdAt(sort: Desc)])
   @@index([expiresAt])
 }
 

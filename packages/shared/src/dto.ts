@@ -21,16 +21,18 @@ export const passwordSchema = z
   .regex(/[A-Za-zА-Яа-яЁё]/, "Пароль должен содержать хотя бы одну букву.")
   .regex(/[0-9]/, "Пароль должен содержать хотя бы одну цифру.");
 
+const internationalPhoneSchema = z
+  .string()
+  .trim()
+  .regex(/^\+[1-9]\d{6,14}$/, "Телефон должен быть в международном формате, например +79991234567");
+
 export const registerDtoSchema = z.object({
   organizationName: z.string().trim().min(2),
   companyType: z.enum(companyTypes),
   billingInn: z.never({ error: "ИНН заполняется в профиле компании после регистрации." }).optional(),
   firstName: z.string().trim().min(1),
   lastName: z.string().trim().min(1),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^\+[1-9]\d{6,14}$/, "Телефон должен быть в международном формате, например +79991234567"),
+  phone: internationalPhoneSchema,
   email: z.string().trim().email(),
   password: passwordSchema,
   // ID документов, на которые пользователь явно поставил галочку при
@@ -41,11 +43,53 @@ export const registerDtoSchema = z.object({
 
 export type RegisterDto = z.infer<typeof registerDtoSchema>;
 
-export const accountProfileUpdateDtoSchema = z.object({
-  gender: z.enum(userGenders).nullable(),
-});
+export const accountProfileUpdateDtoSchema = z
+  .object({
+    firstName: z.string().trim().min(1).optional(),
+    lastName: z.string().trim().min(1).optional(),
+    gender: z.enum(userGenders).nullable().optional(),
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: "Нужно передать хотя бы одно поле профиля.",
+  });
 
 export type AccountProfileUpdateDto = z.infer<typeof accountProfileUpdateDtoSchema>;
+
+export const accountContactChangeFields = ["email", "phone"] as const;
+
+const contactChangeVerificationIdSchema = z.string().trim().min(1);
+const contactChangeCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}$/, "Код подтверждения должен состоять из 4 цифр.");
+
+export const accountContactChangeStartDtoSchema = z.object({
+  field: z.enum(accountContactChangeFields),
+});
+
+export type AccountContactChangeStartDto = z.infer<typeof accountContactChangeStartDtoSchema>;
+
+export const accountContactChangeVerifyDtoSchema = z.object({
+  verificationId: contactChangeVerificationIdSchema,
+  code: contactChangeCodeSchema,
+});
+
+export type AccountContactChangeVerifyDto = z.infer<typeof accountContactChangeVerifyDtoSchema>;
+
+export const accountContactChangeApplyDtoSchema = z.discriminatedUnion("field", [
+  z.object({
+    field: z.literal("email"),
+    verificationId: contactChangeVerificationIdSchema,
+    email: z.string().trim().email(),
+  }),
+  z.object({
+    field: z.literal("phone"),
+    verificationId: contactChangeVerificationIdSchema,
+    phone: internationalPhoneSchema,
+  }),
+]);
+
+export type AccountContactChangeApplyDto = z.infer<typeof accountContactChangeApplyDtoSchema>;
 
 export const registrationVerifyDtoSchema = z.object({
   verificationId: z.string().trim().min(1),

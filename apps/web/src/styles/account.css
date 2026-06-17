@@ -146,6 +146,101 @@
   opacity: 0.68;
 }
 
+.account-gender-picker {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.account-gender-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 172px;
+  min-height: 40px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.account-gender-trigger:hover,
+.account-gender-picker:focus-within .account-gender-trigger {
+  border-color: var(--primary);
+  background: rgb(var(--brand-rgb) / 0.08);
+}
+
+.account-gender-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.account-gender-trigger:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.account-gender-trigger svg {
+  flex: none;
+  color: var(--text-subtle);
+}
+
+.account-gender-menu {
+  position: absolute;
+  z-index: 35;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-lg);
+  animation: auth-select-pop 140ms ease;
+}
+
+.account-gender-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.account-gender-option:hover,
+.account-gender-option.is-selected {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.account-gender-option.is-selected {
+  font-weight: 700;
+}
+
 .account-secret-value {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
   color: var(--text);
@@ -303,6 +398,11 @@
   color: var(--danger-text-strong);
 }
 
+.account-form-message-ok {
+  background: rgb(var(--success-rgb) / 0.1);
+  color: var(--success-text);
+}
+
 body.account-password-modal-open {
   overflow: hidden;
 }
@@ -419,14 +519,59 @@ body.account-password-modal-open {
   width: min(860px, 100%);
 }
 
+.account-contact-modal {
+  width: min(560px, 100%);
+}
+
 .account-subscription-modal-body {
   padding: 20px 24px 24px;
 }
 
 .account-payment-modal-body,
 .account-sessions-modal-body,
-.account-notifications-modal-body {
+.account-notifications-modal-body,
+.account-contact-modal-body {
   padding: 20px 24px 24px;
+}
+
+.account-contact-modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.account-contact-code-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.account-contact-code-head strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.account-contact-code-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.account-contact-code-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.account-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .account-subscription-modal .account-plans {
@@ -488,7 +633,8 @@ body.account-password-modal-open {
 
   .account-payment-modal-body,
   .account-sessions-modal-body,
-  .account-notifications-modal-body {
+  .account-notifications-modal-body,
+  .account-contact-modal-body {
     padding: 18px 20px 20px;
   }
 }

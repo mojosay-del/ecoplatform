@@ -17,6 +17,7 @@ export default defineConfig({
     globalSetup: ["src/test/integration-global-setup.ts"],
     setupFiles: ["src/test/integration-setup.ts"],
     // Integration-тесты используют одну реальную БД, поэтому отключаем параллелизм.
+    pool: "forks",
     fileParallelism: false,
     hookTimeout: 30000,
     testTimeout: 30000,

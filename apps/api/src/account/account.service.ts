@@ -1,10 +1,43 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { FileAccessLevel } from "@prisma/client";
-import type { AccountProfileUpdateDto, AuthMeUser } from "@ecoplatform/shared";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { AccountContactChangeField, FileAccessLevel, Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
+import type {
+  AccountContactChangeApplyDto,
+  AccountContactChangeStartDto,
+  AccountContactChangeVerifyDto,
+  AccountProfileUpdateDto,
+  AuthMeUser,
+} from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
+import { swallowAndLog } from "../common/silent-catch";
 import { getAuthMeUser } from "../auth/auth-profile.helpers";
+import {
+  EMAIL_VERIFICATION_MAX_ATTEMPTS,
+  EMAIL_VERIFICATION_TTL_MS,
+  emailVerificationCodeMatches,
+  generateEmailVerificationCode,
+  hashEmailVerificationCode,
+} from "../auth/email-verification-code.helpers";
+import { EmailService } from "../email/email.service";
 import { FilesService } from "../files/files.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { SessionCacheService } from "../redis/session-cache.service";
+
+type ContactChangeStartResponse = {
+  verificationId: string;
+  email: string;
+  expiresAt: string;
+};
+
+const CONTACT_CHANGE_EXPIRED_MESSAGE = "Код устарел. Отправьте новый код подтверждения.";
+const CONTACT_CHANGE_TOO_MANY_ATTEMPTS_MESSAGE = "Слишком много попыток. Отправьте новый код подтверждения.";
+const CONTACT_CHANGE_WRONG_CODE_MESSAGE = "Неверный код подтверждения.";
 
 // Аватары пользователей. Само изображение загружается общим POST /files/upload
 // (с ресайзом и валидацией), сюда приходит только id уже загруженного публичного
@@ -16,14 +49,171 @@ export class AccountService {
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
     private readonly settings: PlatformSettingsService,
+    private readonly email: EmailService,
+    private readonly sessionCache: SessionCacheService,
   ) {}
 
   async updateProfile(userId: string, input: AccountProfileUpdateDto): Promise<AuthMeUser> {
+    const data: Prisma.UserUpdateInput = {};
+    if (input.firstName !== undefined) data.firstName = input.firstName;
+    if (input.lastName !== undefined) data.lastName = input.lastName;
+    if (input.gender !== undefined) data.gender = input.gender;
+
     await this.prisma.user.update({
       where: { id: userId },
-      data: { gender: input.gender },
+      data,
+    });
+    await this.sessionCache.invalidateUser(userId);
+
+    return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
+  }
+
+  async startContactChange(userId: string, input: AccountContactChangeStartDto): Promise<ContactChangeStartResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    if (!user) {
+      throw new NotFoundException("Пользователь не найден.");
+    }
+
+    const verificationId = randomUUID();
+    const code = generateEmailVerificationCode();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS);
+
+    await this.prisma.accountContactChangeChallenge.updateMany({
+      where: {
+        userId,
+        field: input.field,
+        consumedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: { expiresAt: now },
     });
 
+    await this.prisma.accountContactChangeChallenge.create({
+      data: {
+        id: verificationId,
+        userId,
+        field: input.field,
+        email: user.email,
+        codeHash: hashEmailVerificationCode(verificationId, user.email, code),
+        expiresAt,
+      },
+    });
+
+    this.sendContactChangeCodeInBackground({
+      verificationId,
+      email: user.email,
+      field: input.field,
+      code,
+      expiresAt,
+    });
+
+    return { verificationId, email: user.email, expiresAt: expiresAt.toISOString() };
+  }
+
+  async verifyContactChange(userId: string, input: AccountContactChangeVerifyDto): Promise<{ ok: true }> {
+    const now = new Date();
+    const challenge = await this.prisma.accountContactChangeChallenge.findUnique({
+      where: { id: input.verificationId },
+    });
+
+    if (!challenge || challenge.userId !== userId || challenge.consumedAt || challenge.expiresAt <= now) {
+      throw new BadRequestException(CONTACT_CHANGE_EXPIRED_MESSAGE);
+    }
+
+    if (challenge.verifiedAt) {
+      return { ok: true };
+    }
+
+    if (challenge.attempts >= EMAIL_VERIFICATION_MAX_ATTEMPTS) {
+      throw new BadRequestException(CONTACT_CHANGE_TOO_MANY_ATTEMPTS_MESSAGE);
+    }
+
+    if (!emailVerificationCodeMatches(challenge.id, challenge.email, input.code, challenge.codeHash)) {
+      const nextAttempts = challenge.attempts + 1;
+      const tooManyAttempts = nextAttempts >= EMAIL_VERIFICATION_MAX_ATTEMPTS;
+      await this.prisma.accountContactChangeChallenge.update({
+        where: { id: challenge.id },
+        data: {
+          attempts: nextAttempts,
+          ...(tooManyAttempts ? { expiresAt: now } : {}),
+        },
+      });
+      throw new BadRequestException(
+        tooManyAttempts ? CONTACT_CHANGE_TOO_MANY_ATTEMPTS_MESSAGE : CONTACT_CHANGE_WRONG_CODE_MESSAGE,
+      );
+    }
+
+    await this.prisma.accountContactChangeChallenge.update({
+      where: { id: challenge.id },
+      data: { verifiedAt: now },
+    });
+
+    return { ok: true };
+  }
+
+  async applyContactChange(userId: string, input: AccountContactChangeApplyDto): Promise<AuthMeUser> {
+    const now = new Date();
+    const challenge = await this.prisma.accountContactChangeChallenge.findUnique({
+      where: { id: input.verificationId },
+      select: {
+        id: true,
+        userId: true,
+        field: true,
+        verifiedAt: true,
+        consumedAt: true,
+        expiresAt: true,
+      },
+    });
+
+    if (
+      !challenge ||
+      challenge.userId !== userId ||
+      challenge.field !== input.field ||
+      !challenge.verifiedAt ||
+      challenge.consumedAt ||
+      challenge.expiresAt <= now
+    ) {
+      throw new BadRequestException(CONTACT_CHANGE_EXPIRED_MESSAGE);
+    }
+
+    const nextValue = input.field === "email" ? input.email.trim().toLowerCase() : input.phone.trim();
+    await this.assertContactValueAvailable(userId, input.field, nextValue);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const claimed = await tx.accountContactChangeChallenge.updateMany({
+          where: {
+            id: challenge.id,
+            userId,
+            field: input.field,
+            verifiedAt: { not: null },
+            consumedAt: null,
+            expiresAt: { gt: now },
+          },
+          data: { consumedAt: now },
+        });
+
+        if (claimed.count !== 1) {
+          throw new BadRequestException(CONTACT_CHANGE_EXPIRED_MESSAGE);
+        }
+
+        await tx.user.update({
+          where: { id: userId },
+          data: input.field === "email" ? { email: nextValue } : { phone: nextValue },
+        });
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException(this.contactConflictMessage(input.field));
+      }
+      throw error;
+    }
+
+    await this.sessionCache.invalidateUser(userId);
     return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
   }
 
@@ -49,6 +239,7 @@ export class AccountService {
 
     if (current.avatarFileId !== fileId) {
       await this.prisma.user.update({ where: { id: userId }, data: { avatarFileId: fileId } });
+      await this.sessionCache.invalidateUser(userId);
       // Старое фото больше никем не используется — чистим из S3 и БД.
       if (current.avatarFileId) {
         await this.files.deleteIfUnreferenced([current.avatarFileId]);
@@ -65,8 +256,46 @@ export class AccountService {
     });
     if (current.avatarFileId) {
       await this.prisma.user.update({ where: { id: userId }, data: { avatarFileId: null } });
+      await this.sessionCache.invalidateUser(userId);
       await this.files.deleteIfUnreferenced([current.avatarFileId]);
     }
     return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
   }
+
+  private sendContactChangeCodeInBackground(input: {
+    verificationId: string;
+    email: string;
+    field: AccountContactChangeField;
+    code: string;
+    expiresAt: Date;
+  }): void {
+    void this.email
+      .sendAccountContactChangeCode({
+        to: input.email,
+        field: input.field,
+        code: input.code,
+        expiresAt: input.expiresAt,
+      })
+      .catch(swallowAndLog("account.contact-change.email.background", { verificationId: input.verificationId }));
+  }
+
+  private async assertContactValueAvailable(userId: string, field: AccountContactChangeField, value: string) {
+    const existing = await this.prisma.user.findFirst({
+      where: field === "email" ? { email: value, NOT: { id: userId } } : { phone: value, NOT: { id: userId } },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException(this.contactConflictMessage(field));
+    }
+  }
+
+  private contactConflictMessage(field: AccountContactChangeField) {
+    return field === "email"
+      ? "Пользователь с такой почтой уже зарегистрирован."
+      : "Пользователь с таким телефоном уже зарегистрирован.";
+  }
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }

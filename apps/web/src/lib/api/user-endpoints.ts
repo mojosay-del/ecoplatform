@@ -1,4 +1,7 @@
 import type {
+  AccountContactChangeApplyDto,
+  AccountContactChangeStartDto,
+  AccountContactChangeVerifyDto,
   AccountProfileUpdateDto,
   AuthMeUser,
   BillingStatus,
@@ -71,6 +74,15 @@ type SupportTicket = {
 export const accountApi = {
   updateProfile: (input: AccountProfileUpdateDto) =>
     apiFetch<AuthMeUser>("/account/profile", { method: "PATCH", body: input }),
+  startContactChange: (input: AccountContactChangeStartDto) =>
+    apiFetch<{ verificationId: string; email: string; expiresAt: string }>("/account/contact-change/start", {
+      method: "POST",
+      body: input,
+    }),
+  verifyContactChange: (input: AccountContactChangeVerifyDto) =>
+    apiFetch<{ ok: true }>("/account/contact-change/verify", { method: "POST", body: input }),
+  applyContactChange: (input: AccountContactChangeApplyDto) =>
+    apiFetch<AuthMeUser>("/account/contact-change/apply", { method: "POST", body: input }),
   // fileId — id уже загруженного через api.files.upload публичного изображения.
   setAvatar: (fileId: string) => apiFetch<AuthMeUser>("/account/avatar", { method: "POST", body: { fileId } }),
   removeAvatar: () => apiFetch<AuthMeUser>("/account/avatar", { method: "DELETE" }),

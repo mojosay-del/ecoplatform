@@ -1,6 +1,12 @@
 import { Body, Controller, Delete, Patch, Post, UseGuards } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { z } from "zod";
-import { accountProfileUpdateDtoSchema } from "@ecoplatform/shared";
+import {
+  accountContactChangeApplyDtoSchema,
+  accountContactChangeStartDtoSchema,
+  accountContactChangeVerifyDtoSchema,
+  accountProfileUpdateDtoSchema,
+} from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import type { RequestUser } from "../common/request-user";
@@ -8,6 +14,7 @@ import { parseBody } from "../common/zod";
 import { AccountService } from "./account.service";
 
 const setAvatarSchema = z.object({ fileId: z.string().trim().min(1) });
+const CONTACT_CHANGE_THROTTLE = { short: { limit: 5, ttl: 60_000 } };
 
 @UseGuards(JwtAuthGuard)
 @Controller("account")
@@ -18,6 +25,27 @@ export class AccountController {
   async updateProfile(@CurrentUser() user: RequestUser, @Body() body: unknown) {
     const input = parseBody(accountProfileUpdateDtoSchema, body);
     return this.account.updateProfile(user.id, input);
+  }
+
+  @Throttle(CONTACT_CHANGE_THROTTLE)
+  @Post("contact-change/start")
+  async startContactChange(@CurrentUser() user: RequestUser, @Body() body: unknown) {
+    const input = parseBody(accountContactChangeStartDtoSchema, body);
+    return this.account.startContactChange(user.id, input);
+  }
+
+  @Throttle(CONTACT_CHANGE_THROTTLE)
+  @Post("contact-change/verify")
+  async verifyContactChange(@CurrentUser() user: RequestUser, @Body() body: unknown) {
+    const input = parseBody(accountContactChangeVerifyDtoSchema, body);
+    return this.account.verifyContactChange(user.id, input);
+  }
+
+  @Throttle(CONTACT_CHANGE_THROTTLE)
+  @Post("contact-change/apply")
+  async applyContactChange(@CurrentUser() user: RequestUser, @Body() body: unknown) {
+    const input = parseBody(accountContactChangeApplyDtoSchema, body);
+    return this.account.applyContactChange(user.id, input);
   }
 
   // Привязать загруженное (через /files/upload) фото к профилю как аватар.

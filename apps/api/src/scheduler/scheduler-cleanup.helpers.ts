@@ -144,6 +144,22 @@ export async function cleanupExpiredEmailChallenges(
   return { deleted: count };
 }
 
+export async function cleanupExpiredAccountContactChangeChallenges(
+  prisma: PrismaService,
+  logger: CleanupLogger,
+  now = new Date(),
+): Promise<{ deleted: number }> {
+  const cutoff = new Date(now.getTime() - EMAIL_CHALLENGE_RETENTION_MS);
+  const { count } = await prisma.accountContactChangeChallenge.deleteMany({
+    where: { expiresAt: { lt: cutoff } },
+  });
+
+  if (count > 0) {
+    logger.log(`Account contact change cleanup: deleted ${count} expired challenges`);
+  }
+  return { deleted: count };
+}
+
 export async function cleanupExpiredSessions(
   prisma: PrismaService,
   logger: CleanupLogger,

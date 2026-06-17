@@ -8,6 +8,10 @@ type RegistrationCodeEmail = {
   expiresAt: Date;
 };
 
+type AccountContactChangeCodeEmail = RegistrationCodeEmail & {
+  field: "email" | "phone";
+};
+
 type SmtpConfig = {
   host: string;
   port: number;
@@ -42,6 +46,34 @@ export class EmailService {
   private transporter: Transporter | null = null;
 
   async sendRegistrationCode(input: RegistrationCodeEmail): Promise<void> {
+    await this.sendVerificationCode({
+      ...input,
+      subject: "Код подтверждения ЭкоПлатформы",
+      actionText: "Ваш код подтверждения:",
+      ignoreText: "Если вы не регистрировались на ЭкоПлатформе, просто проигнорируйте это письмо.",
+      warnContext: "registration",
+    });
+  }
+
+  async sendAccountContactChangeCode(input: AccountContactChangeCodeEmail): Promise<void> {
+    const fieldLabel = input.field === "email" ? "email" : "телефона";
+    await this.sendVerificationCode({
+      ...input,
+      subject: "Код подтверждения изменения профиля",
+      actionText: `Ваш код для изменения ${fieldLabel}:`,
+      ignoreText: "Если вы не меняли данные профиля, просто проигнорируйте это письмо.",
+      warnContext: "account contact change",
+    });
+  }
+
+  private async sendVerificationCode(
+    input: RegistrationCodeEmail & {
+      subject: string;
+      actionText: string;
+      ignoreText: string;
+      warnContext: string;
+    },
+  ): Promise<void> {
     if (this.deliveryDisabled()) {
       return;
     }
@@ -58,21 +90,19 @@ export class EmailService {
       await this.sendMailWithTimeout(transporter, config.sendTimeoutMs, {
         from: config.from,
         to: input.to,
-        subject: "Код подтверждения ЭкоПлатформы",
-        text: [
-          `Ваш код подтверждения: ${input.code}`,
-          `Код действует до ${expiresAt} по Москве.`,
-          "Если вы не регистрировались на ЭкоПлатформе, просто проигнорируйте это письмо.",
-        ].join("\n"),
+        subject: input.subject,
+        text: [`${input.actionText} ${input.code}`, `Код действует до ${expiresAt} по Москве.`, input.ignoreText].join(
+          "\n",
+        ),
         html: [
-          "<p>Ваш код подтверждения:</p>",
+          `<p>${input.actionText}</p>`,
           `<p style="font-size:28px;letter-spacing:6px;font-weight:700">${input.code}</p>`,
           `<p>Код действует до ${expiresAt} по Москве.</p>`,
-          "<p>Если вы не регистрировались на ЭкоПлатформе, просто проигнорируйте это письмо.</p>",
+          `<p>${input.ignoreText}</p>`,
         ].join(""),
       });
     } catch (error) {
-      this.logger.warn(`SMTP registration email failed: ${smtpErrorCode(error)}`);
+      this.logger.warn(`SMTP ${input.warnContext} email failed: ${smtpErrorCode(error)}`);
       throw new ServiceUnavailableException("Не удалось отправить код подтверждения. Попробуйте ещё раз через минуту.");
     }
   }

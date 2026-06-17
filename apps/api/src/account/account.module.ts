@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { EmailModule } from "../email/email.module";
 import { FilesModule } from "../files/files.module";
 import { AccountController } from "./account.controller";
 import { AccountService } from "./account.service";
@@ -8,7 +9,7 @@ import { AccountService } from "./account.service";
 // старого файла аватара). FilesModule сам импортирует AuthModule, поэтому цикла
 // нет: AccountModule никем не импортируется.
 @Module({
-  imports: [AuthModule, FilesModule],
+  imports: [AuthModule, EmailModule, FilesModule],
   controllers: [AccountController],
   providers: [AccountService],
 })

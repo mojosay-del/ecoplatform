@@ -3,6 +3,10 @@ import {
   LEGAL_DOCUMENT_BODY_MAX_LENGTH,
   LEGAL_DOCUMENT_TITLE_MAX_LENGTH,
   LISTING_MAX_POSITIONS,
+  accountContactChangeApplyDtoSchema,
+  accountContactChangeStartDtoSchema,
+  accountContactChangeVerifyDtoSchema,
+  accountProfileUpdateDtoSchema,
   createListingDtoSchema,
   createOfferDtoSchema,
   legalDocumentCreateDtoSchema,
@@ -37,6 +41,41 @@ describe("DTO size limits", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("validates partial profile updates but rejects an empty patch", () => {
+    expect(accountProfileUpdateDtoSchema.safeParse({ firstName: "Иван", lastName: "Ферум" }).success).toBe(true);
+    expect(accountProfileUpdateDtoSchema.safeParse({ gender: null }).success).toBe(true);
+    expect(accountProfileUpdateDtoSchema.safeParse({}).success).toBe(false);
+    expect(accountProfileUpdateDtoSchema.safeParse({ firstName: "" }).success).toBe(false);
+  });
+
+  it("validates contact-change payloads", () => {
+    expect(accountContactChangeStartDtoSchema.safeParse({ field: "email" }).success).toBe(true);
+    expect(accountContactChangeVerifyDtoSchema.safeParse({ verificationId: "v1", code: "1234" }).success).toBe(true);
+    expect(
+      accountContactChangeApplyDtoSchema.safeParse({
+        field: "email",
+        verificationId: "v1",
+        email: "user@example.test",
+      }).success,
+    ).toBe(true);
+    expect(
+      accountContactChangeApplyDtoSchema.safeParse({
+        field: "phone",
+        verificationId: "v1",
+        phone: "+79991234567",
+      }).success,
+    ).toBe(true);
+
+    expect(accountContactChangeStartDtoSchema.safeParse({ field: "password" }).success).toBe(false);
+    expect(accountContactChangeVerifyDtoSchema.safeParse({ verificationId: "v1", code: "12ab" }).success).toBe(false);
+    expect(
+      accountContactChangeApplyDtoSchema.safeParse({ field: "email", verificationId: "v1", email: "bad" }).success,
+    ).toBe(false);
+    expect(
+      accountContactChangeApplyDtoSchema.safeParse({ field: "phone", verificationId: "v1", phone: "123" }).success,
+    ).toBe(false);
   });
 
   it("limits listing positions to the configured maximum", () => {
