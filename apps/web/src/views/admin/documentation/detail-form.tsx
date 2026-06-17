@@ -6,6 +6,7 @@ import type { Block } from "../../../lib/editor/block-types";
 import { DocumentEditor } from "../../../components/editor/DocumentEditor";
 import { FileUploadField } from "../../../components/FileUploadField";
 import { DOCUMENT_FILE_ACCEPT, DOCUMENTATION_ATOMIC_KINDS } from "./constants";
+import { DocumentationIconPicker } from "./icon-picker";
 import type { DocArticle, DocAutosaveUi, DocDraftState, SetDocDraft } from "./types";
 
 export function DocDetailForm({
@@ -74,6 +75,14 @@ export function DocDetailForm({
               onChange={(event) => setDraft((prev) => ({ ...prev, subtitle: event.target.value }))}
             />
           </label>
+
+          <div className="form-field news-content-field">
+            <span>Иконка раздела</span>
+            <DocumentationIconPicker
+              value={draft.displayIcon}
+              onChange={(displayIcon) => setDraft((prev) => ({ ...prev, displayIcon }))}
+            />
+          </div>
         </>
       ) : (
         <>

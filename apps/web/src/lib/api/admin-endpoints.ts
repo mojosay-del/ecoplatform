@@ -11,6 +11,7 @@ type AdminNewsListItem = {
   slug: string;
   status: string;
   coverImageId: string | null;
+  pinnedInForum: boolean;
   firstPublishedAt: string | null;
   createdAt: string;
   updatedAt: string;

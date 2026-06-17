@@ -286,6 +286,7 @@ export type DocumentationNode = {
   // Короткий дескриптор документа (строка под заголовком на карточке).
   subtitle: string | null;
   iconType: string | null;
+  displayIcon: string | null;
   parentId: string | null;
   position: number;
   status: string;
@@ -611,7 +612,9 @@ export type ModeratedEntityType =
   | "news_post"
   | "knowledge_article"
   | "marketplace_listing"
-  | "marketplace_review";
+  | "marketplace_review"
+  | "forum_question"
+  | "forum_answer";
 
 export type ModerationCommentStatus = "published" | "hidden_by_moderator" | "removed_by_admin" | "removed_with_news";
 
@@ -649,6 +652,14 @@ export type ModerationEntitySummary =
       status: string;
       toCompany: { id: string; organizationName: string } | null;
       fromCompany: { id: string; organizationName: string } | null;
+    }
+  | { type: "forum_question"; id: string; title: string; status: string }
+  | {
+      type: "forum_answer";
+      id: string;
+      text: string;
+      status: string;
+      question: { id: string; title: string } | null;
     };
 
 export type ModerationComplaint = {

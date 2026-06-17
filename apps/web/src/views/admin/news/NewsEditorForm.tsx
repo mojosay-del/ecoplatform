@@ -119,6 +119,15 @@ export function NewsEditorForm({
         onTagDraftChange={onTagDraftChange}
       />
 
+      <label className="form-field news-content-field" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <input
+          type="checkbox"
+          checked={draft.pinnedInForum}
+          onChange={(event) => onDraftChange((prev) => ({ ...prev, pinnedInForum: event.target.checked }))}
+        />
+        <span>Закрепить в форуме — новость появится сверху ленты раздела «Форум»</span>
+      </label>
+
       <div className="lesson-save-bar news-save-bar">
         <span className={`lesson-save-bar-status ${saveStatusClass}`}>
           {submitting

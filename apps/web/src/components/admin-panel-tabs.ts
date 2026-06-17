@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Headphones,
   Megaphone,
+  MessageCircle,
   Newspaper,
   ScrollText,
   ShieldAlert,
@@ -77,6 +78,13 @@ const documentationTab: AdminPanelTab = {
   roles: ["admin", "content_manager"],
 };
 
+const forumTab: AdminPanelTab = {
+  href: "/admin/content/forum",
+  label: "Форум",
+  pathname: "/admin/content/forum",
+  roles: ["admin", "content_manager", "moderator"],
+};
+
 const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
   {
     title: "CMS",
@@ -110,6 +118,11 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         ...documentationTab,
         description: "Шаблоны, регламенты и отраслевые справки с файлами.",
         icon: FileText,
+      },
+      {
+        ...forumTab,
+        description: "Вопросы, ответы, закрепления и засев контента.",
+        icon: MessageCircle,
       },
     ],
   },

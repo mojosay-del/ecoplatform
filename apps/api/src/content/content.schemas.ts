@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   baseContentBlockSchema,
+  documentationDisplayIconNames,
   knowledgeBaseDisplayIconNames,
   lessonBlockSchema,
   newsBlockSchema,
@@ -45,6 +46,8 @@ export const newsInputSchema = z.object({
   slug: z.string().optional(),
   blocks: z.array(newsBlockSchema).default([]),
   tags: z.array(z.string().min(1)).default([]),
+  // «Закреплено в форуме» — новость-якорь сверху ленты форума (ТЗ §8).
+  pinnedInForum: z.boolean().optional(),
 });
 
 export const nomenclatureInputSchema = z.object({
@@ -151,6 +154,7 @@ export const documentationArticleInputSchema = z.object({
   slug: z.string().optional(),
   position: z.number().int().nonnegative(),
   iconType: z.string().optional(),
+  displayIcon: z.enum(documentationDisplayIconNames).nullable().optional(),
   blocks: z.array(baseContentBlockSchema).default([]),
   // Документ-первые поля (для листьев; у разделов остаются пустыми).
   fileAssetId: z.string().nullable().optional(),

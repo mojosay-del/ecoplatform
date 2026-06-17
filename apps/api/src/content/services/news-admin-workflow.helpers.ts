@@ -39,6 +39,7 @@ export async function createNewsPost(
       title: input.title,
       lead: input.lead,
       coverImageId: input.coverImageId,
+      pinnedInForum: input.pinnedInForum ?? false,
       slug,
       createdById: user.id,
       blocks: {
@@ -103,6 +104,7 @@ export async function updateNewsPost(
         title: input.title,
         lead: input.lead,
         coverImageId: input.coverImageId,
+        pinnedInForum: input.pinnedInForum ?? false,
         blocks: {
           create: input.blocks.map((block, position) => ({
             position,

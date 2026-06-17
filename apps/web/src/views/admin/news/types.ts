@@ -21,6 +21,7 @@ export type NewsItem = {
   slug: string;
   status: "draft" | "published";
   coverImageId: string | null;
+  pinnedInForum: boolean;
   tags: Array<{ newsTagId: string; newsTag: NewsTag }>;
   firstPublishedAt: string | null;
   createdAt: string;
@@ -39,6 +40,7 @@ export type DraftState = {
   title: string;
   lead: string;
   coverImageId: string;
+  pinnedInForum: boolean;
   tags: string[];
   blocks: Block[];
 };

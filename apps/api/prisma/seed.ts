@@ -8,6 +8,7 @@ import {
   CompanyStatus,
   CompanyType,
   ContentStatus,
+  ForumQuestionStatus,
   LearningAccessLevel,
   LegalDocumentType,
   PlatformRole,
@@ -114,7 +115,7 @@ async function main() {
     },
   });
 
-  await prisma.user.upsert({
+  const demoUser = await prisma.user.upsert({
     where: { email: DEMO_EMAIL },
     update: demoPassword.passwordHash ? { passwordHash: demoPassword.passwordHash } : {},
     create: {
@@ -419,6 +420,8 @@ async function main() {
     },
   });
 
+  await seedForum(admin.id, demoUser.id, company.id);
+
   await seedLegalDocuments();
 
   console.log("Seed completed");
@@ -475,6 +478,65 @@ const LEGAL_DOCUMENT_SEEDS: LegalDocSeed[] = [
     isRequired: false,
   },
 ];
+
+// Демо-контент форума: пара значений «Вид сырья» (типы вопроса сидируются
+// миграцией) + один решённый вопрос с принятым ответом, чтобы раздел не пустовал
+// на dev. Идемпотентно по фиксированным id/label.
+async function seedForum(adminUserId: string, demoUserId: string, companyId: string) {
+  const rawMaterial = await prisma.forumRawMaterial.upsert({
+    where: { label: "Макулатура МС-5Б" },
+    update: {},
+    create: { id: "forum-rm-makulatura", label: "Макулатура МС-5Б", position: 0 },
+  });
+  await prisma.forumRawMaterial.upsert({
+    where: { label: "ПЭТ и пластик" },
+    update: {},
+    create: { id: "forum-rm-pet", label: "ПЭТ и пластик", position: 1 },
+  });
+  const questionType = await prisma.forumQuestionType.upsert({
+    where: { label: "Логистика" },
+    update: {},
+    create: { id: "forum-qt-logistics", label: "Логистика", position: 1 },
+  });
+
+  const question = await prisma.forumQuestion.upsert({
+    where: { id: "forum-demo-q1" },
+    update: {},
+    create: {
+      id: "forum-demo-q1",
+      authorId: demoUserId,
+      authorCompanyId: companyId,
+      title: "Какие документы нужны для межрегиональной перевозки макулатуры?",
+      body: "Вожу МС-5Б из области в соседний регион на переработку. Что реально должно быть у водителя в кабине?",
+      rawMaterialId: rawMaterial.id,
+      questionTypeId: questionType.id,
+      status: ForumQuestionStatus.solved,
+      answersCount: 1,
+      views: 42,
+      solvedAt: new Date(),
+    },
+  });
+
+  const answer = await prisma.forumAnswer.upsert({
+    where: { id: "forum-demo-a1" },
+    update: {},
+    create: {
+      id: "forum-demo-a1",
+      questionId: question.id,
+      authorId: adminUserId,
+      body: "Для МС-5Б лицензия не нужна: достаточно договора с покупателем и ТТН с маркой, весом и сторонами.",
+      votesCount: 14,
+      isAccepted: true,
+    },
+  });
+
+  await prisma.forumQuestion.update({
+    where: { id: question.id },
+    data: { acceptedAnswerId: answer.id },
+  });
+
+  console.log("Forum demo content seeded (1 solved question)");
+}
 
 async function seedLegalDocuments() {
   const initialVersion = "1.0.0";

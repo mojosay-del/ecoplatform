@@ -3,6 +3,7 @@ import {
   CommentStatus,
   ContentStatus,
   DiscussionTargetType,
+  ForumQuestionStatus,
   ListingStatus,
   ModerationCaseStatus,
   ReviewStatus,
@@ -264,6 +265,28 @@ export class ModerationService {
         authorUserId: listing.createdById,
         authorCompanyId: listing.sellerCompanyId,
       };
+    }
+
+    if (entityType === "forum_question") {
+      const question = await this.prisma.forumQuestion.findUnique({
+        where: { id: entityId },
+        select: { id: true, status: true, authorId: true, authorCompanyId: true },
+      });
+      if (!question || question.status === ForumQuestionStatus.hidden) {
+        throw new NotFoundException("Вопрос форума не найден или недоступен для жалобы.");
+      }
+      return { type: "forum_question", authorUserId: question.authorId, authorCompanyId: question.authorCompanyId };
+    }
+
+    if (entityType === "forum_answer") {
+      const answer = await this.prisma.forumAnswer.findUnique({
+        where: { id: entityId },
+        select: { id: true, hidden: true, authorId: true, authorCompanyId: true },
+      });
+      if (!answer || answer.hidden) {
+        throw new NotFoundException("Ответ форума не найден или недоступен для жалобы.");
+      }
+      return { type: "forum_answer", authorUserId: answer.authorId, authorCompanyId: answer.authorCompanyId };
     }
 
     // Остаётся marketplace_review (enum жалобы ограничен moderatedEntityTypes).

@@ -6,6 +6,8 @@ export const moderatedEntityTypes = [
   "knowledge_article",
   "marketplace_listing",
   "marketplace_review",
+  "forum_question",
+  "forum_answer",
 ] as const;
 export type ModeratedEntityType = (typeof moderatedEntityTypes)[number];
 

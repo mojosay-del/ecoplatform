@@ -91,6 +91,7 @@ export function AdminNewsView() {
     if (draft.title !== original.title) return true;
     if (draft.lead !== original.lead) return true;
     if ((draft.coverImageId || "") !== (original.coverImageId ?? "")) return true;
+    if (draft.pinnedInForum !== (original.pinnedInForum ?? false)) return true;
     const origTags = original.tags
       .map((t) => t.newsTag.name)
       .sort()
@@ -144,6 +145,7 @@ export function AdminNewsView() {
       title: detail.title,
       lead: detail.lead,
       coverImageId: detail.coverImageId ?? "",
+      pinnedInForum: detail.pinnedInForum ?? false,
       tags: detail.tags.map((t) => t.newsTag.name),
       blocks: detail.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
     });
@@ -239,6 +241,7 @@ export function AdminNewsView() {
       title: draft.title.trim(),
       lead: draft.lead.trim(),
       coverImageId: draft.coverImageId.trim() || null,
+      pinnedInForum: draft.pinnedInForum,
       tags: draft.tags,
       blocks: draft.blocks,
     }),

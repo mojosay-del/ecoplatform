@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { Clock, Download, FileText, Pin } from "lucide-react";
 import type { DocumentationNode } from "@ecoplatform/shared";
+import { documentationDisplayIconForNode } from "../documentation-icons";
 import { formatColor, formatLabel } from "./documentFormats";
 import { formatBytes, formatRuDate, freshness, type Freshness } from "./doc-helpers";
 
@@ -183,6 +184,7 @@ function DocTreeNode({
   const children = node.children ?? [];
   const childCategories = children.filter((child) => child.iconType === "category");
   const docCount = children.filter((child) => child.iconType !== "category").length;
+  const CategoryIcon = documentationDisplayIconForNode(node);
   return (
     <div className="doc-tree-group">
       <button
@@ -190,7 +192,12 @@ function DocTreeNode({
         className={`doc-tree-cat${activeId === node.id ? " on" : ""}`}
         onClick={() => onSelect(node)}
       >
-        <span className="doc-tree-cat-label">{node.title}</span>
+        <span className="doc-tree-cat-main">
+          <span className="doc-tree-cat-icon" aria-hidden="true">
+            <CategoryIcon size={15} strokeWidth={2.1} />
+          </span>
+          <span className="doc-tree-cat-label">{node.title}</span>
+        </span>
         <span className="doc-tree-count">{docCount}</span>
       </button>
       {childCategories.length > 0 ? (

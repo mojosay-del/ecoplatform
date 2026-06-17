@@ -9,6 +9,7 @@
 
 import { adminApi } from "./admin-endpoints";
 import { documentationApi, indicesApi, knowledgeBaseApi, learningApi, newsApi } from "./content-endpoints";
+import { forumApi } from "./forum-endpoints";
 import { marketplaceApi } from "./marketplace-endpoints";
 import {
   accountApi,
@@ -33,6 +34,7 @@ export const api = {
   learning: learningApi,
   knowledgeBase: knowledgeBaseApi,
   documentation: documentationApi,
+  forum: forumApi,
   tripCalculator: tripCalculatorApi,
   billing: billingApi,
   auth: authApi,

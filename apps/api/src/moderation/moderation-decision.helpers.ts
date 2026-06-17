@@ -4,6 +4,7 @@ import {
   ComplaintStatus,
   ContentStatus,
   DiscussionTargetType,
+  ForumQuestionStatus,
   ListingStatus,
   ModerationCaseStatus,
   ModerationDecisionType,
@@ -13,6 +14,7 @@ import {
   SanctionType,
   type Prisma,
 } from "@prisma/client";
+import { recomputeForumQuestionState } from "../forum/forum-state.helpers";
 import type { z } from "zod";
 import { isPlatformAdmin } from "../common/access-policy";
 import type { AdminActionLogService } from "../common/admin-action-log.service";
@@ -230,6 +232,26 @@ async function removeModeratedEntity(tx: Prisma.TransactionClient, found: Modera
     return;
   }
 
+  if (found.entityType === "forum_question") {
+    const question = await tx.forumQuestion.findUnique({ where: { id: found.entityId }, select: { id: true } });
+    if (!question) {
+      throw new BadRequestException("Вопрос форума уже удалён.");
+    }
+    await tx.forumQuestion.update({ where: { id: found.entityId }, data: { status: ForumQuestionStatus.hidden } });
+    return;
+  }
+
+  if (found.entityType === "forum_answer") {
+    const answer = await tx.forumAnswer.findUnique({ where: { id: found.entityId }, select: { questionId: true } });
+    if (!answer) {
+      throw new BadRequestException("Ответ форума уже удалён.");
+    }
+    await tx.forumAnswer.update({ where: { id: found.entityId }, data: { hidden: true } });
+    // Скрытие ответа меняет счётчики/принятый ответ — пересчитываем состояние вопроса.
+    await recomputeForumQuestionState(tx, answer.questionId);
+    return;
+  }
+
   throw new BadRequestException("Тип сущности не поддерживается модерацией.");
 }
 
@@ -322,6 +344,22 @@ function subjectForEntity(entityType: string, title: string | undefined) {
       warningBody: `По объявлению «${safeTitle}»`,
     };
   }
+  if (entityType === "forum_question") {
+    return {
+      complaintBody: `Жалоба по вопросу «${safeTitle}»`,
+      removalTitle: "Вопрос снят модератором",
+      removalBody: `Ваш вопрос «${safeTitle}» скрыт по итогам модерации.`,
+      warningBody: `По вопросу «${safeTitle}»`,
+    };
+  }
+  if (entityType === "forum_answer") {
+    return {
+      complaintBody: `Жалоба по ответу на форуме («${safeTitle}»)`,
+      removalTitle: "Ответ снят модератором",
+      removalBody: `Ваш ответ на вопрос «${safeTitle}» скрыт по итогам модерации.`,
+      warningBody: `По ответу на вопрос «${safeTitle}»`,
+    };
+  }
   // marketplace_review
   return {
     complaintBody: "Жалоба на отзыв",
@@ -334,6 +372,7 @@ function subjectForEntity(entityType: string, title: string | undefined) {
 function fallbackLinkForEntityType(entityType: string): string {
   if (entityType === "knowledge_article") return "/knowledge-base";
   if (entityType === "marketplace_listing" || entityType === "marketplace_review") return "/marketplace";
+  if (entityType === "forum_question" || entityType === "forum_answer") return "/forum";
   return "/news";
 }
 
@@ -384,6 +423,24 @@ async function getModerationEntity(
     const names = listing.positions.map((position) => position.nomenclature.name).filter(Boolean);
     const title = names.length > 0 ? names.join(", ") : listing.description?.trim()?.slice(0, 80) || "Объявление";
     return { title, link: `/marketplace/${found.entityId}` };
+  }
+
+  if (found.entityType === "forum_question") {
+    const question = await deps.prisma.forumQuestion.findUnique({
+      where: { id: found.entityId },
+      select: { title: true },
+    });
+    if (!question) return null;
+    return { title: question.title, link: `/forum/q/${found.entityId}` };
+  }
+
+  if (found.entityType === "forum_answer") {
+    const answer = await deps.prisma.forumAnswer.findUnique({
+      where: { id: found.entityId },
+      select: { question: { select: { id: true, title: true } } },
+    });
+    if (!answer) return null;
+    return { title: answer.question.title, link: `/forum/q/${answer.question.id}` };
   }
 
   // marketplace_review — отдельной страницы отзыва нет, ведём в раздел сделок.

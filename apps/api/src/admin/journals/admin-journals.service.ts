@@ -25,6 +25,10 @@ type JsonRecord = { [key: string]: Prisma.JsonValue | undefined };
 const JOURNAL_ENTITY_TYPE_LABELS: Record<string, string> = {
   Chapter: "Глава курса",
   Company: "Компания",
+  ForumAnswer: "Ответ форума",
+  ForumQuestion: "Вопрос форума",
+  ForumQuestionType: "Тип вопроса (форум)",
+  ForumRawMaterial: "Вид сырья (форум)",
   KnowledgeBaseArticle: "Статья базы знаний",
   LearningModule: "Курс",
   LegalDocument: "Юридический документ",

@@ -80,6 +80,7 @@ export function mapDocumentationNode(
     title: row.title,
     subtitle: row.subtitle,
     iconType: row.iconType,
+    displayIcon: row.displayIcon,
     parentId: row.parentId,
     position: row.position,
     status: row.status,

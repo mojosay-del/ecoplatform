@@ -12,6 +12,7 @@ describe("admin panel home groups", () => {
       "Обучение",
       "База знаний",
       "Документация",
+      "Форум",
       "Пользователи",
       "Компании",
       "Сотрудники",
@@ -27,11 +28,12 @@ describe("admin panel home groups", () => {
   it("keeps content managers on CMS home links without local tabs", () => {
     expect(
       visibleAdminHomeGroups(["content_manager"]).flatMap((group) => group.items.map((item) => item.label)),
-    ).toEqual(["Новости", "Индексы цен", "Обучение", "База знаний", "Документация"]);
+    ).toEqual(["Новости", "Индексы цен", "Обучение", "База знаний", "Документация", "Форум"]);
   });
 
-  it("limits moderator home navigation to moderation work", () => {
+  it("gives moderators the forum CMS card plus moderation work", () => {
     expect(visibleAdminHomeGroups(["moderator"]).flatMap((group) => group.items.map((item) => item.label))).toEqual([
+      "Форум",
       "Очередь модерации",
     ]);
   });

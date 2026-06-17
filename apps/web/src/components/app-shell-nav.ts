@@ -86,7 +86,7 @@ export const appNavSections: NavSection[] = [
   },
   {
     title: "Сообщество",
-    items: [futureItem("forum", "Форум", MessageCircle, "Форум — обсуждения участников рынка.")],
+    items: [{ key: "forum", href: "/forum", label: "Форум", icon: MessageCircle }],
   },
   {
     title: "Базы знаний",
@@ -265,6 +265,10 @@ const adminBreadcrumbs: { prefix: string; trail: BreadcrumbItem[] }[] = [
   {
     prefix: "/admin/content/documentation",
     trail: [adminPanelRoot, adminContentRoot, { href: "/admin/content/documentation", label: "Документация" }],
+  },
+  {
+    prefix: "/admin/content/forum",
+    trail: [adminPanelRoot, adminContentRoot, { href: "/admin/content/forum", label: "Форум" }],
   },
   {
     prefix: "/admin/content/education",

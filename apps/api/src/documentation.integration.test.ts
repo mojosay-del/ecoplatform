@@ -26,6 +26,7 @@ type DocInput = {
   title: string;
   parentId?: string | null;
   iconType?: string;
+  displayIcon?: string | null;
   subtitle?: string | null;
   fileAssetId?: string | null;
   version?: string | null;
@@ -41,7 +42,7 @@ async function createDraftDocument(adminToken: string, input: DocInput) {
     .set(auth(adminToken))
     .send({ position: 0, blocks: [], ...input });
   expect(res.status).toBe(201);
-  return res.body as { id: string; slug: string; status: string };
+  return res.body as { id: string; slug: string; status: string; displayIcon: string | null };
 }
 
 async function publishDocument(adminToken: string, id: string) {
@@ -113,8 +114,9 @@ describe("Documentation: lifecycle", () => {
     expect(detail.body.breadcrumbs).toEqual([]);
   });
 
-  it("publish документа без файла и описания отбивается 403; раздел без блоков публикуется", async () => {
+  it("publish документа без файла и описания отбивается 403; раздел без блоков публикуется с иконкой", async () => {
     const adminToken = await loginAdmin();
+    const reader = await registerCompany("0810003");
 
     const emptyDoc = await createDraftDocument(adminToken, { title: "Пустой документ" });
     const publishEmpty = await ctx.http
@@ -122,12 +124,38 @@ describe("Documentation: lifecycle", () => {
       .set(auth(adminToken));
     expect(publishEmpty.status).toBe(403);
 
-    const category = await createDraftDocument(adminToken, { title: "Раздел без блоков", iconType: "category" });
+    const category = await createDraftDocument(adminToken, {
+      title: "Раздел без блоков",
+      iconType: "category",
+      displayIcon: "Scale",
+    });
+    expect(category.displayIcon).toBe("Scale");
+
     const publishCategory = await ctx.http
       .post(`/api/admin/content/documentation/${category.id}/publish`)
       .set(auth(adminToken));
     expect(publishCategory.status).toBe(201);
     expect(publishCategory.body.status).toBe("published");
+    expect(publishCategory.body.displayIcon).toBe("Scale");
+
+    const tree = await ctx.http.get("/api/documentation?depth=1").set(auth(reader.token));
+    const categoryNode = tree.body.find((node: { id: string }) => node.id === category.id);
+    expect(categoryNode).toBeTruthy();
+    expect(categoryNode.displayIcon).toBe("Scale");
+  });
+
+  it("отклоняет неизвестную иконку раздела документации", async () => {
+    const adminToken = await loginAdmin();
+
+    const res = await ctx.http.post("/api/admin/content/documentation").set(auth(adminToken)).send({
+      title: "Раздел с неверной иконкой",
+      position: 0,
+      iconType: "category",
+      displayIcon: "Recycle",
+      blocks: [],
+    });
+
+    expect(res.status).toBe(400);
   });
 
   it("PATCH документа заменяет блоки и пишет audit log", async () => {
@@ -262,6 +290,24 @@ describe("Documentation: download & roles", () => {
       blocks: [{ type: "paragraph", payload: { html: "<p>Тело.</p>" } }],
     });
     await publishDocument(managerToken, draft.id);
+
+    const category = await createDraftDocument(managerToken, {
+      title: "Раздел контент-менеджера",
+      iconType: "category",
+      displayIcon: "FolderOpen",
+    });
+    const patchedCategory = await ctx.http
+      .patch(`/api/admin/content/documentation/${category.id}`)
+      .set(auth(managerToken))
+      .send({
+        title: "Раздел контент-менеджера",
+        position: 0,
+        iconType: "category",
+        displayIcon: "Landmark",
+        blocks: [],
+      });
+    expect(patchedCategory.status).toBe(200);
+    expect(patchedCategory.body.displayIcon).toBe("Landmark");
 
     const managerDelete = await ctx.http
       .delete(`/api/admin/content/documentation/${draft.id}`)

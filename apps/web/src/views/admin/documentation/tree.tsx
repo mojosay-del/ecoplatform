@@ -4,11 +4,12 @@ import { type CSSProperties, type ReactNode } from "react";
 import { DndContext, closestCenter, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronRight, GripVertical, Pin, Plus } from "lucide-react";
+import { ChevronRight, GripVertical, Pin, Plus, type LucideIcon } from "lucide-react";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";
 import { pluralizeRu } from "../../../lib/ru-plural";
 import { formatBytes } from "../../documentation/doc-helpers";
 import { formatLabel } from "../../documentation/documentFormats";
+import { documentationDisplayIconForNode } from "../../documentation-icons";
 import type { DocArticle } from "./types";
 
 function documentMeta(document: DocArticle): string {
@@ -51,6 +52,7 @@ export function DocCategoryNode({
         status={category.status}
         title={category.title}
         meta={`${documents.length} ${pluralizeRu(documents.length, "документ", "документа", "документов")}`}
+        Icon={documentationDisplayIconForNode(category)}
       />
       {expanded ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onReorder}>
@@ -196,6 +198,7 @@ function DocTreeRow({
   meta,
   pinned,
   dragHandle,
+  Icon,
 }: {
   depth: number;
   expandable?: boolean;
@@ -208,6 +211,7 @@ function DocTreeRow({
   meta?: string;
   pinned?: boolean;
   dragHandle?: ReactNode;
+  Icon?: LucideIcon;
 }) {
   return (
     <div className={`tree-row depth-${depth}${active ? " is-active" : ""}${dragHandle ? " has-drag-handle" : ""}`}>
@@ -231,6 +235,11 @@ function DocTreeRow({
             title={CONTENT_STATUS_LABELS[status]}
             aria-hidden
           />
+        ) : null}
+        {Icon ? (
+          <span className="tree-row-icon" aria-hidden="true">
+            <Icon size={15} strokeWidth={2.1} />
+          </span>
         ) : null}
         <span className="tree-row-title">{title}</span>
         {pinned ? <Pin size={12} aria-label="Закреплён" /> : null}

@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { BillingNotificationsService } from "../billing/billing-notifications.service";
 import { FilesService } from "../files/files.service";
 import { VideoTranscodeService } from "../files/video-transcode.service";
+import { ForumNudgeService } from "../forum/forum-nudge.service";
 import { MarketplaceListingsService } from "../marketplace/services/marketplace-listings.service";
 import { MarketplaceOffersService } from "../marketplace/services/marketplace-offers.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -28,6 +29,7 @@ const EMAIL_CHALLENGE_CLEANUP_LOCK_KEY = "cron:cleanup-email-challenges";
 const STALE_RECORD_CLEANUP_LOCK_KEY = "cron:cleanup-stale-records";
 const MARKETPLACE_ARCHIVE_LOCK_KEY = "cron:marketplace-archive-expired";
 const MARKETPLACE_OFFER_RESOLVE_LOCK_KEY = "cron:marketplace-resolve-offers";
+const FORUM_UNANSWERED_LOCK_KEY = "cron:forum-unanswered-nudge";
 
 /**
  * Координатор регулярных фоновых задач:
@@ -55,6 +57,7 @@ export class SchedulerService {
     private readonly videoTranscode: VideoTranscodeService,
     private readonly marketplace: MarketplaceListingsService,
     private readonly marketplaceOffers: MarketplaceOffersService,
+    private readonly forumNudge: ForumNudgeService,
   ) {}
 
   private get disabled(): boolean {
@@ -116,6 +119,18 @@ export class SchedulerService {
       });
     } catch (error) {
       this.logger.error("Marketplace offer auto-resolve failed", error as Error);
+    }
+  }
+
+  // Пинг контент-менеджерам/админам о вопросах форума без ответа дольше 24 ч.
+  // Раз в час под advisory-lock; дедуп — на уровне createInApp (domainEventId).
+  @Cron(CronExpression.EVERY_HOUR, { name: "forum-unanswered-nudge" })
+  async handleForumUnansweredNudge() {
+    if (this.disabled) return;
+    try {
+      await this.runWithPostgresAdvisoryLock(FORUM_UNANSWERED_LOCK_KEY, () => this.forumNudge.notifyStaleUnanswered());
+    } catch (error) {
+      this.logger.error("Forum unanswered nudge failed", error as Error);
     }
   }
 

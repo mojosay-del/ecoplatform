@@ -27,6 +27,7 @@ export async function createDocumentationArticle(
   const isCategory = isDocumentationCategory(input.iconType);
   const blocks = isCategory ? [] : input.blocks;
   const fileAssetId = isCategory ? null : (input.fileAssetId ?? null);
+  const displayIcon = isCategory ? (input.displayIcon ?? null) : null;
   const check = validateDraftableBlocks(blocks);
 
   if (!check.ok) {
@@ -52,6 +53,7 @@ export async function createDocumentationArticle(
       slug,
       position: input.position,
       iconType: input.iconType,
+      displayIcon,
       createdById: user.id,
       fileAssetId,
       version: isCategory ? null : (input.version ?? null),
@@ -100,6 +102,11 @@ export async function updateDocumentationArticle(
   const isCategory = isDocumentationCategory(input.iconType);
   const blocks = isCategory ? [] : input.blocks;
   const fileAssetId = isCategory ? null : (input.fileAssetId ?? null);
+  const displayIcon = isCategory
+    ? Object.prototype.hasOwnProperty.call(input, "displayIcon")
+      ? (input.displayIcon ?? null)
+      : existing.displayIcon
+    : null;
   const check = validateDraftableBlocks(blocks);
 
   if (!check.ok) {
@@ -133,6 +140,7 @@ export async function updateDocumentationArticle(
         title: input.title,
         subtitle: input.subtitle ?? null,
         iconType: input.iconType,
+        displayIcon,
         fileAssetId,
         version: isCategory ? null : (input.version ?? null),
         effectiveDate: isCategory ? null : parseDate(input.effectiveDate),

@@ -18,6 +18,7 @@ export type DocArticle = {
   slug: string;
   position: number;
   iconType: string | null;
+  displayIcon: string | null;
   status: "draft" | "published";
   firstPublishedAt: string | null;
   revisedAt: string | null;
@@ -38,6 +39,7 @@ export type DocDraftState = {
   title: string;
   subtitle: string;
   iconType: string;
+  displayIcon: string;
   position: number;
   blocks: Block[];
   // Поля документа (для разделов остаются пустыми).

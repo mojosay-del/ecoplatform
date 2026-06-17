@@ -28,6 +28,13 @@ type ModerationEntitySummary =
       text?: string | null;
       toCompany?: { organizationName?: string | null } | null;
       fromCompany?: { organizationName?: string | null } | null;
+    }
+  | { type: "forum_question"; title?: string | null; status?: string | null }
+  | {
+      type: "forum_answer";
+      text?: string | null;
+      status?: string | null;
+      question?: { title?: string | null } | null;
     };
 
 type ModerationCaseDisplayInput = {
@@ -58,6 +65,8 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   marketplace_review: "отзыв",
   news_comment: "комментарий",
   news_post: "новость",
+  forum_question: "вопрос форума",
+  forum_answer: "ответ форума",
 };
 
 export function formatModerationCaseTitle(item: ModerationCaseDisplayInput) {
@@ -82,6 +91,15 @@ export function formatModerationCaseTitle(item: ModerationCaseDisplayInput) {
   if (item.entity?.type === "marketplace_review") {
     const target = item.entity.toCompany?.organizationName;
     return `Жалоба на отзыв${target ? ` о компании «${target}»` : ""}`;
+  }
+
+  if (item.entity?.type === "forum_question") {
+    return `Жалоба на вопрос «${item.entity.title ?? "без названия"}»`;
+  }
+
+  if (item.entity?.type === "forum_answer") {
+    const title = item.entity.question?.title;
+    return `Жалоба на ответ на форуме${title ? ` («${title}»)` : ""}`;
   }
 
   const fallback = ENTITY_TYPE_LABELS[item.entityType] ?? item.entityType;
@@ -109,6 +127,16 @@ export function formatModerationEntityPreview(item: ModerationCaseDisplayInput) 
 
   if (item.entity?.type === "marketplace_review") {
     return item.entity.text?.trim() || "Отзыв без комментария";
+  }
+
+  if (item.entity?.type === "forum_question") {
+    return item.entity.title || "Вопрос форума";
+  }
+
+  if (item.entity?.type === "forum_answer") {
+    const text = item.entity.text?.trim();
+    if (text) return text;
+    return item.entity.question?.title ? `Ответ на вопрос «${item.entity.question.title}»` : "Ответ на форуме";
   }
 
   return "Контент недоступен или был удалён";

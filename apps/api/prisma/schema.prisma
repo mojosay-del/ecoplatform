@@ -689,6 +689,10 @@ model NewsPost {
   status           ContentStatus      @default(draft)
   firstPublishedAt DateTime?
   createdById      String
+  // «Закреплено в форуме»: новость-якорь показывается сверху ленты форума
+  // (раздел «Форум»). Отдельной сущности «якорный пост» нет — это просто флаг
+  // на новости, переключается из CMS-формы новостей. См. apps/api/src/forum.
+  pinnedInForum    Boolean            @default(false)
   blocks           NewsContentBlock[]
   tags             NewsPostTag[]
   likes            NewsLike[]
@@ -703,6 +707,8 @@ model NewsPost {
   @@index([status, firstPublishedAt(sort: Desc)])
   // Админка использует `orderBy updatedAt desc` — отдельный составной индекс.
   @@index([updatedAt(sort: Desc)])
+  // Закреплённые в форуме новости: where status=published, pinnedInForum=true.
+  @@index([status, pinnedInForum])
 }
 
 model NewsContentBlock {
@@ -1010,6 +1016,7 @@ model DocumentationArticle {
   slug             String                 @unique
   position         Int
   iconType         String?
+  displayIcon      String?
   status           ContentStatus          @default(draft)
   firstPublishedAt DateTime?
   createdById      String
@@ -1559,4 +1566,127 @@ model CompanyTripCalculatorSettings {
   data      Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ── Форум (Q&A сообщества): вопрос → ответы → принятое решение ─────────────
+// Не чат, а searchable «память отрасли»: навигация = поиск + две оси-справочника
+// (Вид сырья, Тип вопроса), которые ведёт админ из CMS. Тело вопроса/ответа —
+// простой текст (String), не блоки. Репутация автора берётся из marketplace
+// (CompanyMarketplaceRating + сделки Offer.dealResult=agreed) и собственной
+// метрики «решено на форуме»; здесь не дублируется. Авторские поля — плоские
+// *Id-строки (как createdById у новостей), без relation на User/Company:
+// контент переживает удаление пользователя, как и в остальных разделах.
+
+enum ForumQuestionStatus {
+  open // нужен ответ — ответов ещё нет
+  answered // есть ответы, решение автором не выбрано
+  solved // автор отметил лучший ответ (acceptedAnswerId)
+  hidden // снят модератором (remove_content из очереди модерации)
+}
+
+// Справочник «Вид сырья» — отдельная ось форума, НЕ связана с номенклатурой
+// других разделов. Значения создаёт/правит/удаляет админ. При удалении значения
+// тег у вопросов обнуляется (onDelete: SetNull), сам вопрос остаётся (ТЗ §6).
+model ForumRawMaterial {
+  id        String          @id @default(cuid())
+  label     String          @unique
+  position  Int
+  questions ForumQuestion[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([position])
+}
+
+// Справочник «Тип вопроса» — вторая ось. Сидируется дефолтами
+// (Регуляторика/Логистика/Оборудование/Цены и рынок/Документы), редактируется админом.
+model ForumQuestionType {
+  id        String          @id @default(cuid())
+  label     String          @unique
+  position  Int
+  questions ForumQuestion[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([position])
+}
+
+model ForumQuestion {
+  id              String              @id @default(cuid())
+  authorId        String
+  authorCompanyId String?
+  title           String
+  body            String
+  // Обе оси nullable: при удалении значения справочника тег обнуляется, вопрос
+  // живёт дальше с одним тегом или без (ТЗ §6). UI/фильтры работают с null.
+  rawMaterialId   String?
+  rawMaterial     ForumRawMaterial?   @relation(fields: [rawMaterialId], references: [id], onDelete: SetNull)
+  questionTypeId  String?
+  questionType    ForumQuestionType?  @relation(fields: [questionTypeId], references: [id], onDelete: SetNull)
+  status          ForumQuestionStatus @default(open)
+  views           Int                 @default(0)
+  // Денормализованный счётчик — лента/сортировки без агрегата на каждый запрос.
+  answersCount    Int                 @default(0)
+  // Принятый ответ (без relation, чтобы не плодить цикл question↔answer); на
+  // стороне ответа дублируется флагом isAccepted, синхронно в транзакции.
+  acceptedAnswerId String?
+  // Момент перехода в solved — для метрики «время до решения» (ТЗ §11).
+  solvedAt        DateTime?
+  answers         ForumAnswer[]
+  subscriptions   ForumSubscription[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Лента: orderBy createdAt desc с фильтром по статусу.
+  @@index([status, createdAt(sort: Desc)])
+  // Фильтры по осям.
+  @@index([rawMaterialId])
+  @@index([questionTypeId])
+  // «Мои вопросы» / связка с автором.
+  @@index([authorId])
+}
+
+model ForumAnswer {
+  id              String            @id @default(cuid())
+  questionId      String
+  question        ForumQuestion     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  authorId        String
+  authorCompanyId String?
+  body            String
+  votesCount      Int               @default(0)
+  isAccepted      Boolean           @default(false)
+  // Скрыт модератором (remove_content). У ответа нет статус-энума — достаточно флага.
+  hidden          Boolean           @default(false)
+  votes           ForumAnswerVote[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Список ответов «сначала лучшие».
+  @@index([questionId, votesCount(sort: Desc)])
+  // Метрика «решено на форуме» по автору (groupBy where isAccepted).
+  @@index([authorId, isAccepted])
+}
+
+model ForumAnswerVote {
+  id        String      @id @default(cuid())
+  answerId  String
+  answer    ForumAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime    @default(now())
+
+  // Один пользователь — один голос «полезно» за ответ (без даунвотов).
+  @@unique([answerId, userId])
+  @@index([userId])
+}
+
+model ForumSubscription {
+  id         String        @id @default(cuid())
+  questionId String
+  question   ForumQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  userId     String
+  createdAt  DateTime      @default(now())
+
+  // Подписка пользователя на вопрос (уведомления о новых ответах) — одна на пару.
+  @@unique([questionId, userId])
+  @@index([userId])
 }

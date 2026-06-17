@@ -46,6 +46,14 @@ type ResolvedEntitySummary =
       status: string;
       toCompany: { id: string; organizationName: string } | null;
       fromCompany: { id: string; organizationName: string } | null;
+    }
+  | { type: "forum_question"; id: string; title: string; status: string }
+  | {
+      type: "forum_answer";
+      id: string;
+      text: string;
+      status: string;
+      question: { id: string; title: string } | null;
     };
 
 type UserSummary = {
@@ -174,6 +182,8 @@ export async function enrichCases(deps: ModerationCaseDeps, cases: ModerationCas
   const articleIds = cases.filter((item) => item.entityType === "knowledge_article").map((item) => item.entityId);
   const listingIds = cases.filter((item) => item.entityType === "marketplace_listing").map((item) => item.entityId);
   const reviewIds = cases.filter((item) => item.entityType === "marketplace_review").map((item) => item.entityId);
+  const forumQuestionIds = cases.filter((item) => item.entityType === "forum_question").map((item) => item.entityId);
+  const forumAnswerIds = cases.filter((item) => item.entityType === "forum_answer").map((item) => item.entityId);
 
   const [commentsRaw, newsPosts, articles] = await Promise.all([
     deps.prisma.comment.findMany({
@@ -252,6 +262,43 @@ export async function enrichCases(deps: ModerationCaseDeps, cases: ModerationCas
   ]);
   const listingMap = new Map(listings.map((item) => [item.id, item]));
   const reviewMap = new Map(reviews.map((item) => [item.id, item]));
+
+  const [forumQuestions, forumAnswers] = await Promise.all([
+    forumQuestionIds.length > 0
+      ? deps.prisma.forumQuestion.findMany({
+          where: { id: { in: forumQuestionIds } },
+          select: { id: true, title: true, status: true },
+        })
+      : [],
+    forumAnswerIds.length > 0
+      ? deps.prisma.forumAnswer.findMany({
+          where: { id: { in: forumAnswerIds } },
+          select: { id: true, body: true, hidden: true, question: { select: { id: true, title: true } } },
+        })
+      : [],
+  ]);
+  const forumQuestionMap = new Map(forumQuestions.map((item) => [item.id, item]));
+  const forumAnswerMap = new Map(forumAnswers.map((item) => [item.id, item]));
+
+  const buildForumSummary = (item: ModerationCaseWithRelations): ResolvedEntitySummary | null => {
+    if (item.entityType === "forum_question") {
+      const found = forumQuestionMap.get(item.entityId);
+      if (!found) return null;
+      return { type: "forum_question", id: found.id, title: found.title, status: found.status };
+    }
+    if (item.entityType === "forum_answer") {
+      const found = forumAnswerMap.get(item.entityId);
+      if (!found) return null;
+      return {
+        type: "forum_answer",
+        id: found.id,
+        text: found.body,
+        status: found.hidden ? "hidden" : "published",
+        question: found.question,
+      };
+    }
+    return null;
+  };
   // Замыкание над точными prisma-типами — иначе пришлось бы аннотировать Map с
   // его инвариантным V и ловить ошибки присваивания.
   const buildMarketplaceSummary = (item: ModerationCaseWithRelations): ResolvedEntitySummary | null => {
@@ -304,7 +351,10 @@ export async function enrichCases(deps: ModerationCaseDeps, cases: ModerationCas
   const userMap = new Map<string, UserSummary>(users.map((item) => [item.id, item]));
 
   return cases.map((item) => {
-    const entity = buildEntitySummary(item, commentMap, newsPostMap, articleMap) ?? buildMarketplaceSummary(item);
+    const entity =
+      buildEntitySummary(item, commentMap, newsPostMap, articleMap) ??
+      buildMarketplaceSummary(item) ??
+      buildForumSummary(item);
     return {
       ...item,
       lockedBy: item.lockedById ? (userMap.get(item.lockedById) ?? null) : null,

@@ -133,7 +133,14 @@ export const supportApi = {
 
 export const moderationApi = {
   createComplaint: (body: {
-    entityType: "news_comment" | "news_post" | "knowledge_base_article" | "marketplace_listing" | "marketplace_review";
+    entityType:
+      | "news_comment"
+      | "news_post"
+      | "knowledge_base_article"
+      | "marketplace_listing"
+      | "marketplace_review"
+      | "forum_question"
+      | "forum_answer";
     entityId: string;
     reasonCode: string;
     comment?: string;

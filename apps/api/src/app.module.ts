@@ -14,6 +14,7 @@ import { AuthModule } from "./auth/auth.module";
 import { BillingModule } from "./billing/billing.module";
 import { ContentModule } from "./content/content.module";
 import { FilesModule } from "./files/files.module";
+import { ForumModule } from "./forum/forum.module";
 import { HealthModule } from "./health/health.module";
 import { LegalModule } from "./legal/legal.module";
 import { MarketplaceModule } from "./marketplace/marketplace.module";
@@ -81,6 +82,7 @@ function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
     BillingModule,
     ContentModule,
     FilesModule,
+    ForumModule,
     HealthModule,
     LegalModule,
     MarketplaceModule,

@@ -8,6 +8,7 @@ import { ApiError, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
+import { documentationDisplayIconNameForNode } from "../../documentation-icons";
 import { DOC_CATEGORY_ICON_TYPE, EMPTY_CATEGORY_DRAFT, EMPTY_DOCUMENT_DRAFT } from "./constants";
 import type { DocArticle, DocDraftKind, DocDraftState, ViewState } from "./types";
 import { dateInputToIso, isDocCategory, isoToDateInput, sortByPosition } from "./utils";
@@ -70,6 +71,7 @@ export function useAdminDocumentation() {
         draft.fileAssetId.trim().length > 0 ||
         draft.version.trim().length > 0 ||
         draft.effectiveDate.length > 0 ||
+        (draft.kind === "category" && draft.displayIcon !== EMPTY_CATEGORY_DRAFT.displayIcon) ||
         draft.isPinned ||
         draft.blocks.length > 0
       );
@@ -82,7 +84,7 @@ export function useAdminDocumentation() {
     if (draft.position !== original.position) return true;
 
     if (draft.kind === "category") {
-      return false;
+      return draft.displayIcon !== documentationDisplayIconNameForNode(original);
     }
 
     if (draft.markRevised) return true;
@@ -162,6 +164,7 @@ export function useAdminDocumentation() {
       title: article.title,
       subtitle: article.subtitle ?? "",
       iconType: kind === "category" ? DOC_CATEGORY_ICON_TYPE : (article.iconType ?? ""),
+      displayIcon: kind === "category" ? documentationDisplayIconNameForNode(article) : "",
       position: article.position,
       blocks:
         kind === "category" ? [] : article.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
@@ -187,6 +190,7 @@ export function useAdminDocumentation() {
           title: title.trim(),
           position: categories.length,
           iconType: DOC_CATEGORY_ICON_TYPE,
+          displayIcon: documentationDisplayIconNameForNode({ title: title.trim() || "Раздел" }),
           blocks: [],
         },
       });
@@ -197,6 +201,7 @@ export function useAdminDocumentation() {
         id: category.id,
         title: category.title,
         position: category.position,
+        displayIcon: documentationDisplayIconNameForNode(category),
       });
       setMessage("Раздел создан.");
       return true;
@@ -213,6 +218,7 @@ export function useAdminDocumentation() {
         title: draft.title.trim(),
         subtitle: draft.subtitle.trim() || null,
         iconType: DOC_CATEGORY_ICON_TYPE,
+        displayIcon: draft.displayIcon,
         position: draft.position,
         blocks: [],
       };
@@ -223,6 +229,7 @@ export function useAdminDocumentation() {
       title: draft.title.trim(),
       subtitle: draft.subtitle.trim() || null,
       position: draft.position,
+      displayIcon: null,
       blocks: draft.blocks,
       fileAssetId: draft.fileAssetId.trim() || null,
       version: draft.version.trim() || null,

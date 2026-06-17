@@ -1,4 +1,5 @@
 import type { AtomicBlockKind } from "../../../lib/editor/block-mapping";
+import { defaultDocumentationDisplayIconName } from "../../documentation-icons";
 import type { DocDraftState } from "./types";
 
 export const DOC_CATEGORY_ICON_TYPE = "category";
@@ -11,6 +12,7 @@ export const EMPTY_DOCUMENT_DRAFT: DocDraftState = {
   title: "",
   subtitle: "",
   iconType: "",
+  displayIcon: "",
   position: 0,
   blocks: [],
   fileAssetId: "",
@@ -24,6 +26,7 @@ export const EMPTY_CATEGORY_DRAFT: DocDraftState = {
   ...EMPTY_DOCUMENT_DRAFT,
   kind: "category",
   iconType: DOC_CATEGORY_ICON_TYPE,
+  displayIcon: defaultDocumentationDisplayIconName(),
 };
 
 // Атомарные блоки описания документа — те же, что в базе знаний (всё, кроме

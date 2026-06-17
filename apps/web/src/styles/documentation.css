@@ -374,8 +374,37 @@
 }
 
 .doc-tree-count {
+  flex-shrink: 0;
   color: var(--text-tertiary);
   font-size: 11px;
+}
+
+.doc-tree-cat-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.doc-tree-cat-icon {
+  width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--text-tertiary);
+}
+
+.doc-tree-cat-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-tree-cat.on .doc-tree-cat-icon {
+  color: var(--brand-active);
 }
 
 .doc-tree-cat.on .doc-tree-count {
