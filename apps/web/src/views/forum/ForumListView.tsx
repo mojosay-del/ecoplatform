@@ -5,10 +5,10 @@ import "../../styles/forum.css";
 // лента вопросов с закреплёнными новостями сверху. Бесконечная лента, как на
 // площадке (useInfiniteApiQuery). Правая колонка — мини-профиль + связанные разделы.
 
-import { useEffect, useState } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Lock, Search } from "lucide-react";
-import type { ForumPinnedNews, ForumQuestionListItem, ForumTaxonomy } from "@ecoplatform/shared";
+import { Search } from "lucide-react";
+import type { ForumPinnedNews, ForumQuestionListItem, ForumSummary, ForumTaxonomy } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -25,30 +25,31 @@ const SORTS: { value: ForumSort; label: string }[] = [
 ];
 
 const EMPTY_TAXONOMY: ForumTaxonomy = { rawMaterials: [], questionTypes: [] };
+const EMPTY_SUMMARY: ForumSummary = {
+  solvedQuestionsCount: 0,
+  currentUser: { answersCount: 0, solvedAnswersCount: 0 },
+  weeklyExperts: [],
+};
 
 export function ForumListView() {
   const { user } = useAuth();
-  const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
+  const [queryDraft, setQueryDraft] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [rawMaterialId, setRawMaterialId] = useState("");
   const [questionTypeId, setQuestionTypeId] = useState("");
   const [sort, setSort] = useState<ForumSort>("newest");
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(query.trim()), 250);
-    return () => clearTimeout(timer);
-  }, [query]);
-
   const taxonomy = useApiQuery("forum-taxonomy", () => api.forum.taxonomy(), EMPTY_TAXONOMY);
   const pinned = useApiQuery("forum-pinned", () => api.forum.pinnedNews(), [] as ForumPinnedNews[]);
+  const summary = useApiQuery("forum-summary", () => api.forum.summary(), EMPTY_SUMMARY);
 
-  const key = `forum-${sort}-${rawMaterialId}-${questionTypeId}-${debounced}`;
+  const key = `forum-${sort}-${rawMaterialId}-${questionTypeId}-${searchTerm}`;
   const feed = useInfiniteApiQuery<ForumQuestionListItem>(key, 20, ({ limit, offset }) =>
     api.forum.questions({
       sort,
       rawMaterialId: rawMaterialId || undefined,
       questionTypeId: questionTypeId || undefined,
-      q: debounced || undefined,
+      q: searchTerm || undefined,
       limit,
       offset,
     }),
@@ -60,32 +61,36 @@ export function ForumListView() {
 
   const userName = user ? `${user.firstName} ${user.lastName.charAt(0)}.`.trim() : "Участник";
   const countLabel = `${feed.total} ${pluralizeRu(feed.total, "вопрос", "вопроса", "вопросов")}`;
-  const showPinned = pinned.data.length > 0 && sort === "newest" && !debounced;
+  const solvedLabel = `${summary.data.solvedQuestionsCount} ${pluralizeRu(
+    summary.data.solvedQuestionsCount,
+    "решённый вопрос",
+    "решённых вопроса",
+    "решённых вопросов",
+  )} на форуме`;
+  const showPinned = pinned.data.length > 0 && sort === "newest" && !searchTerm;
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSearchTerm(queryDraft.trim());
+  };
 
   return (
     <AppShell>
       <section className="page forum-page">
         <div className="forum-hero">
-          <div className="forum-hero__head">
-            <div>
-              <p className="forum-kicker">Сообщество</p>
-              <h1 className="forum-title">Форум</h1>
-              <p className="forum-subtitle">Вопросы и ответы сообщества — отраслевая память, которую находят поиском</p>
-            </div>
-            <Link href="/forum/ask" className="button">
-              Задать вопрос
-            </Link>
-          </div>
-          <label className="forum-search">
-            <Search size={18} aria-hidden="true" />
+          <h1 className="forum-title">Найдите готовый ответ — или спросите тех, кто уже сталкивался</h1>
+          <form className="forum-search" onSubmit={handleSearch}>
+            <Search size={22} aria-hidden="true" />
             <input
               type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              value={queryDraft}
+              onChange={(event) => setQueryDraft(event.target.value)}
               placeholder="Например: документы на перевозку макулатуры"
               aria-label="Поиск по форуму"
             />
-          </label>
+            <button type="submit">Искать</button>
+          </form>
+          <p className="forum-hero__metric">{solvedLabel} · обновляется ежедневно</p>
         </div>
 
         <div className="forum-layout">
@@ -125,9 +130,6 @@ export function ForumListView() {
                   </select>
                 </div>
               </div>
-              <p className="forum-filters__note">
-                <Lock size={14} /> Значения тегов ведёт администратор — поэтому список не разрастается
-              </p>
             </div>
 
             <div className="forum-feed-head">
@@ -153,7 +155,7 @@ export function ForumListView() {
             {feed.state === "ready" && feed.items.length === 0 ? (
               <div className="forum-empty">
                 <p>
-                  {debounced
+                  {searchTerm
                     ? "Ничего не найдено. Попробуйте изменить запрос или задайте вопрос."
                     : "Вопросов пока нет. Будьте первым — задайте вопрос."}
                 </p>
@@ -173,8 +175,11 @@ export function ForumListView() {
           <aside className="forum-aside">
             <AsideProfile
               name={userName}
+              avatarUrl={user?.avatarUrl ?? null}
               companyType={user?.company?.type ?? null}
               verified={user?.company?.status === "active"}
+              summary={summary.data.currentUser}
+              weeklyExperts={summary.data.weeklyExperts}
             />
           </aside>
         </div>

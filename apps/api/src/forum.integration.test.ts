@@ -81,6 +81,43 @@ describe("Forum: полный цикл", () => {
     // Находится поиском по телу ответа/заголовку.
     const search = await ctx.http.get("/api/forum?q=межрегиональной").set(auth(responder.token));
     expect(search.body.items.some((item: { id: string }) => item.id === questionId)).toBe(true);
+
+    // Summary: общие метрики, профиль текущего пользователя и недельный рейтинг.
+    const oldQuestionId = await ask(asker.token, {
+      title: "Старый решённый вопрос",
+      body: "Решение было принято раньше текущей недели.",
+      rawMaterialId,
+      questionTypeId,
+    });
+    const oldAnswerId = await answer(responder.token, oldQuestionId, "Старый лучший ответ.");
+    const oldAccept = await ctx.http
+      .post(`/api/forum/q/${oldQuestionId}/accept`)
+      .set(auth(asker.token))
+      .send({ answerId: oldAnswerId });
+    expect(oldAccept.status).toBe(201);
+    await ctx.prisma.forumQuestion.update({ where: { id: oldQuestionId }, data: { solvedAt: new Date("2020-01-01") } });
+
+    const hiddenQuestionId = await ask(asker.token, {
+      title: "Вопрос со скрытым ответом",
+      rawMaterialId,
+      questionTypeId,
+    });
+    const hiddenAnswerId = await answer(
+      responder.token,
+      hiddenQuestionId,
+      "Этот ответ скрыт и не должен попасть в счётчики.",
+    );
+    await ctx.prisma.forumAnswer.update({ where: { id: hiddenAnswerId }, data: { hidden: true } });
+
+    const summary = await ctx.http.get("/api/forum/summary").set(auth(responder.token));
+    expect(summary.status).toBe(200);
+    expect(summary.body.solvedQuestionsCount).toBe(2);
+    expect(summary.body.currentUser).toMatchObject({ answersCount: 2, solvedAnswersCount: 2 });
+    expect(summary.body.weeklyExperts).toHaveLength(1);
+    expect(summary.body.weeklyExperts[0]).toMatchObject({
+      solvedAnswersCount: 1,
+      author: { userId: responder.userId },
+    });
   });
 });
 

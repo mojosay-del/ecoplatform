@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { ContentStatus, ForumQuestionStatus, Prisma } from "@prisma/client";
+import type { ForumSummary } from "@ecoplatform/shared";
 import type { z } from "zod";
 import { assertFunctionalAccess, hasAnyRole, isPlatformStaff } from "../common/access-policy";
 import { paginatedResponse, resolvePagination } from "../common/pagination";
@@ -19,7 +20,7 @@ import {
   setForumSubscription,
   updateForumQuestion,
 } from "./forum-question-workflow.helpers";
-import { buildForumReputationMap } from "./forum-reputation.helpers";
+import { buildForumReputationMap, fallbackReputation } from "./forum-reputation.helpers";
 import {
   mapForumQuestionDetail,
   mapForumQuestionListItem,
@@ -41,6 +42,7 @@ type ForumAnswerInput = z.infer<typeof forumAnswerInputSchema>;
 type ForumAcceptInput = z.infer<typeof forumAcceptInputSchema>;
 
 const PINNED_NEWS_LIMIT = 10;
+const WEEKLY_EXPERTS_LIMIT = 3;
 
 // Раздел «Форум» — Q&A сообщества. Чтение/запись для авторизованных с активным
 // доступом (staff проходит всегда). Админ-эндпоинты — в ForumAdminService.
@@ -137,6 +139,49 @@ export class ForumService {
     return {
       rawMaterials: rawMaterials.map(toTaxonomyValue),
       questionTypes: questionTypes.map(toTaxonomyValue),
+    };
+  }
+
+  async summary(user: RequestUser): Promise<ForumSummary> {
+    assertFunctionalAccess(user);
+    const weekStart = startOfCurrentWeekUtc();
+
+    const [solvedQuestionsCount, answersCount, solvedAnswersCount, weeklyGroups] = await Promise.all([
+      this.prisma.forumQuestion.count({ where: { status: ForumQuestionStatus.solved } }),
+      this.prisma.forumAnswer.count({ where: { authorId: user.id, hidden: false } }),
+      this.prisma.forumAnswer.count({ where: { authorId: user.id, hidden: false, isAccepted: true } }),
+      this.prisma.forumAnswer.groupBy({
+        by: ["authorId"],
+        where: {
+          hidden: false,
+          isAccepted: true,
+          question: {
+            status: ForumQuestionStatus.solved,
+            solvedAt: { gte: weekStart },
+          },
+        },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const sortedGroups = weeklyGroups
+      .sort((left, right) => right._count._all - left._count._all || left.authorId.localeCompare(right.authorId))
+      .slice(0, WEEKLY_EXPERTS_LIMIT);
+    const reputation = await buildForumReputationMap(
+      this.prisma,
+      sortedGroups.map((row) => row.authorId),
+    );
+
+    return {
+      solvedQuestionsCount,
+      currentUser: {
+        answersCount,
+        solvedAnswersCount,
+      },
+      weeklyExperts: sortedGroups.map((row) => ({
+        author: reputation.get(row.authorId) ?? fallbackReputation(row.authorId),
+        solvedAnswersCount: row._count._all,
+      })),
     };
   }
 
@@ -253,4 +298,11 @@ export class ForumService {
     // newest и unanswered — по свежести.
     return [{ createdAt: "desc" }];
   }
+}
+
+function startOfCurrentWeekUtc(now = new Date()): Date {
+  const day = now.getUTCDay() || 7;
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  start.setUTCDate(start.getUTCDate() - day + 1);
+  return start;
 }

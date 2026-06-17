@@ -32,6 +32,11 @@ export class ForumController {
     return this.forum.taxonomy(user);
   }
 
+  @Get("summary")
+  async summary(@CurrentUser() user: RequestUser) {
+    return this.forum.summary(user);
+  }
+
   @Get("q/:id")
   async question(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.forum.getQuestion(id, user);

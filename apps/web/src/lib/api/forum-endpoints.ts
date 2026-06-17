@@ -2,6 +2,7 @@ import type {
   ForumPinnedNews,
   ForumQuestionDetail,
   ForumQuestionListItem,
+  ForumSummary,
   ForumTaxonomy,
   PaginatedResponse,
 } from "@ecoplatform/shared";
@@ -43,6 +44,7 @@ export const forumApi = {
   question: (id: string) => apiFetch<ForumQuestionDetail>(`/forum/q/${enc(id)}`),
   taxonomy: () => apiFetch<ForumTaxonomy>("/forum/taxonomy"),
   pinnedNews: () => apiFetch<ForumPinnedNews[]>("/forum/pinned-news"),
+  summary: () => apiFetch<ForumSummary>("/forum/summary"),
 
   ask: (body: ForumQuestionInput) => apiFetch<{ id: string }>("/forum/q", { method: "POST", body }),
   updateQuestion: (id: string, body: Partial<ForumQuestionInput>) =>

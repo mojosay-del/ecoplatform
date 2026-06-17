@@ -45,6 +45,20 @@ export type ForumAuthorReputation = {
   forumSolved: number;
 };
 
+export type ForumWeeklyExpert = {
+  author: ForumAuthorReputation;
+  solvedAnswersCount: number;
+};
+
+export type ForumSummary = {
+  solvedQuestionsCount: number;
+  currentUser: {
+    answersCount: number;
+    solvedAnswersCount: number;
+  };
+  weeklyExperts: ForumWeeklyExpert[];
+};
+
 // Карточка вопроса в ленте.
 export type ForumQuestionListItem = {
   id: string;

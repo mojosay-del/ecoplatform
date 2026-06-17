@@ -3,8 +3,8 @@
 import Link from "next/link";
 import {
   ArrowUp,
+  Award,
   BadgeCheck,
-  Bell,
   CircleCheck,
   Clock,
   Eye,
@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Newspaper,
   Pin,
+  Plus,
   Store,
 } from "lucide-react";
 import type {
@@ -21,6 +22,7 @@ import type {
   ForumPinnedNews,
   ForumQuestionListItem,
   ForumQuestionStatus,
+  ForumSummary,
   ForumTaxonomyValue,
 } from "@ecoplatform/shared";
 import {
@@ -148,33 +150,54 @@ export function PinnedNewsCard({ item }: { item: ForumPinnedNews }) {
 // Мини-профиль текущего пользователя + связанные разделы (правая колонка ленты).
 export function AsideProfile({
   name,
+  avatarUrl,
   companyType,
   verified,
+  summary,
+  weeklyExperts,
 }: {
   name: string;
+  avatarUrl: string | null;
   companyType: ForumAuthorReputation["companyType"];
   verified: boolean;
+  summary: ForumSummary["currentUser"];
+  weeklyExperts: ForumSummary["weeklyExperts"];
 }) {
   const role = companyRoleLabel(companyType);
+  const profileRoleLabel = role ?? (verified ? "Проверенный профиль" : null);
   return (
     <>
-      <div className="card">
+      <div className="card forum-profile-card">
         <h4>Ваш профиль</h4>
         <div className="forum-prof">
-          <span className="forum-avatar">{initialsFromName(name)}</span>
+          <span className="forum-avatar forum-avatar--profile" aria-hidden="true">
+            {avatarUrl ? <img src={avatarUrl} alt="" /> : initialsFromName(name)}
+          </span>
           <div>
             <b>{name}</b>
-            {verified ? (
-              <span className="forum-verified">
-                <BadgeCheck size={14} /> {role ? `Проверенный · ${role}` : "Проверенный"}
+            {profileRoleLabel ? (
+              <span className="forum-profile-role">
+                <BadgeCheck size={15} /> {profileRoleLabel}
               </span>
-            ) : role ? (
-              <span className="forum-rep">{role}</span>
             ) : null}
           </div>
         </div>
-        <Link href="/forum/ask" className="button" style={{ width: "100%", justifyContent: "center", marginTop: 6 }}>
-          Задать вопрос
+        <div className="forum-stat-grid">
+          <div className="forum-stat-cell">
+            <span>Ответов</span>
+            <b>{summary.answersCount}</b>
+          </div>
+          <div className="forum-stat-cell">
+            <span>Решено</span>
+            <b>{summary.solvedAnswersCount}</b>
+          </div>
+        </div>
+        <p className="forum-profile-hint">
+          <Award size={20} aria-hidden="true" />
+          <span>Ответы, выбранные решением, повышают вашу репутацию на форуме</span>
+        </p>
+        <Link href="/forum/ask" className="button forum-profile-cta">
+          <Plus size={22} aria-hidden="true" /> Задать вопрос
         </Link>
       </div>
 
@@ -191,10 +214,32 @@ export function AsideProfile({
             <Store size={18} /> Объявления <span className="sub">сделки</span>
           </Link>
         </div>
-        <div className="forum-stat" style={{ marginTop: 12, color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>
-          <Bell size={15} /> Уведомления об ответах — в колокольчике
-        </div>
       </div>
+
+      <WeeklyExpertsCard experts={weeklyExperts} />
     </>
+  );
+}
+
+function WeeklyExpertsCard({ experts }: { experts: ForumSummary["weeklyExperts"] }) {
+  return (
+    <div className="card forum-experts-card">
+      <h4>Эксперты недели</h4>
+      {experts.length > 0 ? (
+        <div className="forum-experts-list">
+          {experts.map((expert, index) => (
+            <div key={expert.author.userId} className="forum-expert-row">
+              <span className="forum-expert-rank" aria-label={`${index + 1} место`}>
+                {index + 1}
+              </span>
+              <span className="forum-expert-name">{expert.author.name}</span>
+              <span className="forum-expert-score">+{expert.solvedAnswersCount}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="forum-experts-empty">На этой неделе ещё нет ответов, выбранных решением.</p>
+      )}
+    </div>
   );
 }
