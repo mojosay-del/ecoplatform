@@ -75,7 +75,7 @@ export function AccountMenu({
         {...settingsIconPlayback}
         onClick={() => setOpen((value) => !value)}
       >
-        <AnimatedNavIcon name="settings" ref={settingsIconRef} size={24} />
+        <AnimatedNavIcon name="settings" ref={settingsIconRef} size={25} />
       </button>
       {open ? (
         <div className="account-menu-popover" role="menu" aria-label="Меню аккаунта">
@@ -154,7 +154,7 @@ function AccountMenuLink({
       role="menuitem"
       scroll={accountSection ? false : undefined}
     >
-      <AnimatedNavIcon name={item.icon} ref={iconRef} size={20} />
+      <AnimatedNavIcon name={item.icon} ref={iconRef} size={22} />
       <span>{item.label}</span>
     </Link>
   );
@@ -172,7 +172,7 @@ function AccountMenuLogout({ onLogout }: { onLogout: () => Promise<void> }) {
       onClick={() => void onLogout()}
       role="menuitem"
     >
-      <AnimatedNavIcon name="logout" ref={iconRef} size={20} />
+      <AnimatedNavIcon name="logout" ref={iconRef} size={22} />
       <span>Выйти</span>
     </button>
   );

@@ -136,7 +136,7 @@ export function NewsLikeButton({
       aria-label={post.likedByMe ? `Убрать лайк, сейчас ${likesCount}` : `Поставить лайк, сейчас ${likesCount}`}
       aria-pressed={Boolean(post.likedByMe)}
     >
-      <LikeActionIcon ref={iconRef} size={20} />
+      <LikeActionIcon ref={iconRef} size={24} />
       <strong>{likesCount}</strong>
     </button>
   );

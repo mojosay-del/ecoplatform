@@ -12,7 +12,7 @@ import { ArrowLeft, Bell, BellOff, CircleCheck, Clock, Eye, Flag, MessageSquare,
 import type { ForumAnswerItem, ForumAnswerReplyItem, ForumQuestionDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import {
-  LikeActionIcon,
+  ArrowUpActionIcon,
   SendActionIcon,
   type AnimatedNavIconHandle,
   useAnimatedNavIconPlayback,
@@ -353,7 +353,7 @@ function AnswerItem({
           onClick={onVote}
           {...voteIconPlayback}
         >
-          <LikeActionIcon ref={voteIconRef} size={20} />
+          <ArrowUpActionIcon ref={voteIconRef} size={20} />
         </button>
         <b>{answer.votesCount}</b>
       </div>

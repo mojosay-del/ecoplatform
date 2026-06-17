@@ -5,9 +5,9 @@ import "../../styles/forum.css";
 // лента вопросов с закреплёнными новостями сверху. Бесконечная лента, как на
 // площадке (useInfiniteApiQuery). Правая колонка — мини-профиль + связанные разделы.
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import type { ForumPinnedNews, ForumQuestionListItem, ForumSummary, ForumTaxonomy } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
@@ -17,6 +17,7 @@ import { AccessClosed, AuthRequired, ErrorState, pluralizeRu, useApiQuery } from
 import { AsideProfile, PinnedNewsCard, QuestionCard } from "./components";
 
 type ForumSort = "newest" | "unanswered" | "popular";
+type ForumFilterOption = { value: string; label: string };
 
 const SORTS: { value: ForumSort; label: string }[] = [
   { value: "newest", label: "Новые" },
@@ -30,6 +31,153 @@ const EMPTY_SUMMARY: ForumSummary = {
   currentUser: { answersCount: 0, solvedAnswersCount: 0 },
   weeklyExperts: [],
 };
+
+function ForumFilterSelect({
+  id,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  id: string;
+  label: string;
+  onChange: (value: string) => void;
+  options: ForumFilterOption[];
+  value: string;
+}) {
+  const generatedId = useId();
+  const listboxId = `${id}-${generatedId}-listbox`;
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(selectedIndex);
+  const selected = options[selectedIndex] ?? options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    setActiveIndex(selectedIndex);
+  }, [open, selectedIndex]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const activeItem = listRef.current?.querySelector<HTMLElement>(`[data-index="${activeIndex}"]`);
+    activeItem?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
+
+  const chooseOption = (index: number) => {
+    const option = options[index];
+    if (!option) return;
+
+    onChange(option.value);
+    setOpen(false);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) => Math.min((open ? current : selectedIndex) + 1, options.length - 1));
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) => Math.max((open ? current : selectedIndex) - 1, 0));
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex(0);
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex(options.length - 1);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      return;
+    }
+
+    if (event.key === "Tab") {
+      setOpen(false);
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (open) {
+        chooseOption(activeIndex);
+        return;
+      }
+      setOpen(true);
+    }
+  };
+
+  return (
+    <div className={`forum-filter-select${open ? " is-open" : ""}`} ref={rootRef}>
+      <button
+        aria-activedescendant={open ? `${listboxId}-${activeIndex}` : undefined}
+        aria-controls={open ? listboxId : undefined}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className="forum-filter-select-trigger"
+        id={id}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={handleKeyDown}
+        type="button"
+      >
+        <span>{selected?.label ?? label}</span>
+        <ChevronDown aria-hidden="true" className="forum-filter-select-chevron" size={18} />
+      </button>
+      {open ? (
+        <ul aria-labelledby={id} className="forum-filter-select-list" id={listboxId} ref={listRef} role="listbox">
+          {options.map((option, index) => (
+            <li
+              aria-selected={option.value === value}
+              className={`forum-filter-select-option${index === activeIndex ? " is-active" : ""}${
+                option.value === value ? " is-selected" : ""
+              }`}
+              data-index={index}
+              id={`${listboxId}-${index}`}
+              key={option.value}
+              onClick={() => chooseOption(index)}
+              onMouseEnter={() => setActiveIndex(index)}
+              role="option"
+            >
+              <span>{option.label}</span>
+              {option.value === value ? <Check aria-hidden="true" size={16} /> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 export function ForumListView() {
   const { user } = useAuth();
@@ -99,35 +247,29 @@ export function ForumListView() {
               <div className="forum-filters__row">
                 <div className="forum-field">
                   <label htmlFor="forum-mat">Вид сырья</label>
-                  <select
+                  <ForumFilterSelect
                     id="forum-mat"
-                    className="select"
+                    label="Вид сырья"
                     value={rawMaterialId}
-                    onChange={(event) => setRawMaterialId(event.target.value)}
-                  >
-                    <option value="">Все виды</option>
-                    {taxonomy.data.rawMaterials.map((value) => (
-                      <option key={value.id} value={value.id}>
-                        {value.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "", label: "Все виды" },
+                      ...taxonomy.data.rawMaterials.map((item) => ({ value: item.id, label: item.label })),
+                    ]}
+                    onChange={setRawMaterialId}
+                  />
                 </div>
                 <div className="forum-field">
                   <label htmlFor="forum-type">Тип вопроса</label>
-                  <select
+                  <ForumFilterSelect
                     id="forum-type"
-                    className="select"
+                    label="Тип вопроса"
                     value={questionTypeId}
-                    onChange={(event) => setQuestionTypeId(event.target.value)}
-                  >
-                    <option value="">Любой</option>
-                    {taxonomy.data.questionTypes.map((value) => (
-                      <option key={value.id} value={value.id}>
-                        {value.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "", label: "Любой" },
+                      ...taxonomy.data.questionTypes.map((item) => ({ value: item.id, label: item.label })),
+                    ]}
+                    onChange={setQuestionTypeId}
+                  />
                 </div>
               </div>
             </div>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import { X } from "lucide-react";
 import type { AccountSectionId, NavSection } from "../app-shell-nav";
-import { HideMenuIcon, type AnimatedNavIconHandle, useAnimatedNavIconPlayback } from "./nav-icons";
+import { HideMenuIcon, ShowMenuIcon, type AnimatedNavIconHandle, useAnimatedNavIconPlayback } from "./nav-icons";
 import { NavEntry } from "./NavEntry";
 
 export function AppSidebar({
@@ -52,7 +52,11 @@ export function AppSidebar({
           title={collapsed ? "Развернуть меню" : "Свернуть меню"}
           {...collapseIconPlayback}
         >
-          <HideMenuIcon ref={collapseIconRef} size={22} />
+          {collapsed ? (
+            <ShowMenuIcon ref={collapseIconRef} size={22} />
+          ) : (
+            <HideMenuIcon ref={collapseIconRef} size={22} />
+          )}
         </button>
       </div>
       {visibleNav.map((section) => (

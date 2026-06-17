@@ -23,7 +23,7 @@ import type {
   ForumSummary,
   ForumTaxonomyValue,
 } from "@ecoplatform/shared";
-import { LikeActionIcon } from "../../components/app-shell/nav-icons";
+import { ArrowUpActionIcon } from "../../components/app-shell/nav-icons";
 import {
   companyRoleLabel,
   forumStatusLabel,
@@ -111,7 +111,7 @@ export function QuestionCard({ question }: { question: ForumQuestionListItem }) 
         <Reputation author={question.author} />
         {question.topVotes > 0 ? (
           <span className="forum-stat">
-            <LikeActionIcon size={17} /> {question.topVotes}
+            <ArrowUpActionIcon size={17} /> {question.topVotes}
           </span>
         ) : null}
         <span className="forum-stat">

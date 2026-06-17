@@ -571,6 +571,7 @@
 .news-like-button strong {
   display: inline-grid;
   place-items: center;
+  align-self: center;
   min-width: 24px;
   height: 22px;
   border-radius: var(--radius-chip);
@@ -578,6 +579,23 @@
   background: rgb(var(--white-rgb) / 0.78);
   color: var(--primary-hover);
   font-size: 12px;
+  line-height: 1;
+}
+
+.news-like-button .eco-nav-icon,
+.comment-submit .eco-nav-icon {
+  flex: 0 0 auto;
+  --eco-nav-icon-offset-y: 0;
+}
+
+.news-like-button .eco-nav-icon-lottie-svg [stroke],
+.comment-submit .eco-nav-icon-lottie-svg [stroke] {
+  stroke: currentColor !important;
+}
+
+.news-like-button .eco-nav-icon-lottie-svg [fill]:not([fill="none"]),
+.comment-submit .eco-nav-icon-lottie-svg [fill]:not([fill="none"]) {
+  fill: currentColor !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -730,6 +748,7 @@
   min-width: 48px;
   padding: 0;
   border-radius: 14px;
+  color: var(--white);
 }
 
 .comments-empty {

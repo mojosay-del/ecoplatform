@@ -50,6 +50,8 @@ export function CommentsSection({
   const orderedComments = useMemo(() => sortCommentsChronologically(comments), [comments]);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const submitIconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const submitIconPlayback = useAnimatedNavIconPlayback(submitIconRef);
 
   useEffect(() => {
     const list = listRef.current;
@@ -134,9 +136,10 @@ export function CommentsSection({
               aria-label="Опубликовать комментарий"
               className="button comment-submit"
               disabled={!commentText.trim()}
+              {...submitIconPlayback}
               type="submit"
             >
-              <SendActionIcon size={20} />
+              <SendActionIcon ref={submitIconRef} size={24} />
             </button>
           </div>
         </form>

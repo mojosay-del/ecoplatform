@@ -169,6 +169,8 @@ input[type="checkbox"]:focus-visible {
 
 .app-shell[data-collapsed="true"] .nav-link {
   justify-content: center;
+  width: auto;
+  max-width: none;
   padding: 8px;
   gap: 0;
   margin-right: 0;
@@ -443,6 +445,8 @@ input[type="checkbox"]:focus-visible {
   align-items: center;
   position: relative;
   gap: 9px;
+  width: 191px;
+  max-width: calc(100% - 8px);
   min-height: 34px;
   margin-right: 8px;
   padding: 6px 10px;
@@ -590,6 +594,9 @@ input[type="checkbox"]:focus-visible {
   display: inline-flex;
   align-items: center;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   line-height: 1.15;
 }
 
@@ -612,6 +619,7 @@ input[type="checkbox"]:focus-visible {
 }
 
 .nav-link-child {
+  width: fit-content;
   min-height: 32px;
   padding: 6px 10px;
   font-size: 13px;
@@ -652,6 +660,20 @@ input[type="checkbox"]:focus-visible {
   background: var(--primary-soft);
   color: var(--primary-hover);
   font-weight: 600;
+}
+
+.nav-link.active .eco-nav-icon-lottie-svg [stroke],
+.topbar-breadcrumb-link .eco-nav-icon-lottie-svg [stroke],
+.topbar-breadcrumb-current .eco-nav-icon-lottie-svg [stroke],
+.topbar-breadcrumb-link > svg,
+.topbar-breadcrumb-current > svg {
+  stroke: var(--primary) !important;
+}
+
+.nav-link.active .eco-nav-icon-lottie-svg [fill]:not([fill="none"]),
+.topbar-breadcrumb-link .eco-nav-icon-lottie-svg [fill]:not([fill="none"]),
+.topbar-breadcrumb-current .eco-nav-icon-lottie-svg [fill]:not([fill="none"]) {
+  fill: var(--primary) !important;
 }
 
 .nav-link.disabled {
@@ -5289,9 +5311,9 @@ body.news-modal-open .app-shell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--muted);
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
   border-radius: 8px;
   cursor: pointer;
   flex-shrink: 0;
@@ -5302,9 +5324,16 @@ body.news-modal-open .app-shell {
 }
 
 .sidebar-collapse:hover {
-  color: var(--primary);
-  border-color: var(--primary);
-  background: var(--primary-soft);
+  color: var(--text-secondary);
+  background: var(--panel-soft);
+}
+
+.sidebar-collapse .eco-nav-icon-lottie-svg [stroke] {
+  stroke: currentColor !important;
+}
+
+.sidebar-collapse .eco-nav-icon-lottie-svg [fill]:not([fill="none"]) {
+  fill: currentColor !important;
 }
 
 .app-shell[data-collapsed="true"] .sidebar-head {

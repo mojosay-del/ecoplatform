@@ -89,7 +89,7 @@ export function NotificationBell() {
         {...iconPlayback}
         onClick={() => setOpen((value) => !value)}
       >
-        <AnimatedNavIcon name="notifications" ref={iconRef} size={25} />
+        <AnimatedNavIcon name="notifications" ref={iconRef} size={26} />
         {count > 0 ? <span className={`notification-badge ${count > 9 ? "wide" : ""}`}>{badgeLabel}</span> : null}
       </button>
       <NotificationsPopover

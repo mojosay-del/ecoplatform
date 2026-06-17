@@ -190,7 +190,7 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
               aria-label="Открыть поддержку"
               {...supportIconPlayback}
             >
-              <SupportTopbarIcon ref={supportIconRef} size={26} />
+              <SupportTopbarIcon ref={supportIconRef} size={27} />
             </button>
           )}
           <AccountMenu

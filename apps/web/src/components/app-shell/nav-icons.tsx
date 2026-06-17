@@ -19,6 +19,8 @@ import {
 } from "react";
 import type { NavIconKey } from "../app-shell-nav";
 import adminAnimation from "./iconsax/admin.json";
+import arrowCircleRightAnimation from "./iconsax/arrow-circle-right.json";
+import arrowUpAnimation from "./iconsax/arrow-up.json";
 import calculatorAnimation from "./iconsax/calculator.json";
 import docsAnimation from "./iconsax/docs.json";
 import educationAnimation from "./iconsax/education.json";
@@ -50,9 +52,10 @@ type AnimatedLucideIconProps = SVGProps<SVGSVGElement> & {
 type AnimatedLucideIconComponent = ForwardRefExoticComponent<AnimatedLucideIconProps & RefAttributes<SVGSVGElement>>;
 
 type LottieAnimationData = object;
-type AnimatedIconKey = NavIconKey | "hide-menu" | "like" | "send" | "support";
+type AnimatedIconKey = NavIconKey | "arrow-up" | "hide-menu" | "like" | "send" | "show-menu" | "support";
 type LottieNavIconKey =
   | "admin"
+  | "arrow-up"
   | "calculator"
   | "docs"
   | "education"
@@ -69,6 +72,7 @@ type LottieNavIconKey =
   | "send"
   | "sessions"
   | "settings"
+  | "show-menu"
   | "subscription"
   | "support";
 type LottieNavIconConfig = {
@@ -88,6 +92,7 @@ const NAV_ICON_COMPONENTS: Record<Exclude<AnimatedIconKey, LottieNavIconKey>, An
 
 const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
   admin: { animationData: adminAnimation },
+  "arrow-up": { animationData: arrowUpAnimation },
   calculator: { animationData: calculatorAnimation },
   docs: { animationData: docsAnimation },
   education: { animationData: educationAnimation },
@@ -108,6 +113,7 @@ const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
   send: { animationData: sendAnimation },
   sessions: { animationData: sessionsAnimation },
   settings: { animationData: settingsAnimation },
+  "show-menu": { animationData: arrowCircleRightAnimation },
   subscription: { animationData: subscriptionAnimation },
   support: { animationData: supportAnimation },
 };
@@ -230,6 +236,20 @@ export const HideMenuIcon = forwardRef<AnimatedNavIconHandle, ActionIconProps>(f
   ref,
 ) {
   return <AnimatedNavIcon className={className} name="hide-menu" ref={ref} size={size} />;
+});
+
+export const ShowMenuIcon = forwardRef<AnimatedNavIconHandle, ActionIconProps>(function ShowMenuIcon(
+  { className, size = 22 },
+  ref,
+) {
+  return <AnimatedNavIcon className={className} name="show-menu" ref={ref} size={size} />;
+});
+
+export const ArrowUpActionIcon = forwardRef<AnimatedNavIconHandle, ActionIconProps>(function ArrowUpActionIcon(
+  { className, size = 19 },
+  ref,
+) {
+  return <AnimatedNavIcon className={className} name="arrow-up" ref={ref} size={size} />;
 });
 
 export const LikeActionIcon = forwardRef<AnimatedNavIconHandle, ActionIconProps>(function LikeActionIcon(
