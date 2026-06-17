@@ -10,6 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import {
   acceptForumAnswer,
   createForumAnswer,
+  createForumAnswerReply,
   deleteForumAnswer,
   toggleForumVote,
   updateForumAnswer,
@@ -69,7 +70,7 @@ export class ForumService {
           rawMaterial: true,
           questionType: true,
           // Для превью принятого ответа в ленте.
-          answers: { where: { isAccepted: true, hidden: false }, take: 1 },
+          answers: { where: { isAccepted: true, parentAnswerId: null, hidden: false }, take: 1 },
         },
       }),
     ]);
@@ -90,8 +91,14 @@ export class ForumService {
         rawMaterial: true,
         questionType: true,
         answers: {
-          where: { hidden: false },
+          where: { hidden: false, parentAnswerId: null },
           orderBy: [{ isAccepted: "desc" }, { votesCount: "desc" }, { createdAt: "asc" }],
+          include: {
+            replies: {
+              where: { hidden: false },
+              orderBy: { createdAt: "asc" },
+            },
+          },
         },
       },
     })) as (ForumQuestionRow & { answers: NonNullable<ForumQuestionRow["answers"]> }) | null;
@@ -101,7 +108,10 @@ export class ForumService {
       throw new NotFoundException("Вопрос не найден.");
     }
 
-    const authorIds = [row.authorId, ...row.answers.map((answer) => answer.authorId)];
+    const authorIds = [
+      row.authorId,
+      ...row.answers.flatMap((answer) => [answer.authorId, ...(answer.replies ?? []).map((reply) => reply.authorId)]),
+    ];
     const [reputation, votes, subscription] = await Promise.all([
       buildForumReputationMap(this.prisma, authorIds),
       this.prisma.forumAnswerVote.findMany({
@@ -164,11 +174,14 @@ export class ForumService {
 
     const [solvedQuestionsCount, answersCount, solvedAnswersCount, weeklyGroups] = await Promise.all([
       this.prisma.forumQuestion.count({ where: { status: ForumQuestionStatus.solved } }),
-      this.prisma.forumAnswer.count({ where: { authorId: user.id, hidden: false } }),
-      this.prisma.forumAnswer.count({ where: { authorId: user.id, hidden: false, isAccepted: true } }),
+      this.prisma.forumAnswer.count({ where: { authorId: user.id, parentAnswerId: null, hidden: false } }),
+      this.prisma.forumAnswer.count({
+        where: { authorId: user.id, parentAnswerId: null, hidden: false, isAccepted: true },
+      }),
       this.prisma.forumAnswer.groupBy({
         by: ["authorId"],
         where: {
+          parentAnswerId: null,
           hidden: false,
           isAccepted: true,
           question: {
@@ -246,6 +259,14 @@ export class ForumService {
   async answer(questionId: string, input: ForumAnswerInput, user: RequestUser) {
     assertFunctionalAccess(user);
     return createForumAnswer(this.workflowDeps(), questionId, input.body, {
+      id: user.id,
+      companyId: user.companyId,
+    });
+  }
+
+  async reply(answerId: string, input: ForumAnswerInput, user: RequestUser) {
+    assertFunctionalAccess(user);
+    return createForumAnswerReply(this.workflowDeps(), answerId, input.body, {
       id: user.id,
       companyId: user.companyId,
     });

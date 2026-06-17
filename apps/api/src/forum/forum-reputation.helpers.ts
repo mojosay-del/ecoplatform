@@ -61,7 +61,7 @@ export async function buildForumReputationMap(prisma: PrismaService, authorIds: 
 
   const solved = await prisma.forumAnswer.groupBy({
     by: ["authorId"],
-    where: { authorId: { in: ids }, isAccepted: true, hidden: false },
+    where: { authorId: { in: ids }, parentAnswerId: null, isAccepted: true, hidden: false },
     _count: { _all: true },
   });
   const solvedByAuthor = new Map(solved.map((row) => [row.authorId, row._count._all] as const));

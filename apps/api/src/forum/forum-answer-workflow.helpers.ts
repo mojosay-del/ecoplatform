@@ -58,6 +58,55 @@ export async function createForumAnswer(
   return answer;
 }
 
+export async function createForumAnswerReply(
+  deps: ForumAnswerWorkflowDeps,
+  answerId: string,
+  body: string,
+  author: { id: string; companyId: string | null },
+): Promise<{ id: string }> {
+  const parent = await deps.prisma.forumAnswer.findUnique({
+    where: { id: answerId },
+    select: {
+      id: true,
+      questionId: true,
+      parentAnswerId: true,
+      hidden: true,
+      parentAnswer: { select: { id: true, hidden: true } },
+      question: { select: { status: true } },
+    },
+  });
+  if (
+    !parent ||
+    parent.hidden ||
+    parent.question.status === ForumQuestionStatus.hidden ||
+    (parent.parentAnswerId && parent.parentAnswer?.hidden)
+  ) {
+    throw new NotFoundException("Ответ не найден.");
+  }
+
+  const rootAnswerId = parent.parentAnswerId ?? parent.id;
+  const reply = await deps.prisma.$transaction(async (tx) => {
+    const created = await tx.forumAnswer.create({
+      data: {
+        questionId: parent.questionId,
+        parentAnswerId: rootAnswerId,
+        authorId: author.id,
+        authorCompanyId: author.companyId,
+        body,
+      },
+      select: { id: true },
+    });
+    await tx.forumSubscription.upsert({
+      where: { questionId_userId: { questionId: parent.questionId, userId: author.id } },
+      create: { questionId: parent.questionId, userId: author.id },
+      update: {},
+    });
+    return created;
+  });
+
+  return reply;
+}
+
 export async function updateForumAnswer(
   deps: ForumAnswerWorkflowDeps,
   answerId: string,
@@ -109,10 +158,13 @@ export async function toggleForumVote(
 ): Promise<{ voted: boolean; votesCount: number }> {
   const answer = await deps.prisma.forumAnswer.findUnique({
     where: { id: answerId },
-    select: { id: true, authorId: true, hidden: true },
+    select: { id: true, authorId: true, parentAnswerId: true, hidden: true },
   });
   if (!answer || answer.hidden) {
     throw new NotFoundException("Ответ не найден.");
+  }
+  if (answer.parentAnswerId) {
+    throw new BadRequestException("За обсуждение ответа нельзя голосовать.");
   }
   if (answer.authorId === user.id) {
     throw new BadRequestException("Нельзя голосовать за свой ответ.");
@@ -165,14 +217,17 @@ export async function acceptForumAnswer(
 
   const answer = await deps.prisma.forumAnswer.findUnique({
     where: { id: answerId },
-    select: { id: true, questionId: true, authorId: true, hidden: true },
+    select: { id: true, questionId: true, authorId: true, parentAnswerId: true, hidden: true },
   });
   if (!answer || answer.questionId !== questionId || answer.hidden) {
     throw new NotFoundException("Ответ не найден.");
   }
+  if (answer.parentAnswerId) {
+    throw new BadRequestException("Обсуждение ответа нельзя отметить решением.");
+  }
 
   await deps.prisma.$transaction(async (tx) => {
-    await tx.forumAnswer.updateMany({ where: { questionId }, data: { isAccepted: false } });
+    await tx.forumAnswer.updateMany({ where: { questionId, parentAnswerId: null }, data: { isAccepted: false } });
     await tx.forumAnswer.update({ where: { id: answerId }, data: { isAccepted: true } });
     await recomputeForumQuestionState(tx, questionId);
   });

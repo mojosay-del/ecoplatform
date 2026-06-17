@@ -7,7 +7,7 @@ import { ForumQuestionStatus, type Prisma } from "@prisma/client";
 export async function recomputeForumQuestionState(tx: Prisma.TransactionClient, questionId: string): Promise<void> {
   const [answers, question] = await Promise.all([
     tx.forumAnswer.findMany({
-      where: { questionId, hidden: false },
+      where: { questionId, parentAnswerId: null, hidden: false },
       select: { id: true, isAccepted: true },
     }),
     tx.forumQuestion.findUnique({ where: { id: questionId }, select: { status: true, solvedAt: true } }),

@@ -55,6 +55,8 @@ export const forumApi = {
 
   answer: (questionId: string, body: { body: string }) =>
     apiFetch<{ id: string }>(`/forum/q/${enc(questionId)}/answers`, { method: "POST", body }),
+  reply: (answerId: string, body: { body: string }) =>
+    apiFetch<{ id: string }>(`/forum/answers/${enc(answerId)}/replies`, { method: "POST", body }),
   updateAnswer: (answerId: string, body: { body: string }) =>
     apiFetch<{ id: string }>(`/forum/answers/${enc(answerId)}`, { method: "PATCH", body }),
   deleteAnswer: (answerId: string) => apiFetch<{ ok: true }>(`/forum/answers/${enc(answerId)}`, { method: "DELETE" }),

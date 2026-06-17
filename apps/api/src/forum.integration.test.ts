@@ -38,6 +38,12 @@ async function answer(token: string, questionId: string, body: string): Promise<
   return res.body.id as string;
 }
 
+async function reply(token: string, answerId: string, body: string): Promise<string> {
+  const res = await ctx.http.post(`/api/forum/answers/${answerId}/replies`).set(auth(token)).send({ body });
+  expect(res.status).toBe(201);
+  return res.body.id as string;
+}
+
 describe("Forum: полный цикл", () => {
   it("ask → answer → vote → accept → solved → находится поиском", async () => {
     const adminToken = await loginAdmin();
@@ -118,6 +124,131 @@ describe("Forum: полный цикл", () => {
       solvedAnswersCount: 1,
       author: { userId: responder.userId },
     });
+  });
+});
+
+describe("Forum: ветки обсуждения под ответами", () => {
+  it("reply виден под ответом, но не влияет на статус, счётчики, голосование и выбор решения", async () => {
+    const adminToken = await loginAdmin();
+    const asker = await registerCompany("0900060");
+    const responder = await registerCompany("0900061");
+    const commenter = await registerCompany("0900062");
+    const rawMaterialId = await createRawMaterial(adminToken, "Плёнка ПВД");
+    const questionTypeId = await createQuestionType(adminToken, "Документы-ветки");
+    const questionId = await ask(asker.token, {
+      title: "Нужна ли допсверка по документам?",
+      rawMaterialId,
+      questionTypeId,
+    });
+    const answerId = await answer(responder.token, questionId, "Основной ответ на вопрос.");
+
+    const before = await ctx.http.get(`/api/forum/q/${questionId}`).set(auth(asker.token));
+    expect(before.status).toBe(200);
+    expect(before.body.status).toBe("answered");
+    expect(before.body.answersCount).toBe(1);
+
+    const replyId = await reply(commenter.token, answerId, "Уточнение к ответу без статуса основного ответа.");
+
+    const after = await ctx.http.get(`/api/forum/q/${questionId}`).set(auth(asker.token));
+    expect(after.status).toBe(200);
+    expect(after.body.status).toBe("answered");
+    expect(after.body.answersCount).toBe(1);
+    expect(after.body.answers).toHaveLength(1);
+    expect(after.body.answers[0].id).toBe(answerId);
+    expect(after.body.answers[0].replies).toHaveLength(1);
+    expect(after.body.answers[0].replies[0]).toMatchObject({
+      id: replyId,
+      body: "Уточнение к ответу без статуса основного ответа.",
+    });
+
+    const voteReply = await ctx.http.post(`/api/forum/answers/${replyId}/vote`).set(auth(asker.token));
+    expect(voteReply.status).toBe(400);
+
+    const acceptReply = await ctx.http
+      .post(`/api/forum/q/${questionId}/accept`)
+      .set(auth(asker.token))
+      .send({ answerId: replyId });
+    expect(acceptReply.status).toBe(400);
+  });
+
+  it("reply на reply прикрепляется к верхнему ответу, missing/hidden parent дают 404", async () => {
+    const adminToken = await loginAdmin();
+    const asker = await registerCompany("0900063");
+    const responder = await registerCompany("0900064");
+    const commenter = await registerCompany("0900065");
+    const rawMaterialId = await createRawMaterial(adminToken, "ПНД канистры");
+    const questionTypeId = await createQuestionType(adminToken, "Практика-ветки");
+    const questionId = await ask(asker.token, {
+      title: "Как спорить с ошибочным ответом?",
+      rawMaterialId,
+      questionTypeId,
+    });
+    const answerId = await answer(responder.token, questionId, "Корневой ответ.");
+    const firstReplyId = await reply(commenter.token, answerId, "Первое уточнение.");
+    const secondReplyId = await reply(responder.token, firstReplyId, "Ответ на уточнение.");
+
+    const secondReply = await ctx.prisma.forumAnswer.findUnique({
+      where: { id: secondReplyId },
+      select: { parentAnswerId: true },
+    });
+    expect(secondReply?.parentAnswerId).toBe(answerId);
+
+    const detail = await ctx.http.get(`/api/forum/q/${questionId}`).set(auth(asker.token));
+    expect(detail.status).toBe(200);
+    expect(detail.body.answers[0].replies.map((item: { id: string }) => item.id)).toEqual([
+      firstReplyId,
+      secondReplyId,
+    ]);
+
+    const missing = await ctx.http
+      .post("/api/forum/answers/missing-answer-id/replies")
+      .set(auth(commenter.token))
+      .send({ body: "Не должно создаться." });
+    expect(missing.status).toBe(404);
+
+    await ctx.prisma.forumAnswer.update({ where: { id: answerId }, data: { hidden: true } });
+    const hidden = await ctx.http
+      .post(`/api/forum/answers/${answerId}/replies`)
+      .set(auth(commenter.token))
+      .send({ body: "Не должно создаться." });
+    expect(hidden.status).toBe(404);
+  });
+
+  it("скрытие верхнего ответа убирает ветку из выдачи, жалоба на reply создаёт кейс forum_answer", async () => {
+    const adminToken = await loginAdmin();
+    const asker = await registerCompany("0900066");
+    const responder = await registerCompany("0900067");
+    const reporter = await registerCompany("0900068");
+    const rawMaterialId = await createRawMaterial(adminToken, "Картон ветки");
+    const questionTypeId = await createQuestionType(adminToken, "Модерация-ветки");
+    const questionId = await ask(asker.token, {
+      title: "Ветка должна скрываться вместе с ответом?",
+      rawMaterialId,
+      questionTypeId,
+    });
+    const answerId = await answer(responder.token, questionId, "Ответ с обсуждением.");
+    const replyId = await reply(reporter.token, answerId, "Спорная реплика.");
+
+    const complaint = await ctx.http
+      .post("/api/moderation/complaints")
+      .set(auth(asker.token))
+      .send({ entityType: "forum_answer", entityId: replyId, reasonCode: "false_information" });
+    expect(complaint.status).toBe(201);
+
+    const moderationCase = await ctx.prisma.moderationCase.findFirst({
+      where: { entityType: "forum_answer", entityId: replyId },
+    });
+    expect(moderationCase).not.toBeNull();
+
+    await ctx.prisma.$transaction(async (tx) => {
+      await tx.forumAnswer.update({ where: { id: answerId }, data: { hidden: true } });
+      await tx.forumQuestion.update({ where: { id: questionId }, data: { answersCount: 0, status: "open" } });
+    });
+
+    const detail = await ctx.http.get(`/api/forum/q/${questionId}`).set(auth(asker.token));
+    expect(detail.status).toBe(200);
+    expect(detail.body.answers).toHaveLength(0);
+    expect(detail.body.answersCount).toBe(0);
   });
 });
 

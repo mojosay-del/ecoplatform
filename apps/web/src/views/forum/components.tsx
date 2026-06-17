@@ -60,7 +60,7 @@ export function TagChips({
 export function Avatar({ author, className }: { author: ForumAuthorReputation; className?: string }) {
   return (
     <span className={className ?? "forum-avatar"} aria-hidden="true">
-      {author.avatarUrl ? <img src={author.avatarUrl} alt="" /> : initialsFromName(author.name)}
+      {author.avatarUrl ? <img src={author.avatarUrl} alt="" /> : initialsFromName(author.companyName ?? author.name)}
     </span>
   );
 }
@@ -68,14 +68,19 @@ export function Avatar({ author, className }: { author: ForumAuthorReputation; c
 // Репутация автора: имя + роль + «проверенный» + рейтинг + сделки + решено на форуме.
 export function Reputation({ author }: { author: ForumAuthorReputation }) {
   const role = companyRoleLabel(author.companyType);
+  const displayName = author.companyName ?? author.name;
+  const profileRoleLabel = role ?? (author.verified ? "Проверенный профиль" : null);
   return (
     <span className="forum-who">
       <Avatar author={author} />
-      <span>{author.name}</span>
-      {role ? <span>· {role}</span> : null}
-      {author.verified ? (
-        <span className="forum-verified" title="Проверенная компания">
-          <BadgeCheck size={14} /> проверенный
+      <span className="forum-author-name">{displayName}</span>
+      {profileRoleLabel ? (
+        <span
+          className="forum-profile-role forum-profile-role--inline"
+          title={author.verified ? "Проверенная компания" : undefined}
+        >
+          <BadgeCheck size={15} />
+          {profileRoleLabel}
         </span>
       ) : null}
       {author.rating != null ? <span className="forum-rep">★ {author.rating.toFixed(1)}</span> : null}

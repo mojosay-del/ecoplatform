@@ -92,6 +92,11 @@ export class ForumController {
     return this.forum.deleteAnswer(id, user);
   }
 
+  @Post("answers/:id/replies")
+  async reply(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.forum.reply(id, parseBody(forumAnswerInputSchema, body), user);
+  }
+
   @Post("answers/:id/vote")
   async vote(@Param("id") id: string, @CurrentUser() user: RequestUser) {
     return this.forum.vote(id, user);

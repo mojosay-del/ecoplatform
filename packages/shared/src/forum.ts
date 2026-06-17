@@ -93,18 +93,24 @@ export type ForumPinnedNews = {
   firstPublishedAt: IsoDateString | null;
 };
 
-// Ответ в карточке вопроса.
-export type ForumAnswerItem = {
+// Реплика в ветке под ответом. Это обсуждение ответа, а не самостоятельный ответ
+// на вопрос: у неё нет голосования и выбора «лучшим».
+export type ForumAnswerReplyItem = {
   id: string;
   body: string;
-  votesCount: number;
-  isAccepted: boolean;
-  // Проголосовал ли текущий пользователь «полезно» за этот ответ.
-  votedByMe: boolean;
   // Может ли текущий пользователь править/удалять (автор ответа или модератор/админ).
   canManage: boolean;
   author: ForumAuthorReputation;
   createdAt: IsoDateString;
+};
+
+// Ответ в карточке вопроса.
+export type ForumAnswerItem = ForumAnswerReplyItem & {
+  votesCount: number;
+  isAccepted: boolean;
+  // Проголосовал ли текущий пользователь «полезно» за этот ответ.
+  votedByMe: boolean;
+  replies: ForumAnswerReplyItem[];
 };
 
 // Полная карточка вопроса.

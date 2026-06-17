@@ -5,7 +5,7 @@ import "../../styles/forum.css";
 // правка/удаление своего, жалоба) + композер ответа + подписка. Тело — простой
 // текст (абзацы). Данные обновляются точечно (голос) или перезагрузкой (ответ/принятие).
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -22,7 +22,7 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
-import type { ForumAnswerItem, ForumQuestionDetail } from "@ecoplatform/shared";
+import type { ForumAnswerItem, ForumAnswerReplyItem, ForumQuestionDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
 import { ApiError } from "../../lib/api";
@@ -42,6 +42,7 @@ const REPORT_REASONS: { value: string; label: string }[] = [
 
 const DEFAULT_REPORT_REASON = "spam";
 const VIEW_RECORD_WINDOW_MS = 10_000;
+const FORUM_TEXTAREA_MAX_HEIGHT = 168;
 const recentlyRecordedViews = new Map<string, number>();
 
 type Flash = { text: string; error?: boolean } | null;
@@ -128,7 +129,8 @@ export function ForumQuestionView({ id }: { id: string }) {
     }
   };
 
-  const handleSubmitAnswer = async () => {
+  const handleSubmitAnswer = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     const body = answerBody.trim();
     if (!body) return;
     setSubmitting(true);
@@ -187,40 +189,41 @@ export function ForumQuestionView({ id }: { id: string }) {
 
           {flash ? <div className={`forum-flash${flash.error ? " is-error" : ""}`}>{flash.text}</div> : null}
 
-          <div className="forum-tags">
-            <StatusBadge status={detail.status} />
-            <TagChips rawMaterial={detail.rawMaterial} questionType={detail.questionType} />
-          </div>
-          <h1>{detail.title}</h1>
-          <div className="forum-meta">
-            <Reputation author={detail.author} />
-            <span className="forum-stat">
-              <Clock size={15} /> {relativeTime(detail.createdAt)}
-            </span>
-            <span className="forum-stat">
-              <Eye size={15} /> {detail.views}
-            </span>
-            <button type="button" className="forum-text-button" onClick={handleSubscribe}>
-              {detail.subscribed ? <BellOff size={15} /> : <Bell size={15} />}
-              {detail.subscribed ? "Отписаться" : "Подписаться на ответы"}
-            </button>
-            {detail.canManage ? (
-              <button type="button" className="forum-text-button is-danger" onClick={handleDeleteQuestion}>
-                <Trash2 size={15} /> Удалить вопрос
-              </button>
-            ) : null}
-          </div>
-
           <div className="forum-q-body">
-            {bodyParagraphs(detail.body).map((paragraph, index) => (
-              <p key={index}>{paragraph}</p>
-            ))}
-            {!detail.isAuthor ? (
-              <ReportControl
-                onSubmit={(reason, comment) => handleReport("forum_question", detail.id, reason, comment)}
-                label="Пожаловаться на вопрос"
-              />
-            ) : null}
+            <div className="forum-tags">
+              <StatusBadge status={detail.status} />
+              <TagChips rawMaterial={detail.rawMaterial} questionType={detail.questionType} />
+            </div>
+            <h1>{detail.title}</h1>
+            <div className="forum-q-text">
+              {bodyParagraphs(detail.body).map((paragraph, index) => (
+                <p key={index}>{paragraph}</p>
+              ))}
+            </div>
+            <div className="forum-meta">
+              <Reputation author={detail.author} />
+              <span className="forum-stat">
+                <Clock size={15} /> {relativeTime(detail.createdAt)}
+              </span>
+              <span className="forum-stat">
+                <Eye size={15} /> {detail.views}
+              </span>
+              <button type="button" className="forum-text-button" onClick={handleSubscribe}>
+                {detail.subscribed ? <BellOff size={15} /> : <Bell size={15} />}
+                {detail.subscribed ? "Отписаться" : "Подписаться на ответы"}
+              </button>
+              {detail.canManage ? (
+                <button type="button" className="forum-text-button is-danger" onClick={handleDeleteQuestion}>
+                  <Trash2 size={15} /> Удалить вопрос
+                </button>
+              ) : null}
+              {!detail.isAuthor ? (
+                <ReportControl
+                  onSubmit={(reason, comment) => handleReport("forum_question", detail.id, reason, comment)}
+                  label="Пожаловаться на вопрос"
+                />
+              ) : null}
+            </div>
           </div>
 
           <div className="forum-ans-head">
@@ -234,35 +237,35 @@ export function ForumQuestionView({ id }: { id: string }) {
               key={answer.id}
               answer={answer}
               isMine={answer.author.userId === user?.id}
+              currentUserId={user?.id ?? null}
               canAccept={canAccept && !answer.isAccepted}
               onVote={() => handleVote(answer)}
               onAccept={() => handleAccept(answer)}
               onChanged={refresh}
-              onReport={(reason, comment) => handleReport("forum_answer", answer.id, reason, comment)}
+              onReport={(answerId, reason, comment) => handleReport("forum_answer", answerId, reason, comment)}
               onFlash={setFlash}
             />
           ))}
 
           <div className="forum-composer">
             <label htmlFor="forum-answer">Ваш ответ</label>
-            <textarea
-              id="forum-answer"
-              className="textarea"
-              rows={5}
-              value={answerBody}
-              onChange={(event) => setAnswerBody(event.target.value)}
-              placeholder="Поделитесь тем, что сработало у вас на практике"
-            />
-            <div>
+            <form className="forum-inline-composer" onSubmit={handleSubmitAnswer}>
+              <AutoSizeTextarea
+                id="forum-answer"
+                value={answerBody}
+                onChange={setAnswerBody}
+                placeholder="Поделитесь тем, что сработало у вас на практике"
+              />
               <button
-                type="button"
-                className="button"
-                onClick={handleSubmitAnswer}
+                type="submit"
+                className="button forum-inline-submit forum-inline-submit--icon"
                 disabled={submitting || answerBody.trim().length === 0}
+                aria-label="Опубликовать ответ"
+                title="Опубликовать ответ"
               >
-                <Send size={16} /> Опубликовать ответ
+                <Send size={17} aria-hidden="true" />
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </section>
@@ -273,6 +276,7 @@ export function ForumQuestionView({ id }: { id: string }) {
 function AnswerItem({
   answer,
   isMine,
+  currentUserId,
   canAccept,
   onVote,
   onAccept,
@@ -282,16 +286,22 @@ function AnswerItem({
 }: {
   answer: ForumAnswerItem;
   isMine: boolean;
+  currentUserId: string | null;
   canAccept: boolean;
   onVote: () => void;
   onAccept: () => void;
   onChanged: () => Promise<void>;
-  onReport: (reason: string, comment: string) => Promise<void>;
+  onReport: (answerId: string, reason: string, comment: string) => Promise<void>;
   onFlash: (flash: Flash) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(answer.body);
   const [busy, setBusy] = useState(false);
+  const [discussionOpen, setDiscussionOpen] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyBody, setReplyBody] = useState("");
+  const [replyBusy, setReplyBusy] = useState(false);
+  const repliesCount = answer.replies.length;
 
   const saveEdit = async () => {
     const body = draft.trim();
@@ -318,10 +328,35 @@ function AnswerItem({
     }
   };
 
+  const submitReply = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const body = replyBody.trim();
+    if (!body) return;
+    setReplyBusy(true);
+    try {
+      await api.forum.reply(answer.id, { body });
+      setReplyBody("");
+      setReplyOpen(false);
+      setDiscussionOpen(true);
+      await onChanged();
+      onFlash({ text: "Ответ опубликован в обсуждении." });
+    } catch (error) {
+      onFlash({ text: messageFrom(error), error: true });
+    } finally {
+      setReplyBusy(false);
+    }
+  };
+
   return (
     <article className={`forum-answer${answer.isAccepted ? " forum-answer--best" : ""}`}>
       <div className="forum-vote">
-        <button type="button" aria-pressed={answer.votedByMe} aria-label="Полезно" onClick={onVote}>
+        <button
+          type="button"
+          aria-pressed={answer.votedByMe}
+          aria-label="Отметить этот ответ как наиболее подходящий"
+          title="Отметить этот ответ, как наиболее подходящий."
+          onClick={onVote}
+        >
           <ArrowUp size={18} />
         </button>
         <b>{answer.votesCount}</b>
@@ -370,11 +405,196 @@ function AnswerItem({
                 <Trash2 size={15} /> Удалить
               </button>
             ) : null}
-            {!isMine ? <ReportControl onSubmit={onReport} label="Пожаловаться" /> : null}
+            <button type="button" className="forum-text-button" onClick={() => setReplyOpen((open) => !open)}>
+              <MessageSquare size={15} /> Ответить
+            </button>
+            {repliesCount > 0 ? (
+              <button
+                type="button"
+                className="forum-text-button"
+                onClick={() => setDiscussionOpen((open) => !open)}
+                aria-expanded={discussionOpen}
+              >
+                <MessageSquare size={15} />{" "}
+                {discussionOpen ? "Скрыть обсуждение" : `Показать обсуждение (${repliesCount})`}
+              </button>
+            ) : null}
+            {!isMine ? (
+              <ReportControl
+                onSubmit={(reason, comment) => onReport(answer.id, reason, comment)}
+                label="Пожаловаться"
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {replyOpen ? (
+          <form className="forum-answer-reply-form" onSubmit={submitReply}>
+            <label className="forum-sr-only" htmlFor={`forum-reply-${answer.id}`}>
+              Ответить на ответ
+            </label>
+            <AutoSizeTextarea
+              id={`forum-reply-${answer.id}`}
+              value={replyBody}
+              onChange={setReplyBody}
+              placeholder="Добавьте уточнение или возражение"
+            />
+            <div className="forum-answer-actions">
+              <button type="submit" className="button forum-inline-submit" disabled={replyBusy || !replyBody.trim()}>
+                <Send size={16} aria-hidden="true" /> <span>Опубликовать</span>
+              </button>
+              <button type="button" className="forum-text-button" onClick={() => setReplyOpen(false)}>
+                Отмена
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {discussionOpen && repliesCount > 0 ? (
+          <div className="forum-answer-thread" aria-label="Обсуждение ответа">
+            {answer.replies.map((reply) => (
+              <AnswerReplyItem
+                key={reply.id}
+                reply={reply}
+                isMine={reply.author.userId === currentUserId}
+                onChanged={onChanged}
+                onReport={(reason, comment) => onReport(reply.id, reason, comment)}
+                onFlash={onFlash}
+              />
+            ))}
           </div>
         ) : null}
       </div>
     </article>
+  );
+}
+
+function AnswerReplyItem({
+  reply,
+  isMine,
+  onChanged,
+  onReport,
+  onFlash,
+}: {
+  reply: ForumAnswerReplyItem;
+  isMine: boolean;
+  onChanged: () => Promise<void>;
+  onReport: (reason: string, comment: string) => Promise<void>;
+  onFlash: (flash: Flash) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(reply.body);
+  const [busy, setBusy] = useState(false);
+
+  const saveEdit = async () => {
+    const body = draft.trim();
+    if (!body) return;
+    setBusy(true);
+    try {
+      await api.forum.updateAnswer(reply.id, { body });
+      setEditing(false);
+      await onChanged();
+    } catch (error) {
+      onFlash({ text: messageFrom(error), error: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!window.confirm("Удалить реплику из обсуждения?")) return;
+    try {
+      await api.forum.deleteAnswer(reply.id);
+      await onChanged();
+    } catch (error) {
+      onFlash({ text: messageFrom(error), error: true });
+    }
+  };
+
+  return (
+    <article className="forum-answer-reply">
+      <div className="forum-meta">
+        <Reputation author={reply.author} />
+        <span className="forum-stat">
+          <Clock size={15} /> {relativeTime(reply.createdAt)}
+        </span>
+      </div>
+
+      {editing ? (
+        <>
+          <AutoSizeTextarea
+            id={`forum-reply-edit-${reply.id}`}
+            value={draft}
+            onChange={setDraft}
+            ariaLabel="Текст реплики"
+          />
+          <div className="forum-answer-actions">
+            <button type="button" className="button" onClick={saveEdit} disabled={busy || !draft.trim()}>
+              Сохранить
+            </button>
+            <button type="button" className="forum-text-button" onClick={() => setEditing(false)}>
+              Отмена
+            </button>
+          </div>
+        </>
+      ) : (
+        bodyParagraphs(reply.body).map((paragraph, index) => <p key={index}>{paragraph}</p>)
+      )}
+
+      {!editing ? (
+        <div className="forum-answer-actions">
+          {isMine ? (
+            <button type="button" className="forum-text-button" onClick={() => setEditing(true)}>
+              <Pencil size={15} /> Изменить
+            </button>
+          ) : null}
+          {reply.canManage ? (
+            <button type="button" className="forum-text-button is-danger" onClick={remove}>
+              <Trash2 size={15} /> Удалить
+            </button>
+          ) : null}
+          {!isMine ? <ReportControl onSubmit={onReport} label="Пожаловаться" /> : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function AutoSizeTextarea({
+  id,
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  ariaLabel?: string;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(textarea.scrollHeight, FORUM_TEXTAREA_MAX_HEIGHT);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > FORUM_TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
+  }, [value]);
+
+  return (
+    <textarea
+      id={id}
+      className="forum-auto-textarea"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      ref={textareaRef}
+      rows={1}
+    />
   );
 }
 

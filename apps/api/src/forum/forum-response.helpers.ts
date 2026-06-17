@@ -2,6 +2,7 @@ import type { ForumAnswer, ForumQuestion, ForumQuestionType, ForumRawMaterial } 
 import type {
   ForumAdminQuestionItem,
   ForumAnswerItem,
+  ForumAnswerReplyItem,
   ForumQuestionDetail,
   ForumQuestionListItem,
   ForumQuestionStatus,
@@ -12,7 +13,11 @@ import { fallbackReputation, type ForumReputationMap } from "./forum-reputation.
 export type ForumQuestionRow = ForumQuestion & {
   rawMaterial?: ForumRawMaterial | null;
   questionType?: ForumQuestionType | null;
-  answers?: ForumAnswer[];
+  answers?: ForumAnswerRow[];
+};
+
+export type ForumAnswerRow = ForumAnswer & {
+  replies?: ForumAnswer[];
 };
 
 export function toTaxonomyValue(value: ForumRawMaterial | ForumQuestionType): ForumTaxonomyValue {
@@ -52,7 +57,25 @@ type AnswerContext = {
   canManageAnswer: (authorId: string) => boolean;
 };
 
-export function mapForumAnswer(row: ForumAnswer, reputation: ForumReputationMap, ctx: AnswerContext): ForumAnswerItem {
+export function mapForumAnswerReply(
+  row: ForumAnswer,
+  reputation: ForumReputationMap,
+  ctx: Pick<AnswerContext, "canManageAnswer">,
+): ForumAnswerReplyItem {
+  return {
+    id: row.id,
+    body: row.body,
+    canManage: ctx.canManageAnswer(row.authorId),
+    author: reputation.get(row.authorId) ?? fallbackReputation(row.authorId),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export function mapForumAnswer(
+  row: ForumAnswerRow,
+  reputation: ForumReputationMap,
+  ctx: AnswerContext,
+): ForumAnswerItem {
   return {
     id: row.id,
     body: row.body,
@@ -62,6 +85,7 @@ export function mapForumAnswer(row: ForumAnswer, reputation: ForumReputationMap,
     canManage: ctx.canManageAnswer(row.authorId),
     author: reputation.get(row.authorId) ?? fallbackReputation(row.authorId),
     createdAt: row.createdAt.toISOString(),
+    replies: (row.replies ?? []).map((reply) => mapForumAnswerReply(reply, reputation, ctx)),
   };
 }
 
@@ -72,7 +96,7 @@ type QuestionDetailContext = AnswerContext & {
 };
 
 export function mapForumQuestionDetail(
-  row: ForumQuestionRow & { answers: ForumAnswer[] },
+  row: ForumQuestionRow & { answers: ForumAnswerRow[] },
   reputation: ForumReputationMap,
   ctx: QuestionDetailContext,
 ): ForumQuestionDetail {
