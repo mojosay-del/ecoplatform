@@ -52,10 +52,7 @@ describe("AdminBroadcastService", () => {
 
   it("send создаёт по системному in-app уведомлению на каждого получателя и пишет аудит", async () => {
     const { service, createInApp, record } = setup([{ id: "u1" }, { id: "u2" }]);
-    const result = await service.send(
-      { title: "Привет", body: "Тело", audience: { companyType: "collector" } },
-      actor,
-    );
+    const result = await service.send({ title: "Привет", body: "Тело", audience: { companyType: "collector" } }, actor);
 
     expect(result.recipientCount).toBe(2);
     expect(createInApp).toHaveBeenCalledTimes(2);

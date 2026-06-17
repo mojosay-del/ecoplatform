@@ -117,9 +117,7 @@ export function AdminIndicesView() {
       <section className="page">
         <header className="page-header">
           <h1 className="page-title">Индексы цен</h1>
-          <p className="page-subtitle">
-            Номенклатура и история цен. Выберите позицию слева — справа откроется индекс.
-          </p>
+          <p className="page-subtitle">Номенклатура и история цен. Выберите позицию слева — справа откроется индекс.</p>
         </header>
         {message ? <p className="cms-flash">{message}</p> : null}
 
@@ -137,11 +135,13 @@ export function AdminIndicesView() {
                 <Plus size={14} />
               </button>
             </div>
-            {createOpen ? (
-              <NomenclatureCreateForm onMutate={mutate} onClose={() => setCreateOpen(false)} />
-            ) : null}
+            {createOpen ? <NomenclatureCreateForm onMutate={mutate} onClose={() => setCreateOpen(false)} /> : null}
             {nomenclatures.length === 0 ? <p className="education-tree-empty">Номенклатуры пока нет.</p> : null}
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void reorderNomenclatures(event)}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event) => void reorderNomenclatures(event)}
+            >
               <SortableContext items={nomenclatures.map((item) => item.id)} strategy={verticalListSortingStrategy}>
                 <ul className="tree" role="tree">
                   {nomenclatures.map((nomenclature) => (

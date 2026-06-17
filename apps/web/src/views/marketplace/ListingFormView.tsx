@@ -8,13 +8,7 @@ import Link from "next/link";
 import { ArrowLeft, FileText, PackageCheck } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
 import { AccessClosed, AuthRequired, ErrorState } from "../shared";
-import {
-  AddressSection,
-  ContactsSection,
-  ExtraSection,
-  MediaSection,
-  PositionsSection,
-} from "./listing-form-sections";
+import { AddressSection, ContactsSection, ExtraSection, MediaSection, PositionsSection } from "./listing-form-sections";
 import { useListingForm } from "./use-listing-form";
 
 export function ListingFormView({ listingId }: { listingId?: string }) {

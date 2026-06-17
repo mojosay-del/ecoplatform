@@ -55,8 +55,7 @@ export class IndicesService {
 
     const items = nomenclatures
       .map((item) => {
-        const values =
-          item.priceIndex?.values.map((value) => ({ date: value.date, price: Number(value.price) })) ?? [];
+        const values = item.priceIndex?.values.map((value) => ({ date: value.date, price: Number(value.price) })) ?? [];
         const summary = summarizePriceIndex(values, new Date(), stagnationThreshold);
         return summary
           ? {

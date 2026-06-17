@@ -178,10 +178,7 @@ export function PositionsSection({ form }: { form: ListingFormController }) {
         <Package size={16} strokeWidth={2.2} aria-hidden="true" />
         Добавить позицию
       </button>
-      <p
-        className={`mp-hint mp-weight-hint${form.hasMinimumWeight ? " is-ok" : " is-warning"}`}
-        aria-live="polite"
-      >
+      <p className={`mp-hint mp-weight-hint${form.hasMinimumWeight ? " is-ok" : " is-warning"}`} aria-live="polite">
         {form.weightHintText}
       </p>
     </div>

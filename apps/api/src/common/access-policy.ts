@@ -1,10 +1,6 @@
 import { ForbiddenException } from "@nestjs/common";
 import { CompanyRole } from "@prisma/client";
-import {
-  canOpenFunctionalSections,
-  hasAnyPlatformRole,
-  hasPlatformRole,
-} from "@ecoplatform/shared";
+import { canOpenFunctionalSections, hasAnyPlatformRole, hasPlatformRole } from "@ecoplatform/shared";
 import type { CompanyType, PlatformRole } from "@ecoplatform/shared";
 import type { RequestUser } from "./request-user";
 
@@ -89,11 +85,7 @@ export function assertCompanyOwner(
 // Действие доступно только компаниям заданного типа (collector / trader+processor
 // и т.п.). Возвращает companyId. Платформенный стафф (без компании) НЕ проходит —
 // инструменты типа компании предназначены самим компаниям.
-export function assertCompanyTypeIn(
-  user: RequestUser,
-  types: readonly CompanyType[],
-  message: string,
-): string {
+export function assertCompanyTypeIn(user: RequestUser, types: readonly CompanyType[], message: string): string {
   if (!user.companyId || !user.company || !types.includes(user.company.type)) {
     throw new ForbiddenException(message);
   }

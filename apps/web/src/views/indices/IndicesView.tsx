@@ -49,10 +49,7 @@ export function IndicesView() {
     <AppShell>
       <section className="page">
         <div className="indices-header">
-          <PageHeader
-            title="Индексы цен на вторсырьё"
-            subtitle="Актуальные ценовые индексы по основным видам сырья."
-          />
+          <PageHeader title="Индексы цен на вторсырьё" subtitle="Актуальные ценовые индексы по основным видам сырья." />
           {lastUpdated ? (
             <span className="indices-updated-pill">
               <svg className="indices-updated-icon" width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">

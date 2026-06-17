@@ -153,11 +153,7 @@ export function buildListingDto(values: ListingFormValues): CreateListingDto {
     paymentTerms: values.paymentTerms.trim() || null,
     typicalLoadKg: values.typicalLoadTons.trim() === "" ? null : (Number(values.typicalLoadTons) || 0) * 1000,
     readyNow: values.readyNow,
-    readinessDate: values.readyNow
-      ? null
-      : values.readinessDate
-        ? new Date(values.readinessDate).toISOString()
-        : null,
+    readinessDate: values.readyNow ? null : values.readinessDate ? new Date(values.readinessDate).toISOString() : null,
     media: values.media,
   };
 }

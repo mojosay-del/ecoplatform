@@ -48,7 +48,13 @@ const baseUser: RequestUser = {
 };
 
 const member: RequestUser = { ...baseUser, companyRole: CompanyRole.member };
-const admin: RequestUser = { ...baseUser, companyId: null, companyRole: CompanyRole.owner, company: null, platformRoles: ["admin"] };
+const admin: RequestUser = {
+  ...baseUser,
+  companyId: null,
+  companyRole: CompanyRole.owner,
+  company: null,
+  platformRoles: ["admin"],
+};
 const moderator: RequestUser = { ...admin, platformRoles: ["moderator"] };
 
 describe("access-policy: платформенные роли", () => {
@@ -110,12 +116,12 @@ describe("access-policy: функциональный доступ", () => {
 describe("access-policy: тип компании", () => {
   it("assertCompanyTypeIn: пропускает нужный тип, режет чужой/без компании", () => {
     expect(assertCompanyTypeIn(baseUser, ["collector"], "только заготовители")).toBe("company-1");
-    expect(() => assertCompanyTypeIn({ ...baseUser, company: { ...demoActive, type: "trader" } }, ["collector"], "x")).toThrow(
-      ForbiddenException,
-    );
-    expect(assertCompanyTypeIn({ ...baseUser, company: { ...demoActive, type: "trader" } }, ["trader", "processor"], "x")).toBe(
-      "company-1",
-    );
+    expect(() =>
+      assertCompanyTypeIn({ ...baseUser, company: { ...demoActive, type: "trader" } }, ["collector"], "x"),
+    ).toThrow(ForbiddenException);
+    expect(
+      assertCompanyTypeIn({ ...baseUser, company: { ...demoActive, type: "trader" } }, ["trader", "processor"], "x"),
+    ).toBe("company-1");
     expect(() => assertCompanyTypeIn(admin, ["collector"], "x")).toThrow(ForbiddenException);
     // companyId есть, но снапшот компании отсутствует → отказ (как `company?.type !== X`).
     expect(() => assertCompanyTypeIn({ ...baseUser, company: null }, ["collector"], "x")).toThrow(ForbiddenException);

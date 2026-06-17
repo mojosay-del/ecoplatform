@@ -9,11 +9,7 @@ import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
 import { knowledgeDisplayIconNameForNode } from "../../knowledge-base-icons";
-import {
-  EMPTY_CATEGORY_DRAFT,
-  EMPTY_MATERIAL_DRAFT,
-  KNOWLEDGE_CATEGORY_ICON_TYPE,
-} from "./constants";
+import { EMPTY_CATEGORY_DRAFT, EMPTY_MATERIAL_DRAFT, KNOWLEDGE_CATEGORY_ICON_TYPE } from "./constants";
 import type { Article, DraftKind, DraftState, ViewState } from "./types";
 import { isKnowledgeCategory, sortByPosition } from "./utils";
 

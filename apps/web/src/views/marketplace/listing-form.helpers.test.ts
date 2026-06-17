@@ -107,9 +107,9 @@ describe("listing form helpers: валидация", () => {
   it("требует адрес, телефон, сырьё и вес позиций", () => {
     expect(clientValidationError(validValues({ city: "  " }), false)).toMatch(/адрес/i);
     expect(clientValidationError(validValues({ phoneDigits: "" }), false)).toMatch(/телефон/i);
-    expect(
-      clientValidationError(validValues({ positions: [{ ...emptyPosition(), weightTons: "1" }] }), false),
-    ).toMatch(/вид сырья/i);
+    expect(clientValidationError(validValues({ positions: [{ ...emptyPosition(), weightTons: "1" }] }), false)).toMatch(
+      /вид сырья/i,
+    );
     expect(
       clientValidationError(validValues({ positions: [{ ...emptyPosition(), nomenclatureId: "n" }] }), false),
     ).toMatch(/вес/i);
