@@ -5,6 +5,7 @@
 // компании до отображаемого центра). Заготовителям и покупателям — свои кнопки.
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
@@ -15,7 +16,7 @@ import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
 import { useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
 import { MATERIAL_LEGEND } from "./materials";
-import { ListingMap } from "./ListingMap";
+import type { ListingMapProps } from "./ListingMap";
 import {
   type CompanyPoint,
   type FilterPopover,
@@ -30,6 +31,11 @@ import {
 } from "./marketplace-feed";
 import { MarketplaceFeedList } from "./marketplace-feed-list";
 import { MarketplaceActiveFilters, MarketplaceFilterBar, useMarketplaceFilterDismiss } from "./marketplace-filters";
+
+const ListingMap = dynamic<ListingMapProps>(() => import("./ListingMap").then((module) => module.ListingMap), {
+  ssr: false,
+  loading: () => <div className="mp-map-placeholder">Карта загружается...</div>,
+});
 
 export function MarketplaceView() {
   const { ready, token, user } = useAuth();

@@ -5,10 +5,7 @@ import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
 import { ApiError, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
-import {
-  hasStaleAuthFeaturesAfterSettingsLoad,
-  shouldRefreshAuthAfterSettingChange,
-} from "./settings-auth-refresh";
+import { hasStaleAuthFeaturesAfterSettingsLoad, shouldRefreshAuthAfterSettingChange } from "./settings-auth-refresh";
 
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 

@@ -19,6 +19,7 @@ import {
   cleanupStaleIdempotencyKeys as cleanupStaleIdempotencyKeysHelper,
   cleanupStaleInAppNotifications as cleanupStaleInAppNotificationsHelper,
   cleanupStaleNotificationDeliveries as cleanupStaleNotificationDeliveriesHelper,
+  type AccountDeletionCleanupPlan,
   type AccountDeletionCleanupResult,
 } from "./scheduler-cleanup.helpers";
 import { runWithPostgresAdvisoryLock as runWithPostgresAdvisoryLockHelper } from "./scheduler-lock.helpers";
@@ -139,8 +140,8 @@ export class SchedulerService {
   async handleAccountDeletionCleanup() {
     if (this.disabled) return;
     try {
-      await this.runWithPostgresAdvisoryLock(ACCOUNT_DELETION_CLEANUP_LOCK_KEY, (tx) =>
-        this.cleanupDeletedAccountsInTransaction(tx, new Date()),
+      await this.runWithPostgresAdvisoryLock(ACCOUNT_DELETION_CLEANUP_LOCK_KEY, () =>
+        this.cleanupDeletedAccounts(new Date()),
       );
     } catch (error) {
       this.logger.error("Account deletion cleanup failed", error as Error);
@@ -148,7 +149,13 @@ export class SchedulerService {
   }
 
   async cleanupDeletedAccounts(now = new Date()): Promise<AccountDeletionCleanupResult> {
-    return this.prisma.$transaction((tx) => this.cleanupDeletedAccountsInTransaction(tx, now));
+    const { fileIdsToDelete, ...result } = await this.prisma.$transaction((tx) =>
+      this.cleanupDeletedAccountsInTransaction(tx, now),
+    );
+    if (fileIdsToDelete.length > 0) {
+      await this.files.deleteIfUnreferenced(fileIdsToDelete);
+    }
+    return result;
   }
 
   @Cron("30 3 * * *", { name: "cleanup-orphan-files" })
@@ -293,7 +300,7 @@ export class SchedulerService {
   private async cleanupDeletedAccountsInTransaction(
     tx: Prisma.TransactionClient,
     now: Date,
-  ): Promise<AccountDeletionCleanupResult> {
+  ): Promise<AccountDeletionCleanupPlan> {
     return cleanupDeletedAccountsInTransactionHelper(tx, now);
   }
 

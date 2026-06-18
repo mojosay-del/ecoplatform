@@ -96,8 +96,18 @@ export const appNavSections: NavSection[] = [
         companyTypes: ["collector"],
       },
       futureItem("sales-prices", "Продажные цены", "sales-prices", "Продажные цены — аналитика цен продаж."),
-      futureItem("analytics-map", "Карта аналитики", "analytics-map", "Карта аналитики — географические срезы по рынку."),
-      futureItem("participant-map", "Карта участников", "map", "Карта участников — география переработчиков, складов и логистики."),
+      futureItem(
+        "analytics-map",
+        "Карта аналитики",
+        "analytics-map",
+        "Карта аналитики — географические срезы по рынку.",
+      ),
+      futureItem(
+        "participant-map",
+        "Карта участников",
+        "map",
+        "Карта участников — география переработчиков, складов и логистики.",
+      ),
       {
         key: "marketplace",
         href: "/marketplace",

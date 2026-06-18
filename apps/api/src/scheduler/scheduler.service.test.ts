@@ -105,7 +105,7 @@ describe("SchedulerService", () => {
     const tx = {
       $queryRaw: vi.fn().mockResolvedValue([{ id: "user-1", companyId: "company-1" }]),
       fileAsset: {
-        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findMany: vi.fn().mockResolvedValue([{ id: "file-1" }]),
       },
       user: {
         count: vi.fn().mockResolvedValue(0),
@@ -132,7 +132,7 @@ describe("SchedulerService", () => {
       runHourlyCheck: vi.fn(),
     };
     const files = {
-      deleteIfUnreferenced: vi.fn(),
+      deleteIfUnreferenced: vi.fn().mockResolvedValue(1),
     };
     const service = new SchedulerService(billing as any, prisma as any, files as any);
 
@@ -143,13 +143,15 @@ describe("SchedulerService", () => {
     expect(queryParts).toContain('WHERE "deletionRequestedAt" <');
     expect(queryParts).toContain("FOR UPDATE");
     expect(tx.$queryRaw.mock.calls[0][2]).toBe(500);
-    expect(tx.fileAsset.deleteMany).toHaveBeenCalledWith({
+    expect(tx.fileAsset.findMany).toHaveBeenCalledWith({
       where: {
         uploadedById: { in: ["user-1"] },
         references: { none: {} },
       },
+      select: { id: true },
     });
     expect(tx.user.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ["user-1"] } } });
+    expect(files.deleteIfUnreferenced).toHaveBeenCalledWith(["file-1"]);
     expect(result).toEqual({ deletedUsers: 1, deletedCompanies: 1 });
   });
 

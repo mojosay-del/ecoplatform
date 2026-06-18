@@ -105,6 +105,7 @@ function referencePrisma(overrides: Record<string, unknown> = {}) {
       findUnique: vi.fn().mockResolvedValue({
         id: "file-1",
         storageKey: "uploads/2026-05-22/file.webp",
+        accessLevel: FileAccessLevel.public,
       }),
       aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
       delete: vi.fn().mockResolvedValue({}),
@@ -147,6 +148,7 @@ describe("FilesService cleanup", () => {
         findUnique: vi.fn().mockResolvedValue({
           id: "file-1",
           storageKey: "uploads/2026-05-22/file.webp",
+          accessLevel: FileAccessLevel.public,
           variants: {
             webp: { storageKey: "uploads/2026-05-22/file.webp", mimeType: "image/webp", sizeBytes: 100 },
             avif: { storageKey: "uploads/2026-05-22/file.avif", mimeType: "image/avif", sizeBytes: 80 },
@@ -163,6 +165,32 @@ describe("FilesService cleanup", () => {
       "uploads/2026-05-22/file.avif",
       "uploads/2026-05-22/file.webp",
     ]);
+    expect(prisma.fileAsset.delete).toHaveBeenCalledWith({ where: { id: "file-1" } });
+  });
+
+  it("удаляет приватный legacy-файл из public-бакета, если приватный бакет ещё не настроен", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "file-1",
+          storageKey: "uploads/2026-05-22/private.pdf",
+          accessLevel: FileAccessLevel.authenticated,
+          variants: null,
+        }),
+        delete: vi.fn().mockResolvedValue({}),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: undefined }, () =>
+      service.deleteIfUnreferenced(["file-1"]),
+    );
+
+    expect(s3Send).toHaveBeenCalledTimes(1);
+    expect(s3Send.mock.calls[0][0].input).toMatchObject({
+      Bucket: "public-bucket",
+      Key: "uploads/2026-05-22/private.pdf",
+    });
     expect(prisma.fileAsset.delete).toHaveBeenCalledWith({ where: { id: "file-1" } });
   });
 
@@ -673,6 +701,32 @@ describe("FilesService приватный бакет + signed URL", () => {
     expect(command?.input?.Bucket).toBe("private-bucket");
   });
 
+  it("upload приватного файла без приватного бакета падает до записи metadata", async () => {
+    const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
+        create: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    await expect(
+      withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: undefined }, () =>
+        service.upload(
+          { originalname: "secret.pdf", mimetype: "application/pdf", size: pdf.length, buffer: pdf },
+          { accessLevel: FileAccessLevel.authenticated },
+          "user-1",
+        ),
+      ),
+    ).rejects.toThrow("Приватный S3-бакет не настроен.");
+
+    expect(s3Send).not.toHaveBeenCalled();
+    expect(prisma.fileAsset.create).not.toHaveBeenCalled();
+  });
+
   it("findManyByIds: контент-менеджер видит приватные файлы и получает presigned downloadUrl", async () => {
     const prisma = referencePrisma({
       fileAsset: {
@@ -776,7 +830,7 @@ describe("FilesService приватный бакет + signed URL", () => {
     expect(urls.get("priv")).toBe("https://signed.example/private-bucket/uploads/x/doc.pdf");
   });
 
-  it("signDownloadUrls: приватный файл без приватного бакета → fallback на публичную ссылку (без регрессии)", async () => {
+  it("signDownloadUrls: приватный файл без приватного бакета → null без публичного fallback", async () => {
     const service = serviceWithPrisma(referencePrisma());
 
     const urls = await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: undefined }, () =>
@@ -790,6 +844,6 @@ describe("FilesService приватный бакет + signed URL", () => {
       ]),
     );
 
-    expect(urls.get("priv")).toBe("https://s3.twcstorage.ru/public-bucket/uploads/x/doc.pdf");
+    expect(urls.get("priv")).toBeNull();
   });
 });

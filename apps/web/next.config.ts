@@ -20,6 +20,13 @@ const immutablePublicAssetHeaders = [
 const isProduction = process.env.NODE_ENV === "production";
 
 function buildContentSecurityPolicy(): string {
+  const scriptSrc = [
+    "'self'",
+    ...(isProduction ? [] : ["'unsafe-inline'"]),
+    "https://mapgl.2gis.com",
+    "https://*.2gis.com",
+  ];
+  const styleSrc = ["'self'", ...(isProduction ? [] : ["'unsafe-inline'"]), "blob:"];
   const connectSrc = [
     "'self'",
     "https://s3.twcstorage.ru",
@@ -44,8 +51,12 @@ function buildContentSecurityPolicy(): string {
     // браузер резал загрузку — Vidstack крутил спиннер бесконечно. Зеркалит img-src
     // по доменам, но без data:.
     "media-src 'self' https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
-    "script-src 'self' 'unsafe-inline' https://mapgl.2gis.com https://*.2gis.com",
-    "style-src 'self' 'unsafe-inline' blob:",
+    `script-src ${scriptSrc.join(" ")}`,
+    `style-src ${styleSrc.join(" ")}`,
+    // В коде ещё есть управляемые React style-атрибуты (прогресс-бары, цвета
+    // материалов, размеры графиков). Разрешаем только style-атрибуты, но не
+    // общий inline <style>; убрать и это можно отдельной UI-волной.
+    ...(isProduction ? ["style-src-attr 'unsafe-inline'"] : []),
     `connect-src ${connectSrc.join(" ")}`,
     "font-src 'self' https://*.2gis.com",
     // MapGL поднимает web-workers из blob: — без worker-src карта молча не стартует
@@ -110,6 +121,11 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     clientTraceMetadata: ["baggage", "sentry-trace"],
+    // SRI даёт hash-based CSP для скриптов App Router без перевода всех страниц
+    // в dynamic rendering через per-request nonce.
+    sri: {
+      algorithm: "sha256",
+    },
   },
   turbopack: {
     root: projectRoot,

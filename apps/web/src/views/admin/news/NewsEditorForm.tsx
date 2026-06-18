@@ -3,7 +3,7 @@
 import type { FocusEvent, FormEvent } from "react";
 import { ExternalLink } from "lucide-react";
 import type { Block } from "../../../lib/editor/block-types";
-import { DocumentEditor } from "../../../components/editor/DocumentEditor";
+import { LazyDocumentEditor as DocumentEditor } from "../../../components/editor/LazyDocumentEditor";
 import { FileUploadField } from "../../../components/FileUploadField";
 import { NEWS_ATOMIC_KINDS } from "./constants";
 import { NewsTagPicker } from "./NewsTagPicker";

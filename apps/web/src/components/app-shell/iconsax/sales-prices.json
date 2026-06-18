@@ -28,29 +28,17 @@
         },
         "p": {
           "a": 0,
-          "k": [
-            12.031,
-            12.016,
-            0
-          ],
+          "k": [12.031, 12.016, 0],
           "ix": 2
         },
         "a": {
           "a": 0,
-          "k": [
-            10.451,
-            10.75,
-            0
-          ],
+          "k": [10.451, 10.75, 0],
           "ix": 1
         },
         "s": {
           "a": 0,
-          "k": [
-            90,
-            90,
-            100
-          ],
+          "k": [90, 90, 100],
           "ix": 6
         }
       },
@@ -198,34 +186,16 @@
                 "a": 0,
                 "k": {
                   "i": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "o": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "v": [
-                    [
-                      3.64,
-                      3.635
-                    ],
-                    [
-                      -3.64,
-                      -3.635
-                    ]
+                    [3.64, 3.635],
+                    [-3.64, -3.635]
                   ],
                   "c": false
                 },
@@ -239,12 +209,7 @@
               "ty": "st",
               "c": {
                 "a": 0,
-                "k": [
-                  0.01,
-                  0.01,
-                  0.01,
-                  1
-                ],
+                "k": [0.01, 0.01, 0.01, 1],
                 "ix": 3
               },
               "o": {
@@ -279,18 +244,9 @@
                       "y": 0
                     },
                     "t": 1.55,
-                    "s": [
-                      4.39,
-                      17.115
-                    ],
-                    "to": [
-                      0,
-                      -0.5
-                    ],
-                    "ti": [
-                      0,
-                      0
-                    ]
+                    "s": [4.39, 17.115],
+                    "to": [0, -0.5],
+                    "ti": [0, 0]
                   },
                   {
                     "i": {
@@ -302,25 +258,13 @@
                       "y": 0
                     },
                     "t": 12.6,
-                    "s": [
-                      4.39,
-                      14.115
-                    ],
-                    "to": [
-                      0,
-                      0
-                    ],
-                    "ti": [
-                      0,
-                      -0.5
-                    ]
+                    "s": [4.39, 14.115],
+                    "to": [0, 0],
+                    "ti": [0, -0.5]
                   },
                   {
                     "t": 23.650390625,
-                    "s": [
-                      4.39,
-                      17.115
-                    ]
+                    "s": [4.39, 17.115]
                   }
                 ],
                 "ix": 2,
@@ -328,19 +272,13 @@
               },
               "a": {
                 "a": 0,
-                "k": [
-                  0,
-                  0
-                ],
+                "k": [0, 0],
                 "ix": 1,
                 "x": "var $bm_rt;\nvar amp, freq, decay, n, n, t, t, v;\ntry {\n    amp = $bm_div(effect('Elastic Controller 3')(1), 200);\n    freq = $bm_div(effect('Elastic Controller 3')(2), 30);\n    decay = $bm_div(effect('Elastic Controller 3')(3), 10);\n    $bm_rt = n = 0;\n    if (numKeys > 0) {\n        $bm_rt = n = nearestKey(time).index;\n        if (key(n).time > time) {\n            n--;\n        }\n    }\n    if (n == 0) {\n        $bm_rt = t = 0;\n    } else {\n        $bm_rt = t = $bm_sub(time, key(n).time);\n    }\n    if (n > 0) {\n        v = velocityAtTime($bm_sub(key(n).time, $bm_div(thisComp.frameDuration, 10)));\n        $bm_rt = $bm_sum(value, $bm_div($bm_mul($bm_mul(v, amp), Math.sin($bm_mul($bm_mul($bm_mul(freq, t), 2), Math.PI))), Math.exp($bm_mul(decay, t))));\n    } else {\n        $bm_rt = value;\n    }\n} catch (e$$4) {\n    $bm_rt = value = value;\n}"
               },
               "s": {
                 "a": 0,
-                "k": [
-                  100,
-                  100
-                ],
+                "k": [100, 100],
                 "ix": 3,
                 "x": "var $bm_rt;\nvar amp, freq, decay, n, n, t, t, v;\ntry {\n    amp = $bm_div(effect('Elastic Controller 3')(1), 200);\n    freq = $bm_div(effect('Elastic Controller 3')(2), 30);\n    decay = $bm_div(effect('Elastic Controller 3')(3), 10);\n    $bm_rt = n = 0;\n    if (numKeys > 0) {\n        $bm_rt = n = nearestKey(time).index;\n        if (key(n).time > time) {\n            n--;\n        }\n    }\n    if (n == 0) {\n        $bm_rt = t = 0;\n    } else {\n        $bm_rt = t = $bm_sub(time, key(n).time);\n    }\n    if (n > 0) {\n        v = velocityAtTime($bm_sub(key(n).time, $bm_div(thisComp.frameDuration, 10)));\n        $bm_rt = $bm_sum(value, $bm_div($bm_mul($bm_mul(v, amp), Math.sin($bm_mul($bm_mul($bm_mul(freq, t), 2), Math.PI))), Math.exp($bm_mul(decay, t))));\n    } else {\n        $bm_rt = value;\n    }\n} catch (e$$4) {\n    $bm_rt = value = value;\n}"
               },
@@ -386,34 +324,16 @@
                 "a": 0,
                 "k": {
                   "i": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "o": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "v": [
-                    [
-                      16.539,
-                      8.02
-                    ],
-                    [
-                      16.539,
-                      0.75
-                    ]
+                    [16.539, 8.02],
+                    [16.539, 0.75]
                   ],
                   "c": false
                 },
@@ -427,12 +347,7 @@
               "ty": "st",
               "c": {
                 "a": 0,
-                "k": [
-                  0.01,
-                  0.01,
-                  0.01,
-                  1
-                ],
+                "k": [0.01, 0.01, 0.01, 1],
                 "ix": 3
               },
               "o": {
@@ -456,26 +371,17 @@
               "ty": "tr",
               "p": {
                 "a": 0,
-                "k": [
-                  16.337,
-                  4.332
-                ],
+                "k": [16.337, 4.332],
                 "ix": 2
               },
               "a": {
                 "a": 0,
-                "k": [
-                  16.337,
-                  4.332
-                ],
+                "k": [16.337, 4.332],
                 "ix": 1
               },
               "s": {
                 "a": 0,
-                "k": [
-                  100,
-                  100
-                ],
+                "k": [100, 100],
                 "ix": 3,
                 "x": "var $bm_rt;\nvar amp, freq, decay, n, n, t, t, v;\ntry {\n    amp = $bm_div(effect('Elastic Controller')(1), 200);\n    freq = $bm_div(effect('Elastic Controller')(2), 30);\n    decay = $bm_div(effect('Elastic Controller')(3), 10);\n    $bm_rt = n = 0;\n    if (numKeys > 0) {\n        $bm_rt = n = nearestKey(time).index;\n        if (key(n).time > time) {\n            n--;\n        }\n    }\n    if (n == 0) {\n        $bm_rt = t = 0;\n    } else {\n        $bm_rt = t = $bm_sub(time, key(n).time);\n    }\n    if (n > 0) {\n        v = velocityAtTime($bm_sub(key(n).time, $bm_div(thisComp.frameDuration, 10)));\n        $bm_rt = $bm_sum(value, $bm_div($bm_mul($bm_mul(v, amp), Math.sin($bm_mul($bm_mul($bm_mul(freq, t), 2), Math.PI))), Math.exp($bm_mul(decay, t))));\n    } else {\n        $bm_rt = value;\n    }\n} catch (e$$4) {\n    $bm_rt = value = value;\n}"
               },
@@ -484,53 +390,31 @@
                 "k": [
                   {
                     "i": {
-                      "x": [
-                        0.667
-                      ],
-                      "y": [
-                        1
-                      ]
+                      "x": [0.667],
+                      "y": [1]
                     },
                     "o": {
-                      "x": [
-                        0.333
-                      ],
-                      "y": [
-                        0
-                      ]
+                      "x": [0.333],
+                      "y": [0]
                     },
                     "t": -0.15,
-                    "s": [
-                      0
-                    ]
+                    "s": [0]
                   },
                   {
                     "i": {
-                      "x": [
-                        0.833
-                      ],
-                      "y": [
-                        0.833
-                      ]
+                      "x": [0.833],
+                      "y": [0.833]
                     },
                     "o": {
-                      "x": [
-                        0.333
-                      ],
-                      "y": [
-                        0
-                      ]
+                      "x": [0.333],
+                      "y": [0]
                     },
                     "t": 10.05,
-                    "s": [
-                      140
-                    ]
+                    "s": [140]
                   },
                   {
                     "t": 22.7998046875,
-                    "s": [
-                      0
-                    ]
+                    "s": [0]
                   }
                 ],
                 "ix": 6,
@@ -576,34 +460,16 @@
                 "a": 0,
                 "k": {
                   "i": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "o": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "v": [
-                    [
-                      12.871,
-                      20.14
-                    ],
-                    [
-                      20.151,
-                      20.14
-                    ]
+                    [12.871, 20.14],
+                    [20.151, 20.14]
                   ],
                   "c": false
                 },
@@ -617,12 +483,7 @@
               "ty": "st",
               "c": {
                 "a": 0,
-                "k": [
-                  0.01,
-                  0.01,
-                  0.01,
-                  1
-                ],
+                "k": [0.01, 0.01, 0.01, 1],
                 "ix": 3
               },
               "o": {
@@ -646,26 +507,17 @@
               "ty": "tr",
               "p": {
                 "a": 0,
-                "k": [
-                  0,
-                  0
-                ],
+                "k": [0, 0],
                 "ix": 2
               },
               "a": {
                 "a": 0,
-                "k": [
-                  0,
-                  0
-                ],
+                "k": [0, 0],
                 "ix": 1
               },
               "s": {
                 "a": 0,
-                "k": [
-                  100,
-                  100
-                ],
+                "k": [100, 100],
                 "ix": 3
               },
               "r": {
@@ -710,34 +562,16 @@
                 "a": 0,
                 "k": {
                   "i": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "o": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "v": [
-                    [
-                      12.871,
-                      14.08
-                    ],
-                    [
-                      20.151,
-                      14.08
-                    ]
+                    [12.871, 14.08],
+                    [20.151, 14.08]
                   ],
                   "c": false
                 },
@@ -751,12 +585,7 @@
               "ty": "st",
               "c": {
                 "a": 0,
-                "k": [
-                  0.01,
-                  0.01,
-                  0.01,
-                  1
-                ],
+                "k": [0.01, 0.01, 0.01, 1],
                 "ix": 3
               },
               "o": {
@@ -791,18 +620,9 @@
                       "y": 0
                     },
                     "t": -0.15,
-                    "s": [
-                      0,
-                      0
-                    ],
-                    "to": [
-                      0,
-                      1
-                    ],
-                    "ti": [
-                      0,
-                      0
-                    ]
+                    "s": [0, 0],
+                    "to": [0, 1],
+                    "ti": [0, 0]
                   },
                   {
                     "i": {
@@ -814,25 +634,13 @@
                       "y": 0
                     },
                     "t": 10.05,
-                    "s": [
-                      0,
-                      6
-                    ],
-                    "to": [
-                      0,
-                      0
-                    ],
-                    "ti": [
-                      0,
-                      1
-                    ]
+                    "s": [0, 6],
+                    "to": [0, 0],
+                    "ti": [0, 1]
                   },
                   {
                     "t": 19.400390625,
-                    "s": [
-                      0,
-                      0
-                    ]
+                    "s": [0, 0]
                   }
                 ],
                 "ix": 2,
@@ -840,19 +648,13 @@
               },
               "a": {
                 "a": 0,
-                "k": [
-                  0,
-                  0
-                ],
+                "k": [0, 0],
                 "ix": 1,
                 "x": "var $bm_rt;\nvar amp, freq, decay, n, n, t, t, v;\ntry {\n    amp = $bm_div(effect('Elastic Controller 2')(1), 200);\n    freq = $bm_div(effect('Elastic Controller 2')(2), 30);\n    decay = $bm_div(effect('Elastic Controller 2')(3), 10);\n    $bm_rt = n = 0;\n    if (numKeys > 0) {\n        $bm_rt = n = nearestKey(time).index;\n        if (key(n).time > time) {\n            n--;\n        }\n    }\n    if (n == 0) {\n        $bm_rt = t = 0;\n    } else {\n        $bm_rt = t = $bm_sub(time, key(n).time);\n    }\n    if (n > 0) {\n        v = velocityAtTime($bm_sub(key(n).time, $bm_div(thisComp.frameDuration, 10)));\n        $bm_rt = $bm_sum(value, $bm_div($bm_mul($bm_mul(v, amp), Math.sin($bm_mul($bm_mul($bm_mul(freq, t), 2), Math.PI))), Math.exp($bm_mul(decay, t))));\n    } else {\n        $bm_rt = value;\n    }\n} catch (e$$4) {\n    $bm_rt = value = value;\n}"
               },
               "s": {
                 "a": 0,
-                "k": [
-                  100,
-                  100
-                ],
+                "k": [100, 100],
                 "ix": 3,
                 "x": "var $bm_rt;\nvar amp, freq, decay, n, n, t, t, v;\ntry {\n    amp = $bm_div(effect('Elastic Controller 2')(1), 200);\n    freq = $bm_div(effect('Elastic Controller 2')(2), 30);\n    decay = $bm_div(effect('Elastic Controller 2')(3), 10);\n    $bm_rt = n = 0;\n    if (numKeys > 0) {\n        $bm_rt = n = nearestKey(time).index;\n        if (key(n).time > time) {\n            n--;\n        }\n    }\n    if (n == 0) {\n        $bm_rt = t = 0;\n    } else {\n        $bm_rt = t = $bm_sub(time, key(n).time);\n    }\n    if (n > 0) {\n        v = velocityAtTime($bm_sub(key(n).time, $bm_div(thisComp.frameDuration, 10)));\n        $bm_rt = $bm_sum(value, $bm_div($bm_mul($bm_mul(v, amp), Math.sin($bm_mul($bm_mul($bm_mul(freq, t), 2), Math.PI))), Math.exp($bm_mul(decay, t))));\n    } else {\n        $bm_rt = value;\n    }\n} catch (e$$4) {\n    $bm_rt = value = value;\n}"
               },
@@ -898,34 +700,16 @@
                 "a": 0,
                 "k": {
                   "i": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "o": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "v": [
-                    [
-                      0.75,
-                      4.39
-                    ],
-                    [
-                      8.03,
-                      4.39
-                    ]
+                    [0.75, 4.39],
+                    [8.03, 4.39]
                   ],
                   "c": false
                 },
@@ -939,12 +723,7 @@
               "ty": "st",
               "c": {
                 "a": 0,
-                "k": [
-                  0.01,
-                  0.01,
-                  0.01,
-                  1
-                ],
+                "k": [0.01, 0.01, 0.01, 1],
                 "ix": 3
               },
               "o": {
@@ -968,26 +747,17 @@
               "ty": "tr",
               "p": {
                 "a": 0,
-                "k": [
-                  0,
-                  0
-                ],
+                "k": [0, 0],
                 "ix": 2
               },
               "a": {
                 "a": 0,
-                "k": [
-                  0,
-                  0
-                ],
+                "k": [0, 0],
                 "ix": 1
               },
               "s": {
                 "a": 0,
-                "k": [
-                  100,
-                  100
-                ],
+                "k": [100, 100],
                 "ix": 3
               },
               "r": {
@@ -1032,34 +802,16 @@
                 "a": 0,
                 "k": {
                   "i": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "o": [
-                    [
-                      0,
-                      0
-                    ],
-                    [
-                      0,
-                      0
-                    ]
+                    [0, 0],
+                    [0, 0]
                   ],
                   "v": [
-                    [
-                      12.871,
-                      4.39
-                    ],
-                    [
-                      20.151,
-                      4.39
-                    ]
+                    [12.871, 4.39],
+                    [20.151, 4.39]
                   ],
                   "c": false
                 },
@@ -1073,12 +825,7 @@
               "ty": "st",
               "c": {
                 "a": 0,
-                "k": [
-                  0.01,
-                  0.01,
-                  0.01,
-                  1
-                ],
+                "k": [0.01, 0.01, 0.01, 1],
                 "ix": 3
               },
               "o": {
@@ -1102,26 +849,17 @@
               "ty": "tr",
               "p": {
                 "a": 0,
-                "k": [
-                  0,
-                  0
-                ],
+                "k": [0, 0],
                 "ix": 2
               },
               "a": {
                 "a": 0,
-                "k": [
-                  0,
-                  0
-                ],
+                "k": [0, 0],
                 "ix": 1
               },
               "s": {
                 "a": 0,
-                "k": [
-                  100,
-                  100
-                ],
+                "k": [100, 100],
                 "ix": 3
               },
               "r": {

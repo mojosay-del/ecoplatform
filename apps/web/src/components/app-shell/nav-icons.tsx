@@ -17,34 +17,6 @@ import {
   type SVGProps,
 } from "react";
 import type { NavIconKey } from "../app-shell-nav";
-import adminAnimation from "./iconsax/admin.json";
-import analyticsMapAnimation from "./iconsax/analytics-map.json";
-import arrowCircleRightAnimation from "./iconsax/arrow-circle-right.json";
-import arrowUpAnimation from "./iconsax/arrow-up.json";
-import calculatorAnimation from "./iconsax/calculator.json";
-import docsAnimation from "./iconsax/docs.json";
-import educationAnimation from "./iconsax/education.json";
-import forumAnimation from "./iconsax/forum.json";
-import hideMenuAnimation from "./iconsax/hide-menu.json";
-import knowledgeAnimation from "./iconsax/knowledge.json";
-import likeAnimation from "./iconsax/like.json";
-import logoutAnimation from "./iconsax/logout.json";
-import mapAnimation from "./iconsax/map.json";
-import marketplaceAnimation from "./iconsax/marketplace.json";
-import newsAnimation from "./iconsax/news.json";
-import notificationsAnimation from "./iconsax/notifications.json";
-import passwordCheckAnimation from "./iconsax/password-check.json";
-import priceIndicesAnimation from "./iconsax/price-indices.json";
-import profileAnimation from "./iconsax/profile.json";
-import salesPricesAnimation from "./iconsax/sales-prices.json";
-import sendAnimation from "./iconsax/send.json";
-import sessionsAnimation from "./iconsax/sessions.json";
-import settingsAnimation from "./iconsax/settings.json";
-import smsAnimation from "./iconsax/sms.json";
-import smsNotificationAnimation from "./iconsax/sms-notification.json";
-import smsStarAnimation from "./iconsax/sms-star.json";
-import subscriptionAnimation from "./iconsax/subscription.json";
-import supportAnimation from "./iconsax/support.json";
 
 type AnimatedLucideIconProps = SVGProps<SVGSVGElement> & {
   color?: string;
@@ -58,6 +30,7 @@ type AnimatedLucideIconProps = SVGProps<SVGSVGElement> & {
 type AnimatedLucideIconComponent = ForwardRefExoticComponent<AnimatedLucideIconProps & RefAttributes<SVGSVGElement>>;
 
 type LottieAnimationData = object;
+type LottieAnimationModule = { default: LottieAnimationData };
 type AnimatedIconKey =
   | NavIconKey
   | "arrow-up"
@@ -100,7 +73,7 @@ type LottieNavIconKey =
   | "subscription"
   | "support";
 type LottieNavIconConfig = {
-  animationData: LottieAnimationData;
+  loadAnimationData: () => Promise<LottieAnimationData>;
   playbackSpeed?: number;
   startFrame?: number;
 };
@@ -113,39 +86,43 @@ const NAV_ICON_COMPONENTS: Record<Exclude<AnimatedIconKey, LottieNavIconKey>, An
   "data-privacy": DataPrivacyIcon,
 };
 
+function loadLottieAnimation(loader: () => Promise<LottieAnimationModule>): () => Promise<LottieAnimationData> {
+  return () => loader().then((module) => module.default);
+}
+
 const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
-  admin: { animationData: adminAnimation },
-  "analytics-map": { animationData: analyticsMapAnimation },
-  "arrow-up": { animationData: arrowUpAnimation },
-  calculator: { animationData: calculatorAnimation },
-  docs: { animationData: docsAnimation },
-  education: { animationData: educationAnimation },
-  forum: { animationData: forumAnimation },
-  "hide-menu": { animationData: hideMenuAnimation },
+  admin: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/admin.json")) },
+  "analytics-map": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/analytics-map.json")) },
+  "arrow-up": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/arrow-up.json")) },
+  calculator: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/calculator.json")) },
+  docs: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/docs.json")) },
+  education: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/education.json")) },
+  forum: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/forum.json")) },
+  "hide-menu": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/hide-menu.json")) },
   indices: {
-    animationData: priceIndicesAnimation,
+    loadAnimationData: loadLottieAnimation(() => import("./iconsax/price-indices.json")),
     playbackSpeed: PRICE_INDICES_ANIMATION_SPEED,
     startFrame: PRICE_INDICES_ANIMATION_START_FRAME,
   },
-  knowledge: { animationData: knowledgeAnimation },
-  like: { animationData: likeAnimation },
-  logout: { animationData: logoutAnimation },
-  map: { animationData: mapAnimation },
-  marketplace: { animationData: marketplaceAnimation },
-  news: { animationData: newsAnimation },
-  notifications: { animationData: notificationsAnimation },
-  "password-check": { animationData: passwordCheckAnimation },
-  profile: { animationData: profileAnimation },
-  "sales-prices": { animationData: salesPricesAnimation },
-  send: { animationData: sendAnimation },
-  sessions: { animationData: sessionsAnimation },
-  settings: { animationData: settingsAnimation },
-  "show-menu": { animationData: arrowCircleRightAnimation },
-  sms: { animationData: smsAnimation },
-  "sms-notification": { animationData: smsNotificationAnimation },
-  "sms-star": { animationData: smsStarAnimation },
-  subscription: { animationData: subscriptionAnimation },
-  support: { animationData: supportAnimation },
+  knowledge: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/knowledge.json")) },
+  like: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/like.json")) },
+  logout: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/logout.json")) },
+  map: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/map.json")) },
+  marketplace: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/marketplace.json")) },
+  news: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/news.json")) },
+  notifications: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/notifications.json")) },
+  "password-check": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/password-check.json")) },
+  profile: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/profile.json")) },
+  "sales-prices": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/sales-prices.json")) },
+  send: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/send.json")) },
+  sessions: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/sessions.json")) },
+  settings: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/settings.json")) },
+  "show-menu": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/arrow-circle-right.json")) },
+  sms: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/sms.json")) },
+  "sms-notification": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/sms-notification.json")) },
+  "sms-star": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/sms-star.json")) },
+  subscription: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/subscription.json")) },
+  support: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/support.json")) },
 };
 
 export type AnimatedNavIconHandle = {
@@ -242,7 +219,7 @@ export const AnimatedNavIcon = forwardRef<AnimatedNavIconHandle, AnimatedNavIcon
     >
       {lottieIcon ? (
         <IconsaxLottieIcon
-          animationData={lottieIcon.animationData}
+          loadAnimationData={lottieIcon.loadAnimationData}
           playing={playing}
           playbackSpeed={lottieIcon.playbackSpeed ?? 1}
           reducedMotion={reducedMotion}
@@ -319,14 +296,14 @@ function LucideNavIcon({ name, size }: { name: Exclude<AnimatedIconKey, LottieNa
 }
 
 function IconsaxLottieIcon({
-  animationData,
+  loadAnimationData,
   onComplete,
   playing,
   playbackSpeed,
   reducedMotion,
   startFrame,
 }: {
-  animationData: LottieAnimationData;
+  loadAnimationData: () => Promise<LottieAnimationData>;
   onComplete: () => void;
   playing: boolean;
   playbackSpeed: number;
@@ -335,6 +312,7 @@ function IconsaxLottieIcon({
 }) {
   const containerRef = useRef<HTMLSpanElement | null>(null);
   const animationRef = useRef<AnimationItem | null>(null);
+  const [animationData, setAnimationData] = useState<LottieAnimationData | null>(null);
   const onCompleteRef = useRef(onComplete);
   const playingRef = useRef(playing);
   const reducedMotionRef = useRef(reducedMotion);
@@ -352,8 +330,25 @@ function IconsaxLottieIcon({
   }, [reducedMotion]);
 
   useEffect(() => {
+    let disposed = false;
+    setAnimationData(null);
+
+    void loadAnimationData()
+      .then((data) => {
+        if (!disposed) setAnimationData(data);
+      })
+      .catch(() => {
+        if (!disposed) setAnimationData(null);
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [loadAnimationData]);
+
+  useEffect(() => {
     const container = containerRef.current;
-    if (!container) return undefined;
+    if (!container || !animationData) return undefined;
 
     let disposed = false;
     let removeCompleteListener: (() => void) | null = null;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { ClipboardList, ExternalLink, Paperclip, Plus, Trash2 } from "lucide-react";
 import type { Block } from "../../../lib/editor/block-types";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
-import { DocumentEditor } from "../../../components/editor/DocumentEditor";
+import { LazyDocumentEditor as DocumentEditor } from "../../../components/editor/LazyDocumentEditor";
 import { FileUploadField } from "../../../components/FileUploadField";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";

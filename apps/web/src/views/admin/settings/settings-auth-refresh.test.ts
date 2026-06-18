@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  hasStaleAuthFeaturesAfterSettingsLoad,
-  shouldRefreshAuthAfterSettingChange,
-} from "./settings-auth-refresh";
+import { hasStaleAuthFeaturesAfterSettingsLoad, shouldRefreshAuthAfterSettingChange } from "./settings-auth-refresh";
 
 describe("settings auth refresh", () => {
   it("refreshes the current user after changing feature-backed settings", () => {

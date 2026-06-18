@@ -210,7 +210,11 @@ function buildForumSearchSnippet(
 function findHighlights(sourceText: string, query: string): Array<{ start: number; end: number }> {
   const normalizedText = normalizeForHighlight(sourceText);
   const tokens = Array.from(
-    new Set(normalizeForHighlight(query).match(/[\p{L}\p{N}]+/gu)?.filter((token) => token.length >= MIN_HIGHLIGHT_TOKEN_LENGTH) ?? []),
+    new Set(
+      normalizeForHighlight(query)
+        .match(/[\p{L}\p{N}]+/gu)
+        ?.filter((token) => token.length >= MIN_HIGHLIGHT_TOKEN_LENGTH) ?? [],
+    ),
   ).sort((left, right) => right.length - left.length);
 
   const ranges: Array<{ start: number; end: number }> = [];

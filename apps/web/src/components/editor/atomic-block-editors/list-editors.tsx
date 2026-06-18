@@ -2,6 +2,7 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { FileUploadField } from "../../FileUploadField";
+import styles from "../document-editor.module.css";
 import type { Img, PatchFn } from "./types";
 import { str } from "./utils";
 
@@ -110,8 +111,8 @@ export function LessonTasksEditor({ tasks, onChange }: { tasks: Img[]; onChange:
   return (
     <div className="form" style={{ gap: 8 }}>
       {list.map((task, index) => (
-        <div className="doc-task-row" key={index}>
-          <span className="doc-task-index">{index + 1}</span>
+        <div className={styles.taskRow} key={index}>
+          <span className={styles.taskIndex}>{index + 1}</span>
           <div className="form" style={{ gap: 4, flex: 1 }}>
             <input
               className="input"

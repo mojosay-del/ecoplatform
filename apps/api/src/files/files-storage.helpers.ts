@@ -8,6 +8,14 @@ function isPlaceholderS3Value(value: string) {
   return value.startsWith("replace-with-");
 }
 
+function readPrivateBucket(): string | null {
+  const bucket = process.env.S3_PRIVATE_BUCKET;
+  if (!bucket || isPlaceholderS3Value(bucket)) {
+    return null;
+  }
+  return bucket;
+}
+
 export function getS3Config() {
   const endpoint = process.env.S3_ENDPOINT;
   const region = process.env.S3_REGION ?? "ru-1";
@@ -38,6 +46,7 @@ export function getS3Config() {
       },
     }),
     bucket,
+    privateBucket: readPrivateBucket(),
     publicBaseUrl: process.env.S3_PUBLIC_BASE_URL ?? endpoint,
   };
 }
@@ -62,6 +71,7 @@ export function readS3HealthConfig() {
     configured: true,
     endpoint: process.env.S3_ENDPOINT,
     bucket: config.bucket,
+    privateBucketConfigured: Boolean(config.privateBucket),
   };
 }
 
@@ -75,9 +85,15 @@ export async function s3PingBucket(timeoutMs: number): Promise<void> {
   const timeout = setTimeout(() => abortController.abort(), timeoutMs);
 
   try {
-    await config.client.send(new HeadBucketCommand({ Bucket: config.bucket }), {
-      abortSignal: abortController.signal,
-    });
+    await Promise.all(
+      [config.bucket, config.privateBucket]
+        .filter((bucket): bucket is string => Boolean(bucket))
+        .map((bucket) =>
+          config.client.send(new HeadBucketCommand({ Bucket: bucket }), {
+            abortSignal: abortController.signal,
+          }),
+        ),
+    );
   } finally {
     clearTimeout(timeout);
     config.client.destroy();
@@ -102,33 +118,36 @@ export function publicUrl(storageKey: string, accessLevel: FileAccessLevel): str
   return directObjectUrl(baseUrl, bucket, storageKey);
 }
 
-// Отдельный приватный бакет для непубличных файлов (вложения платных уроков).
-// Если не настроен — возвращаем null, и всё работает по-старому (мягкая
-// деградация: до настройки инфраструктуры файлы остаются в публичном бакете).
-function privateBucket(): string | null {
-  const bucket = process.env.S3_PRIVATE_BUCKET;
-  if (!bucket || isPlaceholderS3Value(bucket)) {
-    return null;
-  }
-  return bucket;
-}
-
 // Бакет, в котором ФИЗИЧЕСКИ лежит объект данного уровня доступа: public — в
-// обычном public-read бакете, остальное — в приватном (если он настроен).
-// Единая точка истины для upload / delete / presign — они обязаны совпадать.
+// обычном public-read бакете, остальное — только в приватном.
+// Единая точка истины для upload / presign / transcode — они обязаны совпадать.
 export function bucketForAccessLevel(accessLevel: FileAccessLevel, publicBucket: string): string {
   if (accessLevel === FileAccessLevel.public) {
     return publicBucket;
   }
-  return privateBucket() ?? publicBucket;
+  const bucket = readPrivateBucket();
+  if (!bucket) {
+    throw new BadRequestException("Приватный S3-бакет не настроен.");
+  }
+  return bucket;
+}
+
+export function bucketForObjectDeletion(accessLevel: FileAccessLevel, publicBucket: string): string {
+  if (accessLevel === FileAccessLevel.public) {
+    return publicBucket;
+  }
+
+  // До fail-closed приватные файлы при отсутствии S3_PRIVATE_BUCKET фактически
+  // попадали в public-бакет. Для удаления это безопасный legacy fallback: URL мы
+  // не выдаём, а старые объекты не оставляем висеть навсегда.
+  return readPrivateBucket() ?? publicBucket;
 }
 
 /**
  * Считает ссылку для скачивания пачки файлов с учётом уровня доступа:
  *  - public → прямая публичная ссылка (как раньше, кешируется CDN);
  *  - не public + настроен приватный бакет → presigned GET на ttlSeconds;
- *  - не public + приватный бакет НЕ настроен → fallback на прямую ссылку
- *    (объект ещё в публичном бакете, не мигрирован) — без регрессии выдачи;
+ *  - не public + приватный бакет НЕ настроен → null (fail-closed);
  *  - S3 не настроен → null.
  * Принимает пачку, чтобы на странице урока создавать S3-клиент один раз.
  *
@@ -150,7 +169,7 @@ export async function signS3DownloadUrls(
 
   const needsPrivate = assets.some((asset) => asset.accessLevel !== FileAccessLevel.public);
   const config = needsPrivate ? getS3Config() : null;
-  const bucket = needsPrivate ? privateBucket() : null;
+  const bucket = needsPrivate ? config?.privateBucket : null;
 
   try {
     for (const asset of assets) {
@@ -163,7 +182,7 @@ export async function signS3DownloadUrls(
         continue;
       }
       if (!bucket) {
-        urls.set(asset.id, directObjectUrl(config.publicBaseUrl, config.bucket, asset.storageKey));
+        urls.set(asset.id, null);
         continue;
       }
       const command = new GetObjectCommand({

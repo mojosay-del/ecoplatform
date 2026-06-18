@@ -5,7 +5,7 @@ import type { RequestUser } from "../common/request-user";
 import { PrismaService } from "../prisma/prisma.service";
 import { compactFileIds } from "./files-reference.helpers";
 import { parseImageVariants } from "./files-response.helpers";
-import { bucketForAccessLevel, getS3Config } from "./files-storage.helpers";
+import { bucketForObjectDeletion, getS3Config } from "./files-storage.helpers";
 
 export type FilesCleanupDeps = {
   prisma: PrismaService;
@@ -47,17 +47,21 @@ async function deleteAssetObjects(asset: FileAsset): Promise<void> {
   }
 
   // Удаляем из того же бакета, куда объект был загружен по его уровню доступа.
-  const objectBucket = bucketForAccessLevel(asset.accessLevel, config.bucket);
-  await Promise.all(
-    fileStorageKeys(asset).map((key) =>
-      config.client.send(
-        new DeleteObjectCommand({
-          Bucket: objectBucket,
-          Key: key,
-        }),
+  const objectBucket = bucketForObjectDeletion(asset.accessLevel, config.bucket);
+  try {
+    await Promise.all(
+      fileStorageKeys(asset).map((key) =>
+        config.client.send(
+          new DeleteObjectCommand({
+            Bucket: objectBucket,
+            Key: key,
+          }),
+        ),
       ),
-    ),
-  );
+    );
+  } finally {
+    config.client.destroy();
+  }
 }
 
 export async function deleteUnreferencedFiles(

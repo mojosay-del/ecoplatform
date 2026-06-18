@@ -24,6 +24,7 @@ import {
   type AtomicBlockKind,
 } from "../../lib/editor/block-mapping";
 import { AtomicBlockEditor } from "./atomic-block-editors";
+import styles from "./document-editor.module.css";
 
 // Человекочитаемые подписи и иконки атомарных блоков (для шапки карточки и меню).
 export const ATOMIC_BLOCK_LABELS: Record<AtomicBlockKind, string> = {
@@ -137,19 +138,25 @@ function AtomicNodeView({ node, updateAttributes, deleteNode }: NodeViewProps) {
   if (!kind) return null;
 
   return (
-    <NodeViewWrapper className="doc-block" data-kind={kind}>
-      <div className="doc-block-card" contentEditable={false}>
-        <div className="doc-block-head">
-          <span className="doc-block-handle" data-drag-handle aria-label="Перетащить блок" role="button" tabIndex={-1}>
+    <NodeViewWrapper className={styles.block} data-kind={kind}>
+      <div className={styles.blockCard} contentEditable={false}>
+        <div className={styles.blockHead}>
+          <span
+            className={styles.blockHandle}
+            data-drag-handle
+            aria-label="Перетащить блок"
+            role="button"
+            tabIndex={-1}
+          >
             <GripVertical size={15} />
           </span>
-          <span className="doc-block-label">
+          <span className={styles.blockLabel}>
             {ATOMIC_BLOCK_ICONS[kind]}
             {ATOMIC_BLOCK_LABELS[kind]}
           </span>
           <button
             type="button"
-            className="doc-block-delete"
+            className={styles.blockDelete}
             onClick={() => deleteNode()}
             aria-label="Удалить блок"
             title="Удалить блок"
@@ -157,7 +164,7 @@ function AtomicNodeView({ node, updateAttributes, deleteNode }: NodeViewProps) {
             <Trash2 size={14} />
           </button>
         </div>
-        <div className="doc-block-body">
+        <div className={styles.blockBody}>
           <AtomicBlockEditor kind={kind} payload={payload} onChange={update} />
         </div>
       </div>

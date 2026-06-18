@@ -51,9 +51,7 @@ export function AccountGenderValue({ onSaved, value }: { onSaved: () => Promise<
   return (
     <>
       <AccountEditableValue value={currentOption.label} label="Пол" onEdit={() => setOpen(true)} />
-      {open ? (
-        <GenderEditDialog currentValue={currentValue} onClose={() => setOpen(false)} onSaved={onSaved} />
-      ) : null}
+      {open ? <GenderEditDialog currentValue={currentValue} onClose={() => setOpen(false)} onSaved={onSaved} /> : null}
     </>
   );
 }

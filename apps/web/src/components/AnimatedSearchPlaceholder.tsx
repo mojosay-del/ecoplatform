@@ -59,9 +59,7 @@ export function AnimatedSearchPlaceholder({
         <span className="animated-search-placeholder-prefix">{prefix}</span>
         <span className="animated-search-placeholder-window">
           {previousIndex !== null ? (
-            <span className="animated-search-placeholder-item is-exiting">
-              {normalizedExamples[previousIndex]}
-            </span>
+            <span className="animated-search-placeholder-item is-exiting">{normalizedExamples[previousIndex]}</span>
           ) : null}
           <span className="animated-search-placeholder-item is-entering" key={`${examplesKey}:${activeIndex}`}>
             {normalizedExamples[activeIndex]}

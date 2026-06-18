@@ -205,7 +205,11 @@ describe("Forum: умный поиск", () => {
       rawMaterialId,
       questionTypeId,
     });
-    const hiddenAnswerId = await answer(responder.token, visibleQuestionId, "sekretnyymarker найден только в скрытом ответе.");
+    const hiddenAnswerId = await answer(
+      responder.token,
+      visibleQuestionId,
+      "sekretnyymarker найден только в скрытом ответе.",
+    );
     await ctx.prisma.forumAnswer.update({ where: { id: hiddenAnswerId }, data: { hidden: true } });
 
     const hiddenQuestionId = await ask(asker.token, {

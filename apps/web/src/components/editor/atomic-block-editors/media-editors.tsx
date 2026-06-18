@@ -2,6 +2,7 @@
 
 import { Plus, X } from "lucide-react";
 import { FileUploadField } from "../../FileUploadField";
+import styles from "../document-editor.module.css";
 import type { Img, PatchFn } from "./types";
 import { str } from "./utils";
 
@@ -119,12 +120,12 @@ export function GalleryEditor({ images, onChange }: { images: Img[]; onChange: (
 
   return (
     <div className="form" style={{ gap: 8 }}>
-      <div className="doc-gallery-grid">
+      <div className={styles.galleryGrid}>
         {images.map((image, index) => (
-          <div className="doc-gallery-tile" key={index}>
+          <div className={styles.galleryTile} key={index}>
             <button
               type="button"
-              className="doc-gallery-remove"
+              className={styles.galleryRemove}
               onClick={() => remove(index)}
               aria-label="Удалить изображение"
               title="Удалить изображение"

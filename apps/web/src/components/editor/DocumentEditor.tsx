@@ -23,6 +23,7 @@ import { createRichTextExtensions } from "../../lib/editor/rich-text-extensions"
 import { blocksToDoc, docToBlocks, type EditorBlock } from "../../lib/editor/serializer";
 import { ATOMIC_BLOCK_KINDS, ATOMIC_BLOCK_NODE_NAME, type AtomicBlockKind } from "../../lib/editor/block-mapping";
 import { ATOMIC_BLOCK_ICONS, ATOMIC_BLOCK_LABELS, atomicBlockNodes, atomicDefaultPayload } from "./atomic-nodes";
+import styles from "./document-editor.module.css";
 import { createSlashCommand } from "./slash-command";
 
 const TEXT_COLORS = [
@@ -42,7 +43,7 @@ const FONT_SIZES = [
   { value: "22px", label: "Большой" },
 ];
 
-type DocumentEditorProps = {
+export type DocumentEditorProps = {
   blocks: EditorBlock[];
   onChange: (blocks: EditorBlock[]) => void;
   allowedAtomicKinds?: AtomicBlockKind[];
@@ -76,7 +77,7 @@ export function DocumentEditor({
     extensions,
     content: blocksToDoc(blocks),
     immediatelyRender: false,
-    editorProps: { attributes: { class: "document-editor-content rich-text-content" } },
+    editorProps: { attributes: { class: `${styles.content} rich-text-content` } },
     onUpdate({ editor }) {
       const next = docToBlocks(editor.getJSON());
       lastEmittedRef.current = JSON.stringify(next);
@@ -96,9 +97,9 @@ export function DocumentEditor({
   if (!editor) return null;
 
   return (
-    <div className="document-editor">
+    <div className={styles.root}>
       <Toolbar editor={editor} allowedAtomicKinds={allowedAtomicKinds} />
-      <EditorContent editor={editor} className="document-editor-surface" />
+      <EditorContent editor={editor} className={styles.surface} />
     </div>
   );
 }
@@ -335,7 +336,7 @@ function InsertMenu({ editor, allowedAtomicKinds }: { editor: Editor; allowedAto
   }
 
   return (
-    <div className="doc-insert" ref={ref}>
+    <div className={styles.insert} ref={ref}>
       <button
         type="button"
         className={`rich-text-button${open ? " is-active" : ""}`}
@@ -348,16 +349,16 @@ function InsertMenu({ editor, allowedAtomicKinds }: { editor: Editor; allowedAto
         <Plus size={16} />
       </button>
       {open ? (
-        <div className="doc-insert-menu" role="menu">
+        <div className={styles.insertMenu} role="menu">
           {allowedAtomicKinds.map((kind) => (
             <button
               key={kind}
               type="button"
               role="menuitem"
-              className="doc-insert-menu-item"
+              className={styles.insertMenuItem}
               onClick={() => insert(kind)}
             >
-              <span className="doc-insert-menu-icon">{ATOMIC_BLOCK_ICONS[kind]}</span>
+              <span className={styles.insertMenuIcon}>{ATOMIC_BLOCK_ICONS[kind]}</span>
               {ATOMIC_BLOCK_LABELS[kind]}
             </button>
           ))}

@@ -9,6 +9,7 @@ import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Heading2, Heading3, IndentIncrease, List, ListOrdered, Quote, Type } from "lucide-react";
 import { ATOMIC_BLOCK_NODE_NAME, type AtomicBlockKind } from "../../lib/editor/block-mapping";
 import { ATOMIC_BLOCK_ICONS, ATOMIC_BLOCK_LABELS, atomicDefaultPayload } from "./atomic-nodes";
+import styles from "./document-editor.module.css";
 
 export type SlashItem = {
   title: string;
@@ -137,26 +138,26 @@ const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function SlashMenu
 
   if (items.length === 0) {
     return (
-      <div className="slash-menu">
-        <div className="slash-empty">Ничего не найдено</div>
+      <div className={styles.slashMenu}>
+        <div className={styles.slashEmpty}>Ничего не найдено</div>
       </div>
     );
   }
 
   return (
-    <div className="slash-menu" role="listbox">
+    <div className={styles.slashMenu} role="listbox">
       {items.map((item, index) => (
         <button
           key={item.title}
           type="button"
           role="option"
           aria-selected={index === selected}
-          className={`slash-item${index === selected ? " is-active" : ""}`}
+          className={`${styles.slashItem}${index === selected ? ` ${styles.slashItemActive}` : ""}`}
           onMouseEnter={() => setSelected(index)}
           onClick={() => command(item)}
         >
-          <span className="slash-item-icon">{item.icon}</span>
-          <span className="slash-item-title">{item.title}</span>
+          <span className={styles.slashItemIcon}>{item.icon}</span>
+          <span className={styles.slashItemTitle}>{item.title}</span>
         </button>
       ))}
     </div>
@@ -199,7 +200,7 @@ export function createSlashCommand(allowedAtomicKinds: AtomicBlockKind[]) {
             editor: props.editor,
           });
           const element = component.element as HTMLElement;
-          element.classList.add("slash-popup");
+          element.classList.add(styles.slashPopup!);
           document.body.appendChild(element);
           positionMenu(element, props.clientRect ?? (() => null));
         },

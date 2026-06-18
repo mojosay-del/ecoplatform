@@ -28,10 +28,14 @@ export type AccountDeletionCleanupResult = {
   deletedCompanies: number;
 };
 
+export type AccountDeletionCleanupPlan = AccountDeletionCleanupResult & {
+  fileIdsToDelete: string[];
+};
+
 export async function cleanupDeletedAccountsInTransaction(
   tx: Prisma.TransactionClient,
   now: Date,
-): Promise<AccountDeletionCleanupResult> {
+): Promise<AccountDeletionCleanupPlan> {
   const cutoff = new Date(now.getTime() - ACCOUNT_DELETION_GRACE_MS);
   // Row lock закрывает гонку с одновременной отменой удаления аккаунта.
   const candidates = await tx.$queryRaw<AccountDeletionCandidate[]>`
@@ -44,17 +48,18 @@ export async function cleanupDeletedAccountsInTransaction(
   `;
 
   if (candidates.length === 0) {
-    return { deletedUsers: 0, deletedCompanies: 0 };
+    return { deletedUsers: 0, deletedCompanies: 0, fileIdsToDelete: [] };
   }
 
   const userIds = candidates.map((user) => user.id);
   const companyIds = Array.from(new Set(candidates.map((user) => user.companyId).filter(Boolean))) as string[];
 
-  await tx.fileAsset.deleteMany({
+  const fileAssetsToDelete = await tx.fileAsset.findMany({
     where: {
       uploadedById: { in: userIds },
       references: { none: {} },
     },
+    select: { id: true },
   });
 
   const deletedUsers = await tx.user.deleteMany({ where: { id: { in: userIds } } });
@@ -102,7 +107,11 @@ export async function cleanupDeletedAccountsInTransaction(
     }
   }
 
-  return { deletedUsers: deletedUsers.count, deletedCompanies };
+  return {
+    deletedUsers: deletedUsers.count,
+    deletedCompanies,
+    fileIdsToDelete: fileAssetsToDelete.map((file) => file.id),
+  };
 }
 
 export async function cleanupOrphanFiles(

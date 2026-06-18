@@ -19,14 +19,7 @@ import { NewsCard, NewsCardSkeleton } from "./NewsCard";
 import { NewsModal } from "./NewsModal";
 
 const SEARCH_DEBOUNCE_MS = 2000;
-const NEWS_SEARCH_EXAMPLES = [
-  "Заводы",
-  "Логистика",
-  "Законы",
-  "Субсидии",
-  "Цены",
-  "Переработка",
-];
+const NEWS_SEARCH_EXAMPLES = ["Заводы", "Логистика", "Законы", "Субсидии", "Цены", "Переработка"];
 
 export function NewsView() {
   const { ready, token, user } = useAuth();

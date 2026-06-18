@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { Block } from "../../../lib/editor/block-types";
-import { DocumentEditor } from "../../../components/editor/DocumentEditor";
+import { LazyDocumentEditor as DocumentEditor } from "../../../components/editor/LazyDocumentEditor";
 import { FileUploadField } from "../../../components/FileUploadField";
 import { KNOWLEDGE_ATOMIC_KINDS } from "./constants";
 import { KnowledgeIconPicker } from "./icon-picker";

@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import styles from "../document-editor.module.css";
 import type { PatchFn } from "./types";
 import { str } from "./utils";
 
@@ -27,14 +28,14 @@ export function MatchingEditor({ payload, onChange }: { payload: Record<string, 
       />
       <div className="stack-list">
         {pairs.map((pair, index) => (
-          <div className="doc-pair-row" key={index}>
+          <div className={styles.pairRow} key={index}>
             <input
               className="input"
               placeholder="Слева"
               value={pair.left}
               onChange={(event) => setPair(index, { left: event.target.value })}
             />
-            <span className="doc-pair-link" aria-hidden>
+            <span className={styles.pairLink} aria-hidden>
               ↔
             </span>
             <input

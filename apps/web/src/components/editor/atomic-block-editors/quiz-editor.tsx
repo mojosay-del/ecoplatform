@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import styles from "../document-editor.module.css";
 import type { PatchFn } from "./types";
 import { str } from "./utils";
 
@@ -49,17 +50,17 @@ export function QuizEditor({ payload, onChange }: { payload: Record<string, unkn
         value={str(payload.question)}
         onChange={(event) => onChange({ question: event.target.value })}
       />
-      <label className="doc-quiz-multiple">
+      <label className={styles.quizMultiple}>
         <input type="checkbox" checked={multiple} onChange={(event) => toggleMultiple(event.target.checked)} />
         Несколько правильных ответов
       </label>
 
       <div className="stack-list">
         {options.map((option, index) => (
-          <div className="doc-quiz-option" key={index}>
+          <div className={styles.quizOption} key={index}>
             <input
               type={multiple ? "checkbox" : "radio"}
-              className="doc-quiz-correct"
+              className={styles.quizCorrect}
               name="quiz-correct"
               checked={option.correct}
               onChange={(event) => chooseCorrect(index, event.target.checked)}

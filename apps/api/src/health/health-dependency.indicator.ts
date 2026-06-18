@@ -86,9 +86,20 @@ export class HealthDependencyIndicator {
       return this.indicator.check(key).up(payload);
     }
 
+    if (this.isProduction() && !config.privateBucketConfigured) {
+      return this.indicator.check(key).down({
+        configured: true,
+        privateBucketConfigured: false,
+        reason: "private_bucket_missing",
+        ...this.successData(startedAt, options),
+      });
+    }
+
     try {
       await this.files.pingS3();
-      const details = options.detailed ? { endpoint: config.endpoint, bucket: config.bucket } : {};
+      const details = options.detailed
+        ? { endpoint: config.endpoint, bucket: config.bucket, privateBucketConfigured: config.privateBucketConfigured }
+        : {};
       return this.indicator.check(key).up({
         configured: true,
         ...details,

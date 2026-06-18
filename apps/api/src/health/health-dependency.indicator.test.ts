@@ -167,6 +167,7 @@ describe("HealthDependencyIndicator", () => {
         configured: true,
         endpoint: "https://s3.example.test",
         bucket: "test-bucket",
+        privateBucketConfigured: true,
       }),
       pingS3: vi.fn().mockResolvedValue(undefined),
     };
@@ -178,7 +179,42 @@ describe("HealthDependencyIndicator", () => {
     expect(result.s3.configured).toBe(true);
     expect(result.s3.endpoint).toBe("https://s3.example.test");
     expect(result.s3.bucket).toBe("test-bucket");
+    expect(result.s3.privateBucketConfigured).toBe(true);
     expect(result.s3.latencyMs).toEqual(expect.any(Number));
     expect(files.pingS3).toHaveBeenCalledOnce();
+  });
+
+  it("в production роняет readiness, если приватный S3 bucket не настроен", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    const files = {
+      getS3HealthConfig: vi.fn().mockReturnValue({
+        configured: true,
+        endpoint: "https://s3.example.test",
+        bucket: "test-bucket",
+        privateBucketConfigured: false,
+      }),
+      pingS3: vi.fn(),
+    };
+    const indicator = createIndicator({ files: files as unknown as FilesService });
+
+    try {
+      await expect(indicator.objectStorage("s3", { detailed: true })).resolves.toEqual({
+        s3: {
+          status: "down",
+          configured: true,
+          privateBucketConfigured: false,
+          reason: "private_bucket_missing",
+          latencyMs: expect.any(Number),
+        },
+      });
+      expect(files.pingS3).not.toHaveBeenCalled();
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
   });
 });

@@ -46,14 +46,7 @@ type MapObjectEntry =
   | { mode: "dot"; marker: MapglHtmlMarker; element: HTMLElement }
   | { mode: "circle"; circle: MapglCircle; color: string; coordinates: MapglLngLat };
 
-export function ListingMap({
-  listings,
-  onSelect,
-  hoveredId,
-  onHover,
-  onUserMoved,
-  fitOnDataChange = true,
-}: {
+export type ListingMapProps = {
   listings: MarketplaceListingListItem[];
   onSelect?: (id: string) => void;
   // Двусторонняя hover-синхронизация с лентой: подсветить объект по id…
@@ -66,7 +59,16 @@ export function ListingMap({
   // При активном bbox-фильтре карту не пере-fit'им под новые данные, чтобы не
   // сбивать выставленный пользователем вид (и не зациклить fit → moved).
   fitOnDataChange?: boolean;
-}) {
+};
+
+export function ListingMap({
+  listings,
+  onSelect,
+  hoveredId,
+  onHover,
+  onUserMoved,
+  fitOnDataChange = true,
+}: ListingMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapglMap | null>(null);
   const modeRef = useRef<ListingMapMode | null>(null);
