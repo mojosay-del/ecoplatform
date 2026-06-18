@@ -3,6 +3,7 @@ import { CompanyStatus, NotificationCategory, SubscriptionStatus } from "@prisma
 import { swallowAndLog } from "../common/silent-catch";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { formatBillingNotificationDateTime } from "./billing-notification-dates";
 
 /**
  * Регулярная проверка биллинг-состояния компаний:
@@ -75,7 +76,7 @@ export class BillingNotificationsService {
             sourceId,
             category: NotificationCategory.billing,
             title: "Демо-доступ скоро закончится",
-            body: `Демо-период компании заканчивается ${endsAt.toLocaleString("ru-RU")}. Активируйте подписку, чтобы сохранить доступ к разделам.`,
+            body: `Демо-период компании заканчивается ${formatBillingNotificationDateTime(endsAt)}. Активируйте подписку, чтобы сохранить доступ к разделам.`,
             link: "/account",
             payload: { companyId: company.id, demoEndsAt: endsAt.toISOString() },
           })
@@ -145,7 +146,7 @@ export class BillingNotificationsService {
             sourceId,
             category: NotificationCategory.billing,
             title: "Подписка скоро закончится",
-            body: `Подписка компании заканчивается ${endsAt.toLocaleString("ru-RU")}. Продлите, чтобы сохранить доступ.`,
+            body: `Подписка компании заканчивается ${formatBillingNotificationDateTime(endsAt)}. Продлите, чтобы сохранить доступ.`,
             link: "/account",
             payload: {
               companyId: company.id,

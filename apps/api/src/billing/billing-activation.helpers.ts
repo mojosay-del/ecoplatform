@@ -5,6 +5,7 @@ import { computeDiff } from "../common/admin-action-log.service";
 import { swallowAndLog } from "../common/silent-catch";
 import type { NotificationsService } from "../notifications/notifications.service";
 import type { PrismaService } from "../prisma/prisma.service";
+import { formatBillingNotificationDateTime } from "./billing-notification-dates";
 import {
   addDays,
   isCompanySubscriptionCurrentlyActive,
@@ -150,7 +151,7 @@ export async function notifyManualActivation(
           sourceId: result.subscription.id,
           category: NotificationCategory.billing,
           title: "Подписка активирована",
-          body: `Активирован тариф ${input.plan} до ${new Date(result.subscription.endsAt).toLocaleString("ru-RU")}.`,
+          body: `Активирован тариф ${input.plan} до ${formatBillingNotificationDateTime(result.subscription.endsAt)}.`,
           link: "/account",
           payload: { plan: input.plan, endsAt: result.subscription.endsAt },
         })
@@ -311,7 +312,7 @@ export async function notifySelfActivation(
           sourceId: result.subscription.id,
           category: NotificationCategory.billing,
           title: "Подписка активирована",
-          body: `${planLabel} подписка активирована до ${new Date(result.subscription.endsAt).toLocaleString("ru-RU")}.`,
+          body: `${planLabel} подписка активирована до ${formatBillingNotificationDateTime(result.subscription.endsAt)}.`,
           link: "/account/billing",
           payload: { plan: input.plan, endsAt: result.subscription.endsAt, source: "subscription_page" },
         })

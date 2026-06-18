@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { CheckCheck } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { NOTIFICATION_CATEGORY_LABELS } from "../lib/display-labels";
+import { AnimatedNavIcon, type AnimatedNavIconHandle } from "./app-shell/nav-icons";
 
 // Popover, который открывается по колокольчику в шапке. Цель — дать
 // быстрый просмотр последних уведомлений и одну кнопку «прочитать все»,
@@ -22,6 +22,9 @@ type Notification = {
 };
 
 const POPOVER_LIMIT = 10;
+const DATE_TIME_WITH_SECONDS_RE = /(\b\d{2}\.\d{2}\.\d{4},\s*\d{1,2}:\d{2}):\d{2}\b/g;
+
+type NotificationMessageIconKey = "sms" | "sms-notification" | "sms-star";
 
 type Props = {
   open: boolean;
@@ -112,41 +115,7 @@ export function NotificationsPopover({ open, onClose, items, loading, onChanged 
         {!loading && recent.length === 0 ? <p className="notif-popover-empty">Новых уведомлений нет.</p> : null}
         <ul className="notif-popover-list">
           {recent.map((item) => (
-            <li key={item.id} className={`notif-popover-item${item.readAt ? "" : " unread"}`}>
-              <button
-                type="button"
-                className="notif-popover-item-button"
-                onClick={() => {
-                  if (!item.readAt) void markOneRead(item.id);
-                  if (item.link) {
-                    onClose();
-                    // Переход обрабатывается обёрткой <Link>, поэтому здесь
-                    // ничего не делаем — кнопка нужна для непролинкованных.
-                  }
-                }}
-              >
-                <div className="notif-popover-item-head">
-                  <strong className="notif-popover-item-title">{formatPopoverTitle(item)}</strong>
-                  <span className="notif-popover-item-cat">
-                    {NOTIFICATION_CATEGORY_LABELS[item.category] ?? item.category}
-                  </span>
-                </div>
-                <p className="notif-popover-item-body">{formatPopoverBody(item)}</p>
-                <span className="notif-popover-item-time">{formatRelative(item.createdAt)}</span>
-              </button>
-              {item.link ? (
-                <Link
-                  className="notif-popover-item-link"
-                  href={item.link}
-                  onClick={() => {
-                    if (!item.readAt) void markOneRead(item.id);
-                    onClose();
-                  }}
-                >
-                  Открыть
-                </Link>
-              ) : null}
-            </li>
+            <NotificationPopoverItem key={item.id} item={item} markOneRead={markOneRead} onClose={onClose} />
           ))}
         </ul>
       </div>
@@ -157,6 +126,71 @@ export function NotificationsPopover({ open, onClose, items, loading, onChanged 
         </Link>
       </footer>
     </div>
+  );
+}
+
+type NotificationPopoverItemProps = {
+  item: Notification;
+  markOneRead: (id: string) => Promise<void>;
+  onClose: () => void;
+};
+
+function NotificationPopoverItem({ item, markOneRead, onClose }: NotificationPopoverItemProps) {
+  const iconRef = useRef<AnimatedNavIconHandle | null>(null);
+
+  const activate = useCallback(() => {
+    if (!item.readAt) void markOneRead(item.id);
+    if (item.link) onClose();
+  }, [item.id, item.link, item.readAt, markOneRead, onClose]);
+
+  const playIcon = useCallback(() => iconRef.current?.play(), []);
+  const resetIcon = useCallback(() => iconRef.current?.reset(), []);
+  const iconName = getNotificationIconName(item);
+  const className = `notif-popover-item${item.readAt ? "" : " unread"}`;
+  const controlClassName = "notif-popover-item-control";
+  const content = (
+    <>
+      <span className="notif-popover-item-icon" aria-hidden="true">
+        <AnimatedNavIcon name={iconName} ref={iconRef} size={24} />
+      </span>
+      <span className="notif-popover-item-copy">
+        <span className="notif-popover-item-head">
+          <strong className="notif-popover-item-title">{formatPopoverTitle(item)}</strong>
+        </span>
+        <span className="notif-popover-item-body">{formatPopoverBody(item)}</span>
+        <span className="notif-popover-item-time">{formatRelative(item.createdAt)}</span>
+      </span>
+    </>
+  );
+
+  return (
+    <li className={className}>
+      {item.link ? (
+        <Link
+          className={controlClassName}
+          href={item.link}
+          onBlur={resetIcon}
+          onClick={activate}
+          onFocus={playIcon}
+          onMouseEnter={playIcon}
+          onMouseLeave={resetIcon}
+        >
+          {content}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className={controlClassName}
+          onBlur={resetIcon}
+          onClick={activate}
+          onFocus={playIcon}
+          onMouseEnter={playIcon}
+          onMouseLeave={resetIcon}
+        >
+          {content}
+        </button>
+      )}
+    </li>
   );
 }
 
@@ -171,7 +205,12 @@ function formatPopoverTitle(item: Notification): string {
 
 function formatPopoverBody(item: Notification): string {
   if (isAuthLoginNotification(item)) return "Вход выполнен.";
-  return item.body;
+  return item.body.replace(DATE_TIME_WITH_SECONDS_RE, "$1");
+}
+
+function getNotificationIconName(item: Notification): NotificationMessageIconKey {
+  if (item.category === "system") return "sms-star";
+  return item.readAt ? "sms" : "sms-notification";
 }
 
 function formatRelative(iso: string): string {

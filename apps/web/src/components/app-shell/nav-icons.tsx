@@ -37,6 +37,9 @@ import profileAnimation from "./iconsax/profile.json";
 import sendAnimation from "./iconsax/send.json";
 import sessionsAnimation from "./iconsax/sessions.json";
 import settingsAnimation from "./iconsax/settings.json";
+import smsAnimation from "./iconsax/sms.json";
+import smsNotificationAnimation from "./iconsax/sms-notification.json";
+import smsStarAnimation from "./iconsax/sms-star.json";
 import subscriptionAnimation from "./iconsax/subscription.json";
 import supportAnimation from "./iconsax/support.json";
 
@@ -52,7 +55,17 @@ type AnimatedLucideIconProps = SVGProps<SVGSVGElement> & {
 type AnimatedLucideIconComponent = ForwardRefExoticComponent<AnimatedLucideIconProps & RefAttributes<SVGSVGElement>>;
 
 type LottieAnimationData = object;
-type AnimatedIconKey = NavIconKey | "arrow-up" | "hide-menu" | "like" | "send" | "show-menu" | "support";
+type AnimatedIconKey =
+  | NavIconKey
+  | "arrow-up"
+  | "hide-menu"
+  | "like"
+  | "send"
+  | "show-menu"
+  | "sms"
+  | "sms-notification"
+  | "sms-star"
+  | "support";
 type LottieNavIconKey =
   | "admin"
   | "arrow-up"
@@ -73,6 +86,9 @@ type LottieNavIconKey =
   | "sessions"
   | "settings"
   | "show-menu"
+  | "sms"
+  | "sms-notification"
+  | "sms-star"
   | "subscription"
   | "support";
 type LottieNavIconConfig = {
@@ -114,6 +130,9 @@ const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
   sessions: { animationData: sessionsAnimation },
   settings: { animationData: settingsAnimation },
   "show-menu": { animationData: arrowCircleRightAnimation },
+  sms: { animationData: smsAnimation },
+  "sms-notification": { animationData: smsNotificationAnimation },
+  "sms-star": { animationData: smsStarAnimation },
   subscription: { animationData: subscriptionAnimation },
   support: { animationData: supportAnimation },
 };
