@@ -6,6 +6,7 @@ import type {
   AuthMeUser,
   BillingStatus,
   BillingSubscriptionActivationResponse,
+  BillingTrialActivationResponse,
   CompanyProfileUpdateDto,
   ConsentRecordItem,
   ConsentSource,
@@ -103,6 +104,11 @@ export const billingApi = {
     apiFetch<BillingSubscriptionActivationResponse>("/billing/subscriptions", {
       method: "POST",
       body: input,
+      headers: { "Idempotency-Key": options.idempotencyKey },
+    }),
+  activateTrial: (options: { idempotencyKey: string }) =>
+    apiFetch<BillingTrialActivationResponse>("/billing/trial", {
+      method: "POST",
       headers: { "Idempotency-Key": options.idempotencyKey },
     }),
 };

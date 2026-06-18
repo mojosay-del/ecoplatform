@@ -16,16 +16,16 @@ export type PaidSubscriptionPlanTier = SubscriptionPlanTier & { key: Subscriptio
 export const SUBSCRIPTION_PLAN_TIERS: SubscriptionPlanTier[] = [
   {
     key: "demo",
-    name: "Демо",
-    description: "Полный доступ для знакомства с платформой.",
+    name: "Пробный доступ",
+    description: "Один день, чтобы спокойно осмотреть платформу перед выбором тарифа.",
     price: "0 ₽",
-    pricePeriod: "/ 30 дней",
+    pricePeriod: "/ 24 часа",
     accent: "green",
     features: [
-      { label: "Доступ ко всем разделам", included: true },
+      { label: "Доступ к рабочим разделам на 24 часа", included: true },
       { label: "Индексы цен и новости", included: true },
       { label: "Базы знаний и обучение", included: true },
-      { label: "Ограничено по времени", included: false },
+      { label: "Доступен только один раз", included: false },
     ],
   },
   {

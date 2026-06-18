@@ -150,21 +150,41 @@ export function setupIntegrationContext() {
     return res.body.accessToken as string;
   }
 
-  async function registerWithBody(body: Record<string, unknown>): Promise<string> {
-    const start = await submitRegistration(body);
-    return verifyRegistration(start.verificationId);
+  type RegisterOptions = { activateTrial?: boolean };
+
+  async function activateTrialForToken(token: string, idempotencyKey: string): Promise<void> {
+    const res = await testApp.http
+      .post("/api/billing/trial")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", idempotencyKey);
+    expect(res.status).toBe(201);
   }
 
-  async function registerCompany(suffix: string): Promise<{ token: string; companyId: string; userId: string }> {
-    const token = await registerWithBody({
-      organizationName: `ООО Тест ${suffix}`,
-      companyType: "collector",
-      firstName: "Иван",
-      lastName: "Тестов",
-      phone: `+7900${suffix}`,
-      email: `user${suffix}@test.local`,
-      password: "User12345678",
-    });
+  async function registerWithBody(body: Record<string, unknown>, options: RegisterOptions = {}): Promise<string> {
+    const start = await submitRegistration(body);
+    const token = await verifyRegistration(start.verificationId);
+    if (options.activateTrial !== false) {
+      await activateTrialForToken(token, `test-trial-${start.verificationId}`);
+    }
+    return token;
+  }
+
+  async function registerCompany(
+    suffix: string,
+    options: RegisterOptions = {},
+  ): Promise<{ token: string; companyId: string; userId: string }> {
+    const token = await registerWithBody(
+      {
+        organizationName: `ООО Тест ${suffix}`,
+        companyType: "collector",
+        firstName: "Иван",
+        lastName: "Тестов",
+        phone: `+7900${suffix}`,
+        email: `user${suffix}@test.local`,
+        password: "User12345678",
+      },
+      options,
+    );
 
     const me = await testApp.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
     expect(me.status).toBe(200);

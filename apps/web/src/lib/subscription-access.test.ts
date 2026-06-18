@@ -22,7 +22,8 @@ function company(overrides: Partial<AuthMeCompany>): AuthMeCompany {
 }
 
 describe("subscription access helpers", () => {
-  it("requires the subscription page for expired demo or paid subscriptions", () => {
+  it("requires the subscription page for missing/expired trial or paid subscriptions", () => {
+    expect(isSubscriptionSelectionRequired(company({ demoEndsAt: null }), NOW)).toBe(true);
     expect(isSubscriptionSelectionRequired(company({ demoEndsAt: "2026-05-31T12:00:00.000Z" }), NOW)).toBe(true);
     expect(
       isSubscriptionSelectionRequired(

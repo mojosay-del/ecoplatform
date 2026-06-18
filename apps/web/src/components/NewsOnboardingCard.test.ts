@@ -31,7 +31,7 @@ function demoUser(demoEndsAt: string | null, status: "demo" | "active" = "demo")
 }
 
 describe("NewsOnboardingCard state", () => {
-  it("shows only for an active demo company that has not dismissed onboarding", () => {
+  it("shows only for an active trial company that has not dismissed onboarding", () => {
     const now = new Date("2026-05-27T09:00:00.000Z");
 
     expect(shouldShowNewsOnboarding(demoUser("2026-05-30T09:00:00.000Z"), false, now)).toBe(true);
@@ -41,7 +41,7 @@ describe("NewsOnboardingCard state", () => {
     expect(shouldShowNewsOnboarding(demoUser("2026-05-30T09:00:00.000Z", "active"), false, now)).toBe(false);
   });
 
-  it("formats the demo date for the welcome text", () => {
+  it("formats the trial date for the welcome text", () => {
     expect(formatOnboardingDemoDate("2026-05-30T09:00:00.000Z")).toBe("30 мая 2026");
     expect(formatOnboardingDemoDate("not-a-date")).toBeNull();
   });

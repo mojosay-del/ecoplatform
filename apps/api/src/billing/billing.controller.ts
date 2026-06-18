@@ -47,6 +47,15 @@ export class BillingController {
     return this.billing.activateSelf(input, user.id, companyId, idempotencyKey);
   }
 
+  @Post("billing/trial")
+  async activateOwnTrial(
+    @CurrentUser() user: RequestUser,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+  ) {
+    const companyId = assertCompanyOwner(user, "Пробный доступ доступен только пользователям компаний.");
+    return this.billing.activateTrial(user.id, companyId, idempotencyKey);
+  }
+
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Get("admin/billing/companies")

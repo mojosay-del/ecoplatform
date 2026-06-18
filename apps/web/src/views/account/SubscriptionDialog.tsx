@@ -25,12 +25,14 @@ export function SubscriptionDialog({
   const companyStatusLabel = billing?.status ? (COMPANY_STATUS_LABELS[billing.status] ?? billing.status) : null;
   const showBillingStateBanner =
     billing?.status === "past_due" || billing?.status === "suspended" || billing?.status === "pending_deletion";
-  const currentPlanKey: SubscriptionPlanTier["key"] =
+  const currentPlanKey: SubscriptionPlanTier["key"] | null =
     billing?.status === "active" && billing?.subscriptionPlan === "extended"
       ? "extended"
       : billing?.status === "active" && billing?.subscriptionPlan === "basic"
         ? "basic"
-        : "demo";
+        : billing?.status === "demo" && billing.demoEndsAt
+          ? "demo"
+          : null;
 
   return (
     <div

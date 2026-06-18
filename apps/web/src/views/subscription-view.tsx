@@ -12,7 +12,9 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { COMPANY_STATUS_LABELS, SUBSCRIPTION_PLAN_TITLE_LABELS } from "../lib/display-labels";
 import { isSubscriptionSelectionRequired, safeSubscriptionReturnPath } from "../lib/subscription-access";
-import { PAID_SUBSCRIPTION_PLAN_TIERS, type PaidSubscriptionPlanTier } from "../lib/subscription-plans";
+import { SUBSCRIPTION_PLAN_TIERS, type SubscriptionPlanTier } from "../lib/subscription-plans";
+
+type SubscriptionChoiceKey = SubscriptionPlanTier["key"];
 
 export function SubscriptionView() {
   const router = useRouter();
@@ -20,8 +22,8 @@ export function SubscriptionView() {
   const { user, token, refreshMe } = useAuth();
   const returnPath = useMemo(() => safeSubscriptionReturnPath(searchParams.get("from")), [searchParams]);
   const company = user?.company ?? null;
-  const [busyPlan, setBusyPlan] = useState<SubscriptionPlan | null>(null);
-  const [activatedPlan, setActivatedPlan] = useState<SubscriptionPlan | null>(null);
+  const [busyPlan, setBusyPlan] = useState<SubscriptionChoiceKey | null>(null);
+  const [activatedPlan, setActivatedPlan] = useState<SubscriptionChoiceKey | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasActivePaidSubscription =
@@ -29,7 +31,40 @@ export function SubscriptionView() {
     Boolean(company.subscriptionPlan) &&
     Boolean(company.subscriptionEndsAt) &&
     new Date(company.subscriptionEndsAt!).getTime() > Date.now();
+  const trialEndsAtTime = parseDateTime(company?.demoEndsAt);
+  const hasActiveTrial = company?.status === "demo" && trialEndsAtTime !== null && trialEndsAtTime > Date.now();
+  const trialAlreadyUsed = Boolean(company?.demoEndsAt);
   const needsSubscription = isSubscriptionSelectionRequired(company);
+
+  async function activateChoice(plan: SubscriptionChoiceKey) {
+    if (plan === "demo") {
+      await activateTrial();
+      return;
+    }
+
+    await activatePlan(plan);
+  }
+
+  async function activateTrial() {
+    if (!token || busyPlan || !company || hasActivePaidSubscription || trialAlreadyUsed) return;
+    setBusyPlan("demo");
+    setActivatedPlan(null);
+    setMessage(null);
+    setErrorMessage(null);
+    try {
+      await api.billing.activateTrial({
+        idempotencyKey: createTrialIdempotencyKey(),
+      });
+      await refreshMe();
+      setActivatedPlan("demo");
+      setMessage("Пробный доступ активирован. Возвращаем вас к работе.");
+      window.setTimeout(() => router.replace(returnPath), 900);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Не удалось включить пробный доступ.");
+    } finally {
+      setBusyPlan(null);
+    }
+  }
 
   async function activatePlan(plan: SubscriptionPlan) {
     if (!token || busyPlan || hasActivePaidSubscription) return;
@@ -67,7 +102,10 @@ export function SubscriptionView() {
                 ЭкоПлатформа
               </span>
               <h1>Выберите подписку</h1>
-              <p>Доступ к рабочим разделам приостановлен. Выберите тариф, и мы сразу включим платформу на 30 дней.</p>
+              <p>
+                Доступ к рабочим разделам приостановлен. Включите пробный доступ на 24 часа или выберите тариф на 30
+                дней.
+              </p>
               <div className="subscription-hero-actions" aria-label="Статус доступа">
                 <StatusPill variant={needsSubscription ? "danger" : "success"}>
                   {needsSubscription ? "Нужна подписка" : "Доступ не заблокирован"}
@@ -90,7 +128,7 @@ export function SubscriptionView() {
                   <span />
                   <span />
                 </div>
-                <strong>30 дней</strong>
+                <strong>24 часа / 30 дней</strong>
                 <small>доступ включится сразу</small>
               </div>
             </div>
@@ -107,7 +145,7 @@ export function SubscriptionView() {
             </div>
             <div>
               <span>После выбора</span>
-              <strong>Активно на 30 дней</strong>
+              <strong>Пробный доступ на 24 часа или тариф на 30 дней</strong>
             </div>
           </div>
 
@@ -131,23 +169,40 @@ export function SubscriptionView() {
           ) : null}
 
           <div className="subscription-plan-grid">
-            {PAID_SUBSCRIPTION_PLAN_TIERS.map((tier, index) => (
-              <SubscriptionPlanCard
-                disabled={!company || hasActivePaidSubscription}
-                index={index}
-                key={tier.key}
-                onActivate={activatePlan}
-                pending={busyPlan === tier.key}
-                selected={activatedPlan === tier.key}
-                tier={tier}
-              />
-            ))}
+            {SUBSCRIPTION_PLAN_TIERS.map((tier, index) => {
+              const isTrial = tier.key === "demo";
+              const selected =
+                activatedPlan === tier.key ||
+                (isTrial && hasActiveTrial) ||
+                (!isTrial && hasActivePaidSubscription && company?.subscriptionPlan === tier.key);
+              const disabled = isTrial
+                ? !company || hasActivePaidSubscription || trialAlreadyUsed
+                : !company || hasActivePaidSubscription;
+              const disabledLabel =
+                isTrial && trialAlreadyUsed
+                  ? hasActiveTrial
+                    ? "Пробный доступ активен"
+                    : "Пробный доступ использован"
+                  : undefined;
+              return (
+                <SubscriptionPlanCard
+                  disabled={disabled}
+                  disabledLabel={disabledLabel}
+                  index={index}
+                  key={tier.key}
+                  onActivate={activateChoice}
+                  pending={busyPlan === tier.key}
+                  selected={selected}
+                  tier={tier}
+                />
+              );
+            })}
           </div>
 
           <div className="subscription-proof-row">
             <span>
               <Clock3 size={16} />
-              Месяц доступа
+              Пробный доступ 24 часа
             </span>
             <span>
               <CreditCard size={16} />
@@ -166,6 +221,7 @@ export function SubscriptionView() {
 
 function SubscriptionPlanCard({
   disabled,
+  disabledLabel,
   index,
   onActivate,
   pending,
@@ -173,19 +229,30 @@ function SubscriptionPlanCard({
   tier,
 }: {
   disabled: boolean;
+  disabledLabel?: string;
   index: number;
-  onActivate: (plan: SubscriptionPlan) => void;
+  onActivate: (plan: SubscriptionChoiceKey) => void;
   pending: boolean;
   selected: boolean;
-  tier: PaidSubscriptionPlanTier;
+  tier: SubscriptionPlanTier;
 }) {
+  const isTrial = tier.key === "demo";
   const buttonLabel = selected
-    ? "Подписка активирована"
+    ? isTrial
+      ? "Пробный доступ активен"
+      : "Подписка активирована"
     : pending
-      ? "Активируем..."
-      : tier.key === "basic"
-        ? "Выбрать базовую"
-        : "Выбрать расширенную";
+      ? isTrial
+        ? "Включаем..."
+        : "Активируем..."
+      : disabledLabel
+        ? disabledLabel
+        : isTrial
+          ? "Включить пробный"
+          : tier.key === "basic"
+            ? "Выбрать базовую"
+            : "Выбрать расширенную";
+  const periodLabel = isTrial ? "активация на 24 часа" : "активация на 30 дней";
   return (
     <article
       className={`subscription-plan-card accent-${tier.accent}${tier.badge ? " is-featured" : ""}${selected ? " is-selected" : ""}`}
@@ -194,7 +261,7 @@ function SubscriptionPlanCard({
       {tier.badge ? <span className="subscription-plan-badge">{tier.badge}</span> : null}
       <div className="subscription-plan-head">
         <span className="subscription-plan-icon">
-          {tier.key === "basic" ? <Leaf size={22} /> : <Sparkles size={22} />}
+          {isTrial ? <Clock3 size={22} /> : tier.key === "basic" ? <Leaf size={22} /> : <Sparkles size={22} />}
         </span>
         <div>
           <h2>{tier.name}</h2>
@@ -204,7 +271,7 @@ function SubscriptionPlanCard({
 
       <div className="subscription-plan-price">
         <strong>{tier.price ?? "Цена скоро"}</strong>
-        <span>активация на 30 дней</span>
+        <span>{periodLabel}</span>
       </div>
 
       <ul className="subscription-feature-list">
@@ -234,11 +301,26 @@ function describeCurrentAccess(company: AuthMeCompany | null): string {
   if (company.status === "active" && company.subscriptionPlan) {
     return SUBSCRIPTION_PLAN_TITLE_LABELS[company.subscriptionPlan] ?? company.subscriptionPlan;
   }
-  if (company.status === "demo") return "Демо-доступ";
+  if (company.status === "demo") {
+    const trialEndsAt = parseDateTime(company.demoEndsAt);
+    if (!trialEndsAt) return "Доступ ещё не выбран";
+    return trialEndsAt > Date.now() ? "Пробный доступ" : "Пробный доступ истёк";
+  }
   return COMPANY_STATUS_LABELS[company.status] ?? company.status;
 }
 
 function createSubscriptionIdempotencyKey(plan: SubscriptionPlan): string {
   const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return `self-subscription-${plan}-${random}`;
+}
+
+function createTrialIdempotencyKey(): string {
+  const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `self-trial-${random}`;
+}
+
+function parseDateTime(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
 }

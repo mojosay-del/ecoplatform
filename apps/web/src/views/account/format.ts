@@ -26,12 +26,12 @@ export function describeSubscription(
     const endsAt = billing.demoEndsAt ? new Date(billing.demoEndsAt) : null;
     const expired = endsAt ? endsAt.getTime() <= Date.now() : false;
     return {
-      tariff: "Демо-доступ",
+      tariff: endsAt ? "Пробный доступ" : "Доступ не выбран",
       note: endsAt
         ? expired
-          ? `Демо истёк ${endsAt.toLocaleString("ru-RU")}. Активируйте подписку.`
-          : `Демо до ${endsAt.toLocaleString("ru-RU")}`
-        : "Демо без срока",
+          ? `Пробный доступ истёк ${endsAt.toLocaleString("ru-RU")}. Активируйте подписку.`
+          : `Пробный доступ до ${endsAt.toLocaleString("ru-RU")}`
+        : "Выберите пробный доступ или подписку.",
     };
   }
   if (billing.status === "active" && billing.subscriptionPlan) {

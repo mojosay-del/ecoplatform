@@ -31,7 +31,7 @@ function demoUser(demoEndsAt: string): AuthMeUser {
 }
 
 describe("DemoBanner", () => {
-  it("shows for active demo company on regular pages and hides on admin routes", () => {
+  it("shows for active trial company on regular pages and hides on admin routes", () => {
     const now = new Date("2026-05-27T09:00:00.000Z");
     const user = demoUser("2026-05-27T12:00:00.000Z");
 

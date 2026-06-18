@@ -7,15 +7,14 @@ const ctx = setupIntegrationContext();
 const { loginAdmin, submitRegistration, verifyRegistration, registerWithBody, registerCompany } = ctx;
 
 describe("Auth — регистрация и профиль", () => {
-  it("регистрация после подтверждения почты создаёт компанию в demo-статусе и возвращает access-токен", async () => {
-    const { token, companyId } = await registerCompany("0000001");
+  it("регистрация после подтверждения почты создаёт компанию без активного trial и возвращает access-токен", async () => {
+    const { token, companyId } = await registerCompany("0000001", { activateTrial: false });
     expect(token).toMatch(/\./);
 
     const company = await ctx.prisma.company.findUnique({ where: { id: companyId } });
     expect(company?.status).toBe(CompanyStatus.demo);
     expect(company?.type).toBe("collector");
-    expect(company?.demoEndsAt).toBeInstanceOf(Date);
-    expect(company!.demoEndsAt!.getTime()).toBeGreaterThan(Date.now());
+    expect(company?.demoEndsAt).toBeNull();
   });
 
   it("регистрация не создаёт пользователя до ввода кода из письма", async () => {

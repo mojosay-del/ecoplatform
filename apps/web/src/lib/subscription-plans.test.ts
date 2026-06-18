@@ -8,7 +8,8 @@ describe("subscription plan tiers", () => {
     expect(PAID_SUBSCRIPTION_PLAN_TIERS.map((tier) => tier.name)).toEqual(["Базовая", "Расширенная"]);
   });
 
-  it("keeps demo only in the account tariff overview", () => {
+  it("keeps trial before paid plans in public plan overview", () => {
     expect(SUBSCRIPTION_PLAN_TIERS.map((tier) => tier.key)).toEqual(["demo", "basic", "extended"]);
+    expect(SUBSCRIPTION_PLAN_TIERS[0]!.name).toBe("Пробный доступ");
   });
 });

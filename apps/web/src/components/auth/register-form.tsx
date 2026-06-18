@@ -264,7 +264,7 @@ export function RegisterForm() {
       if (verificationAttemptRef.current !== attempt) return;
       setVerificationPhase("success");
       verificationRedirectTimerRef.current = window.setTimeout(() => {
-        router.push("/news");
+        router.push("/subscription?from=%2Fnews");
       }, VERIFICATION_SUCCESS_REDIRECT_DELAY_MS);
     } catch (err) {
       if (verificationAttemptRef.current !== attempt) return;

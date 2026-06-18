@@ -25,7 +25,7 @@ export function NewsOnboardingCard({ user, onDismiss }: Props) {
       <div className="news-onboarding-copy">
         <p className="news-onboarding-eyebrow">Быстрый старт</p>
         <h2>
-          Добро пожаловать, {user.firstName}! Демо до {demoDate}.
+          Добро пожаловать, {user.firstName}! Пробный доступ до {demoDate}.
         </h2>
         <p>Что попробовать в первую очередь:</p>
       </div>

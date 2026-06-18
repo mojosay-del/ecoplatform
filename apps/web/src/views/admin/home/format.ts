@@ -72,6 +72,7 @@ const ACTION_LABELS: Record<string, string> = {
   "learning.module.update": "Курс обновлён",
   manual_subscription_activation: "Подписка активирована вручную",
   self_subscription_activation: "Подписка выбрана пользователем",
+  self_trial_activation: "Пробный доступ включён",
   "moderation.admin_sanction.module_restriction": "Ограничение модуля применено",
   "moderation.case.lock": "Кейс модерации взят в работу",
   "moderation.case.release": "Кейс модерации освобождён",
@@ -132,7 +133,7 @@ export function auditVisual(action: string): { icon: LucideIcon; tone: AuditTone
   if (action.includes("user.block")) return { icon: LockKeyhole, tone: "danger" };
   if (action.includes("user.unblock")) return { icon: Unlock, tone: "publish" };
   if (action.includes("platform_roles") || action.includes("staff")) return { icon: UserCog, tone: "security" };
-  if (action.includes("subscription")) return { icon: CreditCard, tone: "create" };
+  if (action.includes("subscription") || action.includes("trial")) return { icon: CreditCard, tone: "create" };
   if (action.includes("moderation")) return { icon: ShieldAlert, tone: "danger" };
   if (action.includes("setting")) return { icon: Settings2, tone: "security" };
   if (action.includes("status")) return { icon: RefreshCw, tone: "update" };

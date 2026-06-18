@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import type {
   AddressDto,
@@ -6,6 +6,7 @@ import type {
   ManualSubscriptionDto,
   SelfSubscriptionDto,
 } from "@ecoplatform/shared";
+import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { paginatedResponse, resolvePagination, type PaginationInput } from "../common/pagination";
 import { AddressGeocoderService } from "../geo/address-geocoder.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -14,12 +15,14 @@ import { SessionCacheService } from "../redis/session-cache.service";
 import {
   createManualSubscriptionActivation,
   createSelfSubscriptionActivation,
+  createSelfTrialActivation,
   notifyManualActivation,
   notifySelfActivation,
 } from "./billing-activation.helpers";
 import {
   hashManualSubscriptionRequest,
   hashSelfSubscriptionRequest,
+  hashTrialActivationRequest,
   normalizeIdempotencyKey,
   type ManualSubscriptionResponse,
 } from "./billing-subscription.helpers";
@@ -38,6 +41,7 @@ export class BillingService {
     private readonly notifications: NotificationsService,
     private readonly sessionCache: SessionCacheService,
     private readonly geocoder: AddressGeocoderService,
+    private readonly settings: PlatformSettingsService,
   ) {}
 
   private async resolveCompanyAddressGeo(address: AddressDto): Promise<CompanyAddressGeo | null> {
@@ -214,6 +218,22 @@ export class BillingService {
     const result = await createSelfSubscriptionActivation(this.prisma, input, actorId, companyId, key, requestHash);
     await this.sessionCache.invalidateCompany(companyId);
     await notifySelfActivation(this.prisma, this.notifications, input, result);
+
+    return result;
+  }
+
+  async activateTrial(actorId: string, companyId: string, idempotencyKey: string | undefined) {
+    const trialEnabled = await this.settings.getValue("demo.enabled");
+    if (!trialEnabled) {
+      throw new ForbiddenException("Пробный доступ временно недоступен.");
+    }
+
+    const key = normalizeIdempotencyKey(idempotencyKey);
+    const requestHash = hashTrialActivationRequest(companyId);
+    const durationHours = await this.settings.getValue("demo.duration_hours");
+
+    const result = await createSelfTrialActivation(this.prisma, actorId, companyId, key, requestHash, durationHours);
+    await this.sessionCache.invalidateCompany(companyId);
 
     return result;
   }

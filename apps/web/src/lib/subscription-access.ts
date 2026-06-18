@@ -6,7 +6,7 @@ export function isSubscriptionSelectionRequired(company: AuthMeCompany | null | 
   if (!company) return false;
 
   if (company.status === "demo") {
-    return isPast(company.demoEndsAt, now);
+    return !company.demoEndsAt || isPast(company.demoEndsAt, now);
   }
 
   if (company.status === "past_due") {

@@ -2,12 +2,14 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 import { createHash } from "crypto";
 import { CompanyStatus, Prisma } from "@prisma/client";
 import type { Company, Subscription } from "@prisma/client";
-import type { ManualSubscriptionDto, SelfSubscriptionDto } from "@ecoplatform/shared";
+import type { BillingTrialActivationResponse, ManualSubscriptionDto, SelfSubscriptionDto } from "@ecoplatform/shared";
 
 export type ManualSubscriptionResponse = {
   company: ReturnType<typeof serializeCompany>;
   subscription: ReturnType<typeof serializeSubscription>;
 };
+
+export type TrialActivationResponse = BillingTrialActivationResponse;
 
 export function normalizeIdempotencyKey(key: string | undefined): string {
   const normalized = key?.trim();
@@ -51,10 +53,28 @@ export function hashSelfSubscriptionRequest(input: SelfSubscriptionDto, companyI
     .digest("hex");
 }
 
+export function hashTrialActivationRequest(companyId: string): string {
+  return createHash("sha256")
+    .update(
+      stableStringify({
+        companyId,
+        source: "subscription_page",
+      }),
+    )
+    .digest("hex");
+}
+
 export function replayManualSubscription(
   existing: { requestHash: string; response: Prisma.JsonValue | null },
   requestHash: string,
 ): ManualSubscriptionResponse {
+  return replayStoredResponse<ManualSubscriptionResponse>(existing, requestHash);
+}
+
+export function replayStoredResponse<T>(
+  existing: { requestHash: string; response: Prisma.JsonValue | null },
+  requestHash: string,
+): T {
   if (existing.requestHash !== requestHash) {
     throw new ConflictException("Idempotency-Key уже использован с другим payload.");
   }
@@ -63,7 +83,7 @@ export function replayManualSubscription(
     throw new ConflictException("Запрос с этим Idempotency-Key ещё обрабатывается. Повторите позже.");
   }
 
-  return existing.response as unknown as ManualSubscriptionResponse;
+  return existing.response as unknown as T;
 }
 
 export function isUniqueConstraintError(error: unknown): boolean {
@@ -107,6 +127,10 @@ export function serializeSubscription(subscription: Subscription) {
 
 export function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+export function addHours(date: Date, hours: number): Date {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
 
 export function isCompanySubscriptionCurrentlyActive(company: Company, now = new Date()): boolean {

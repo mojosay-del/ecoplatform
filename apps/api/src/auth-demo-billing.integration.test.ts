@@ -7,10 +7,63 @@ const ctx = setupIntegrationContext();
 const { loginAdmin, registerCompany, createCompanyMember } = ctx;
 
 describe("Demo gating", () => {
-  it("свежезарегистрированный пользователь видит /api/news (demo активен)", async () => {
-    const { token } = await registerCompany("0000010");
-    const res = await ctx.http.get("/api/news").set("Authorization", `Bearer ${token}`);
-    expect(res.status).toBe(200);
+  it("свежезарегистрированный пользователь без выбранного trial не видит /api/news", async () => {
+    const { token } = await registerCompany("0000010", { activateTrial: false });
+    const news = await ctx.http.get("/api/news").set("Authorization", `Bearer ${token}`);
+    expect(news.status).toBe(403);
+  });
+
+  it("самостоятельная активация пробного доступа открывает /api/news на 24 часа один раз", async () => {
+    const { token, companyId } = await registerCompany("0000015", { activateTrial: false });
+
+    const closed = await ctx.http.get("/api/news").set("Authorization", `Bearer ${token}`);
+    expect(closed.status).toBe(403);
+
+    const key = `self-trial-${companyId}`;
+    const first = await ctx.http
+      .post("/api/billing/trial")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", key);
+
+    expect(first.status).toBe(201);
+    expect(first.body.company.status).toBe("demo");
+    expect(first.body.company.demoEndsAt).toBe(first.body.trialEndsAt);
+    expect(new Date(first.body.trialEndsAt).getTime()).toBeGreaterThan(Date.now() + 23 * 60 * 60 * 1000);
+
+    const second = await ctx.http
+      .post("/api/billing/trial")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", key);
+    expect(second.status).toBe(201);
+    expect(second.body).toEqual(first.body);
+
+    const open = await ctx.http.get("/api/news").set("Authorization", `Bearer ${token}`);
+    expect(open.status).toBe(200);
+
+    const conflict = await ctx.http
+      .post("/api/billing/trial")
+      .set("Authorization", `Bearer ${token}`)
+      .set("Idempotency-Key", `self-trial-repeat-${companyId}`);
+    expect(conflict.status).toBe(409);
+
+    const [logs, subscriptions] = await Promise.all([
+      ctx.prisma.adminActionLog.findMany({
+        where: { action: "self_trial_activation", entityId: companyId },
+      }),
+      ctx.prisma.subscription.findMany({ where: { companyId } }),
+    ]);
+    expect(logs).toHaveLength(1);
+    expect(subscriptions).toHaveLength(0);
+    const payload = logs[0].payload as {
+      before: { demoEndsAt: string | null };
+      after: { demoEndsAt: string | null };
+      durationHours: number;
+      source: string;
+    };
+    expect(payload.before.demoEndsAt).toBeNull();
+    expect(payload.after.demoEndsAt).toBe(first.body.trialEndsAt);
+    expect(payload.durationHours).toBe(24);
+    expect(payload.source).toBe("subscription_page");
   });
 
   it("после истечения demo /api/news → 403, /api/billing/status и /api/auth/me остаются доступны", async () => {
@@ -206,6 +259,23 @@ describe("Demo gating", () => {
     ).resolves.toBe(0);
   });
 
+  it("участник компании не может самостоятельно включить пробный доступ", async () => {
+    const { companyId } = await registerCompany("0000021", { activateTrial: false });
+    const member = await createCompanyMember(companyId, "0000021");
+
+    const res = await ctx.http
+      .post("/api/billing/trial")
+      .set("Authorization", `Bearer ${member.token}`)
+      .set("Idempotency-Key", `self-trial-member-reject-${companyId}`);
+
+    expect(res.status).toBe(403);
+    const company = await ctx.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    expect(company.demoEndsAt).toBeNull();
+    await expect(
+      ctx.prisma.adminActionLog.count({ where: { action: "self_trial_activation", entityId: companyId } }),
+    ).resolves.toBe(0);
+  });
+
   it("самостоятельная активация Расширенной подписки работает после истечения платной подписки", async () => {
     const adminToken = await loginAdmin();
     const { token, companyId } = await registerCompany("0000017");
@@ -298,18 +368,23 @@ describe("Demo gating", () => {
 
   it("платформенный сотрудник не может активировать клиентскую подписку для себя", async () => {
     const adminToken = await loginAdmin();
-    const res = await ctx.http
+    const subscription = await ctx.http
       .post("/api/billing/subscriptions")
       .set("Authorization", `Bearer ${adminToken}`)
       .set("Idempotency-Key", "self-platform-staff")
       .send({ plan: "basic" });
+    const trial = await ctx.http
+      .post("/api/billing/trial")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", "self-trial-platform-staff");
 
-    expect(res.status).toBe(403);
+    expect(subscription.status).toBe(403);
+    expect(trial.status).toBe(403);
   });
 
   it("админский список billing-компаний валидирует pagination query", async () => {
     const adminToken = await loginAdmin();
-    await registerCompany("0000015");
+    await registerCompany("0000022");
 
     const bad = await ctx.http
       .get("/api/admin/billing/companies?limit=abc")

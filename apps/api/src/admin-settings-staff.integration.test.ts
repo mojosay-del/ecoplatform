@@ -183,7 +183,7 @@ describe("Platform settings", () => {
     expect(res.status).toBe(400);
   });
 
-  it("изменение настройки demo.duration_hours применяется к новой регистрации", async () => {
+  it("изменение настройки demo.duration_hours применяется к новому пробному доступу", async () => {
     const adminToken = await loginAdmin();
 
     await ctx.http
@@ -191,7 +191,13 @@ describe("Platform settings", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ value: 72 });
 
-    const registered = await registerCompany("0300010");
+    const registered = await registerCompany("0300010", { activateTrial: false });
+    const trial = await ctx.http
+      .post("/api/billing/trial")
+      .set("Authorization", `Bearer ${registered.token}`)
+      .set("Idempotency-Key", `settings-trial-${registered.companyId}`);
+    expect(trial.status).toBe(201);
+
     const company = await ctx.prisma.company.findUnique({ where: { id: registered.companyId } });
     const ttlHours = (company!.demoEndsAt!.getTime() - Date.now()) / (60 * 60 * 1000);
     expect(ttlHours).toBeGreaterThan(70);

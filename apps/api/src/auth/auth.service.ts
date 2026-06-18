@@ -154,14 +154,9 @@ export class AuthService {
     }
 
     const consentDocumentIds = await this.resolveRegistrationConsentDocumentIds(challenge.acceptedDocumentIds);
-    // Демо-доступ управляется из админки. Когда выдача демо выключена, компания
-    // регистрируется с уже истёкшим демо (demoEndsAt = «сейчас»): кабинет
-    // доступен, но платные разделы закрыты до ручной активации подписки.
-    // Существующий access.ts уже трактует demo с прошедшим demoEndsAt как
-    // «демо закончилось», поэтому новый статус заводить не нужно.
-    const demoEnabled = await this.settings.getValue("demo.enabled");
-    const demoHours = await this.settings.getValue("demo.duration_hours");
-    const demoEndsAt = demoEnabled ? new Date(Date.now() + demoHours * 60 * 60 * 1000) : new Date();
+    // После подтверждения почты компания создаётся без активного trial.
+    // Пользователь сразу попадает на /subscription и сам выбирает:
+    // пробный доступ на demo.duration_hours или тестовую paid-подписку.
     const userId = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.emailVerificationChallenge.updateMany({
         where: {
@@ -181,7 +176,7 @@ export class AuthService {
           organizationName: challenge.organizationName,
           type: challenge.companyType,
           status: CompanyStatus.demo,
-          demoEndsAt,
+          demoEndsAt: null,
         },
       });
 

@@ -279,6 +279,12 @@ export type DocumentationFileMeta = {
   sizeBytes: number;
 };
 
+export type DocumentationSearchSnippet = {
+  source: "title" | "subtitle" | "file" | "description";
+  text: string;
+  highlights: Array<{ start: number; end: number }>;
+};
+
 export type DocumentationNode = {
   id: string;
   slug: string;
@@ -295,6 +301,7 @@ export type DocumentationNode = {
   effectiveDate: IsoDateString | null;
   firstPublishedAt: IsoDateString | null;
   revisedAt: IsoDateString | null;
+  searchSnippet?: DocumentationSearchSnippet;
   // У разделов (iconType="category") файла нет.
   file: DocumentationFileMeta | null;
   // tree-выдача отдаёт детей вложенным массивом; detail — без children.
@@ -364,6 +371,11 @@ export type BillingCompanySummary = {
 export type BillingSubscriptionActivationResponse = {
   company: BillingCompanySummary;
   subscription: BillingSubscription;
+};
+
+export type BillingTrialActivationResponse = {
+  company: BillingCompanySummary;
+  trialEndsAt: IsoDateString;
 };
 
 // `/billing/status` отдаёт данные компании (с реквизитами) + список подписок.
