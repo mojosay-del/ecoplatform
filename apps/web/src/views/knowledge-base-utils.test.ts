@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { KnowledgeNode } from "@ecoplatform/shared";
-import { findPreferredKnowledgeNode } from "./knowledge-base-utils";
+import { countKnowledgeNodes, findPreferredKnowledgeNode } from "./knowledge-base-utils";
 
 function knowledgeNode(slug: string, overrides: Partial<KnowledgeNode> = {}): KnowledgeNode {
   return {
@@ -47,5 +47,25 @@ describe("findPreferredKnowledgeNode", () => {
 
   it("для пустого дерева возвращает null", () => {
     expect(findPreferredKnowledgeNode([])).toBeNull();
+  });
+});
+
+describe("countKnowledgeNodes", () => {
+  it("считает корневые разделы и вложенные материалы одним общим числом", () => {
+    const tree = [
+      knowledgeNode("makulatura", {
+        children: [
+          knowledgeNode("karton"),
+          knowledgeNode("bumaga", {
+            children: [knowledgeNode("arhiv")],
+          }),
+        ],
+      }),
+      knowledgeNode("plastiki", {
+        children: [knowledgeNode("pet-butylka")],
+      }),
+    ];
+
+    expect(countKnowledgeNodes(tree)).toBe(6);
   });
 });

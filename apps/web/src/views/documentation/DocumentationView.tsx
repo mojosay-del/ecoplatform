@@ -15,6 +15,8 @@ import { DocTree, DocumentCard, EssentialsStrip, FormatFilter, RecentlyUpdated }
 import { flattenDocuments } from "./doc-helpers";
 import { triggerDocumentDownload } from "./download";
 
+const SEARCH_DEBOUNCE_MS = 2000;
+
 function findNode(nodes: DocumentationNode[], id: string | null): DocumentationNode | null {
   if (!id) return null;
   for (const node of nodes) {
@@ -45,7 +47,7 @@ export function DocumentationView() {
   const [searchResults, setSearchResults] = useState<DocumentationNode[] | null>(null);
 
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedQuery(query.trim()), 250);
+    const id = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [query]);
 

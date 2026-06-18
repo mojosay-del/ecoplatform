@@ -25,7 +25,7 @@ const SORTS: { value: ForumSort; label: string }[] = [
   { value: "popular", label: "Популярные" },
 ];
 
-const SEARCH_DEBOUNCE_MS = 350;
+const SEARCH_DEBOUNCE_MS = 2000;
 const EMPTY_TAXONOMY: ForumTaxonomy = { rawMaterials: [], questionTypes: [] };
 const EMPTY_SUMMARY: ForumSummary = {
   solvedQuestionsCount: 0,

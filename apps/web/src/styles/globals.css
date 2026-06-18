@@ -5569,12 +5569,8 @@ body.news-modal-open .app-shell {
     height: 280px;
   }
 
-  .knowledge-child-grid {
-    grid-template-columns: 1fr;
-  }
-
   .knowledge-content-head h1 {
-    font-size: var(--text-2xl);
+    font-size: 24px;
   }
 
   .indices-workspace-grid,

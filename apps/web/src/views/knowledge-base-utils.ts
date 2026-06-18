@@ -8,6 +8,10 @@ export function findPreferredKnowledgeNode(nodes: KnowledgeNode[]): KnowledgeNod
   );
 }
 
+export function countKnowledgeNodes(nodes: KnowledgeNode[]): number {
+  return nodes.reduce((count, node) => count + 1 + countKnowledgeNodes(node.children ?? []), 0);
+}
+
 export function findFirstReadableKnowledgeNode(nodes: KnowledgeNode[]): KnowledgeNode | null {
   for (const node of nodes) {
     if ((node.blocks ?? []).length > 0 || (node.children ?? []).length === 0) {

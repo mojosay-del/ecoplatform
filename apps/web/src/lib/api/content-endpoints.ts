@@ -66,6 +66,7 @@ export const learningApi = {
 
 export const knowledgeBaseApi = {
   tree: () => apiFetch<KnowledgeNode[]>("/knowledge-base"),
+  search: (q: string) => apiFetch<KnowledgeNode[]>(`/knowledge-base/search?q=${enc(q)}`),
   getArticle: (slug: string) => apiFetch<KnowledgeArticleDetail>(`/knowledge-base/${enc(slug)}`),
 };
 

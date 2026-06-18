@@ -7,17 +7,23 @@ import "../styles/knowledge.css";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { PanelRightOpen, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { PanelRightOpen, Search, X } from "lucide-react";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
 import { AppShell } from "../components/AppShell";
 import { CoverImage } from "../components/CoverImage";
 import { api, preferredFileAssetImageUrl } from "../lib/api";
 import { useCoverAssets } from "../lib/use-cover-assets";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "./shared";
+import { AccessClosed, AuthRequired, ErrorState, PageHeader, pluralizeRu, useApiQuery } from "./shared";
 import { collectContentBlockImageFileIds, ContentBlocks } from "./content-blocks";
 import { knowledgeDisplayIconForNode } from "./knowledge-base-icons";
-import { findPreferredKnowledgeNode } from "./knowledge-base-utils";
+import { countKnowledgeNodes, findPreferredKnowledgeNode } from "./knowledge-base-utils";
+
+const SEARCH_DEBOUNCE_MS = 2000;
+
+function materialsAddedLabel(count: number): string {
+  return `${count} ${pluralizeRu(count, "материал добавлен", "материала добавлено", "материалов добавлено")}`;
+}
 
 export function KnowledgeBaseView() {
   const { data, state, errorMessage } = useApiQuery("kb-tree", () => api.knowledgeBase.tree(), [] as KnowledgeNode[]);
@@ -87,15 +93,18 @@ function KnowledgeBaseLayout({
 }) {
   const pathname = usePathname();
   const [materialNavOpen, setMaterialNavOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<KnowledgeNode[] | null>(null);
   const fallbackActive = useMemo(() => findPreferredKnowledgeNode(tree), [tree]);
   const active = activeArticle ?? fallbackActive;
   const activeNavSlug = activeSlug ?? active?.slug;
-  const activeChildren = (active?.children ?? []) as KnowledgeNode[];
   const breadcrumbs = active ? buildKnowledgeBreadcrumbs(tree, active) : [];
-  const coverItems = useMemo(() => (active ? [active, ...((active.children ?? []) as KnowledgeNode[])] : []), [active]);
+  const coverItems = useMemo(() => (active ? [active] : []), [active]);
   const covers = useCoverAssets(coverItems);
   const activeCover = active?.coverImageId ? covers.get(active.coverImageId) : null;
   const activeCoverUrl = preferredFileAssetImageUrl(activeCover);
+  const materialCount = useMemo(() => countKnowledgeNodes(tree), [tree]);
   const shouldReserveActiveCover = Boolean(active?.coverImageId || activeCoverUrl);
   const articleImageIds = useMemo(() => {
     if (!active) return [];
@@ -122,6 +131,33 @@ function KnowledgeBaseLayout({
   useEffect(() => {
     setSettledArticleImageIds(new Set());
   }, [active?.slug, articleImageIdsKey]);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [query]);
+
+  useEffect(() => {
+    let ignore = false;
+    if (debouncedQuery.length < 2) {
+      setSearchResults(null);
+      return;
+    }
+
+    setSearchResults(null);
+    api.knowledgeBase
+      .search(debouncedQuery)
+      .then((results) => {
+        if (!ignore) setSearchResults(results);
+      })
+      .catch(() => {
+        if (!ignore) setSearchResults([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [debouncedQuery]);
 
   useEffect(() => {
     setMaterialNavOpen(false);
@@ -164,77 +200,147 @@ function KnowledgeBaseLayout({
     };
   }, [materialNavOpen]);
 
+  const resetSearch = useCallback(() => {
+    setQuery("");
+    setDebouncedQuery("");
+    setSearchResults(null);
+  }, []);
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setDebouncedQuery(query.trim());
+  };
+
+  const searching = debouncedQuery.length >= 2;
+  const searchLoading = searching && searchResults === null;
+  const hasSearchDraft = query.length > 0;
+
   return (
     <AppShell>
       <section className="page knowledge-page">
-        <div className="knowledge-workspace">
-          <aside className="knowledge-nav-panel" role="navigation" aria-label="Навигация по базе знаний">
-            <KnowledgeNavigation tree={tree} activeSlug={activeNavSlug} showHeading />
-          </aside>
-
-          <main className="knowledge-content-panel">
-            <div className="knowledge-mobile-tools">
+        <header className="knowledge-header">
+          <h1 className="knowledge-title">База знаний по сырью</h1>
+          <p className="knowledge-subtitle">Номенклатуры, требования к качеству и практические признаки вторсырья</p>
+          <form className="knowledge-search" onSubmit={handleSearch} role="search">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              aria-label="Поиск по базе знаний сырья"
+            />
+            {!hasSearchDraft ? (
+              <span className="knowledge-search-placeholder" aria-hidden="true">
+                <Search size={22} />
+                <span>Например: макулатура, ПЭТ бутылка, стрейч</span>
+              </span>
+            ) : null}
+            {hasSearchDraft ? (
               <button
-                className="knowledge-mobile-nav-trigger"
+                className="knowledge-search-reset"
                 type="button"
-                onClick={() => setMaterialNavOpen(true)}
-                aria-controls="knowledge-material-nav-drawer"
-                aria-expanded={materialNavOpen}
+                aria-label="Сбросить поиск"
+                onClick={resetSearch}
               >
-                <PanelRightOpen size={17} aria-hidden="true" />
-                <span>Разделы сырья</span>
+                <X size={18} aria-hidden="true" />
               </button>
-            </div>
-            {!active ? (
-              <article className="knowledge-article-card">
-                <p className="page-subtitle">Выберите материал в навигации слева.</p>
-              </article>
-            ) : (
-              <>
-                <div className="knowledge-content-head">
-                  <div className="knowledge-title-row">
-                    <div>
-                      {breadcrumbs.length > 0 ? (
-                        <p className="knowledge-breadcrumbs">
-                          {breadcrumbs.map((crumb, index) => (
-                            <span key={crumb.slug}>
-                              {index > 0 ? " / " : ""}
-                              <Link href={`/knowledge-base/${crumb.slug}`}>{crumb.title}</Link>
-                            </span>
-                          ))}
-                        </p>
-                      ) : null}
-                      <h1>
-                        {active.title}
-                        {active.subtitle ? <span> · {active.subtitle}</span> : null}
-                      </h1>
+            ) : null}
+          </form>
+          <p className="knowledge-header-metric">{materialsAddedLabel(materialCount)}</p>
+        </header>
+
+        {tree.length === 0 ? (
+          <div className="knowledge-empty">
+            <p className="page-subtitle">Материалы пока не добавлены.</p>
+          </div>
+        ) : (
+          <div className="knowledge-workspace">
+            <aside className="knowledge-nav-panel" role="navigation" aria-label="Навигация по базе знаний">
+              <KnowledgeNavigation tree={tree} activeSlug={activeNavSlug} showHeading onNavigate={resetSearch} />
+            </aside>
+
+            <main className="knowledge-content-panel">
+              <div className="knowledge-mobile-tools">
+                <button
+                  className="knowledge-mobile-nav-trigger"
+                  type="button"
+                  onClick={() => setMaterialNavOpen(true)}
+                  aria-controls="knowledge-material-nav-drawer"
+                  aria-expanded={materialNavOpen}
+                >
+                  <PanelRightOpen size={17} aria-hidden="true" />
+                  <span>Разделы сырья</span>
+                </button>
+              </div>
+              {searching ? (
+                <KnowledgeSearchResults
+                  loading={searchLoading}
+                  results={searchResults ?? []}
+                  query={debouncedQuery}
+                  onResetSearch={resetSearch}
+                />
+              ) : !active ? (
+                <article className="knowledge-article-card">
+                  <p className="page-subtitle">Выберите материал в навигации слева.</p>
+                </article>
+              ) : (
+                <>
+                  <div className="knowledge-content-head">
+                    <div className="knowledge-title-row">
+                      <div>
+                        {breadcrumbs.length > 0 ? (
+                          <p className="knowledge-breadcrumbs">
+                            {breadcrumbs.map((crumb, index) => (
+                              <span key={crumb.slug}>
+                                {index > 0 ? " / " : ""}
+                                <Link href={`/knowledge-base/${crumb.slug}`}>{crumb.title}</Link>
+                              </span>
+                            ))}
+                          </p>
+                        ) : null}
+                        <h1>
+                          {active.title}
+                          {active.subtitle ? <span> · {active.subtitle}</span> : null}
+                        </h1>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div
-                  className={`knowledge-article-loader ${isArticleReady ? "is-ready" : "is-loading"}`}
-                  key={active.slug}
-                >
-                  <div aria-hidden={!isArticleReady || undefined} className="knowledge-article-ready-content">
-                    {shouldReserveActiveCover ? (
-                      <div className="knowledge-article-shell content-fade-in">
-                        <figure className="knowledge-cover">
-                          {activeCoverUrl ? (
-                            <CoverImage
-                              alt={activeCover?.originalName ?? active.title}
-                              src={activeCoverUrl}
-                              eager
-                              onLoadSettled={() => {
-                                if (active.coverImageId) markArticleImageSettled(active.coverImageId);
-                              }}
-                              sizes="(max-width: 1024px) 100vw, 800px"
-                            />
-                          ) : (
-                            <span className="cover-skeleton" aria-hidden="true" />
-                          )}
-                        </figure>
-                        <article className="knowledge-article-card content-article">
+                  <div
+                    className={`knowledge-article-loader ${isArticleReady ? "is-ready" : "is-loading"}`}
+                    key={active.slug}
+                  >
+                    <div aria-hidden={!isArticleReady || undefined} className="knowledge-article-ready-content">
+                      {shouldReserveActiveCover ? (
+                        <div className="knowledge-article-shell content-fade-in">
+                          <figure className="knowledge-cover">
+                            {activeCoverUrl ? (
+                              <CoverImage
+                                alt={activeCover?.originalName ?? active.title}
+                                src={activeCoverUrl}
+                                eager
+                                onLoadSettled={() => {
+                                  if (active.coverImageId) markArticleImageSettled(active.coverImageId);
+                                }}
+                                sizes="(max-width: 1024px) 100vw, 800px"
+                              />
+                            ) : (
+                              <span className="cover-skeleton" aria-hidden="true" />
+                            )}
+                          </figure>
+                          <article className="knowledge-article-card content-article">
+                            {(active.blocks ?? []).length > 0 ? (
+                              <ContentBlocks
+                                blocks={active.blocks ?? []}
+                                onImageLoadSettled={markArticleImageSettled}
+                                variant="knowledge"
+                              />
+                            ) : (
+                              <p className="page-subtitle">Описание появится после наполнения материала.</p>
+                            )}
+                          </article>
+                        </div>
+                      ) : (
+                        <article className="knowledge-article-card content-article content-fade-in">
                           {(active.blocks ?? []).length > 0 ? (
                             <ContentBlocks
                               blocks={active.blocks ?? []}
@@ -245,60 +351,15 @@ function KnowledgeBaseLayout({
                             <p className="page-subtitle">Описание появится после наполнения материала.</p>
                           )}
                         </article>
-                      </div>
-                    ) : (
-                      <article className="knowledge-article-card content-article content-fade-in">
-                        {(active.blocks ?? []).length > 0 ? (
-                          <ContentBlocks
-                            blocks={active.blocks ?? []}
-                            onImageLoadSettled={markArticleImageSettled}
-                            variant="knowledge"
-                          />
-                        ) : (
-                          <p className="page-subtitle">Описание появится после наполнения материала.</p>
-                        )}
-                      </article>
-                    )}
-                  </div>
-                  {!isArticleReady ? <KnowledgeArticleSkeleton /> : null}
-                </div>
-
-                {activeChildren.length > 0 ? (
-                  <section className="knowledge-child-section" aria-label="Материалы раздела">
-                    <h2>Материалы раздела</h2>
-                    <div className="knowledge-child-grid">
-                      {activeChildren.map((child: KnowledgeNode) => {
-                        const childCover = child.coverImageId ? covers.get(child.coverImageId) : null;
-                        const childCoverUrl = preferredFileAssetImageUrl(childCover);
-                        return (
-                          <Link
-                            className={`knowledge-child-card${child.coverImageId ? " has-cover" : ""}`}
-                            href={`/knowledge-base/${child.slug}`}
-                            key={child.id}
-                          >
-                            {child.coverImageId ? (
-                              <div className="knowledge-child-card-cover">
-                                {childCoverUrl ? (
-                                  <CoverImage alt="" src={childCoverUrl} sizes="(max-width: 768px) 100vw, 280px" />
-                                ) : (
-                                  // URL обложки ещё резолвится — держим серый скелетон,
-                                  // чтобы карточка не «прыгала» и грузилась целиком.
-                                  <span className="cover-skeleton" aria-hidden="true" />
-                                )}
-                              </div>
-                            ) : null}
-                            <strong>{child.title}</strong>
-                            {child.subtitle ? <span>{child.subtitle}</span> : null}
-                          </Link>
-                        );
-                      })}
+                      )}
                     </div>
-                  </section>
-                ) : null}
-              </>
-            )}
-          </main>
-        </div>
+                    {!isArticleReady ? <KnowledgeArticleSkeleton /> : null}
+                  </div>
+                </>
+              )}
+            </main>
+          </div>
+        )}
         {materialNavOpen ? (
           <div
             className="knowledge-nav-drawer-root"
@@ -332,7 +393,10 @@ function KnowledgeBaseLayout({
                   tree={tree}
                   activeSlug={activeNavSlug}
                   showHeading={false}
-                  onNavigate={() => setMaterialNavOpen(false)}
+                  onNavigate={() => {
+                    resetSearch();
+                    setMaterialNavOpen(false);
+                  }}
                 />
               </div>
             </aside>
@@ -340,6 +404,63 @@ function KnowledgeBaseLayout({
         ) : null}
       </section>
     </AppShell>
+  );
+}
+
+function KnowledgeSearchResults({
+  loading,
+  onResetSearch,
+  query,
+  results,
+}: {
+  loading: boolean;
+  onResetSearch: () => void;
+  query: string;
+  results: KnowledgeNode[];
+}) {
+  return (
+    <section className="knowledge-search-results" aria-live="polite">
+      <div className="knowledge-content-head">
+        <div>
+          <p className="knowledge-breadcrumbs">Поиск по сырью</p>
+          <h1>Результаты поиска</h1>
+        </div>
+      </div>
+      {loading ? (
+        <div className="knowledge-search-grid" aria-busy="true">
+          <div className="knowledge-search-skeleton">
+            <div className="page-skeleton-bar w-2-3" />
+            <div className="page-skeleton-bar w-full" />
+          </div>
+          <div className="knowledge-search-skeleton">
+            <div className="page-skeleton-bar w-3-4" />
+            <div className="page-skeleton-bar w-full" />
+          </div>
+        </div>
+      ) : results.length === 0 ? (
+        <div className="knowledge-empty-state">
+          <p>По запросу «{query}» материалов не нашлось. Попробуйте другое слово или откройте раздел слева.</p>
+          <button type="button" className="knowledge-empty-action" onClick={onResetSearch}>
+            Сбросить поиск
+          </button>
+        </div>
+      ) : (
+        <div className="knowledge-search-grid">
+          {results.map((node) => (
+            <Link
+              className="knowledge-search-card"
+              href={`/knowledge-base/${node.slug}`}
+              key={node.id}
+              onClick={onResetSearch}
+            >
+              <span className="knowledge-search-card-kicker">Материал</span>
+              <strong>{node.title}</strong>
+              {node.subtitle ? <span>{node.subtitle}</span> : null}
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -375,7 +496,6 @@ function KnowledgeNavigation({
     <>
       {showHeading ? (
         <div className="knowledge-nav-heading">
-          <span className="knowledge-nav-kicker">База знаний</span>
           <h2>Навигация по сырью</h2>
         </div>
       ) : null}
