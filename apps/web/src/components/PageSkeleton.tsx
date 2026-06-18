@@ -30,10 +30,15 @@ export function PageSkeleton({
             <span className="brand-text">ЭкоПлатформа</span>
           </div>
         </div>
-        {["Главная", "Базы знаний", "Инструменты"].map((section, sectionIndex) => (
-          <nav className="nav-section" key={section}>
-            <p className="nav-title">{section}</p>
-            {Array.from({ length: sectionIndex === 0 ? 3 : 2 }).map((_, itemIndex) => (
+        {[
+          { title: "Рынок", itemCount: 2 },
+          { title: "Базы знаний", itemCount: 3 },
+          { title: "Инструменты", itemCount: 5 },
+          { title: "Сообщество", itemCount: 1 },
+        ].map((section) => (
+          <nav className="nav-section" key={section.title}>
+            <p className="nav-title">{section.title}</p>
+            {Array.from({ length: section.itemCount }).map((_, itemIndex) => (
               <div className="nav-link app-shell-loading-nav-link" key={itemIndex}>
                 <span className="app-shell-loading-icon" />
                 <span className="app-shell-loading-line" />

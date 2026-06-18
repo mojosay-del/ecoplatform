@@ -14,10 +14,29 @@ import {
 } from "./app-shell-nav";
 
 describe("AppShell future navigation teasers", () => {
+  it("keeps the primary sidebar grouped in the requested order", () => {
+    expect(appNavSections.slice(0, 4).map((section) => section.title)).toEqual([
+      "Рынок",
+      "Базы знаний",
+      "Инструменты",
+      "Сообщество",
+    ]);
+    expect(appNavSections[0]?.items.map((item) => item.label)).toEqual(["Новости", "Индексы цен"]);
+    expect(appNavSections[1]?.items.map((item) => item.label)).toEqual(["Обучение", "Сырьё", "Документация"]);
+    expect(appNavSections[2]?.items.map((item) => item.label)).toEqual([
+      "Калькулятор",
+      "Продажные цены",
+      "Карта аналитики",
+      "Карта участников",
+      "Торговая площадка",
+    ]);
+    expect(appNavSections[3]?.items.map((item) => item.label)).toEqual(["Форум"]);
+  });
+
   it("keeps every disabled sidebar item documented as a roadmap teaser", () => {
     const items = futureNavItems();
 
-    expect(items.map((item) => item.label)).toEqual(["Карты"]);
+    expect(items.map((item) => item.label)).toEqual(["Продажные цены", "Карта аналитики", "Карта участников"]);
 
     for (const item of items) {
       expect(item.disabledHint).toContain("—");
@@ -25,20 +44,20 @@ describe("AppShell future navigation teasers", () => {
     }
   });
 
-  it("hides marketplace listings while the feature is disabled", () => {
+  it("hides marketplace while the feature is disabled", () => {
     const labelsFor = (companyType: CompanyType | null, roles: string[] = [], marketplace = false) =>
       appNavSections.flatMap((section) =>
         filterVisibleItems(section.items, { roles, companyType, features: { marketplace } }).map((item) => item.label),
       );
 
-    expect(labelsFor("collector")).not.toContain("Объявления");
-    expect(labelsFor("trader")).not.toContain("Объявления");
-    expect(labelsFor("processor")).not.toContain("Объявления");
-    expect(labelsFor(null, ["content_manager"])).not.toContain("Объявления");
-    expect(labelsFor("collector", [], true)).toContain("Объявления");
-    expect(labelsFor("trader", [], true)).toContain("Объявления");
-    expect(labelsFor("processor", [], true)).toContain("Объявления");
-    expect(labelsFor(null, ["content_manager"], true)).toContain("Объявления");
+    expect(labelsFor("collector")).not.toContain("Торговая площадка");
+    expect(labelsFor("trader")).not.toContain("Торговая площадка");
+    expect(labelsFor("processor")).not.toContain("Торговая площадка");
+    expect(labelsFor(null, ["content_manager"])).not.toContain("Торговая площадка");
+    expect(labelsFor("collector", [], true)).toContain("Торговая площадка");
+    expect(labelsFor("trader", [], true)).toContain("Торговая площадка");
+    expect(labelsFor("processor", [], true)).toContain("Торговая площадка");
+    expect(labelsFor(null, ["content_manager"], true)).toContain("Торговая площадка");
   });
 
   it("keeps admin routes behind one panel entry in the sidebar", () => {
@@ -66,10 +85,10 @@ describe("AppShell future navigation teasers", () => {
         filterVisibleItems(section.items, { roles, companyType }).map((item) => item.label),
       );
 
-    expect(labelsFor("collector")).toContain("Розничный");
-    expect(labelsFor("trader")).not.toContain("Розничный");
-    expect(labelsFor("processor")).not.toContain("Розничный");
-    expect(labelsFor(null, ["content_manager"])).toContain("Розничный");
+    expect(labelsFor("collector")).toContain("Калькулятор");
+    expect(labelsFor("trader")).not.toContain("Калькулятор");
+    expect(labelsFor("processor")).not.toContain("Калькулятор");
+    expect(labelsFor(null, ["content_manager"])).toContain("Калькулятор");
   });
 
   it("keeps account and notification links out of the global sidebar", () => {
@@ -121,7 +140,7 @@ describe("AppShell future navigation teasers", () => {
   it("builds regular breadcrumbs from the visible sidebar section", () => {
     const trail = getBreadcrumbTrail(appNavSections, "/news");
 
-    expect(trail?.map((item) => item.label)).toEqual(["Главная", "Новости"]);
+    expect(trail?.map((item) => item.label)).toEqual(["Рынок", "Новости"]);
     expect(trail?.[1]?.href).toBe("/news");
   });
 

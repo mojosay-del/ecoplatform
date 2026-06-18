@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 
 export type NavIconKey =
   | "admin"
+  | "analytics-map"
   | "back"
   | "calculator"
   | "data-privacy"
@@ -17,6 +18,7 @@ export type NavIconKey =
   | "news"
   | "notifications"
   | "profile"
+  | "sales-prices"
   | "sessions"
   | "settings"
   | "subscription";
@@ -63,10 +65,15 @@ const futureItem = (key: string, label: string, icon: NavIconKey, disabledHint: 
 
 export const appNavSections: NavSection[] = [
   {
-    title: "Главная",
+    title: "Рынок",
     items: [
       { key: "news", href: "/news", label: "Новости", icon: "news" },
       { key: "indices", href: "/indices", label: "Индексы цен", icon: "indices" },
+    ],
+  },
+  {
+    title: "Базы знаний",
+    items: [
       {
         key: "education",
         href: "/education",
@@ -74,15 +81,27 @@ export const appNavSections: NavSection[] = [
         icon: "education",
         companyTypes: EDUCATION_COMPANY_TYPES,
       },
+      { key: "knowledge-base", href: "/knowledge-base", label: "Сырьё", icon: "knowledge" },
+      { key: "docs", href: "/documentation", label: "Документация", icon: "docs" },
     ],
   },
   {
-    title: "Торговая площадка",
+    title: "Инструменты",
     items: [
+      {
+        key: "calculator-retail",
+        href: "/calculators/retail",
+        label: "Калькулятор",
+        icon: "calculator",
+        companyTypes: ["collector"],
+      },
+      futureItem("sales-prices", "Продажные цены", "sales-prices", "Продажные цены — аналитика цен продаж."),
+      futureItem("analytics-map", "Карта аналитики", "analytics-map", "Карта аналитики — географические срезы по рынку."),
+      futureItem("participant-map", "Карта участников", "map", "Карта участников — география переработчиков, складов и логистики."),
       {
         key: "marketplace",
         href: "/marketplace",
-        label: "Объявления",
+        label: "Торговая площадка",
         icon: "marketplace",
         feature: "marketplace",
       },
@@ -91,33 +110,6 @@ export const appNavSections: NavSection[] = [
   {
     title: "Сообщество",
     items: [{ key: "forum", href: "/forum", label: "Форум", icon: "forum" }],
-  },
-  {
-    title: "Базы знаний",
-    items: [
-      { key: "knowledge-base", href: "/knowledge-base", label: "Сырьё", icon: "knowledge" },
-      { key: "docs", href: "/documentation", label: "Документация", icon: "docs" },
-    ],
-  },
-  {
-    title: "Инструменты",
-    items: [futureItem("maps", "Карты", "map", "Карты — география переработчиков, складов и логистики.")],
-  },
-  {
-    // Калькуляторы — категория (заголовок секции) с набором инструментов.
-    // «Розничный» — калькулятор выгоды рейса для заготовителя; видят только
-    // collector'ы (и платформенный персонал). Сюда же добавятся будущие
-    // калькуляторы (оптовый, логистики, переработки).
-    title: "Калькуляторы",
-    items: [
-      {
-        key: "calculator-retail",
-        href: "/calculators/retail",
-        label: "Розничный",
-        icon: "calculator",
-        companyTypes: ["collector"],
-      },
-    ],
   },
   {
     title: "Служебное",

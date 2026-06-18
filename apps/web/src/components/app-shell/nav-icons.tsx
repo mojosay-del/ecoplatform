@@ -2,7 +2,6 @@
 
 import BackIcon from "@animated-color-icons/lucide-react/ArrowLeftCircle";
 import DataPrivacyIcon from "@animated-color-icons/lucide-react/ShieldCheck";
-import MarketplaceIcon from "@animated-color-icons/lucide-react/Store";
 import type { AnimationItem } from "lottie-web";
 import {
   forwardRef,
@@ -19,6 +18,7 @@ import {
 } from "react";
 import type { NavIconKey } from "../app-shell-nav";
 import adminAnimation from "./iconsax/admin.json";
+import analyticsMapAnimation from "./iconsax/analytics-map.json";
 import arrowCircleRightAnimation from "./iconsax/arrow-circle-right.json";
 import arrowUpAnimation from "./iconsax/arrow-up.json";
 import calculatorAnimation from "./iconsax/calculator.json";
@@ -30,10 +30,12 @@ import knowledgeAnimation from "./iconsax/knowledge.json";
 import likeAnimation from "./iconsax/like.json";
 import logoutAnimation from "./iconsax/logout.json";
 import mapAnimation from "./iconsax/map.json";
+import marketplaceAnimation from "./iconsax/marketplace.json";
 import newsAnimation from "./iconsax/news.json";
 import notificationsAnimation from "./iconsax/notifications.json";
 import priceIndicesAnimation from "./iconsax/price-indices.json";
 import profileAnimation from "./iconsax/profile.json";
+import salesPricesAnimation from "./iconsax/sales-prices.json";
 import sendAnimation from "./iconsax/send.json";
 import sessionsAnimation from "./iconsax/sessions.json";
 import settingsAnimation from "./iconsax/settings.json";
@@ -68,6 +70,7 @@ type AnimatedIconKey =
   | "support";
 type LottieNavIconKey =
   | "admin"
+  | "analytics-map"
   | "arrow-up"
   | "calculator"
   | "docs"
@@ -79,9 +82,11 @@ type LottieNavIconKey =
   | "like"
   | "logout"
   | "map"
+  | "marketplace"
   | "news"
   | "notifications"
   | "profile"
+  | "sales-prices"
   | "send"
   | "sessions"
   | "settings"
@@ -103,11 +108,11 @@ const PRICE_INDICES_ANIMATION_SPEED = 1.45;
 const NAV_ICON_COMPONENTS: Record<Exclude<AnimatedIconKey, LottieNavIconKey>, AnimatedLucideIconComponent> = {
   back: BackIcon,
   "data-privacy": DataPrivacyIcon,
-  marketplace: MarketplaceIcon,
 };
 
 const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
   admin: { animationData: adminAnimation },
+  "analytics-map": { animationData: analyticsMapAnimation },
   "arrow-up": { animationData: arrowUpAnimation },
   calculator: { animationData: calculatorAnimation },
   docs: { animationData: docsAnimation },
@@ -123,9 +128,11 @@ const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
   like: { animationData: likeAnimation },
   logout: { animationData: logoutAnimation },
   map: { animationData: mapAnimation },
+  marketplace: { animationData: marketplaceAnimation },
   news: { animationData: newsAnimation },
   notifications: { animationData: notificationsAnimation },
   profile: { animationData: profileAnimation },
+  "sales-prices": { animationData: salesPricesAnimation },
   send: { animationData: sendAnimation },
   sessions: { animationData: sessionsAnimation },
   settings: { animationData: settingsAnimation },

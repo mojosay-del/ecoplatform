@@ -5,6 +5,10 @@ import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
 import { ApiError, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
+import {
+  hasStaleAuthFeaturesAfterSettingsLoad,
+  shouldRefreshAuthAfterSettingChange,
+} from "./settings-auth-refresh";
 
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
@@ -104,7 +108,7 @@ function isSettingsSection(id: string) {
 }
 
 export function AdminSettingsView() {
-  const { token } = useAuth();
+  const { token, user, refreshMe } = useAuth();
   const [state, setState] = useState<ApiState>("unauthenticated");
   const [items, setItems] = useState<SettingItem[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -147,6 +151,9 @@ export function AdminSettingsView() {
     try {
       await apiFetch(`/admin/settings/${key}`, { method: "PATCH", token, body: { value } });
       await loadList();
+      if (shouldRefreshAuthAfterSettingChange(key)) {
+        await refreshMe();
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить настройку");
     } finally {
@@ -167,6 +174,12 @@ export function AdminSettingsView() {
     void loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  useEffect(() => {
+    if (hasStaleAuthFeaturesAfterSettingsLoad(items, user?.features)) {
+      void refreshMe();
+    }
+  }, [items, user?.features, refreshMe]);
 
   // Синхронизация активной группы с hash.
   useEffect(() => {
