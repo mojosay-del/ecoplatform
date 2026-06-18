@@ -33,6 +33,7 @@ import mapAnimation from "./iconsax/map.json";
 import marketplaceAnimation from "./iconsax/marketplace.json";
 import newsAnimation from "./iconsax/news.json";
 import notificationsAnimation from "./iconsax/notifications.json";
+import passwordCheckAnimation from "./iconsax/password-check.json";
 import priceIndicesAnimation from "./iconsax/price-indices.json";
 import profileAnimation from "./iconsax/profile.json";
 import salesPricesAnimation from "./iconsax/sales-prices.json";
@@ -62,6 +63,7 @@ type AnimatedIconKey =
   | "arrow-up"
   | "hide-menu"
   | "like"
+  | "password-check"
   | "send"
   | "show-menu"
   | "sms"
@@ -85,6 +87,7 @@ type LottieNavIconKey =
   | "marketplace"
   | "news"
   | "notifications"
+  | "password-check"
   | "profile"
   | "sales-prices"
   | "send"
@@ -131,6 +134,7 @@ const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
   marketplace: { animationData: marketplaceAnimation },
   news: { animationData: newsAnimation },
   notifications: { animationData: notificationsAnimation },
+  "password-check": { animationData: passwordCheckAnimation },
   profile: { animationData: profileAnimation },
   "sales-prices": { animationData: salesPricesAnimation },
   send: { animationData: sendAnimation },
@@ -290,6 +294,13 @@ export const SendActionIcon = forwardRef<AnimatedNavIconHandle, ActionIconProps>
   ref,
 ) {
   return <AnimatedNavIcon className={className} name="send" ref={ref} size={size} />;
+});
+
+export const PasswordCheckIcon = forwardRef<AnimatedNavIconHandle, ActionIconProps>(function PasswordCheckIcon(
+  { className, size = 24 },
+  ref,
+) {
+  return <AnimatedNavIcon className={className} name="password-check" ref={ref} size={size} />;
 });
 
 export const SupportTopbarIcon = forwardRef<AnimatedNavIconHandle, ActionIconProps>(function SupportTopbarIcon(

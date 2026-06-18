@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Lock, ShieldCheck } from "lucide-react";
+import { Lock } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
 import { SendActionIcon } from "../app-shell/nav-icons";
 import { api, ApiError } from "../../lib/api";
@@ -27,6 +27,8 @@ import {
   isPasswordStrong,
   normalizeEmailValue,
 } from "./utils";
+
+const REGISTRATION_TRUST_ITEMS = ["Соответствие 152-ФЗ", "Защищённое соединение", "Регистрация за пару минут"] as const;
 
 export function RegisterForm() {
   const router = useRouter();
@@ -432,10 +434,11 @@ export function RegisterForm() {
               </button>
             </div>
             {!canSubmit && submitHint ? <p className="auth-submit-hint">{submitHint}</p> : null}
-            <p className="auth-secure-note">
-              <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
-              Соединение защищено
-            </p>
+            <ul className="auth-inline-trust" aria-label="Гарантии регистрации">
+              {REGISTRATION_TRUST_ITEMS.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </>
         ) : (
           <div className="auth-verification-actions">

@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
-import { Eye, EyeOff, Lock, type LucideIcon, Mail } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Lock, type LucideIcon, Mail } from "lucide-react";
+import { PasswordCheckIcon, type AnimatedNavIconHandle } from "../app-shell/nav-icons";
 import {
   ORGANIZATION_EMPTY_DELAY,
   ORGANIZATION_ERASE_DELAY,
@@ -158,7 +159,7 @@ export function PasswordInput({
   onValueChange?: (value: string) => void;
 }) {
   const [visible, setVisible] = useState(false);
-  const Icon = visible ? EyeOff : Eye;
+  const iconRef = useRef<AnimatedNavIconHandle | null>(null);
 
   return (
     <div className="password-input-wrap auth-field-affix">
@@ -179,9 +180,12 @@ export function PasswordInput({
         aria-label={visible ? "Скрыть пароль" : "Показать пароль"}
         aria-pressed={visible}
         onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setVisible((prev) => !prev)}
+        onClick={() => {
+          iconRef.current?.play();
+          setVisible((prev) => !prev);
+        }}
       >
-        <Icon size={18} strokeWidth={2.2} aria-hidden="true" />
+        <PasswordCheckIcon ref={iconRef} />
       </button>
     </div>
   );

@@ -74,12 +74,6 @@ function AuthVisual({ mode }: { mode: AuthMode }) {
 
         <h2 className="auth-visual-title">Рынок вторсырья, каким он должен быть: прозрачным, понятным и удобным.</h2>
       </div>
-
-      <ul className="auth-visual-trust">
-        <li>Соответствие 152-ФЗ</li>
-        <li>Защищённое соединение</li>
-        <li>Регистрация за пару минут</li>
-      </ul>
     </section>
   );
 }

@@ -65,8 +65,7 @@ export function PersonStepFields({
 }) {
   return (
     <>
-      <fieldset className="auth-section">
-        <legend className="auth-section-title">О вас</legend>
+      <fieldset className="auth-section" aria-label="О вас">
         <div className="auth-grid-2">
           <AuthField label="Фамилия">
             <FieldAffix icon={User}>
@@ -91,19 +90,6 @@ export function PersonStepFields({
             </FieldAffix>
           </AuthField>
         </div>
-        <AuthField label="Телефон">
-          <PhoneInput
-            name="phone"
-            countryId={values.phoneCountryId}
-            digits={values.phoneDigits}
-            onCountryChange={(countryId: PhoneCountryId) => setField("phoneCountryId", countryId)}
-            onDigitsChange={(digits) => setField("phoneDigits", digits)}
-          />
-        </AuthField>
-      </fieldset>
-
-      <fieldset className="auth-section">
-        <legend className="auth-section-title">Доступ</legend>
         <div className="auth-grid-2">
           <AuthField label="Email">
             <EmailInput
@@ -124,6 +110,15 @@ export function PersonStepFields({
             <PasswordStrengthMeter password={values.password} />
           </AuthField>
         </div>
+        <AuthField label="Телефон">
+          <PhoneInput
+            name="phone"
+            countryId={values.phoneCountryId}
+            digits={values.phoneDigits}
+            onCountryChange={(countryId: PhoneCountryId) => setField("phoneCountryId", countryId)}
+            onDigitsChange={(digits) => setField("phoneDigits", digits)}
+          />
+        </AuthField>
       </fieldset>
 
       <fieldset className="auth-section">
