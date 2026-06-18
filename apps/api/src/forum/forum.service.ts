@@ -28,6 +28,7 @@ import {
   toTaxonomyValue,
   type ForumQuestionRow,
 } from "./forum-response.helpers";
+import { searchForumQuestions } from "./forum-search.helpers";
 import type {
   forumAcceptInputSchema,
   forumAnswerInputSchema,
@@ -57,6 +58,11 @@ export class ForumService {
   async list(user: RequestUser, query: ForumListQuery) {
     assertFunctionalAccess(user);
     const pagination = resolvePagination(query, { defaultLimit: 20, maxLimit: 50 });
+    const q = query.q?.trim();
+    if (q) {
+      return this.searchList(q, query, pagination);
+    }
+
     const where = this.buildListWhere(query);
 
     const [total, rows] = await this.prisma.$transaction([
@@ -306,6 +312,44 @@ export class ForumService {
     return { prisma: this.prisma, notifications: this.notifications };
   }
 
+  private async searchList(q: string, query: ForumListQuery, pagination: ReturnType<typeof resolvePagination>) {
+    const result = await searchForumQuestions(this.prisma, {
+      q,
+      rawMaterialId: query.rawMaterialId,
+      questionTypeId: query.questionTypeId,
+      sort: query.sort,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
+    const ids = result.matches.map((match) => match.id);
+    if (ids.length === 0) {
+      return paginatedResponse([], result.total, pagination);
+    }
+
+    const rows = (await this.prisma.forumQuestion.findMany({
+      where: { id: { in: ids } },
+      include: {
+        rawMaterial: true,
+        questionType: true,
+        answers: { where: { isAccepted: true, parentAnswerId: null, hidden: false }, take: 1 },
+      },
+    })) as ForumQuestionRow[];
+    const rowsById = new Map(rows.map((row) => [row.id, row]));
+    const snippetsById = new Map(result.matches.map((match) => [match.id, match.snippet]));
+    const reputation = await buildForumReputationMap(
+      this.prisma,
+      rows.map((row) => row.authorId),
+    );
+
+    const items = ids.flatMap((id) => {
+      const row = rowsById.get(id);
+      if (!row) return [];
+      return [{ ...mapForumQuestionListItem(row, reputation), searchSnippet: snippetsById.get(id) }];
+    });
+
+    return paginatedResponse(items, result.total, pagination);
+  }
+
   private buildListWhere(query: ForumListQuery): Prisma.ForumQuestionWhereInput {
     const where: Prisma.ForumQuestionWhereInput = { status: { not: ForumQuestionStatus.hidden } };
     if (query.rawMaterialId) {
@@ -316,14 +360,6 @@ export class ForumService {
     }
     if (query.sort === "unanswered") {
       where.answersCount = 0;
-    }
-    const q = query.q?.trim();
-    if (q) {
-      where.OR = [
-        { title: { contains: q, mode: "insensitive" } },
-        { body: { contains: q, mode: "insensitive" } },
-        { answers: { some: { hidden: false, body: { contains: q, mode: "insensitive" } } } },
-      ];
     }
     return where;
   }

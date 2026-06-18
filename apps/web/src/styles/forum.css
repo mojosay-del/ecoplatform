@@ -68,7 +68,7 @@ section.forum-page .forum-hero .forum-title {
   background: var(--surface-elevated);
   border: 1px solid var(--border-strong);
   border-radius: 15px;
-  padding: 0 0 0 16px;
+  padding: 0 14px 0 16px;
   box-shadow: var(--shadow-card);
   overflow: hidden;
 }
@@ -91,25 +91,35 @@ section.forum-page .forum-hero .forum-title {
   color: var(--text);
   min-width: 0;
 }
-.forum-search button {
-  align-self: stretch;
-  min-width: 112px;
-  border: 0;
-  background: var(--brand);
-  color: var(--text-inverse);
-  font-size: var(--text-sm);
-  font-weight: 600;
+.forum-search input::-webkit-search-cancel-button,
+.forum-search input::-webkit-search-decoration {
+  appearance: none;
+}
+.forum-search__reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-muted);
   cursor: pointer;
   transition:
     background 120ms ease,
-    color 120ms ease;
+    color 120ms ease,
+    border-color 120ms ease;
 }
-.forum-search button:hover {
-  background: var(--brand-hover);
+.forum-search__reset:hover {
+  background: var(--surface-muted-strong);
+  color: var(--text);
+  border-color: var(--border-strong);
 }
-.forum-search button:focus-visible {
+.forum-search__reset:focus-visible {
   outline: none;
-  box-shadow: inset var(--focus-ring);
+  box-shadow: var(--focus-ring);
 }
 .forum-hero__metric {
   margin: 0;
@@ -350,6 +360,22 @@ section.forum-page .forum-hero .forum-title {
   color: var(--text-secondary);
   margin: 0 0 11px;
   line-height: 1.55;
+}
+.forum-search-snippet {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 11px;
+  line-height: 1.55;
+}
+.forum-search-snippet > span:first-child {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.forum-search-snippet mark {
+  border-radius: 4px;
+  background: rgb(var(--warning-strong-rgb) / 0.18);
+  color: var(--text);
+  padding: 0 2px;
 }
 
 /* Бейджи статуса и чипы тегов */
@@ -1161,15 +1187,14 @@ section.forum-page .forum-expert-rank {
     border-radius: var(--radius-card);
   }
   .forum-search input {
-    flex: 1 1 calc(100% - 42px);
+    flex: 1 1 calc(100% - 82px);
     padding: 8px 0;
     font-size: var(--text-base);
   }
-  .forum-search button {
-    width: 100%;
-    min-height: 48px;
-    border-radius: var(--radius-button);
-    font-size: var(--text-base);
+  .forum-search__reset {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
   }
   .forum-inline-composer {
     align-items: stretch;

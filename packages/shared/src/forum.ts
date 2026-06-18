@@ -63,6 +63,12 @@ export type ForumQuestionViewRecord = {
   views: number;
 };
 
+export type ForumSearchSnippet = {
+  source: "title" | "question" | "answer";
+  text: string;
+  highlights: Array<{ start: number; end: number }>;
+};
+
 // Карточка вопроса в ленте.
 export type ForumQuestionListItem = {
   id: string;
@@ -78,6 +84,8 @@ export type ForumQuestionListItem = {
   topVotes: number;
   // Превью принятого ответа (только у solved-вопросов).
   acceptedAnswerExcerpt: string | null;
+  // Контекст найденного совпадения: обычный текст + диапазоны для подсветки.
+  searchSnippet?: ForumSearchSnippet;
   author: ForumAuthorReputation;
   createdAt: IsoDateString;
 };

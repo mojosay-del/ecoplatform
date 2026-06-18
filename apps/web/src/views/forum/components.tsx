@@ -31,6 +31,7 @@ import {
   initialsFromName,
   relativeTime,
 } from "./forum-helpers";
+import { forumSearchSnippetSegments, forumSearchSnippetSourceLabel } from "./search-snippet";
 
 export function StatusBadge({ status }: { status: ForumQuestionStatus }) {
   const variant = forumStatusVariant(status);
@@ -99,7 +100,9 @@ export function QuestionCard({ question }: { question: ForumQuestionListItem }) 
         <TagChips rawMaterial={question.rawMaterial} questionType={question.questionType} />
       </div>
       <h3>{question.title}</h3>
-      {question.status === "solved" && question.acceptedAnswerExcerpt ? (
+      {question.searchSnippet ? (
+        <SearchSnippet snippet={question.searchSnippet} />
+      ) : question.status === "solved" && question.acceptedAnswerExcerpt ? (
         <div className="forum-answer-peek">
           <CircleCheck size={18} aria-hidden="true" />
           <p>Лучший ответ: {question.acceptedAnswerExcerpt}</p>
@@ -125,6 +128,21 @@ export function QuestionCard({ question }: { question: ForumQuestionListItem }) 
         </span>
       </div>
     </Link>
+  );
+}
+
+function SearchSnippet({ snippet }: { snippet: NonNullable<ForumQuestionListItem["searchSnippet"]> }) {
+  return (
+    <p className="forum-search-snippet">
+      <span>{forumSearchSnippetSourceLabel(snippet.source)}: </span>
+      {forumSearchSnippetSegments(snippet).map((segment, index) =>
+        segment.highlighted ? (
+          <mark key={`${segment.text}-${index}`}>{segment.text}</mark>
+        ) : (
+          <span key={`${segment.text}-${index}`}>{segment.text}</span>
+        ),
+      )}
+    </p>
   );
 }
 

@@ -127,6 +127,102 @@ describe("Forum: полный цикл", () => {
   });
 });
 
+describe("Forum: умный поиск", () => {
+  it("ищет по смысловым формам, е/ё, опечаткам, фильтрам и ранжирует заголовок выше ответа", async () => {
+    const adminToken = await loginAdmin();
+    const asker = await registerCompany("0900100");
+    const responder = await registerCompany("0900101");
+
+    const paperId = await createRawMaterial(adminToken, "Макулатура поиск");
+    const plasticId = await createRawMaterial(adminToken, "ПЭТ поиск");
+    const questionTypeId = await createQuestionType(adminToken, "Документы-поиск");
+
+    const titleMatchId = await ask(asker.token, {
+      title: "Лицензия на перевозку макулатуры",
+      body: "Короткий вопрос про рейс.",
+      rawMaterialId: paperId,
+      questionTypeId,
+    });
+    const answerMatchId = await ask(asker.token, {
+      title: "Как оформить рейс в соседний регион?",
+      body: "Вопрос без точного ключевого слова.",
+      rawMaterialId: paperId,
+      questionTypeId,
+    });
+    await answer(responder.token, answerMatchId, "Для перевозки нужна лицензия и договор с перевозчиком.");
+    const morphologyId = await ask(asker.token, {
+      title: "Документы для перевозки вторсырья",
+      body: "Проверяем русскую форму слова.",
+      rawMaterialId: paperId,
+      questionTypeId,
+    });
+    const yoId = await ask(asker.token, {
+      title: "Сортёр для ПЭТ бутылки",
+      body: "Название с буквой ё должно находиться через е.",
+      rawMaterialId: plasticId,
+      questionTypeId,
+    });
+
+    const ranked = await ctx.http.get("/api/forum").query({ q: "лицензия перевозка" }).set(auth(asker.token));
+    expect(ranked.status).toBe(200);
+    expect(ranked.body.items.map((item: { id: string }) => item.id)).toContain(answerMatchId);
+    expect(ranked.body.items[0]).toMatchObject({
+      id: titleMatchId,
+      searchSnippet: { source: "title" },
+    });
+    expect(ranked.body.items[0].searchSnippet.highlights.length).toBeGreaterThan(0);
+
+    const morphology = await ctx.http.get("/api/forum").query({ q: "вторсырье" }).set(auth(asker.token));
+    expect(morphology.status).toBe(200);
+    expect(morphology.body.items.map((item: { id: string }) => item.id)).toContain(morphologyId);
+
+    const yo = await ctx.http.get("/api/forum").query({ q: "сортер" }).set(auth(asker.token));
+    expect(yo.status).toBe(200);
+    expect(yo.body.items.map((item: { id: string }) => item.id)).toContain(yoId);
+
+    const typo = await ctx.http.get("/api/forum").query({ q: "лицензща" }).set(auth(asker.token));
+    expect(typo.status).toBe(200);
+    expect(typo.body.items.map((item: { id: string }) => item.id)).toContain(titleMatchId);
+
+    const filtered = await ctx.http
+      .get("/api/forum")
+      .query({ q: "сортер", rawMaterialId: paperId })
+      .set(auth(asker.token));
+    expect(filtered.status).toBe(200);
+    expect(filtered.body.items.map((item: { id: string }) => item.id)).not.toContain(yoId);
+  });
+
+  it("не ищет скрытые вопросы и скрытые ответы", async () => {
+    const adminToken = await loginAdmin();
+    const asker = await registerCompany("0900102");
+    const responder = await registerCompany("0900103");
+    const rawMaterialId = await createRawMaterial(adminToken, "Скрытый поиск");
+    const questionTypeId = await createQuestionType(adminToken, "Модерация-поиск");
+
+    const visibleQuestionId = await ask(asker.token, {
+      title: "Обычный вопрос без маркера",
+      body: "Видимый текст не содержит секретный маркер.",
+      rawMaterialId,
+      questionTypeId,
+    });
+    const hiddenAnswerId = await answer(responder.token, visibleQuestionId, "sekretnyymarker найден только в скрытом ответе.");
+    await ctx.prisma.forumAnswer.update({ where: { id: hiddenAnswerId }, data: { hidden: true } });
+
+    const hiddenQuestionId = await ask(asker.token, {
+      title: "sekretnyymarker скрытого вопроса",
+      body: "Этот вопрос скрыт модерацией.",
+      rawMaterialId,
+      questionTypeId,
+    });
+    await ctx.prisma.forumQuestion.update({ where: { id: hiddenQuestionId }, data: { status: "hidden" } });
+
+    const search = await ctx.http.get("/api/forum").query({ q: "sekretnyymarker" }).set(auth(asker.token));
+    expect(search.status).toBe(200);
+    expect(search.body.items.map((item: { id: string }) => item.id)).not.toContain(visibleQuestionId);
+    expect(search.body.items.map((item: { id: string }) => item.id)).not.toContain(hiddenQuestionId);
+  });
+});
+
 describe("Forum: ветки обсуждения под ответами", () => {
   it("reply виден под ответом, но не влияет на статус, счётчики, голосование и выбор решения", async () => {
     const adminToken = await loginAdmin();

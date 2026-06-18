@@ -7,7 +7,7 @@ import "../../styles/forum.css";
 
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 import type { ForumPinnedNews, ForumQuestionListItem, ForumSummary, ForumTaxonomy } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
@@ -25,6 +25,7 @@ const SORTS: { value: ForumSort; label: string }[] = [
   { value: "popular", label: "Популярные" },
 ];
 
+const SEARCH_DEBOUNCE_MS = 350;
 const EMPTY_TAXONOMY: ForumTaxonomy = { rawMaterials: [], questionTypes: [] };
 const EMPTY_SUMMARY: ForumSummary = {
   solvedQuestionsCount: 0,
@@ -191,6 +192,13 @@ export function ForumListView() {
   const pinned = useApiQuery("forum-pinned", () => api.forum.pinnedNews(), [] as ForumPinnedNews[]);
   const summary = useApiQuery("forum-summary", () => api.forum.summary(), EMPTY_SUMMARY);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setSearchTerm(queryDraft.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [queryDraft]);
+
   const key = `forum-${sort}-${rawMaterialId}-${questionTypeId}-${searchTerm}`;
   const feed = useInfiniteApiQuery<ForumQuestionListItem>(key, 20, ({ limit, offset }) =>
     api.forum.questions({
@@ -216,10 +224,16 @@ export function ForumListView() {
     "решённых вопросов",
   )} на форуме`;
   const showPinned = pinned.data.length > 0 && sort === "newest" && !searchTerm;
+  const hasSearchDraft = queryDraft.trim().length > 0;
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSearchTerm(queryDraft.trim());
+  };
+
+  const resetSearch = () => {
+    setQueryDraft("");
+    setSearchTerm("");
   };
 
   return (
@@ -227,7 +241,7 @@ export function ForumListView() {
       <section className="page forum-page">
         <div className="forum-hero">
           <h1 className="forum-title">Найдите готовый ответ — или спросите тех, кто уже сталкивался</h1>
-          <form className="forum-search" onSubmit={handleSearch}>
+          <form className="forum-search" onSubmit={handleSearch} role="search">
             <Search size={22} aria-hidden="true" />
             <input
               type="search"
@@ -236,7 +250,11 @@ export function ForumListView() {
               placeholder="Например: документы на перевозку макулатуры"
               aria-label="Поиск по форуму"
             />
-            <button type="submit">Искать</button>
+            {hasSearchDraft ? (
+              <button className="forum-search__reset" type="button" aria-label="Сбросить поиск" onClick={resetSearch}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            ) : null}
           </form>
           <p className="forum-hero__metric">{solvedLabel} · обновляется ежедневно</p>
         </div>
@@ -298,7 +316,7 @@ export function ForumListView() {
               <div className="forum-empty">
                 <p>
                   {searchTerm
-                    ? "Ничего не найдено. Попробуйте изменить запрос или задайте вопрос."
+                    ? `По запросу «${searchTerm}» ничего не найдено. Попробуйте другие слова или задайте вопрос.`
                     : "Вопросов пока нет. Будьте первым — задайте вопрос."}
                 </p>
                 <Link href="/forum/ask" className="button" style={{ marginTop: 12 }}>
