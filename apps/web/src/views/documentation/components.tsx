@@ -7,6 +7,7 @@ import type { DocumentationNode } from "@ecoplatform/shared";
 import { documentationDisplayIconForNode } from "../documentation-icons";
 import { formatColor, formatLabel } from "./documentFormats";
 import { formatBytes, formatRuDate, freshness, type Freshness } from "./doc-helpers";
+import { documentationSearchSnippetSegments, documentationSearchSnippetSourceLabel } from "./search-snippet";
 
 function fmtStyle(format: string | undefined): CSSProperties {
   return { ["--fmt" as string]: formatColor(format) } as CSSProperties;
@@ -48,7 +49,11 @@ export function DocumentCard({
           {fresh ? <FreshnessBadge kind={fresh} /> : null}
         </div>
         <h3 className="doc-card-title">{node.title}</h3>
-        {node.subtitle ? <p className="doc-card-sub">{node.subtitle}</p> : null}
+        {node.searchSnippet ? (
+          <DocumentationSearchSnippet snippet={node.searchSnippet} />
+        ) : node.subtitle ? (
+          <p className="doc-card-sub">{node.subtitle}</p>
+        ) : null}
       </Link>
       <div className="doc-card-foot">
         <span className="doc-card-meta">{metaLine(node)}</span>
@@ -64,6 +69,21 @@ export function DocumentCard({
         )}
       </div>
     </article>
+  );
+}
+
+function DocumentationSearchSnippet({ snippet }: { snippet: NonNullable<DocumentationNode["searchSnippet"]> }) {
+  return (
+    <p className="doc-search-snippet">
+      <span>{documentationSearchSnippetSourceLabel(snippet.source)}: </span>
+      {documentationSearchSnippetSegments(snippet).map((segment, index) =>
+        segment.highlighted ? (
+          <mark key={`${segment.text}-${index}`}>{segment.text}</mark>
+        ) : (
+          <span key={`${segment.text}-${index}`}>{segment.text}</span>
+        ),
+      )}
+    </p>
   );
 }
 
@@ -123,8 +143,10 @@ export function RecentlyUpdated({ items }: { items: DocumentationNode[] }) {
               <Link className="doc-recent-title" href={`/documentation/${node.slug}`}>
                 {node.title}
               </Link>
-              {fresh ? <FreshnessBadge kind={fresh} /> : null}
-              {date ? <span className="doc-recent-date">{date}</span> : null}
+              <span className="doc-recent-meta">
+                {fresh ? <FreshnessBadge kind={fresh} /> : null}
+                {date ? <span className="doc-recent-date">{date}</span> : null}
+              </span>
             </li>
           );
         })}

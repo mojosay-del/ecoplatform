@@ -26,11 +26,11 @@ export function describeSubscription(
     const endsAt = billing.demoEndsAt ? new Date(billing.demoEndsAt) : null;
     const expired = endsAt ? endsAt.getTime() <= Date.now() : false;
     return {
-      tariff: endsAt ? "Пробный доступ" : "Доступ не выбран",
+      tariff: endsAt ? "Пробный" : "Доступ не выбран",
       note: endsAt
         ? expired
-          ? `Пробный доступ истёк ${endsAt.toLocaleString("ru-RU")}. Активируйте подписку.`
-          : `Пробный доступ до ${endsAt.toLocaleString("ru-RU")}`
+          ? `Пробный доступ истёк ${formatAccountDateTime(endsAt)}. Активируйте подписку.`
+          : `Пробный доступ до ${formatAccountDateTime(endsAt)}`
         : "Выберите пробный доступ или подписку.",
     };
   }
@@ -38,7 +38,7 @@ export function describeSubscription(
     const endsAt = billing.subscriptionEndsAt ? new Date(billing.subscriptionEndsAt) : null;
     return {
       tariff: SUBSCRIPTION_PLAN_TITLE_LABELS[billing.subscriptionPlan] ?? billing.subscriptionPlan,
-      note: endsAt ? `Действует до ${endsAt.toLocaleString("ru-RU")}` : "Подписка активна",
+      note: endsAt ? `Действует до ${formatAccountDateTime(endsAt)}` : "Подписка активна",
     };
   }
   if (billing.status === "past_due")
@@ -51,7 +51,7 @@ export function describeSubscription(
 }
 
 export function formatAccountDateTime(value?: string | Date | null) {
-  return value ? new Date(value).toLocaleString("ru-RU") : "—";
+  return value ? new Date(value).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" }) : "—";
 }
 
 export function formatAccountDate(value?: string | Date | null) {

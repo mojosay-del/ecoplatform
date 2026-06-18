@@ -155,7 +155,7 @@ export class AuthService {
 
     const consentDocumentIds = await this.resolveRegistrationConsentDocumentIds(challenge.acceptedDocumentIds);
     // После подтверждения почты компания создаётся без активного trial.
-    // Пользователь сразу попадает на /subscription и сам выбирает:
+    // Web сразу открывает продукт и показывает обязательный выбор доступа:
     // пробный доступ на demo.duration_hours или тестовую paid-подписку.
     const userId = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.emailVerificationChallenge.updateMany({

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AuthMeUser } from "@ecoplatform/shared";
 import { getDemoBannerState, shouldShowDemoBanner } from "./demo-banner-state";
-import { subscriptionSelectionHref } from "../lib/subscription-access";
+import { accountProfileModalHref } from "./app-shell-nav";
 
 const MINUTE_MS = 60 * 1000;
 
@@ -33,7 +33,7 @@ export function DemoBanner({ user, pathname }: { user: AuthMeUser | null; pathna
       aria-label={accessibleText}
       className={`demo-banner demo-banner-${state.mode}`}
       data-tooltip="Активировать подписку"
-      href={subscriptionSelectionHref(pathname)}
+      href={accountProfileModalHref("subscription")}
       title="Активировать подписку"
     >
       <span className="demo-banner-time" aria-live="polite">

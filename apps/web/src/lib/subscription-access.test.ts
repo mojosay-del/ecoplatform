@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AuthMeCompany } from "@ecoplatform/shared";
-import {
-  isSubscriptionSelectionRequired,
-  safeSubscriptionReturnPath,
-  subscriptionSelectionHref,
-} from "./subscription-access";
+import { isSubscriptionSelectionRequired, safeSubscriptionReturnPath } from "./subscription-access";
 
 const NOW = new Date("2026-06-01T12:00:00.000Z");
 
@@ -22,7 +18,7 @@ function company(overrides: Partial<AuthMeCompany>): AuthMeCompany {
 }
 
 describe("subscription access helpers", () => {
-  it("requires the subscription page for missing/expired trial or paid subscriptions", () => {
+  it("requires the subscription gate for missing/expired trial or paid subscriptions", () => {
     expect(isSubscriptionSelectionRequired(company({ demoEndsAt: null }), NOW)).toBe(true);
     expect(isSubscriptionSelectionRequired(company({ demoEndsAt: "2026-05-31T12:00:00.000Z" }), NOW)).toBe(true);
     expect(
@@ -59,6 +55,5 @@ describe("subscription access helpers", () => {
     expect(safeSubscriptionReturnPath("https://evil.test/news")).toBe("/news");
     expect(safeSubscriptionReturnPath("//evil.test/news")).toBe("/news");
     expect(safeSubscriptionReturnPath("/subscription?from=/news")).toBe("/news");
-    expect(subscriptionSelectionHref("/indices")).toBe("/subscription?from=%2Findices");
   });
 });

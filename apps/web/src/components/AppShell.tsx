@@ -5,7 +5,12 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { Menu } from "lucide-react";
+import type { BillingStatus } from "@ecoplatform/shared";
 import { useAuth } from "../lib/auth";
+import { api } from "../lib/api";
+import { isSubscriptionSelectionRequired } from "../lib/subscription-access";
+import { useApiQuery } from "../views/shared/use-api-query";
+import { SubscriptionDialog } from "../views/account/SubscriptionDialog";
 import {
   AccountMenu,
   AppShellFooter,
@@ -58,6 +63,16 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
   const showNotifications = chrome.notifications !== false;
   const showDemoBanner = chrome.demoBanner !== false;
   const showAdminPanelBackLink = chrome.adminBackLink !== false && pathname.startsWith("/admin/");
+  const subscriptionGateRequired = !isAdminUser && isSubscriptionSelectionRequired(user?.company);
+  const {
+    data: subscriptionGateBilling,
+    setData: setSubscriptionGateBilling,
+    state: subscriptionGateBillingState,
+  } = useApiQuery<BillingStatus | null>(
+    subscriptionGateRequired ? `billing-status:gate:${user?.company?.id ?? "company"}` : null,
+    () => api.billing.status(),
+    null,
+  );
 
   // Любой защищённый раздел оборачивается в AppShell. Если AuthProvider уже
   // попробовал восстановить refresh-cookie и токена нет — отправляем на /login.
@@ -142,7 +157,7 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
 
   return (
     <div
-      className={`app-shell${showSidebar ? "" : " app-shell-no-sidebar"}`}
+      className={`app-shell${showSidebar ? "" : " app-shell-no-sidebar"}${subscriptionGateRequired ? " is-subscription-gated" : ""}`}
       data-collapsed={collapsed ? "true" : "false"}
     >
       {showSidebar ? (
@@ -216,6 +231,17 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
       {/* Drawer поддержки рендерим один раз на уровне AppShell — компонент
           сам проверяет проп `open` и ничего не рисует, пока он false. */}
       {isAdminUser ? null : <UserSupportDrawer open={supportOpen} onClose={() => setSupportOpen(false)} />}
+      {subscriptionGateRequired ? (
+        <SubscriptionDialog
+          billing={subscriptionGateBilling}
+          billingState={subscriptionGateBillingState}
+          closeDisabled
+          onBillingUpdated={setSubscriptionGateBilling}
+          onClose={() => undefined}
+          onGateSatisfied={() => undefined}
+          onOpenSupport={() => setSupportOpen(true)}
+        />
+      ) : null}
     </div>
   );
 }

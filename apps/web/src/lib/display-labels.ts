@@ -66,8 +66,8 @@ export const SUBSCRIPTION_PLAN_LABELS: Record<string, string> = {
 } satisfies Record<SubscriptionPlan, string>;
 
 export const SUBSCRIPTION_PLAN_TITLE_LABELS: Record<string, string> = {
-  basic: "Базовая подписка",
-  extended: "Расширенная подписка",
+  basic: "Базовая",
+  extended: "Расширенная",
 } satisfies Record<SubscriptionPlan, string>;
 
 export const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {

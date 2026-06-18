@@ -448,6 +448,19 @@ body.account-password-modal-open {
 .account-password-modal-head h2 {
   font-size: 20px;
   font-weight: 800;
+  letter-spacing: 0;
+}
+
+.account-modal-sr-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .account-password-modal-head p {
@@ -508,7 +521,7 @@ body.account-password-modal-open {
 }
 
 .account-payment-modal {
-  width: min(760px, 100%);
+  width: min(900px, 100%);
 }
 
 .account-sessions-modal {
@@ -1008,6 +1021,87 @@ body.account-password-modal-open {
   color: var(--muted);
 }
 
+.account-billing-period-toggle {
+  display: inline-grid;
+  flex: 0 0 auto;
+  grid-template-columns: 48px 74px;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.account-billing-period-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 32px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.account-billing-period-toggle button.is-active {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgb(var(--shadow-rgb) / 0.08);
+}
+
+.account-billing-period-toggle button:first-child:not(.is-active) {
+  background: var(--panel);
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px rgb(var(--shadow-rgb) / 0.04);
+}
+
+.account-billing-period-toggle button:last-child {
+  color: var(--success-text);
+}
+
+.account-billing-period-toggle button:last-child:not(.is-active) {
+  background: var(--success-soft);
+  box-shadow: inset 0 0 0 1px rgb(var(--success-rgb) / 0.12);
+}
+
+.account-billing-period-toggle button:last-child.is-active {
+  background: var(--success-soft);
+  color: var(--success-text);
+  box-shadow: 0 7px 18px rgb(var(--success-rgb) / 0.18);
+}
+
+.account-billing-period-toggle button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.account-billing-period-discount {
+  display: inline;
+  min-width: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--success-text);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.account-billing-period-toggle button.is-active .account-billing-period-discount {
+  background: transparent;
+}
+
 /* Тарифные карточки */
 
 .account-plans {
@@ -1077,16 +1171,33 @@ body.account-password-modal-open {
   margin: 16px 0 4px;
 }
 
+.account-plan-price.is-switchable {
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.account-plan-price-value {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  min-width: 0;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .account-plan-amount {
   font-size: 30px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .account-plan-period {
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .account-plan-tbd {

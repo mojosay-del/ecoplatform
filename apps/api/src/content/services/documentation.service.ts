@@ -23,6 +23,7 @@ import {
   mapDocumentationNode,
   type DocumentationArticleRow,
 } from "./documentation-response.helpers";
+import { searchDocumentationArticles } from "./documentation-search.helpers";
 
 type DocumentationInput = z.infer<typeof documentationArticleInputSchema>;
 
@@ -95,25 +96,24 @@ export class DocumentationService {
     if (trimmed.length === 0) {
       return [];
     }
+    const matches = await searchDocumentationArticles(this.prisma, { q: trimmed, limit: 50 });
+    const ids = matches.map((match) => match.id);
+    if (ids.length === 0) {
+      return [];
+    }
+
     const rows = (await this.prisma.documentationArticle.findMany({
-      where: {
-        status: ContentStatus.published,
-        AND: [
-          DOCUMENT_LEAF_FILTER,
-          {
-            OR: [
-              { title: { contains: trimmed, mode: "insensitive" } },
-              { subtitle: { contains: trimmed, mode: "insensitive" } },
-            ],
-          },
-        ],
-      },
-      take: 50,
-      orderBy: { title: "asc" },
+      where: { id: { in: ids } },
       include: { file: true },
     })) as DocumentationArticleRow[];
+    const rowsById = new Map(rows.map((row) => [row.id, row]));
+    const snippetsById = new Map(matches.map((match) => [match.id, match.snippet]));
 
-    return rows.map((row) => mapDocumentationNode(row));
+    return ids.flatMap((id) => {
+      const row = rowsById.get(id);
+      if (!row) return [];
+      return [{ ...mapDocumentationNode(row), searchSnippet: snippetsById.get(id) }];
+    });
   }
 
   async getDocument(slug: string, user: RequestUser) {

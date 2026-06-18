@@ -414,9 +414,17 @@ export function AccountView({ section }: { section: AccountSectionId }) {
         />
       </section>
       {subscriptionDialogOpen ? (
-        <SubscriptionDialog billing={billing} onClose={closeSubscriptionDialog} onOpenSupport={openSupport} />
+        <SubscriptionDialog
+          billing={billing}
+          billingState={billingState}
+          onBillingUpdated={setBilling}
+          onClose={closeSubscriptionDialog}
+          onOpenSupport={openSupport}
+        />
       ) : null}
-      {paymentDialogOpen ? <PaymentDialog onClose={() => setPaymentDialogOpen(false)} /> : null}
+      {paymentDialogOpen ? (
+        <PaymentDialog billing={billing} billingState={billingState} onClose={() => setPaymentDialogOpen(false)} />
+      ) : null}
       {sessionsDialogOpen ? (
         <SessionsDialog
           onClose={closeSessionsDialog}

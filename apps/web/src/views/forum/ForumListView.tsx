@@ -224,7 +224,7 @@ export function ForumListView() {
     "решённых вопросов",
   )} на форуме`;
   const showPinned = pinned.data.length > 0 && sort === "newest" && !searchTerm;
-  const hasSearchDraft = queryDraft.trim().length > 0;
+  const hasSearchDraft = queryDraft.length > 0;
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -242,14 +242,18 @@ export function ForumListView() {
         <div className="forum-hero">
           <h1 className="forum-title">Найдите готовый ответ — или спросите тех, кто уже сталкивался</h1>
           <form className="forum-search" onSubmit={handleSearch} role="search">
-            <Search size={22} aria-hidden="true" />
             <input
               type="search"
               value={queryDraft}
               onChange={(event) => setQueryDraft(event.target.value)}
-              placeholder="Например: документы на перевозку макулатуры"
               aria-label="Поиск по форуму"
             />
+            {!hasSearchDraft ? (
+              <span className="forum-search__placeholder" aria-hidden="true">
+                <Search size={22} />
+                <span>Например: документы на перевозку макулатуры</span>
+              </span>
+            ) : null}
             {hasSearchDraft ? (
               <button className="forum-search__reset" type="button" aria-label="Сбросить поиск" onClick={resetSearch}>
                 <X size={18} aria-hidden="true" />

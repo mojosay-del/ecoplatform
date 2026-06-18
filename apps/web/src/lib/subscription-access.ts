@@ -33,10 +33,6 @@ export function safeSubscriptionReturnPath(value: string | null | undefined): st
   return path;
 }
 
-export function subscriptionSelectionHref(from: string): string {
-  return `/subscription?from=${encodeURIComponent(safeSubscriptionReturnPath(from))}`;
-}
-
 function isPast(value: string | null | undefined, now: Date): boolean {
   if (!value) return false;
   const time = new Date(value).getTime();

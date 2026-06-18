@@ -10,6 +10,6 @@ describe("subscription plan tiers", () => {
 
   it("keeps trial before paid plans in public plan overview", () => {
     expect(SUBSCRIPTION_PLAN_TIERS.map((tier) => tier.key)).toEqual(["demo", "basic", "extended"]);
-    expect(SUBSCRIPTION_PLAN_TIERS[0]!.name).toBe("Пробный доступ");
+    expect(SUBSCRIPTION_PLAN_TIERS[0]!.name).toBe("Пробный");
   });
 });

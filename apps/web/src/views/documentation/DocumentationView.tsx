@@ -5,8 +5,8 @@ import "../../styles/documentation.css";
 // «Часто нужные» (закреплённые), «Недавно обновлено», поиск и фильтр по формату.
 // Структурный близнец «Базы знаний», но документ — первоклассная сущность.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { PanelRightOpen, Search, X } from "lucide-react";
 import type { DocumentationNode } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
@@ -27,8 +27,8 @@ function findNode(nodes: DocumentationNode[], id: string | null): DocumentationN
   return null;
 }
 
-function countLabel(count: number): string {
-  return `${count} ${pluralizeRu(count, "документ", "документа", "документов")}`;
+function documentsAddedLabel(count: number): string {
+  return `${count} ${pluralizeRu(count, "документ добавлен", "документа добавлено", "документов добавлено")}`;
 }
 
 export function DocumentationView() {
@@ -45,6 +45,7 @@ export function DocumentationView() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [format, setFormat] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<DocumentationNode[] | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
@@ -57,6 +58,7 @@ export function DocumentationView() {
       setSearchResults(null);
       return;
     }
+    setSearchResults(null);
     api.documentation
       .search(debouncedQuery)
       .then((results) => {
@@ -72,6 +74,7 @@ export function DocumentationView() {
 
   const categories = useMemo(() => tree.filter((node) => node.iconType === "category"), [tree]);
   const topDocuments = useMemo(() => tree.filter((node) => node.iconType !== "category"), [tree]);
+  const allDocuments = useMemo(() => flattenDocuments(tree), [tree]);
 
   useEffect(() => {
     if (activeId === null && categories.length > 0) {
@@ -83,17 +86,77 @@ export function DocumentationView() {
 
   const formats = useMemo(() => {
     const set = new Set<string>();
-    for (const doc of flattenDocuments(tree)) {
+    for (const doc of allDocuments) {
       if (doc.file) set.add(doc.file.format);
     }
     return Array.from(set).sort();
-  }, [tree]);
+  }, [allDocuments]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+
+    const media = window.matchMedia("(max-width: 960px)");
+    if (!media.matches) {
+      setNavOpen(false);
+      return;
+    }
+
+    const onMediaChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) setNavOpen(false);
+    };
+
+    media.addEventListener("change", onMediaChange);
+    return () => media.removeEventListener("change", onMediaChange);
+  }, [navOpen]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setNavOpen(false);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [navOpen]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [navOpen]);
 
   const onDownload = useCallback((node: DocumentationNode) => {
     void triggerDocumentDownload(node);
   }, []);
 
+  const resetSearch = useCallback(() => {
+    setQuery("");
+    setDebouncedQuery("");
+    setSearchResults(null);
+  }, []);
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setDebouncedQuery(query.trim());
+  };
+
+  const selectCategory = useCallback(
+    (node: DocumentationNode) => {
+      setActiveId(node.id);
+      resetSearch();
+      setNavOpen(false);
+    },
+    [resetSearch],
+  );
+
   const searching = debouncedQuery.length >= 2;
+  const searchLoading = searching && searchResults === null;
+  const hasSearchDraft = query.length > 0;
+  const hasNavigation = categories.length > 0 || topDocuments.length > 0;
   const baseGrid: DocumentationNode[] = searching
     ? (searchResults ?? [])
     : activeCategory
@@ -109,21 +172,28 @@ export function DocumentationView() {
     <AppShell>
       <section className="page doc-page">
         <header className="doc-header">
-          <div>
-            <span className="doc-kicker">Базы знаний</span>
-            <h1 className="doc-title">Документация</h1>
-            <p className="doc-subtitle">Шаблоны, регламенты и отраслевые справки для работы с вторсырьём</p>
-          </div>
-          <label className="doc-search">
-            <Search size={16} aria-hidden="true" />
+          <h1 className="doc-title">Документация</h1>
+          <p className="doc-subtitle">Шаблоны, регламенты и отраслевые справки для работы с вторсырьём</p>
+          <form className="doc-search" onSubmit={handleSearch} role="search">
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Поиск по документам…"
               aria-label="Поиск по документам"
             />
-          </label>
+            {!hasSearchDraft ? (
+              <span className="doc-search-placeholder" aria-hidden="true">
+                <Search size={22} />
+                <span>Например: договор поставки вторсырья</span>
+              </span>
+            ) : null}
+            {hasSearchDraft ? (
+              <button className="doc-search-reset" type="button" aria-label="Сбросить поиск" onClick={resetSearch}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            ) : null}
+          </form>
+          <p className="doc-header-metric">{documentsAddedLabel(allDocuments.length)}</p>
         </header>
 
         {tree.length === 0 ? (
@@ -132,8 +202,21 @@ export function DocumentationView() {
           </div>
         ) : (
           <>
-            {!searching ? <EssentialsStrip items={pinned.data} onDownload={onDownload} /> : null}
-            {!searching ? <RecentlyUpdated items={recent.data} /> : null}
+            <EssentialsStrip items={pinned.data} onDownload={onDownload} />
+            {hasNavigation ? (
+              <div className="doc-mobile-tools">
+                <button
+                  className="doc-mobile-nav-trigger"
+                  type="button"
+                  onClick={() => setNavOpen(true)}
+                  aria-controls="documentation-nav-drawer"
+                  aria-expanded={navOpen}
+                >
+                  <PanelRightOpen size={17} aria-hidden="true" />
+                  <span>Разделы</span>
+                </button>
+              </div>
+            ) : null}
             <FormatFilter formats={formats} active={format} onChange={setFormat} />
             <div className="doc-workspace">
               <aside className="doc-nav-panel" aria-label="Навигация по документации">
@@ -144,25 +227,22 @@ export function DocumentationView() {
                 {categories.length === 0 && topDocuments.length === 0 ? (
                   <p className="page-subtitle">Разделов пока нет.</p>
                 ) : (
-                  <DocTree
-                    nodes={tree}
-                    activeId={activeId}
-                    onSelect={(node) => {
-                      setActiveId(node.id);
-                      setQuery("");
-                    }}
-                  />
+                  <DocTree nodes={tree} activeId={activeId} onSelect={selectCategory} />
                 )}
               </aside>
               <main className="doc-content-panel">
                 <div className="doc-content-head">
                   <h2>{searching ? "Результаты поиска" : activeCategory ? activeCategory.title : "Документы"}</h2>
-                  <span className="doc-content-count">{countLabel(grid.length)}</span>
                 </div>
-                {grid.length === 0 ? (
-                  <p className="page-subtitle">
-                    {searching ? "Ничего не найдено." : "В этом разделе пока нет документов."}
-                  </p>
+                {searchLoading ? (
+                  <p className="page-subtitle">Ищем документы...</p>
+                ) : grid.length === 0 ? (
+                  <DocumentationEmptyState
+                    searching={searching}
+                    hasFormat={format !== null}
+                    onResetFormat={() => setFormat(null)}
+                    onResetSearch={resetSearch}
+                  />
                 ) : (
                   <div className="doc-grid">
                     {grid.map((node) => (
@@ -172,9 +252,85 @@ export function DocumentationView() {
                 )}
               </main>
             </div>
+            {!searching ? <RecentlyUpdated items={recent.data} /> : null}
+            {navOpen ? (
+              <div
+                className="doc-nav-drawer-root"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="documentation-nav-drawer-title"
+              >
+                <button
+                  className="doc-nav-drawer-backdrop"
+                  type="button"
+                  onClick={() => setNavOpen(false)}
+                  aria-label="Закрыть навигацию по документации"
+                />
+                <aside className="doc-nav-drawer" id="documentation-nav-drawer">
+                  <header className="doc-nav-drawer-head">
+                    <div>
+                      <span className="doc-nav-kicker">Документация</span>
+                      <h2 id="documentation-nav-drawer-title">Разделы документации</h2>
+                    </div>
+                    <button
+                      className="doc-nav-drawer-close"
+                      type="button"
+                      onClick={() => setNavOpen(false)}
+                      aria-label="Закрыть"
+                    >
+                      <X size={20} aria-hidden="true" />
+                    </button>
+                  </header>
+                  <div className="doc-nav-drawer-body">
+                    <DocTree nodes={tree} activeId={activeId} onSelect={selectCategory} />
+                  </div>
+                </aside>
+              </div>
+            ) : null}
           </>
         )}
       </section>
     </AppShell>
+  );
+}
+
+function DocumentationEmptyState({
+  hasFormat,
+  onResetFormat,
+  onResetSearch,
+  searching,
+}: {
+  hasFormat: boolean;
+  onResetFormat: () => void;
+  onResetSearch: () => void;
+  searching: boolean;
+}) {
+  if (searching) {
+    return (
+      <div className="doc-empty-state">
+        <p>По этому запросу документов не нашлось. Попробуйте другое слово или сбросьте фильтр формата.</p>
+        <div className="doc-empty-actions">
+          <button type="button" className="doc-empty-action" onClick={onResetSearch}>
+            Сбросить поиск
+          </button>
+          {hasFormat ? (
+            <button type="button" className="doc-empty-action is-ghost" onClick={onResetFormat}>
+              Показать все форматы
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="doc-empty-state">
+      <p>{hasFormat ? "В этом разделе нет документов выбранного формата." : "В этом разделе пока нет документов."}</p>
+      {hasFormat ? (
+        <button type="button" className="doc-empty-action" onClick={onResetFormat}>
+          Показать все форматы
+        </button>
+      ) : null}
+    </div>
   );
 }

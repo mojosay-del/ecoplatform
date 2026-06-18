@@ -5,13 +5,13 @@
 // видел сайдбар, а не «голый» экран.
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { canAccessEducationSection } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
+import { accountProfileModalHref } from "../../components/app-shell-nav";
 import { StatusPill } from "../../components/StatusPill";
 import { useAuth } from "../../lib/auth";
-import { isSubscriptionSelectionRequired, subscriptionSelectionHref } from "../../lib/subscription-access";
+import { isSubscriptionSelectionRequired } from "../../lib/subscription-access";
 
 export function AuthRequired({ title }: { title: string }) {
   return (
@@ -36,9 +36,7 @@ export function AuthRequired({ title }: { title: string }) {
 
 export function AccessClosed({ title }: { title: string }) {
   const { user } = useAuth();
-  const router = useRouter();
   const pathname = usePathname();
-  const [currentPath, setCurrentPath] = useState(pathname);
   const shouldRedirect = isSubscriptionSelectionRequired(user?.company);
   const isEducationRoute = pathname === "/education" || pathname.startsWith("/education/");
   const isEducationCompanyTypeBlocked =
@@ -46,29 +44,14 @@ export function AccessClosed({ title }: { title: string }) {
   const description = isEducationCompanyTypeBlocked
     ? "Раздел обучения сейчас доступен только заготовителям. Остальные рабочие разделы остаются открыты."
     : shouldRedirect
-      ? "Срок доступа истёк. Перенаправляем на выбор подписки."
+      ? "Срок доступа истёк. Выберите доступ в окне подписки, чтобы продолжить работу."
       : "Для этого раздела нужен другой уровень доступа. Личный кабинет, биллинг и поддержка остаются доступны.";
   const actionHref = isEducationCompanyTypeBlocked
     ? "/news"
     : shouldRedirect
-      ? subscriptionSelectionHref(currentPath)
-      : "/account/billing";
-  const actionLabel = isEducationCompanyTypeBlocked
-    ? "К новостям"
-    : shouldRedirect
-      ? "Выбрать подписку"
-      : "Открыть подписку";
-
-  useEffect(() => {
-    setCurrentPath(currentBrowserPath(pathname));
-  }, [pathname]);
-
-  useEffect(() => {
-    const path = currentBrowserPath(pathname);
-    if (shouldRedirect) {
-      router.replace(subscriptionSelectionHref(path));
-    }
-  }, [pathname, router, shouldRedirect]);
+      ? "/news"
+      : accountProfileModalHref("subscription");
+  const actionLabel = isEducationCompanyTypeBlocked ? "К новостям" : shouldRedirect ? "К новостям" : "Открыть подписку";
 
   return (
     <AppShell>
@@ -85,11 +68,6 @@ export function AccessClosed({ title }: { title: string }) {
       </section>
     </AppShell>
   );
-}
-
-function currentBrowserPath(pathname: string): string {
-  if (typeof window === "undefined") return pathname;
-  return `${window.location.pathname}${window.location.search}`;
 }
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {

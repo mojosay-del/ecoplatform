@@ -253,6 +253,103 @@ describe("Documentation: pinned & recent", () => {
   });
 });
 
+describe("Documentation: smart search", () => {
+  it("ищет по названию, подзаголовку, имени файла, описанию и опечаткам", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0810030");
+    const uploader = await adminId();
+
+    const file = await createDocFileAsset(uploader, "dogovor-perevozki-makulatury.docx");
+    const titleMatch = await createDraftDocument(adminToken, {
+      title: "Договор перевозки макулатуры",
+      subtitle: "Шаблон для рейсов между регионами",
+      fileAssetId: file.id,
+    });
+    await publishDocument(adminToken, titleMatch.id);
+
+    const descriptionMatch = await createDraftDocument(adminToken, {
+      title: "Акт приёма-передачи",
+      fileAssetId: await createDocFileAsset(uploader, "akt.xlsx").then((asset) => asset.id),
+      blocks: [
+        { type: "heading", payload: { text: "Сопроводительные документы" } },
+        { type: "paragraph", payload: { html: "<p>Текст про лицензии и маршрутный лист.</p>" } },
+      ],
+    });
+    await publishDocument(adminToken, descriptionMatch.id);
+
+    const subtitleMatch = await createDraftDocument(adminToken, {
+      title: "Справка ФККО",
+      subtitle: "Классификатор отходов для вторсырья",
+      blocks: [{ type: "paragraph", payload: { html: "<p>Описание справки.</p>" } }],
+    });
+    await publishDocument(adminToken, subtitleMatch.id);
+
+    const titleSearch = await ctx.http
+      .get("/api/documentation/search")
+      .query({ q: "макулатуры перевозки" })
+      .set(auth(reader.token));
+    expect(titleSearch.status).toBe(200);
+    expect(titleSearch.body[0]).toMatchObject({ id: titleMatch.id, searchSnippet: { source: "title" } });
+    expect(titleSearch.body[0].searchSnippet.highlights.length).toBeGreaterThan(0);
+
+    const descriptionSearch = await ctx.http
+      .get("/api/documentation/search")
+      .query({ q: "лицензия маршрутный" })
+      .set(auth(reader.token));
+    expect(descriptionSearch.status).toBe(200);
+    expect(descriptionSearch.body.map((item: { id: string }) => item.id)).toContain(descriptionMatch.id);
+    const descriptionItem = descriptionSearch.body.find((item: { id: string }) => item.id === descriptionMatch.id);
+    expect(descriptionItem.searchSnippet.source).toBe("description");
+
+    const fileSearch = await ctx.http
+      .get("/api/documentation/search")
+      .query({ q: "dogovor perevozki" })
+      .set(auth(reader.token));
+    expect(fileSearch.status).toBe(200);
+    expect(fileSearch.body.map((item: { id: string }) => item.id)).toContain(titleMatch.id);
+
+    const subtitleSearch = await ctx.http
+      .get("/api/documentation/search")
+      .query({ q: "вторсырье" })
+      .set(auth(reader.token));
+    expect(subtitleSearch.status).toBe(200);
+    expect(subtitleSearch.body.map((item: { id: string }) => item.id)).toContain(subtitleMatch.id);
+
+    const typoSearch = await ctx.http.get("/api/documentation/search").query({ q: "лицензща" }).set(auth(reader.token));
+    expect(typoSearch.status).toBe(200);
+    expect(typoSearch.body.map((item: { id: string }) => item.id)).toContain(descriptionMatch.id);
+  });
+
+  it("не отдаёт черновики и документы внутри чернового раздела", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0810031");
+    const uploader = await adminId();
+
+    const draft = await createDraftDocument(adminToken, {
+      title: "sekretnyydoc отдельный черновик",
+      fileAssetId: await createDocFileAsset(uploader, "draft.pdf").then((asset) => asset.id),
+    });
+
+    const parent = await createDraftDocument(adminToken, {
+      title: "Черновой раздел",
+      iconType: "category",
+      displayIcon: "FolderOpen",
+    });
+    const child = await createDraftDocument(adminToken, {
+      title: "sekretnyydoc внутри чернового раздела",
+      parentId: parent.id,
+      fileAssetId: await createDocFileAsset(uploader, "child.pdf").then((asset) => asset.id),
+    });
+    await publishDocument(adminToken, child.id);
+
+    const search = await ctx.http.get("/api/documentation/search").query({ q: "sekretnyydoc" }).set(auth(reader.token));
+    expect(search.status).toBe(200);
+    const ids = search.body.map((item: { id: string }) => item.id);
+    expect(ids).not.toContain(draft.id);
+    expect(ids).not.toContain(child.id);
+  });
+});
+
 describe("Documentation: download & roles", () => {
   it("download: 200 с файлом, 404 без файла, 404 для черновика обычному пользователю", async () => {
     const adminToken = await loginAdmin();
