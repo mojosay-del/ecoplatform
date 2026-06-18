@@ -6,8 +6,9 @@ import "../../styles/documentation.css";
 // Структурный близнец «Базы знаний», но документ — первоклассная сущность.
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { PanelRightOpen, Search, X } from "lucide-react";
+import { PanelRightOpen, X } from "lucide-react";
 import type { DocumentationNode } from "@ecoplatform/shared";
+import { AnimatedSearchPlaceholder } from "../../components/AnimatedSearchPlaceholder";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
 import { AccessClosed, AuthRequired, ErrorState, pluralizeRu, useApiQuery } from "../shared";
@@ -16,6 +17,15 @@ import { flattenDocuments } from "./doc-helpers";
 import { triggerDocumentDownload } from "./download";
 
 const SEARCH_DEBOUNCE_MS = 2000;
+const DOC_SEARCH_EXAMPLES = [
+  "Договор поставки",
+  "Акт приема",
+  "Спецификация",
+  "ТН",
+  "Акт сверки",
+  "Памятка",
+  "Канистра",
+];
 
 function findNode(nodes: DocumentationNode[], id: string | null): DocumentationNode | null {
   if (!id) return null;
@@ -163,13 +173,26 @@ export function DocumentationView() {
       ? (activeCategory.children ?? []).filter((child) => child.iconType !== "category")
       : topDocuments;
   const grid = format ? baseGrid.filter((node) => node.file?.format === format) : baseGrid;
+  const mobileTopbarAction = hasNavigation ? (
+    <button
+      className="icon-button doc-topbar-nav-trigger"
+      type="button"
+      onClick={() => setNavOpen(true)}
+      aria-controls="documentation-nav-drawer"
+      aria-expanded={navOpen}
+      aria-label="Открыть разделы документации"
+      title="Открыть разделы документации"
+    >
+      <PanelRightOpen size={20} aria-hidden="true" />
+    </button>
+  ) : null;
 
   if (state === "unauthenticated") return <AuthRequired title="Документация" />;
   if (state === "forbidden") return <AccessClosed title="Документация" />;
   if (state === "error") return <ErrorState title="Документация" message={errorMessage} />;
 
   return (
-    <AppShell>
+    <AppShell chrome={{ mobileTopbarAction }}>
       <section className="page doc-page">
         <header className="doc-header">
           <h1 className="doc-title">Документация</h1>
@@ -182,10 +205,7 @@ export function DocumentationView() {
               aria-label="Поиск по документам"
             />
             {!hasSearchDraft ? (
-              <span className="doc-search-placeholder" aria-hidden="true">
-                <Search size={22} />
-                <span>Например: договор поставки вторсырья</span>
-              </span>
+              <AnimatedSearchPlaceholder className="doc-search-placeholder" examples={DOC_SEARCH_EXAMPLES} />
             ) : null}
             {hasSearchDraft ? (
               <button className="doc-search-reset" type="button" aria-label="Сбросить поиск" onClick={resetSearch}>
@@ -203,20 +223,6 @@ export function DocumentationView() {
         ) : (
           <>
             <EssentialsStrip items={pinned.data} onDownload={onDownload} />
-            {hasNavigation ? (
-              <div className="doc-mobile-tools">
-                <button
-                  className="doc-mobile-nav-trigger"
-                  type="button"
-                  onClick={() => setNavOpen(true)}
-                  aria-controls="documentation-nav-drawer"
-                  aria-expanded={navOpen}
-                >
-                  <PanelRightOpen size={17} aria-hidden="true" />
-                  <span>Разделы</span>
-                </button>
-              </div>
-            ) : null}
             <FormatFilter formats={formats} active={format} onChange={setFormat} />
             <div className="doc-workspace">
               <aside className="doc-nav-panel" aria-label="Навигация по документации">

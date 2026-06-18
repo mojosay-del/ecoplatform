@@ -23,12 +23,13 @@ import {
   type PreviewRequestOptions,
 } from "./endpoint-utils";
 
-type NewsListInput = PaginationInput & { tags?: string[] };
+type NewsListInput = PaginationInput & { q?: string; tags?: string[] };
 
 function newsListSuffix(input: NewsListInput = {}) {
   const query = new URLSearchParams();
   if (input.limit !== undefined) query.set("limit", String(input.limit));
   if (input.offset !== undefined) query.set("offset", String(input.offset));
+  if (input.q?.trim()) query.set("q", input.q.trim());
   input.tags?.forEach((tag) => query.append("tags[]", tag));
   return query.toString() ? `?${query.toString()}` : "";
 }

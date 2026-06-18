@@ -7,8 +7,9 @@ import "../../styles/forum.css";
 
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { Check, ChevronDown, X } from "lucide-react";
 import type { ForumPinnedNews, ForumQuestionListItem, ForumSummary, ForumTaxonomy } from "@ecoplatform/shared";
+import { AnimatedSearchPlaceholder } from "../../components/AnimatedSearchPlaceholder";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -26,6 +27,14 @@ const SORTS: { value: ForumSort; label: string }[] = [
 ];
 
 const SEARCH_DEBOUNCE_MS = 2000;
+const FORUM_SEARCH_EXAMPLES = [
+  "Какое масло выбрать",
+  "Хороший пресс",
+  "Какой погрузчик выбрать",
+  "Оптимизация склада",
+  "Новый закон",
+  "Нужна помощь",
+];
 const EMPTY_TAXONOMY: ForumTaxonomy = { rawMaterials: [], questionTypes: [] };
 const EMPTY_SUMMARY: ForumSummary = {
   solvedQuestionsCount: 0,
@@ -249,10 +258,7 @@ export function ForumListView() {
               aria-label="Поиск по форуму"
             />
             {!hasSearchDraft ? (
-              <span className="forum-search__placeholder" aria-hidden="true">
-                <Search size={22} />
-                <span>Например: документы на перевозку макулатуры</span>
-              </span>
+              <AnimatedSearchPlaceholder className="forum-search__placeholder" examples={FORUM_SEARCH_EXAMPLES} />
             ) : null}
             {hasSearchDraft ? (
               <button className="forum-search__reset" type="button" aria-label="Сбросить поиск" onClick={resetSearch}>

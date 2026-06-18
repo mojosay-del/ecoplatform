@@ -9,7 +9,7 @@ import type { NomenclatureListItem, PaginatedResponse } from "@ecoplatform/share
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
 import { getIndexMarketPulse } from "../index-movement-summary";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
+import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
 import { formatIndexUpdatedDate } from "./format";
 import { IndexCard } from "./IndexCard";
 import { IndexMarketPulse } from "./IndexMarketPulse";
@@ -49,7 +49,8 @@ export function IndicesView() {
     <AppShell>
       <section className="page">
         <div className="indices-header">
-          <PageHeader title="Индексы цен на вторсырьё" subtitle="Актуальные ценовые индексы по основным видам сырья." />
+          <h1 className="indices-title">Индексы цен на вторсырьё</h1>
+          <p className="indices-subtitle">Актуальные ценовые индексы по основным видам сырья.</p>
           {lastUpdated ? (
             <span className="indices-updated-pill">
               <svg className="indices-updated-icon" width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">

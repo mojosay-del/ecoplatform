@@ -58,9 +58,9 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
     return <div className="index-chart-empty">Нет данных для графика</div>;
   }
 
-  const width = 720;
-  const height = 260;
-  const padding = { top: 40, right: 36, bottom: 42, left: 36 };
+  const width = 760;
+  const height = 300;
+  const padding = { top: 56, right: 20, bottom: 46, left: 20 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
 
@@ -155,9 +155,9 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
 
   // Ширина плашки масштабируем под содержимое: «20 мая · 31 635».
   const tooltipText = `${activeDateLabel} · ${formatIndexPrice(activePrice)}`;
-  const tooltipWidth = Math.max(82, tooltipText.length * 7 + 20);
+  const tooltipWidth = Math.max(138, tooltipText.length * 8.4 + 34);
   const tooltipX = Math.min(Math.max(activeX, tooltipWidth / 2 + 6), width - tooltipWidth / 2 - 6);
-  const tooltipY = Math.max(activeY - 24, padding.top + 2);
+  const tooltipY = Math.max(activeY - 34, padding.top + 7);
   const isHoveringChart = hoverIndex !== null;
 
   return (
@@ -209,8 +209,24 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
 
         {/* Метка активной точки: без hover показывает последнее значение. */}
         <g transform={`translate(${tooltipX}, ${tooltipY})`}>
-          <rect x={-tooltipWidth / 2} y="-23" width={tooltipWidth} height="28" rx="14" fill="#1a202e" />
-          <text x="0" y="-5" textAnchor="middle" fontSize="13" fontWeight="700" fill="white">
+          <rect
+            className="index-chart-tooltip-bg"
+            x={-tooltipWidth / 2}
+            y="-31"
+            width={tooltipWidth}
+            height="38"
+            rx="19"
+            fill="#1a202e"
+          />
+          <text
+            className="index-chart-tooltip-text"
+            x="0"
+            y="-9"
+            textAnchor="middle"
+            fontSize="15.5"
+            fontWeight="700"
+            fill="white"
+          >
             {tooltipText}
           </text>
         </g>
@@ -220,7 +236,15 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
           // половина первой/последней даты уходит за границу SVG и обрезается.
           const anchor = i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle";
           return (
-            <text key={i} x={label.x} y={height - 12} textAnchor={anchor} fontSize="13" fill="var(--muted)">
+            <text
+              className="index-chart-axis-label"
+              key={i}
+              x={label.x}
+              y={height - 12}
+              textAnchor={anchor}
+              fontSize="13"
+              fill="var(--muted)"
+            >
               {label.text}
             </text>
           );

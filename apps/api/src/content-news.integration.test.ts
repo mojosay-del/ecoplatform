@@ -5,6 +5,20 @@ const ctx = setupIntegrationContext();
 const { loginAdmin, loginContentManager, registerCompany, createPublishedNewsWithComment, createCoverAsset } = ctx;
 
 describe("Content lifecycle: news", () => {
+  it("публичный поиск новостей находит публикации по тегу", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800102");
+    const marketNews = await ctx.createPublishedNews(adminToken, "public-search-market", ["рынок"]);
+    const otherNews = await ctx.createPublishedNews(adminToken, "public-search-other", ["экспорт"]);
+
+    const response = await ctx.http.get("/api/news?q=рынок").set("Authorization", `Bearer ${reader.token}`);
+
+    expect(response.status).toBe(200);
+    const ids = response.body.items.map((item: { id: string }) => item.id);
+    expect(ids).toContain(marketNews.id);
+    expect(ids).not.toContain(otherNews.id);
+  });
+
   it("delete новости полностью удаляет её и связанные данные", async () => {
     const adminToken = await loginAdmin();
     const contentManagerToken = await loginContentManager();

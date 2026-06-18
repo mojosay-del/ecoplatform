@@ -27,6 +27,7 @@ export class ContentNewsController {
       limit: input.limit,
       offset: input.offset,
       page: input.page,
+      q: input.q,
       take: input.take,
       tags: parseStringArrayQuery(input.tags, input["tags[]"]),
     });

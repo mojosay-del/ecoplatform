@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type FormEvent } from "react";
 import { Flag, MessageCircleOff } from "lucide-react";
 import type { NewsCommentDecorated } from "@ecoplatform/shared";
 import {
@@ -52,6 +52,15 @@ export function CommentsSection({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submitIconRef = useRef<AnimatedNavIconHandle | null>(null);
   const submitIconPlayback = useAnimatedNavIconPlayback(submitIconRef);
+  const syncTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(textarea.scrollHeight, COMMENT_TEXTAREA_MAX_HEIGHT);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > COMMENT_TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
+  }, []);
 
   useEffect(() => {
     const list = listRef.current;
@@ -60,14 +69,31 @@ export function CommentsSection({
   }, [orderedComments]);
 
   useLayoutEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+    syncTextareaHeight();
+  }, [commentText, syncTextareaHeight]);
 
-    textarea.style.height = "auto";
-    const nextHeight = Math.min(textarea.scrollHeight, COMMENT_TEXTAREA_MAX_HEIGHT);
-    textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY = textarea.scrollHeight > COMMENT_TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
-  }, [commentText]);
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return undefined;
+
+    const parent = textarea.parentElement;
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            syncTextareaHeight();
+          });
+
+    observer?.observe(textarea);
+    if (parent) observer?.observe(parent);
+    window.addEventListener("resize", syncTextareaHeight);
+    syncTextareaHeight();
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", syncTextareaHeight);
+    };
+  }, [syncTextareaHeight]);
 
   return (
     <section className="comments-section" aria-labelledby="comments-title">

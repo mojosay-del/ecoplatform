@@ -299,6 +299,10 @@
   font-size: 14px;
 }
 
+.index-movement-mobile-list {
+  display: none;
+}
+
 .index-card {
   container-type: inline-size;
   display: grid;
@@ -329,10 +333,18 @@
 }
 
 .index-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.index-card-title-line {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 8px;
   min-width: 0;
 }
 
@@ -428,15 +440,25 @@
   }
 }
 
+.index-card-price-line {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 10px;
+  min-width: 0;
+}
+
 .index-current-price {
-  display: grid;
-  justify-items: end;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-end;
   flex: 0 0 auto;
   gap: 3px;
+  min-width: 0;
 }
 
 .index-current-price strong {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1.05;
@@ -444,35 +466,52 @@
 }
 
 .index-current-unit {
+  align-self: flex-start;
+  margin-top: 2px;
   font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
   color: var(--muted);
 }
 
 .index-card-foot {
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  justify-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .index-card-periods.index-period-tabs {
-  margin: 0;
+  margin-inline: auto;
+  justify-self: center;
 }
 
 .index-card-updated {
   font-size: 11px;
   color: var(--text-subtle);
+  text-align: center;
   white-space: nowrap;
 }
 
 .index-card-body {
   display: grid;
   gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.index-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   min-width: 0;
 }
 
 .index-card-title {
+  flex: 0 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: 20px;
   font-weight: 700;
@@ -484,14 +523,14 @@
 .index-chart-wrap {
   min-width: 0;
   width: 100%;
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   overflow: hidden;
 }
 
 .index-chart {
   width: 100%;
   height: auto;
-  aspect-ratio: 720 / 260;
+  aspect-ratio: 760 / 300;
   display: block;
   /* Палец читает график; вертикальный скролл страницы остаётся за браузером. */
   touch-action: pan-y;
@@ -567,13 +606,33 @@
   color: var(--muted);
 }
 
-/* Шапка раздела: заголовок слева, плашка «обновлено …» справа. */
 .indices-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 680px);
+  max-width: 680px;
+  margin: 0 auto 24px;
+  text-align: center;
+}
+
+.indices-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 36px;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.indices-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .indices-updated-pill {
@@ -581,7 +640,6 @@
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
-  margin-top: 4px;
   padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-chip);
@@ -733,12 +791,32 @@
 }
 
 @media (max-width: 720px) {
+  .indices-header {
+    gap: 9px;
+    margin-bottom: 20px;
+  }
+  .indices-title {
+    font-size: 30px;
+    line-height: 1.1;
+  }
+  .indices-subtitle {
+    font-size: 14px;
+    line-height: 1.45;
+  }
   .index-movement-summary {
-    padding: 16px 14px;
+    display: none;
   }
   .index-movement-head {
     display: grid;
-    gap: 12px;
+    gap: 10px;
+  }
+  .index-movement-title h2 {
+    font-size: 24px;
+    line-height: 1.14;
+  }
+  .index-movement-title span {
+    margin-top: 3px;
+    font-size: 11.5px;
   }
   .index-movement-periods {
     width: 100%;
@@ -746,48 +824,69 @@
   }
   .index-period-popover-trigger {
     width: 100%;
+    min-height: 42px;
+    font-size: 12.5px;
   }
   .index-period-popover-menu {
     right: auto;
     left: 0;
     width: min(100%, 180px);
   }
-  .index-movement-table {
+  .index-movement-table-wrap {
+    display: none;
+  }
+  .index-movement-mobile-list {
+    display: grid;
+    gap: 8px;
+  }
+  .index-movement-mobile-card {
+    display: grid;
+    gap: 8px;
     min-width: 0;
-    table-layout: auto;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
   }
-  .index-movement-table thead {
-    display: none;
+  .index-movement-mobile-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
   }
-  .index-movement-table tbody {
-    display: grid;
-    gap: 10px;
-  }
-  .index-movement-table tr {
-    display: grid;
-    gap: 6px;
-    padding-top: 12px;
-    border-top: 1px solid var(--line);
-  }
-  .index-movement-table th,
-  .index-movement-table td {
-    padding: 0;
-    border-top: 0;
-  }
-  /* На карточном мобильном виде спарклайн (3-я колонка) скрываем — числа рядом
-     несут те же данные. */
-  .index-movement-table th:nth-child(3),
-  .index-movement-table td:nth-child(3) {
-    display: none;
-  }
-  .index-movement-table td:nth-child(4)::before,
-  .index-movement-table td:nth-child(5)::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: 2px;
-    color: var(--muted);
+  .index-movement-mobile-head .index-trend-chip {
+    flex: 0 0 auto;
+    gap: 4px;
+    padding: 3px 8px;
     font-size: 11px;
+  }
+  .index-movement-mobile-head .index-movement-link {
+    min-width: 0;
+    font-size: 16px;
+    line-height: 1.18;
+    overflow-wrap: anywhere;
+  }
+  .index-movement-mobile-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .index-movement-mobile-metric {
+    min-width: 0;
+  }
+  .index-movement-mobile-label {
+    display: block;
+    margin-bottom: 1px;
+    color: var(--muted);
+    font-size: 10.5px;
     font-weight: 700;
+  }
+  .index-movement-mobile-metric strong {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 16.5px;
+    line-height: 1.12;
   }
   .indices-grid {
     grid-template-columns: 1fr;
@@ -797,11 +896,97 @@
     padding: 20px 18px 14px;
   }
   .index-card-head {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-items: flex-start;
+    gap: 10px;
+  }
+  .index-card-title-line {
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+  }
+  .index-card-title-line .index-delta {
+    margin-left: auto;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .index-card-title {
+    font-size: 20px;
+    line-height: 1.12;
+  }
+  .index-card-updated {
+    font-size: 11.5px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .index-card-code {
+    display: none;
+  }
+  .index-card-price-line {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
   }
   .index-current-price {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: baseline;
+    gap: 2px 7px;
+    width: auto;
     text-align: left;
+  }
+  .index-current-price strong {
+    flex: 0 1 auto;
+    font-size: clamp(30px, 8vw, 34px);
+    line-height: 1;
+  }
+  .index-current-unit {
+    flex: 0 0 auto;
+    font-size: 13px;
+    line-height: 1.1;
+  }
+  .index-current-price .index-delta {
+    flex: 0 0 auto;
+    max-width: 100%;
+    margin-top: 0;
+    margin-left: auto;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .index-chart-wrap {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 0;
+  }
+  .index-chart {
+    width: min(100%, 340px);
+    margin-inline: auto;
+  }
+  .index-chart-tooltip-text {
+    font-size: 15px;
+  }
+  .index-chart-axis-label {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .index-card-foot {
+    justify-content: center;
+    width: 100%;
+  }
+  .index-card-periods.index-period-tabs {
+    width: 100%;
+    justify-content: center;
+    gap: 6px;
+    margin-inline: auto;
+  }
+  .index-card .index-period-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 6px;
+    text-align: center;
   }
   .index-chart-empty {
     min-height: 240px;

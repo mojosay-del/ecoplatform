@@ -223,7 +223,7 @@ export function AsideProfile({
         </Link>
       </div>
 
-      <div className="card">
+      <div className="card forum-related-card">
         <h4>Связанные разделы</h4>
         <div className="forum-links">
           <Link href="/news">

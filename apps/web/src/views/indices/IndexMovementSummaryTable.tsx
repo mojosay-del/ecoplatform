@@ -53,60 +53,93 @@ export function IndexMovementSummaryTable({ items }: { items: NomenclatureListIt
       {rows.length === 0 ? (
         <p className="index-movement-empty">За выбранный период нет заметного роста или снижения.</p>
       ) : (
-        <div className="index-movement-table-wrap">
-          <table className="index-movement-table">
-            <colgroup>
-              <col className="index-movement-col-kind" />
-              <col className="index-movement-col-name" />
-              <col className="index-movement-col-spark" />
-              <col className="index-movement-col-price" />
-              <col className="index-movement-col-change" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">Динамика</th>
-                <th scope="col">Индекс</th>
-                <th scope="col">График</th>
-                <th scope="col">Цена</th>
-                <th scope="col">Изменение</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const dir = KIND_DIRECTION[row.kind];
+        <>
+          <div className="index-movement-table-wrap">
+            <table className="index-movement-table">
+              <colgroup>
+                <col className="index-movement-col-kind" />
+                <col className="index-movement-col-name" />
+                <col className="index-movement-col-spark" />
+                <col className="index-movement-col-price" />
+                <col className="index-movement-col-change" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">Динамика</th>
+                  <th scope="col">Индекс</th>
+                  <th scope="col">График</th>
+                  <th scope="col">Цена</th>
+                  <th scope="col">Изменение</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const dir = KIND_DIRECTION[row.kind];
 
-                return (
-                  <tr key={`${row.kind}-${row.item.id}`}>
-                    <td>
-                      <TrendChip direction={dir} />
-                    </td>
-                    <td>
-                      <a className="index-movement-link" href={`#${getIndexAnchorId(row.item.id)}`}>
-                        {row.item.name}
-                      </a>
-                    </td>
-                    <td className="index-movement-spark">
-                      <IndexSparkline
-                        points={pickRecentSeries(row.item.chart)}
-                        direction={dir}
-                        width={88}
-                        height={28}
-                      />
-                    </td>
-                    <td data-label="Цена" className="index-num">
-                      {formatIndexPrice(row.currentPrice)} {row.item.unit ?? "₽/т"}
-                    </td>
-                    <td data-label="Изменение">
+                  return (
+                    <tr key={`${row.kind}-${row.item.id}`}>
+                      <td>
+                        <TrendChip direction={dir} />
+                      </td>
+                      <td>
+                        <a className="index-movement-link" href={`#${getIndexAnchorId(row.item.id)}`}>
+                          {row.item.name}
+                        </a>
+                      </td>
+                      <td className="index-movement-spark">
+                        <IndexSparkline
+                          points={pickRecentSeries(row.item.chart)}
+                          direction={dir}
+                          width={88}
+                          height={28}
+                        />
+                      </td>
+                      <td data-label="Цена" className="index-num">
+                        {formatIndexPrice(row.currentPrice)} {row.item.unit ?? "₽/т"}
+                      </td>
+                      <td data-label="Изменение">
+                        <strong className={`index-movement-change ${dir} index-num`}>
+                          {formatIndexMovementChange(row.change)}
+                        </strong>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="index-movement-mobile-list" aria-label="Движение индексов">
+            {rows.map((row) => {
+              const dir = KIND_DIRECTION[row.kind];
+
+              return (
+                <article className="index-movement-mobile-card" key={`mobile-${row.kind}-${row.item.id}`}>
+                  <div className="index-movement-mobile-head">
+                    <TrendChip direction={dir} />
+                    <a className="index-movement-link" href={`#${getIndexAnchorId(row.item.id)}`}>
+                      {row.item.name}
+                    </a>
+                  </div>
+                  <div className="index-movement-mobile-metrics">
+                    <div className="index-movement-mobile-metric">
+                      <span className="index-movement-mobile-label">Цена</span>
+                      <strong className="index-num">
+                        {formatIndexPrice(row.currentPrice)} {row.item.unit ?? "₽/т"}
+                      </strong>
+                    </div>
+                    <div className="index-movement-mobile-metric">
+                      <span className="index-movement-mobile-label">Изменение</span>
                       <strong className={`index-movement-change ${dir} index-num`}>
                         {formatIndexMovementChange(row.change)}
                       </strong>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </>
       )}
     </section>
   );

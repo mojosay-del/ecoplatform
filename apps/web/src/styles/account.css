@@ -601,10 +601,47 @@ body.account-password-modal-open {
     grid-column: span 1;
   }
 
-  .account-detail-row,
   .account-notification-head,
   .account-notification-row {
     grid-template-columns: 1fr;
+  }
+
+  .account-detail-row {
+    grid-template-columns: minmax(96px, 0.42fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    padding: 9px 0;
+  }
+
+  .account-detail-row dt {
+    font-size: 12.5px;
+    line-height: 1.25;
+  }
+
+  .account-detail-row dd {
+    font-size: 13.5px;
+    line-height: 1.3;
+  }
+
+  .account-editable-value {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .account-gender-trigger {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    padding: 0 10px 0 12px;
+    font-size: 13.5px;
+  }
+
+  .account-gender-menu {
+    right: 0;
+    left: auto;
+    min-width: min(210px, 100%);
   }
 
   .account-card-head,
@@ -821,6 +858,7 @@ body.account-password-modal-open {
 .account-welcome-tag {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   height: 26px;
   padding: 0 11px;
@@ -829,6 +867,7 @@ body.account-password-modal-open {
   border: 1px solid rgb(var(--white-rgb) / 0.32);
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
 }
 
 .account-welcome-dot {
@@ -943,6 +982,11 @@ body.account-password-modal-open {
   overflow-wrap: anywhere;
 }
 
+.account-stat-value-single {
+  font-size: 18px;
+  line-height: 1.15;
+}
+
 .account-stat-label {
   margin-top: 4px;
   font-size: 12.5px;
@@ -964,6 +1008,105 @@ body.account-password-modal-open {
 .account-stat:hover .account-stat-arrow {
   opacity: 1;
   transform: translateX(2px);
+}
+
+.account-gender-modal {
+  width: min(430px, 100%);
+}
+
+.account-gender-modal-body {
+  display: grid;
+  gap: 18px;
+  padding: 18px 24px 24px;
+}
+
+.account-gender-modal-options {
+  display: grid;
+  gap: 8px;
+}
+
+.account-gender-modal-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.account-gender-modal-option:hover,
+.account-gender-modal-option:focus-visible,
+.account-gender-modal-option.is-selected {
+  border-color: var(--primary);
+  background: rgb(var(--brand-rgb) / 0.09);
+  color: var(--primary);
+}
+
+.account-gender-modal-option:focus-visible,
+.account-gender-modal-action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.account-gender-modal-option:disabled,
+.account-gender-modal-action:disabled {
+  cursor: progress;
+  opacity: 0.66;
+}
+
+.account-gender-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.account-gender-modal-action {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.account-gender-modal-action:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.account-gender-modal-action.is-save {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--white);
+}
+
+.account-gender-modal-action.is-save:hover {
+  background: var(--primary-hover);
+  color: var(--white);
 }
 
 /* Текущий план — компактная плашка */
@@ -1436,9 +1579,28 @@ body.account-password-modal-open {
 
 @media (max-width: 720px) {
   .account-welcome {
-    grid-template-columns: 1fr;
-    text-align: center;
-    justify-items: center;
+    grid-template-columns: 56px minmax(0, 1fr) 54px;
+    gap: 10px;
+    align-items: center;
+    padding: 14px;
+    text-align: left;
+    justify-items: start;
+  }
+
+  .account-avatar-edit {
+    align-items: flex-start;
+  }
+
+  .account-welcome-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    font-size: 22px;
+  }
+
+  .account-avatar-badge {
+    width: 22px;
+    height: 22px;
   }
 
   .account-welcome-info {
@@ -1446,18 +1608,101 @@ body.account-password-modal-open {
     max-width: 100%;
   }
 
+  .account-welcome-hi {
+    font-size: 12px;
+  }
+
   .account-welcome-name {
     max-width: 100%;
-    margin-inline: auto;
+    margin: 1px 0 5px;
     overflow-wrap: anywhere;
-    text-align: center;
+    font-size: 22px;
+    text-align: left;
   }
 
   .account-welcome-tags {
+    flex-wrap: nowrap;
+    gap: 4px;
+    justify-content: flex-start;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .account-welcome-tag {
+    flex: 0 1 auto;
+    min-width: 0;
+    min-height: 21px;
+    height: auto;
+    padding: 0 7px;
+    font-size: 10.5px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     justify-content: center;
+    text-align: center;
+  }
+
+  .account-welcome-tag:first-child {
+    max-width: min(122px, 52vw);
   }
 
   .account-welcome-ring {
-    order: -1;
+    justify-self: end;
+    gap: 0;
+  }
+
+  .account-welcome-ring svg {
+    width: 54px;
+    height: 54px;
+  }
+
+  .account-welcome-ring-label {
+    display: none;
+  }
+
+  .account-scroll-section .account-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .account-scroll-section .account-stat {
+    min-height: 92px;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 4px;
+    border-radius: 14px;
+    text-align: center;
+  }
+
+  .account-stat-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 6px;
+    border-radius: 10px;
+  }
+
+  .account-stat-value {
+    width: 100%;
+    font-size: 13px;
+    line-height: 1.12;
+    text-align: center;
+  }
+
+  .account-stat-value-single {
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .account-stat-label {
+    width: 100%;
+    margin-top: 3px;
+    font-size: 10.5px;
+    line-height: 1.15;
+    text-align: center;
+  }
+
+  .account-stat-arrow {
+    display: none;
   }
 }

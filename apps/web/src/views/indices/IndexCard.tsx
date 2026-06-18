@@ -7,7 +7,7 @@ import { formatIndexPrice, formatIndexUpdatedDate } from "./format";
 import { IndexChart } from "./IndexChart";
 import { IndexPeriodTabs } from "./IndexPeriodTabs";
 import { trendFromSummary } from "./trend";
-import { TrendArrow, TrendChip } from "./TrendChip";
+import { TrendArrow } from "./TrendChip";
 import type { IndexPeriod } from "./types";
 
 export function IndexCard({ item }: { item: NomenclatureListItem }) {
@@ -48,28 +48,28 @@ export function IndexCard({ item }: { item: NomenclatureListItem }) {
   // «стагнации» давало серый чип «Без изменений» рядом с красной дельтой.
   const trend = trendFromSummary(item.summary?.trend);
   const updatedLabel = item.summary?.currentDate ? formatIndexUpdatedDate(item.summary.currentDate) : "";
+  const weeklyDelta = hasWeekly ? (
+    <span className={`index-delta ${trend} index-num`}>
+      <TrendArrow direction={trend} />
+      {formatIndexMovementChange(weeklyChangeRaw)} за нед.
+    </span>
+  ) : (
+    <span className="index-delta flat">— за нед.</span>
+  );
 
   return (
     <article className="index-card" id={getIndexAnchorId(item.id)}>
       <div className="index-card-head">
-        <div className="index-card-body">
+        <div className="index-card-title-line">
           <h2 className="index-card-title">{item.name}</h2>
-          <div className="index-card-tags">
-            <span className="index-card-code">{item.code}</span>
-            <TrendChip direction={trend} />
-          </div>
+          <span className="index-card-code">{item.code}</span>
+          {weeklyDelta}
         </div>
-        <div className="index-current-price">
-          <strong className="index-num">{formatIndexPrice(currentPrice)}</strong>
-          <span className="index-current-unit">{item.unit ?? "₽/т"}</span>
-          {hasWeekly ? (
-            <span className={`index-delta ${trend} index-num`}>
-              <TrendArrow direction={trend} />
-              {formatIndexMovementChange(weeklyChangeRaw)} за нед.
-            </span>
-          ) : (
-            <span className="index-delta flat">— за нед.</span>
-          )}
+        <div className="index-card-price-line">
+          <div className="index-current-price">
+            <strong className="index-num">{formatIndexPrice(currentPrice)}</strong>
+            <span className="index-current-unit">{item.unit ?? "₽/т"}</span>
+          </div>
         </div>
       </div>
 

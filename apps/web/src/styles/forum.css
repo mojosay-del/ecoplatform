@@ -1226,6 +1226,38 @@ section.forum-page .forum-expert-rank {
     height: 34px;
     flex-basis: 34px;
   }
+  .forum-aside {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .forum-profile-card {
+    grid-column: 1 / -1;
+  }
+  .forum-related-card,
+  .forum-experts-card {
+    min-width: 0;
+    padding: 12px;
+  }
+  .forum-related-card h4,
+  .forum-experts-card h4 {
+    margin-bottom: 8px;
+    font-size: 11px;
+  }
+  .forum-links a {
+    align-items: flex-start;
+    gap: 8px;
+    min-height: 44px;
+    padding: 9px 0;
+  }
+  .forum-links .sub {
+    margin-left: 0;
+  }
+  .forum-expert-row {
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    gap: 8px;
+    min-height: 44px;
+  }
   .forum-inline-composer {
     align-items: stretch;
     flex-direction: column;
@@ -1248,5 +1280,11 @@ section.forum-page .forum-expert-rank {
   }
   .forum-stat-grid {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 360px) {
+  .forum-aside {
+    grid-template-columns: 1fr;
   }
 }

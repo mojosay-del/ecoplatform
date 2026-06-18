@@ -20,6 +20,7 @@ const stringArrayQueryValueSchema = z.union([z.string(), z.array(z.string())]);
 const lessonCoverSubtitleSchema = z.string().trim().max(120).nullable().optional();
 
 export const newsListQuerySchema = paginationQuerySchema(100).extend({
+  q: z.string().trim().max(120).optional(),
   tags: stringArrayQueryValueSchema.optional(),
   "tags[]": stringArrayQueryValueSchema.optional(),
 });

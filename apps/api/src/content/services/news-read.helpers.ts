@@ -29,22 +29,30 @@ type AudioAttachment = {
 export async function listPublishedNews(
   { prisma, common }: NewsReadDeps,
   user: RequestUser,
-  paginationInput: PaginationInput & { tags?: string[] } = {},
+  paginationInput: PaginationInput & { q?: string; tags?: string[] } = {},
 ) {
   common.assertFunctionalAccess(user);
 
   const pagination = resolvePagination(paginationInput, { defaultLimit: 20, maxLimit: 100 });
   const tagFilters = normaliseTagFilters(paginationInput.tags);
+  const search = paginationInput.q?.trim();
+  const andFilters: Prisma.NewsPostWhereInput[] = tagFilters.map((name) => ({
+    tags: { some: { newsTag: { name } } },
+  }));
+
+  if (search) {
+    andFilters.push({
+      OR: [
+        { title: { contains: search, mode: "insensitive" } },
+        { lead: { contains: search, mode: "insensitive" } },
+        { tags: { some: { newsTag: { name: { contains: search, mode: "insensitive" } } } } },
+      ],
+    });
+  }
 
   const where: Prisma.NewsPostWhereInput = {
     status: ContentStatus.published,
-    ...(tagFilters.length > 0
-      ? {
-          AND: tagFilters.map((name) => ({
-            tags: { some: { newsTag: { name } } },
-          })),
-        }
-      : {}),
+    ...(andFilters.length > 0 ? { AND: andFilters } : {}),
   };
 
   const [total, posts] = await prisma.$transaction([

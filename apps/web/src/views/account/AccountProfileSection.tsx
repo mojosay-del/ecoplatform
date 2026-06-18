@@ -1,9 +1,14 @@
-import { ArrowRight, Bell, CreditCard, FileText, Smartphone } from "lucide-react";
+import { useRef } from "react";
 import type { BillingStatus } from "@ecoplatform/shared";
+import type { NavIconKey } from "../../components/app-shell-nav";
+import {
+  AnimatedNavIcon,
+  type AnimatedNavIconHandle,
+  useAnimatedNavIconPlayback,
+} from "../../components/app-shell/nav-icons";
 import type { User } from "../../lib/auth";
-import { COMPANY_STATUS_LABELS, COMPANY_TYPE_LABELS, PLATFORM_ROLE_LABELS } from "../../lib/display-labels";
+import { COMPANY_TYPE_LABELS, PLATFORM_ROLE_LABELS } from "../../lib/display-labels";
 import { AccountAvatarEditor } from "./AccountAvatarEditor";
-import { describeSubscription } from "./format";
 import { AccountDetailList, AccountPasswordValue, AccountScrollSection } from "./shared";
 import { CompanyProfileForm } from "./CompanyProfileForm";
 import { AccountContactValue, AccountGenderValue, AccountNameValue } from "./PersonalProfileFields";
@@ -20,7 +25,6 @@ export function AccountProfileSection({
   onOpenSessions,
   onOpenSubscription,
   onProfileSaved,
-  sessionsCount,
   user,
 }: {
   billing: BillingStatus | null;
@@ -37,8 +41,6 @@ export function AccountProfileSection({
   sessionsCount: number;
   user: User | null;
 }) {
-  const subscription = describeSubscription(billing);
-  const companyStatusLabel = billing?.status ? (COMPANY_STATUS_LABELS[billing.status] ?? billing.status) : null;
   const fullName = user ? `${user.firstName} ${user.lastName}` : "Не авторизован";
   const company = billing;
   const profileChecks: Array<{ label: string; done: boolean }> = [
@@ -84,7 +86,6 @@ export function AccountProfileSection({
                 {company?.type ? (
                   <span className="account-welcome-tag">{COMPANY_TYPE_LABELS[company.type] ?? company.type}</span>
                 ) : null}
-                {companyStatusLabel ? <span className="account-welcome-tag">{companyStatusLabel}</span> : null}
               </>
             )}
           </div>
@@ -139,38 +140,30 @@ export function AccountProfileSection({
 
       {!isPlatformStaff ? (
         <div className="account-stats">
-          <button className="account-stat" type="button" onClick={onOpenSubscription}>
-            <span className="account-stat-icon account-stat-warn">
-              <CreditCard size={20} />
-            </span>
-            <span className="account-stat-value">{subscription.tariff}</span>
-            <span className="account-stat-label">Подписка</span>
-            <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
-          </button>
-          <button className="account-stat" type="button" onClick={onOpenPayment}>
-            <span className="account-stat-icon account-stat-brand">
-              <FileText size={20} />
-            </span>
-            <span className="account-stat-value">Платежные данные</span>
-            <span className="account-stat-label">Оплата и документы</span>
-            <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
-          </button>
-          <button className="account-stat" type="button" onClick={onOpenSessions}>
-            <span className="account-stat-icon account-stat-info">
-              <Smartphone size={20} />
-            </span>
-            <span className="account-stat-value">{sessionsCount}</span>
-            <span className="account-stat-label">Активные сессии</span>
-            <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
-          </button>
-          <button className="account-stat" type="button" onClick={onOpenNotifications}>
-            <span className="account-stat-icon account-stat-green">
-              <Bell size={20} />
-            </span>
-            <span className="account-stat-value">Вкл</span>
-            <span className="account-stat-label">Уведомления</span>
-            <ArrowRight className="account-stat-arrow" size={16} aria-hidden="true" />
-          </button>
+          <AccountStatButton
+            iconClassName="account-stat-warn"
+            iconName="subscription"
+            label="Подписка"
+            onClick={onOpenSubscription}
+          />
+          <AccountStatButton
+            iconClassName="account-stat-brand"
+            iconName="docs"
+            label="Оплата"
+            onClick={onOpenPayment}
+          />
+          <AccountStatButton
+            iconClassName="account-stat-info"
+            iconName="sessions"
+            label="Сессии"
+            onClick={onOpenSessions}
+          />
+          <AccountStatButton
+            iconClassName="account-stat-green"
+            iconName="notifications"
+            label="Уведомления"
+            onClick={onOpenNotifications}
+          />
         </div>
       ) : null}
 
@@ -211,5 +204,29 @@ export function AccountProfileSection({
         ) : null}
       </div>
     </AccountScrollSection>
+  );
+}
+
+function AccountStatButton({
+  iconClassName,
+  iconName,
+  label,
+  onClick,
+}: {
+  iconClassName: string;
+  iconName: NavIconKey;
+  label: string;
+  onClick: () => void;
+}) {
+  const iconRef = useRef<AnimatedNavIconHandle | null>(null);
+  const iconPlayback = useAnimatedNavIconPlayback(iconRef);
+
+  return (
+    <button className="account-stat" type="button" onClick={onClick} {...iconPlayback}>
+      <span className={`account-stat-icon ${iconClassName}`}>
+        <AnimatedNavIcon name={iconName} ref={iconRef} size={24} />
+      </span>
+      <span className="account-stat-value account-stat-value-single">{label}</span>
+    </button>
   );
 }

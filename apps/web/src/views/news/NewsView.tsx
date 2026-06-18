@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { NewsPostDetail, NewsTagSummary } from "@ecoplatform/shared";
+import { X } from "lucide-react";
+import type { NewsPostDetail } from "@ecoplatform/shared";
+import { AnimatedSearchPlaceholder } from "../../components/AnimatedSearchPlaceholder";
 import { AppShell } from "../../components/AppShell";
 import { NewsOnboardingCard } from "../../components/NewsOnboardingCard";
 import { NEWS_ONBOARDING_STORAGE_KEY, shouldShowNewsOnboarding } from "../../components/news-onboarding-state";
@@ -10,23 +12,27 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useCoverAssets, useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
-import { AccessClosed, AuthRequired, ErrorState, getNewsFeedSnapshot, useApiQuery } from "../shared";
-import {
-  NEWS_ALL_TAG_LIMIT,
-  addNewsTagSelection,
-  buildNewsUrl,
-  normaliseNewsTagSelection,
-  toggleNewsTagSelection,
-} from "../news-tag-filters";
+import { AccessClosed, AuthRequired, ErrorState, getNewsFeedSnapshot } from "../shared";
+import { addNewsTagSelection, buildNewsUrl, normaliseNewsTagSelection } from "../news-tag-filters";
 import { NEWS_PAGE_SIZE } from "./constants";
 import { NewsCard, NewsCardSkeleton } from "./NewsCard";
 import { NewsModal } from "./NewsModal";
-import { NewsTagFilters } from "./NewsTagFilters";
+
+const SEARCH_DEBOUNCE_MS = 2000;
+const NEWS_SEARCH_EXAMPLES = [
+  "Заводы",
+  "Логистика",
+  "Законы",
+  "Субсидии",
+  "Цены",
+  "Переработка",
+];
 
 export function NewsView() {
   const { ready, token, user } = useAuth();
   const [onboardingDismissed, setOnboardingDismissed] = useState<boolean | null>(null);
-  const [isAllTagsOpen, setIsAllTagsOpen] = useState(false);
+  const [newsSearchQuery, setNewsSearchQuery] = useState("");
+  const [debouncedNewsSearchQuery, setDebouncedNewsSearchQuery] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSearch = searchParams.toString();
@@ -35,25 +41,22 @@ export function NewsView() {
     [currentSearch],
   );
   const selectedTagKey = selectedTags.join("\u001f");
+  const activeNewsSearchQuery = debouncedNewsSearchQuery.length >= 2 ? debouncedNewsSearchQuery : "";
   const feed = useInfiniteApiQuery(
-    ready && token ? `news-feed:${selectedTagKey}` : null,
+    ready && token ? `news-feed:${selectedTagKey}:${activeNewsSearchQuery}` : null,
     NEWS_PAGE_SIZE,
     ({ limit, offset }) =>
       api.news.list(
         {
           limit,
           offset,
+          q: activeNewsSearchQuery || undefined,
           tags: selectedTags,
         },
         {
           token,
         },
       ),
-  );
-  const { data: tagOptions, state: tagState } = useApiQuery<NewsTagSummary[]>(
-    ready && token ? "news-tags" : null,
-    () => api.news.tags({ limit: NEWS_ALL_TAG_LIMIT }, { token }),
-    [],
   );
   const { items, setItems, state, errorMessage, hasMore, isLoadingMore, sentinelRef } = feed;
   const covers = useCoverAssets(items);
@@ -70,6 +73,8 @@ export function NewsView() {
   const openedSlug = searchParams.get("post");
   const showOnboarding =
     user && onboardingDismissed === false ? shouldShowNewsOnboarding(user, onboardingDismissed) : false;
+  const hasNewsSearchDraft = newsSearchQuery.length > 0;
+  const isNewsSearching = activeNewsSearchQuery.length >= 2;
 
   useEffect(() => {
     try {
@@ -78,6 +83,11 @@ export function NewsView() {
       setOnboardingDismissed(false);
     }
   }, []);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedNewsSearchQuery(newsSearchQuery.trim()), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [newsSearchQuery]);
 
   // Модалка открывается через query ?post=slug: есть shareable URL, browser back/forward и закрытие через URL.
   function openPost(slug: string) {
@@ -92,23 +102,20 @@ export function NewsView() {
     return buildNewsUrl(currentSearch, selectedTags, slug);
   }
 
-  function applyTags(nextTags: string[]) {
-    setIsAllTagsOpen(false);
-    router.push(buildNewsUrl(currentSearch, nextTags), { scroll: true });
-  }
-
-  function toggleTag(tag: string) {
-    applyTags(toggleNewsTagSelection(selectedTags, tag));
-  }
-
   function selectTag(tag: string) {
     const nextTags = addNewsTagSelection(selectedTags, tag);
     if (nextTags.length === selectedTags.length) return;
-    applyTags(nextTags);
+    router.push(buildNewsUrl(currentSearch, nextTags), { scroll: true });
   }
 
-  function clearTags() {
-    applyTags([]);
+  function resetSearch() {
+    setNewsSearchQuery("");
+    setDebouncedNewsSearchQuery("");
+  }
+
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDebouncedNewsSearchQuery(newsSearchQuery.trim());
   }
 
   function updatePostInFeed(updatedPost: NewsPostDetail) {
@@ -143,15 +150,28 @@ export function NewsView() {
       <section className="page">
         <header className="news-feed-header">
           <h1>Новости</h1>
-          <NewsTagFilters
-            isAllTagsOpen={isAllTagsOpen}
-            isLoading={tagState === "loading"}
-            onClear={clearTags}
-            onToggleDropdown={() => setIsAllTagsOpen((value) => !value)}
-            onToggleTag={toggleTag}
-            selectedTags={selectedTags}
-            tagOptions={tagOptions}
-          />
+          <p>Сигналы рынка, решения компаний и события, которые двигают вторсырьё.</p>
+          <form className="news-feed-search" onSubmit={handleSearch} role="search">
+            <input
+              aria-label="Поиск по новостям"
+              onChange={(event) => setNewsSearchQuery(event.currentTarget.value)}
+              type="search"
+              value={newsSearchQuery}
+            />
+            {!hasNewsSearchDraft ? (
+              <AnimatedSearchPlaceholder className="news-feed-search-placeholder" examples={NEWS_SEARCH_EXAMPLES} />
+            ) : null}
+            {hasNewsSearchDraft ? (
+              <button
+                aria-label="Сбросить поиск по новостям"
+                className="news-feed-search-reset"
+                onClick={resetSearch}
+                type="button"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            ) : null}
+          </form>
         </header>
         {showOnboarding && user ? <NewsOnboardingCard user={user} onDismiss={dismissOnboarding} /> : null}
 
@@ -165,7 +185,11 @@ export function NewsView() {
           </div>
         ) : items.length === 0 ? (
           <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            {selectedTags.length > 0 ? "Нет публикаций с выбранными тегами." : "Пока нет публикаций."}
+            {isNewsSearching
+              ? `По запросу «${activeNewsSearchQuery}» ничего не найдено.`
+              : selectedTags.length > 0
+                ? "Нет публикаций с выбранными тегами."
+                : "Пока нет публикаций."}
           </p>
         ) : (
           <div className="news-masonry">

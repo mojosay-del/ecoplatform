@@ -186,6 +186,9 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
               <Menu size={20} />
             </button>
           ) : null}
+          {showSidebar && chrome.mobileTopbarAction ? (
+            <div className="topbar-mobile-action">{chrome.mobileTopbarAction}</div>
+          ) : null}
           {!showSidebar ? (
             <Link className="topbar-brand" href="/news" title="ЭкоПлатформа">
               <Image alt="" height={30} src="/brand/logo.webp" width={30} priority />

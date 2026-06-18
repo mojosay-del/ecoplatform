@@ -8,8 +8,9 @@ import "../styles/knowledge.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { PanelRightOpen, Search, X } from "lucide-react";
+import { PanelRightOpen, X } from "lucide-react";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
+import { AnimatedSearchPlaceholder } from "../components/AnimatedSearchPlaceholder";
 import { AppShell } from "../components/AppShell";
 import { CoverImage } from "../components/CoverImage";
 import { api, preferredFileAssetImageUrl } from "../lib/api";
@@ -17,9 +18,17 @@ import { useCoverAssets } from "../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, pluralizeRu, useApiQuery } from "./shared";
 import { collectContentBlockImageFileIds, ContentBlocks } from "./content-blocks";
 import { knowledgeDisplayIconForNode } from "./knowledge-base-icons";
-import { countKnowledgeNodes, findPreferredKnowledgeNode } from "./knowledge-base-utils";
+import { countKnowledgeNodes } from "./knowledge-base-utils";
 
 const SEARCH_DEBOUNCE_MS = 2000;
+const KNOWLEDGE_SEARCH_EXAMPLES = [
+  "Нюансы по ПВД",
+  "Стрейч пленка",
+  "Критерии по ПЭТ",
+  "ГОСТ по картону",
+  "Архив",
+  "Канистра",
+];
 
 function materialsAddedLabel(count: number): string {
   return `${count} ${pluralizeRu(count, "материал добавлен", "материала добавлено", "материалов добавлено")}`;
@@ -27,7 +36,6 @@ function materialsAddedLabel(count: number): string {
 
 export function KnowledgeBaseView() {
   const { data, state, errorMessage } = useApiQuery("kb-tree", () => api.knowledgeBase.tree(), [] as KnowledgeNode[]);
-  const activeNode = useMemo(() => findPreferredKnowledgeNode(data), [data]);
 
   if (state === "unauthenticated") {
     return <AuthRequired title="База знаний" />;
@@ -39,7 +47,7 @@ export function KnowledgeBaseView() {
     return <ErrorState title="База знаний" message={errorMessage} />;
   }
 
-  return <KnowledgeBaseLayout tree={data} activeArticle={activeNode} activeSlug={activeNode?.slug} />;
+  return <KnowledgeBaseLayout tree={data} activeArticle={null} activeSlug={undefined} />;
 }
 
 export function KnowledgeArticleView({ slug }: { slug: string }) {
@@ -96,8 +104,7 @@ function KnowledgeBaseLayout({
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [searchResults, setSearchResults] = useState<KnowledgeNode[] | null>(null);
-  const fallbackActive = useMemo(() => findPreferredKnowledgeNode(tree), [tree]);
-  const active = activeArticle ?? fallbackActive;
+  const active = activeArticle ?? null;
   const activeNavSlug = activeSlug ?? active?.slug;
   const breadcrumbs = active ? buildKnowledgeBreadcrumbs(tree, active) : [];
   const coverItems = useMemo(() => (active ? [active] : []), [active]);
@@ -214,9 +221,23 @@ function KnowledgeBaseLayout({
   const searching = debouncedQuery.length >= 2;
   const searchLoading = searching && searchResults === null;
   const hasSearchDraft = query.length > 0;
+  const mobileTopbarAction =
+    tree.length > 0 ? (
+      <button
+        className="icon-button knowledge-topbar-nav-trigger"
+        type="button"
+        onClick={() => setMaterialNavOpen(true)}
+        aria-controls="knowledge-material-nav-drawer"
+        aria-expanded={materialNavOpen}
+        aria-label="Открыть разделы сырья"
+        title="Открыть разделы сырья"
+      >
+        <PanelRightOpen size={20} aria-hidden="true" />
+      </button>
+    ) : null;
 
   return (
-    <AppShell>
+    <AppShell chrome={{ mobileTopbarAction }}>
       <section className="page knowledge-page">
         <header className="knowledge-header">
           <h1 className="knowledge-title">База знаний по сырью</h1>
@@ -229,10 +250,10 @@ function KnowledgeBaseLayout({
               aria-label="Поиск по базе знаний сырья"
             />
             {!hasSearchDraft ? (
-              <span className="knowledge-search-placeholder" aria-hidden="true">
-                <Search size={22} />
-                <span>Например: макулатура, ПЭТ бутылка, стрейч</span>
-              </span>
+              <AnimatedSearchPlaceholder
+                className="knowledge-search-placeholder"
+                examples={KNOWLEDGE_SEARCH_EXAMPLES}
+              />
             ) : null}
             {hasSearchDraft ? (
               <button
@@ -259,18 +280,6 @@ function KnowledgeBaseLayout({
             </aside>
 
             <main className="knowledge-content-panel">
-              <div className="knowledge-mobile-tools">
-                <button
-                  className="knowledge-mobile-nav-trigger"
-                  type="button"
-                  onClick={() => setMaterialNavOpen(true)}
-                  aria-controls="knowledge-material-nav-drawer"
-                  aria-expanded={materialNavOpen}
-                >
-                  <PanelRightOpen size={17} aria-hidden="true" />
-                  <span>Разделы сырья</span>
-                </button>
-              </div>
               {searching ? (
                 <KnowledgeSearchResults
                   loading={searchLoading}
@@ -279,9 +288,7 @@ function KnowledgeBaseLayout({
                   onResetSearch={resetSearch}
                 />
               ) : !active ? (
-                <article className="knowledge-article-card">
-                  <p className="page-subtitle">Выберите материал в навигации слева.</p>
-                </article>
+                <KnowledgePickEmptyState />
               ) : (
                 <>
                   <div className="knowledge-content-head">
@@ -404,6 +411,14 @@ function KnowledgeBaseLayout({
         ) : null}
       </section>
     </AppShell>
+  );
+}
+
+function KnowledgePickEmptyState() {
+  return (
+    <article className="knowledge-selection-empty" aria-label="Нужно выбрать группу или номенклатуру">
+      <p>Нужно выбрать группу или номенклатуру</p>
+    </article>
   );
 }
 

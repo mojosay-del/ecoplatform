@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { LearningChapterSummary, LearningModuleListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { CoverImage } from "../../components/CoverImage";
 import { StatusPill } from "../../components/StatusPill";
 import { api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useCoverAssets } from "../../lib/use-cover-assets";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
+import { AccessClosed, AuthRequired, ErrorState, pluralizeRu, useApiQuery } from "../shared";
 import { shouldRenderCoveredCardSkeleton } from "../shared/covered-card-readiness";
 
 export function EducationView() {
@@ -23,6 +23,25 @@ export function EducationView() {
   } as PaginatedResponse<LearningModuleListItem>);
   const data = page.items;
   const covers = useCoverAssets(data);
+  const lessonsCount = useMemo(
+    () =>
+      data.reduce(
+        (sum, module) =>
+          sum +
+          (module.chapters?.reduce(
+            (chapterSum: number, chapter: LearningChapterSummary) => chapterSum + (chapter.lessons?.length ?? 0),
+            0,
+          ) ?? 0),
+        0,
+      ),
+    [data],
+  );
+  const lessonsLabel = `${lessonsCount} ${pluralizeRu(
+    lessonsCount,
+    "урок добавлен",
+    "урока добавлено",
+    "уроков добавлено",
+  )}`;
 
   if (state === "unauthenticated") {
     return <AuthRequired title="Обучение" />;
@@ -39,7 +58,11 @@ export function EducationView() {
   return (
     <AppShell>
       <section className="page">
-        <PageHeader title="Обучение" />
+        <header className="education-header">
+          <h1 className="education-title">Обучение</h1>
+          <p className="education-subtitle">Практические материалы для закупки, склада и работы с качеством сырья.</p>
+          <p className="education-header-metric">{lessonsLabel}</p>
+        </header>
         {state === "loading" ? (
           <div className="education-grid" aria-busy="true">
             {Array.from({ length: 6 }).map((_, index) => (

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { Check, ChevronDown, Mail, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Check, Mail, X } from "lucide-react";
 import type { UserGender } from "@ecoplatform/shared";
 import {
   DEFAULT_PHONE_COUNTRY,
@@ -46,94 +46,130 @@ export function AccountNameValue({ onSaved, user }: { onSaved: () => Promise<voi
 export function AccountGenderValue({ onSaved, value }: { onSaved: () => Promise<void>; value: User["gender"] | null }) {
   const currentValue = value ?? "";
   const [open, setOpen] = useState(false);
+  const currentOption = GENDER_OPTIONS.find((option) => option.value === currentValue) ?? GENDER_OPTIONS[0]!;
+
+  return (
+    <>
+      <AccountEditableValue value={currentOption.label} label="Пол" onEdit={() => setOpen(true)} />
+      {open ? (
+        <GenderEditDialog currentValue={currentValue} onClose={() => setOpen(false)} onSaved={onSaved} />
+      ) : null}
+    </>
+  );
+}
+
+function GenderEditDialog({
+  currentValue,
+  onClose,
+  onSaved,
+}: {
+  currentValue: "" | UserGender;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
   const [selected, setSelected] = useState<"" | UserGender>(currentValue);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const listboxId = useId();
+  const [message, setMessage] = useState<string | null>(null);
   const selectedOption = GENDER_OPTIONS.find((option) => option.value === selected) ?? GENDER_OPTIONS[0]!;
+
+  useAccountDialogBodyLock(true, onClose, saving);
 
   useEffect(() => {
     setSelected(currentValue);
     setMessage(null);
   }, [currentValue]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    if (selected === currentValue) {
+      onClose();
+      return;
+    }
 
-  async function chooseGender(nextValue: "" | UserGender) {
-    setOpen(false);
-    if (nextValue === selected || saving) return;
-    setSelected(nextValue);
     setSaving(true);
     setMessage(null);
     try {
-      await api.account.updateProfile({ gender: nextValue || null });
+      await api.account.updateProfile({ gender: selected || null });
       await onSaved();
-      setMessage({ type: "ok", text: "Сохранено." });
+      onClose();
     } catch (error) {
       setSelected(currentValue);
-      setMessage({ type: "error", text: error instanceof Error ? error.message : "Не удалось сохранить." });
+      setMessage(error instanceof Error ? error.message : "Не удалось сохранить пол.");
     } finally {
       setSaving(false);
     }
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === "Escape") {
-      setOpen(false);
-      return;
-    }
-    if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
-      event.preventDefault();
-      setOpen(true);
-    }
-  }
-
   return (
-    <div className="account-gender-picker" ref={rootRef}>
-      <button
-        aria-controls={open ? listboxId : undefined}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        aria-label="Пол"
-        className="account-gender-trigger"
-        disabled={saving}
-        onClick={() => setOpen((current) => !current)}
-        onKeyDown={onKeyDown}
-        type="button"
-      >
-        <span>{saving ? "Сохраняем..." : selectedOption.label}</span>
-        <ChevronDown aria-hidden="true" size={16} />
-      </button>
-      {open ? (
-        <div className="account-gender-menu" id={listboxId} role="listbox" aria-label="Пол">
-          {GENDER_OPTIONS.map((option) => (
+    <div
+      aria-labelledby="account-gender-dialog-title"
+      aria-modal="true"
+      className="account-password-modal-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !saving) onClose();
+      }}
+      role="dialog"
+    >
+      <section className="account-password-modal account-gender-modal">
+        <header className="account-password-modal-head">
+          <div>
+            <span className="account-password-modal-kicker">Личные данные</span>
+            <h2 id="account-gender-dialog-title">Пол</h2>
+            <p>Выберите вариант, который будет указан в профиле.</p>
+          </div>
+          <button
+            aria-label="Закрыть выбор пола"
+            className="account-password-modal-close"
+            disabled={saving}
+            onClick={onClose}
+            type="button"
+          >
+            <X aria-hidden="true" size={18} />
+          </button>
+        </header>
+        <form className="account-gender-modal-body" onSubmit={onSubmit}>
+          <div className="account-gender-modal-options" role="radiogroup" aria-label="Пол">
+            {GENDER_OPTIONS.map((option) => {
+              const isSelected = option.value === selected;
+              return (
+                <button
+                  aria-checked={isSelected}
+                  className={`account-gender-modal-option${isSelected ? " is-selected" : ""}`}
+                  disabled={saving}
+                  key={option.value || "empty"}
+                  onClick={() => setSelected(option.value)}
+                  role="radio"
+                  type="button"
+                >
+                  <span>{option.label}</span>
+                  {isSelected ? <Check aria-hidden="true" size={17} /> : null}
+                </button>
+              );
+            })}
+          </div>
+          {message ? <p className="account-form-message account-form-message-error">{message}</p> : null}
+          <div className="account-gender-modal-actions">
             <button
-              aria-selected={option.value === selected}
-              className={`account-gender-option${option.value === selected ? " is-selected" : ""}`}
-              key={option.value || "empty"}
-              onClick={() => void chooseGender(option.value)}
-              role="option"
+              aria-label="Отменить выбор пола"
+              className="account-gender-modal-action is-cancel"
+              disabled={saving}
+              onClick={onClose}
               type="button"
             >
-              <span>{option.label}</span>
-              {option.value === selected ? <Check aria-hidden="true" size={15} /> : null}
+              <X aria-hidden="true" size={20} />
             </button>
-          ))}
-        </div>
-      ) : null}
-      {message ? (
-        <span className={`account-form-message account-form-message-${message.type}`}>{message.text}</span>
-      ) : null}
+            <button
+              aria-label={`Сохранить пол: ${selectedOption.label}`}
+              className="account-gender-modal-action is-save"
+              disabled={saving}
+              type="submit"
+            >
+              <Check aria-hidden="true" size={21} />
+            </button>
+          </div>
+        </form>
+      </section>
     </div>
   );
 }

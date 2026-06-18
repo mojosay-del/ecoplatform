@@ -46,7 +46,7 @@ export class NewsService {
     private readonly settings: PlatformSettingsService,
   ) {}
 
-  async listNews(user: RequestUser, paginationInput: PaginationInput & { tags?: string[] } = {}) {
+  async listNews(user: RequestUser, paginationInput: PaginationInput & { q?: string; tags?: string[] } = {}) {
     return listPublishedNews(this.readDeps(), user, paginationInput);
   }
 
