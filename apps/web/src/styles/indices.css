@@ -40,7 +40,7 @@
 
 .indices-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
   align-items: start;
 }
@@ -49,13 +49,13 @@
   display: grid;
   gap: 18px;
   min-width: 0;
-  margin: 0 0 22px;
+  margin: 24px 0 22px;
   padding: 20px;
   background: linear-gradient(180deg, rgb(var(--white-rgb) / 0.96), rgb(var(--white-rgb) / 0.9)), var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow-card);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .index-movement-head {
@@ -87,12 +87,102 @@
 }
 
 .index-movement-periods {
-  margin: 0;
-  background: var(--panel);
+  margin: 0 0 0 auto;
 }
 
-.index-movement-periods.index-period-tabs {
-  margin: 0 0 0 auto;
+.index-period-popover {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+}
+
+.index-period-popover-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 36px;
+  min-width: 118px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
+}
+
+.index-period-popover-trigger:hover,
+.index-period-popover.is-open .index-period-popover-trigger {
+  border-color: var(--primary-soft-strong);
+  color: var(--primary-hover);
+}
+
+.index-period-popover-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.index-period-popover-trigger svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 160ms ease;
+}
+
+.index-period-popover.is-open .index-period-popover-trigger svg {
+  transform: rotate(180deg);
+  color: currentColor;
+}
+
+.index-period-popover-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  gap: 4px;
+  width: 156px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+}
+
+.index-period-popover-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.index-period-popover-option:hover,
+.index-period-popover-option:focus-visible,
+.index-period-popover-option.is-selected {
+  outline: none;
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
+
+.index-period-popover-option.is-selected {
+  font-weight: 800;
 }
 
 .index-movement-table-wrap {
@@ -107,34 +197,30 @@
 
 .index-movement-table {
   width: 100%;
-  min-width: 860px;
+  min-width: 760px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
 }
 
 .index-movement-col-kind {
-  width: 17%;
-}
-
-.index-movement-col-name {
-  width: 22%;
-}
-
-.index-movement-col-spark {
-  width: 15%;
-}
-
-.index-movement-col-code {
-  width: 13%;
-}
-
-.index-movement-col-price {
   width: 18%;
 }
 
+.index-movement-col-name {
+  width: 25%;
+}
+
+.index-movement-col-spark {
+  width: 19%;
+}
+
+.index-movement-col-price {
+  width: 20%;
+}
+
 .index-movement-col-change {
-  width: 15%;
+  width: 18%;
 }
 
 .index-movement-spark {
@@ -185,19 +271,6 @@
 
 .index-movement-link:hover {
   color: var(--primary);
-}
-
-.index-movement-code {
-  display: inline-flex;
-  max-width: 100%;
-  padding: 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-chip);
-  background: var(--panel-soft);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
 }
 
 .index-movement-change {
@@ -671,11 +744,13 @@
     width: 100%;
     margin: 0;
   }
-  .index-movement-periods .index-period-label-full {
-    display: none;
+  .index-period-popover-trigger {
+    width: 100%;
   }
-  .index-movement-periods .index-period-label-short {
-    display: inline;
+  .index-period-popover-menu {
+    right: auto;
+    left: 0;
+    width: min(100%, 180px);
   }
   .index-movement-table {
     min-width: 0;
@@ -706,8 +781,7 @@
     display: none;
   }
   .index-movement-table td:nth-child(4)::before,
-  .index-movement-table td:nth-child(5)::before,
-  .index-movement-table td:nth-child(6)::before {
+  .index-movement-table td:nth-child(5)::before {
     content: attr(data-label);
     display: block;
     margin-bottom: 2px;

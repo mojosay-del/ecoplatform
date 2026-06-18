@@ -585,6 +585,13 @@
 .news-like-button .eco-nav-icon,
 .comment-submit .eco-nav-icon {
   flex: 0 0 auto;
+}
+
+.news-like-button .eco-nav-icon {
+  --eco-nav-icon-offset-y: -1px;
+}
+
+.comment-submit .eco-nav-icon {
   --eco-nav-icon-offset-y: 0;
 }
 
@@ -654,7 +661,7 @@
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: linear-gradient(180deg, rgb(var(--brand-rgb) / 0.04), rgb(var(--brand-rgb) / 0)), var(--panel-soft);
+  background: var(--bg);
   box-shadow: inset 0 1px 0 rgb(var(--white-rgb) / 0.65);
 }
 

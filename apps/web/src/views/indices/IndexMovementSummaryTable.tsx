@@ -10,7 +10,7 @@ import {
 } from "../index-movement-summary";
 import { INDEX_PERIOD_LABELS } from "./constants";
 import { formatIndexPrice, pickRecentSeries } from "./format";
-import { IndexPeriodTabs } from "./IndexPeriodTabs";
+import { IndexPeriodPopover } from "./IndexPeriodPopover";
 import { IndexSparkline } from "./IndexSparkline";
 import type { TrendDirection } from "./trend";
 import { TrendChip } from "./TrendChip";
@@ -22,14 +22,17 @@ const KIND_DIRECTION: Record<"rising" | "falling" | "flat", TrendDirection> = {
   flat: "flat",
 };
 
+const MAX_VISIBLE_MOVEMENT_ROWS = 5;
+
 export function IndexMovementSummaryTable({ items }: { items: NomenclatureListItem[] }) {
   const [period, setPeriod] = useState<IndexPeriod>("2W");
   const summary = useMemo(() => getIndexMovementSummary(items, period), [items, period]);
-  const rows: Array<IndexMovementRow & { kind: "rising" | "falling" | "flat" }> = [
+  const allRows: Array<IndexMovementRow & { kind: "rising" | "falling" | "flat" }> = [
     ...summary.rising.map((row) => ({ ...row, kind: "rising" as const })),
     ...summary.falling.map((row) => ({ ...row, kind: "falling" as const })),
     ...summary.flat.map((row) => ({ ...row, kind: "flat" as const })),
   ];
+  const rows = allRows.slice(0, MAX_VISIBLE_MOVEMENT_ROWS);
   const periodLabel = INDEX_PERIOD_LABELS[period].toLowerCase();
 
   return (
@@ -39,7 +42,7 @@ export function IndexMovementSummaryTable({ items }: { items: NomenclatureListIt
           <h2 id="index-movement-title">Движение индексов</h2>
           <span>Рост и снижение за {periodLabel}</span>
         </div>
-        <IndexPeriodTabs
+        <IndexPeriodPopover
           ariaLabel="Период движения индексов"
           className="index-movement-periods"
           period={period}
@@ -56,7 +59,6 @@ export function IndexMovementSummaryTable({ items }: { items: NomenclatureListIt
               <col className="index-movement-col-kind" />
               <col className="index-movement-col-name" />
               <col className="index-movement-col-spark" />
-              <col className="index-movement-col-code" />
               <col className="index-movement-col-price" />
               <col className="index-movement-col-change" />
             </colgroup>
@@ -65,7 +67,6 @@ export function IndexMovementSummaryTable({ items }: { items: NomenclatureListIt
                 <th scope="col">Динамика</th>
                 <th scope="col">Индекс</th>
                 <th scope="col">График</th>
-                <th scope="col">Код</th>
                 <th scope="col">Цена</th>
                 <th scope="col">Изменение</th>
               </tr>
@@ -91,9 +92,6 @@ export function IndexMovementSummaryTable({ items }: { items: NomenclatureListIt
                         width={88}
                         height={28}
                       />
-                    </td>
-                    <td data-label="Код">
-                      <span className="index-movement-code">{row.item.code}</span>
                     </td>
                     <td data-label="Цена" className="index-num">
                       {formatIndexPrice(row.currentPrice)} {row.item.unit ?? "₽/т"}
