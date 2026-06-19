@@ -339,7 +339,7 @@ export function RegisterForm() {
   if (registrationOpen === false) {
     return (
       <AuthShell mode="register">
-        <div className="auth-card auth-card-wide auth-closed">
+        <div className="ui-card ui-card-wide auth-closed">
           <span className="auth-closed-badge" aria-hidden="true">
             <Lock size={28} strokeWidth={1.75} />
           </span>
@@ -347,9 +347,9 @@ export function RegisterForm() {
             <span className="auth-closed-pill-dot" aria-hidden="true" />
             Скоро откроется
           </span>
-          <header className="auth-card-head">
-            <h1 className="auth-card-title">Регистрация закрыта</h1>
-            <p className="auth-card-sub">
+          <header className="ui-card-head">
+            <h1 className="ui-card-title">Регистрация закрыта</h1>
+            <p className="ui-card-sub">
               Регистрация новых пользователей временно отключена. Загляните чуть позже — мы готовим место для новых
               компаний.
             </p>
@@ -357,7 +357,7 @@ export function RegisterForm() {
           <Link className="button auth-submit auth-closed-cta" href="/login">
             Войти в аккаунт
           </Link>
-          <p className="auth-card-sub auth-closed-foot">Уже есть аккаунт? Войдите по кнопке выше.</p>
+          <p className="ui-card-sub auth-closed-foot">Уже есть аккаунт? Войдите по кнопке выше.</p>
         </div>
       </AuthShell>
     );
@@ -367,13 +367,13 @@ export function RegisterForm() {
     <AuthShell mode="register">
       <form
         ref={formRef}
-        className={`auth-card form auth-card-wide${step === "verification" ? " auth-card-verification" : ""}`}
+        className={`ui-card form ui-card-wide${step === "verification" ? " ui-card-verification" : ""}`}
         onSubmit={onSubmit}
       >
         {step !== "verification" ? (
-          <header className="auth-card-head">
-            <h1 className="auth-card-title">Создать аккаунт</h1>
-            <p className="auth-card-sub">
+          <header className="ui-card-head">
+            <h1 className="ui-card-title">Создать аккаунт</h1>
+            <p className="ui-card-sub">
               Пробный доступ на 24 часа · <Link href="/login">Уже есть аккаунт</Link>
             </p>
           </header>

@@ -33,7 +33,7 @@ async function registerSmokeUser(page: Page, user: SmokeUser): Promise<boolean> 
   await acceptNecessaryCookies(page);
 
   await expect(page.getByRole("heading", { name: "Создать аккаунт" })).toBeVisible();
-  const form = page.locator("form.auth-card");
+  const form = page.locator("form.ui-card");
   await form.locator("input[name='organizationName']").fill(user.organizationName);
   await form.locator("select[name='companyType']").selectOption("collector");
   await page.getByRole("button", { name: "Далее" }).click();
@@ -82,7 +82,7 @@ async function login(page: Page, user: SmokeUser) {
   await acceptNecessaryCookies(page);
 
   await expect(page.getByRole("heading", { name: "Войти в аккаунт" })).toBeVisible();
-  const form = page.locator("form.auth-card");
+  const form = page.locator("form.ui-card");
   await form.locator("input[name='email']").fill(user.email);
   await form.locator("input[name='password']").fill(user.password);
   await page.getByRole("button", { name: "Войти" }).click();

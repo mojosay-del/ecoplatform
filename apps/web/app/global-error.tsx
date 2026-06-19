@@ -16,9 +16,9 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
     <html lang="ru">
       <body>
         <MarketingShell>
-          <div className="auth-card marketing-card marketing-card-centered">
-            <h1 className="auth-card-title">Что-то пошло не так</h1>
-            <p className="auth-card-sub">Приложение не смогло отрисоваться.</p>
+          <div className="ui-card marketing-card marketing-card-centered">
+            <h1 className="ui-card-title">Что-то пошло не так</h1>
+            <p className="ui-card-sub">Приложение не смогло отрисоваться.</p>
             <p className="page-subtitle">Мы уже знаем о проблеме. Попробуйте обновить страницу.</p>
             {error.digest ? (
               <StatusPill as="p" className="marketing-incident">

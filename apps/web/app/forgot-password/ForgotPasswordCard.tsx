@@ -42,10 +42,10 @@ export function ForgotPasswordCard({ supportEmail }: { supportEmail: string }) {
   }
 
   return (
-    <div className="auth-card marketing-card">
-      <header className="auth-card-head">
-        <h1 className="auth-card-title">Восстановление пароля</h1>
-        <p className="auth-card-sub">
+    <div className="ui-card marketing-card">
+      <header className="ui-card-head">
+        <h1 className="ui-card-title">Восстановление пароля</h1>
+        <p className="ui-card-sub">
           Пока на стадии MVP — самостоятельный сброс пароля будет доступен в ближайшем обновлении.
         </p>
       </header>

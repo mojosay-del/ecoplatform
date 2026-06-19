@@ -126,7 +126,7 @@ export function PersonStepFields({
         {legalLoadError ? (
           <p className="auth-error">Не удалось загрузить юридические документы. Обновите страницу.</p>
         ) : legalDocs.length === 0 ? (
-          <p className="auth-card-sub">Загружаем актуальные документы…</p>
+          <p className="ui-card-sub">Загружаем актуальные документы…</p>
         ) : (
           <div className="consent-list">
             {requiredDocs.map((doc) => (
@@ -180,7 +180,7 @@ export function VerificationStepFields({
         </span>
         <span>Подтвердите почту</span>
       </legend>
-      <p className="auth-card-sub auth-verification-copy">
+      <p className="ui-card-sub auth-verification-copy">
         Код отправлен на {verificationEmail ?? normalizeEmailValue(valuesEmail)}
         {verificationExpiresAt ? `, действует до ${verificationExpiresAt}.` : "."}
       </p>

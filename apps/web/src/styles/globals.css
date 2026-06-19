@@ -1641,7 +1641,7 @@ input[type="checkbox"]:focus-visible {
   gap: 14px;
 }
 
-.auth-card {
+.ui-card {
   width: 100%;
   max-width: 420px;
   background: transparent;
@@ -1652,10 +1652,10 @@ input[type="checkbox"]:focus-visible {
   flex-direction: column;
   gap: 16px;
   /* Деликатное появление формы при загрузке. */
-  animation: auth-card-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-card-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes auth-card-enter {
+@keyframes ui-card-enter {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -1666,21 +1666,21 @@ input[type="checkbox"]:focus-visible {
   }
 }
 
-.auth-card-wide {
+.ui-card-wide {
   /* Регистрация имеет 7 полей и парные строки — нужна чуть большая ширина. */
   max-width: 460px;
 }
 
-.auth-card-verification {
+.ui-card-verification {
   max-width: 420px;
   gap: 18px;
 }
 
-.auth-card-head {
+.ui-card-head {
   margin-bottom: 4px;
 }
 
-.auth-card-title {
+.ui-card-title {
   margin: 0 0 6px;
   font-size: var(--text-2xl);
   line-height: 1.2;
@@ -1690,32 +1690,32 @@ input[type="checkbox"]:focus-visible {
   text-align: left;
 }
 
-.auth-card-sub {
+.ui-card-sub {
   margin: 0;
   font-size: 14px;
   color: var(--muted);
 }
 
-.auth-card-sub a {
+.ui-card-sub a {
   color: var(--brand);
   font-weight: 600;
 }
 
 /* Шапка auth-форм центрируется одинаково на входе и регистрации. */
 
-.auth-card .auth-card-head,
-.auth-card .auth-card-title {
+.ui-card .ui-card-head,
+.ui-card .ui-card-title {
   text-align: center;
 }
 
 /* Контролы формы тянем до тач-таргета 44px (скоп только на auth, чтобы не
    трогать формы остального приложения). */
 
-.auth-card .input,
-.auth-card .select,
-.auth-card .password-input,
-.auth-card .phone-input,
-.auth-card .button {
+.ui-card .input,
+.ui-card .select,
+.ui-card .password-input,
+.ui-card .phone-input,
+.ui-card .button {
   padding-block: 12px;
 }
 
@@ -1880,7 +1880,7 @@ input[type="checkbox"]:focus-visible {
   text-align: center;
 }
 
-.marketing-card-centered .auth-card-title {
+.marketing-card-centered .ui-card-title {
   text-align: center;
 }
 
@@ -2477,7 +2477,7 @@ input[type="checkbox"]:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   /* При системной настройке «уменьшить движение» — анимаций нет. */
-  .auth-card,
+  .ui-card,
   .auth-code-digits,
   .auth-code-box,
   .auth-code-box.is-filled,
@@ -2492,7 +2492,7 @@ input[type="checkbox"]:focus-visible {
 }
 
 @media (max-width: 540px) {
-  .auth-card-title {
+  .ui-card-title {
     font-size: var(--text-2xl);
   }
 }

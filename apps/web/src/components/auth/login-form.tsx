@@ -38,10 +38,10 @@ export function LoginForm() {
 
   return (
     <AuthShell mode="login">
-      <form className="auth-card form" onSubmit={onSubmit}>
-        <header className="auth-card-head">
-          <h1 className="auth-card-title">Войти в аккаунт</h1>
-          <p className="auth-card-sub">
+      <form className="ui-card form" onSubmit={onSubmit}>
+        <header className="ui-card-head">
+          <h1 className="ui-card-title">Войти в аккаунт</h1>
+          <p className="ui-card-sub">
             Нет аккаунта? <Link href="/register">Создать аккаунт</Link>
           </p>
         </header>

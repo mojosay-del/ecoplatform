@@ -269,10 +269,10 @@
     box-shadow: 0 0 0 5px rgb(var(--brand-rgb) / 0);
   }
 }
-.auth-closed .auth-card-head {
+.auth-closed .ui-card-head {
   margin-bottom: 0;
 }
-.auth-closed .auth-card-sub {
+.auth-closed .ui-card-sub {
   max-width: 38ch;
   margin: 0 auto;
   line-height: 1.55;

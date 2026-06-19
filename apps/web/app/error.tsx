@@ -13,9 +13,9 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
 
   return (
     <MarketingShell>
-      <div className="auth-card marketing-card marketing-card-centered">
-        <h1 className="auth-card-title">Что-то пошло не так</h1>
-        <p className="auth-card-sub">Страница не смогла отрисоваться.</p>
+      <div className="ui-card marketing-card marketing-card-centered">
+        <h1 className="ui-card-title">Что-то пошло не так</h1>
+        <p className="ui-card-sub">Страница не смогла отрисоваться.</p>
         <p className="page-subtitle">
           Мы уже знаем о проблеме. Попробуйте обновить страницу — если ошибка повторится, напишите в поддержку из
           кабинета.
