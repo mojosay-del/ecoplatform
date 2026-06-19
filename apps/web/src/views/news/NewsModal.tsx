@@ -7,6 +7,7 @@ import type { NewsPostDetail } from "@ecoplatform/shared";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { queryKeys } from "../../lib/query";
+import { useDialogA11y } from "../../lib/use-dialog-a11y";
 import { withUpdatedCommentLike, withUpdatedNewsLike } from "../shared";
 import { useApiQuery } from "../shared";
 import { NewsArticleContent } from "./NewsArticleContent";
@@ -43,27 +44,13 @@ export function NewsModal({
   const backdropRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
+  useDialogA11y(modalRef, { bodyClassName: "news-modal-open", bodyLock: true, onEscape: onClose });
+
   useEffect(() => {
     if (post) {
       onPostUpdateRef.current?.(post);
     }
   }, [post]);
-
-  // Закрытие по Esc, блокируем прокрутку и расфокусируем фон пока модалка открыта.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.body.classList.add("news-modal-open");
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-      document.body.classList.remove("news-modal-open");
-    };
-  }, [onClose]);
 
   useEffect(() => {
     const modal = modalRef.current;

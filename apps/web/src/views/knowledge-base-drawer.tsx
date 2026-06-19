@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef } from "react";
 import { X } from "lucide-react";
 import type { KnowledgeNode } from "@ecoplatform/shared";
+import { useDialogA11y } from "../lib/use-dialog-a11y";
 import { KnowledgeNavigation } from "./knowledge-base-navigation";
 
 export function KnowledgeNavigationDrawer({
@@ -15,6 +17,9 @@ export function KnowledgeNavigationDrawer({
   onNavigate: () => void;
   tree: KnowledgeNode[];
 }) {
+  const drawerRef = useRef<HTMLElement>(null);
+  useDialogA11y(drawerRef, { bodyLock: false, onEscape: onClose });
+
   return (
     <div
       className="knowledge-nav-drawer-root"
@@ -28,7 +33,7 @@ export function KnowledgeNavigationDrawer({
         onClick={onClose}
         aria-label="Закрыть навигацию по сырью"
       />
-      <aside className="knowledge-nav-drawer" id="knowledge-material-nav-drawer">
+      <aside className="knowledge-nav-drawer" id="knowledge-material-nav-drawer" ref={drawerRef}>
         <header className="knowledge-nav-drawer-head">
           <div>
             <span className="knowledge-nav-kicker">База знаний</span>

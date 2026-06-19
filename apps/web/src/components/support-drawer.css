@@ -88,6 +88,10 @@
   background: rgb(var(--black-rgb) / 0.04);
   color: var(--text);
 }
+.support-drawer-close:focus-visible {
+  outline: 3px solid rgb(var(--brand-rgb) / 0.45);
+  outline-offset: 3px;
+}
 .support-drawer-tabs {
   display: flex;
   gap: 4px;

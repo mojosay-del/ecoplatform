@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { ChevronLeft, MessageSquare, Plus, X } from "lucide-react";
 import { supportTicketCategories } from "@ecoplatform/shared";
 import "./support-drawer.css";
@@ -9,6 +9,7 @@ import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { api, apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../lib/display-labels";
+import { useDialogA11y } from "../lib/use-dialog-a11y";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
 // Drawer (правая выезжающая панель), открываемый по иконке «?» в шапке.
@@ -40,6 +41,7 @@ type DrawerProps = {
 
 export function UserSupportDrawer({ open, onClose }: DrawerProps) {
   const { token } = useAuth();
+  const drawerRef = useRef<HTMLElement>(null);
   const [tab, setTab] = useState<"list" | "new">("list");
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -52,6 +54,8 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
   );
   const tickets = ticketsQuery.items;
 
+  useDialogA11y(drawerRef, { bodyLock: true, enabled: open, onEscape: onClose, restoreFocus: true });
+
   // Подгружаем список при открытии drawer'а и подписываемся на
   // глобальное событие — если где-то ещё в приложении создадут тикет,
   // список обновится.
@@ -61,26 +65,6 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
     window.addEventListener("support:changed", handler);
     return () => window.removeEventListener("support:changed", handler);
   }, [open, ticketsQuery.reload]);
-
-  // Закрытие по Escape — стандартная пользовательская привычка для модалок.
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  // Блокируем прокрутку body, чтобы фон не уезжал под drawer'ом.
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [open]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -117,11 +101,11 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
   const activeTicket = tickets.find((t) => t.id === activeTicketId) ?? null;
 
   return (
-    <div className="support-drawer-root" role="dialog" aria-modal="true" aria-label="Поддержка">
+    <div className="support-drawer-root" role="dialog" aria-modal="true" aria-labelledby="support-drawer-title">
       <div className="support-drawer-backdrop" onClick={onClose} aria-hidden="true" />
-      <aside className="support-drawer">
+      <aside className="support-drawer" ref={drawerRef}>
         <header className="support-drawer-head">
-          <h2 className="support-drawer-title">
+          <h2 className="support-drawer-title" id="support-drawer-title">
             {activeTicket ? (
               <button
                 type="button"

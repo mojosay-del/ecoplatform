@@ -5,12 +5,13 @@ import "../../styles/documentation.css";
 // «Часто нужные» (закреплённые), «Недавно обновлено», поиск и фильтр по формату.
 // Структурный близнец «Базы знаний», но документ — первоклассная сущность.
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { PanelRightOpen, X } from "lucide-react";
 import type { DocumentationNode } from "@ecoplatform/shared";
 import { AnimatedSearchPlaceholder } from "../../components/AnimatedSearchPlaceholder";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
+import { useDialogA11y } from "../../lib/use-dialog-a11y";
 import { AccessClosed, AuthRequired, ErrorState, pluralizeRu, useApiQuery } from "../shared";
 import { DocTree, DocumentCard, EssentialsStrip, FormatFilter, RecentlyUpdated } from "./components";
 import { flattenDocuments } from "./doc-helpers";
@@ -56,6 +57,9 @@ export function DocumentationView() {
   const [format, setFormat] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<DocumentationNode[] | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const navDrawerRef = useRef<HTMLElement>(null);
+
+  useDialogA11y(navDrawerRef, { bodyLock: true, enabled: navOpen, onEscape: () => setNavOpen(false) });
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
@@ -117,26 +121,6 @@ export function DocumentationView() {
 
     media.addEventListener("change", onMediaChange);
     return () => media.removeEventListener("change", onMediaChange);
-  }, [navOpen]);
-
-  useEffect(() => {
-    if (!navOpen) return;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setNavOpen(false);
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navOpen]);
-
-  useEffect(() => {
-    if (!navOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
   }, [navOpen]);
 
   const onDownload = useCallback((node: DocumentationNode) => {
@@ -272,7 +256,7 @@ export function DocumentationView() {
                   onClick={() => setNavOpen(false)}
                   aria-label="Закрыть навигацию по документации"
                 />
-                <aside className="doc-nav-drawer" id="documentation-nav-drawer">
+                <aside className="doc-nav-drawer" id="documentation-nav-drawer" ref={navDrawerRef}>
                   <header className="doc-nav-drawer-head">
                     <div>
                       <span className="doc-nav-kicker">Документация</span>

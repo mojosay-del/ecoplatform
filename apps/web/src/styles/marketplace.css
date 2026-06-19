@@ -2420,6 +2420,11 @@
   color: #0f172a;
 }
 
+.mp-modal-close:focus-visible {
+  outline: 3px solid rgb(var(--brand-rgb, 245 119 62) / 0.5);
+  outline-offset: 3px;
+}
+
 .mp-modal-header {
   display: flex;
   align-items: center;

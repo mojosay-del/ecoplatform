@@ -48,6 +48,10 @@ body.news-modal-open .app-shell {
   background: var(--panel);
   border-color: var(--line-strong);
 }
+.news-modal-close:focus-visible {
+  outline: 3px solid rgb(var(--brand-rgb) / 0.55);
+  outline-offset: 3px;
+}
 /* --- Модалка новости: кнопка ✕ и контент не под вырезом/домашней полосой --- */
 .news-modal-backdrop {
   padding-top: calc(40px + env(safe-area-inset-top));

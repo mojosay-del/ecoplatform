@@ -32,6 +32,7 @@ import { api, preferredFileAssetImageUrl, preferredFileAssetMediaUrl } from "../
 import { useAuth } from "../../lib/auth";
 import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { pluralizeRu } from "../../lib/ru-plural";
+import { useDialogA11y } from "../../lib/use-dialog-a11y";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useApiQuery } from "../shared";
 import { CompanyReviews } from "./CompanyReviews";
@@ -80,8 +81,11 @@ export function ListingModal({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   // Якорь колонки действий — мобильная CTA-полоса прокручивает к форме ставки.
   const actionRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const assets = useFileAssetsByIds((data?.media ?? []).map((item) => item.fileId));
+
+  useDialogA11y(modalRef, { bodyLock: true });
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -113,10 +117,11 @@ export function ListingModal({
     <div
       className={`mp-modal-backdrop${lightboxOpen ? " is-locked" : ""}`}
       role="dialog"
+      aria-label="Объявление"
       aria-modal="true"
       onClick={onClose}
     >
-      <div className="mp-modal" onClick={(event) => event.stopPropagation()}>
+      <div className="mp-modal" onClick={(event) => event.stopPropagation()} ref={modalRef}>
         <button className="mp-modal-close" type="button" aria-label="Закрыть" onClick={onClose}>
           <X size={20} />
         </button>
