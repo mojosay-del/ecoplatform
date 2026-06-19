@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LegalDocumentDetail, LegalDocumentSummary, LegalDocumentType } from "@ecoplatform/shared";
 import { sanitizeParagraphHtml } from "../lib/sanitize-html";
+import "./legal-document.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 

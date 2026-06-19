@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { FileText, RefreshCcw, Upload, X } from "lucide-react";
+import "./file-upload.css";
 import {
   apiDeleteFile,
   apiFetch,

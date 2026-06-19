@@ -6,6 +6,7 @@ import { AM, AZ, BY, KG, KZ, MD, RU, TJ, TM, UZ } from "country-flag-icons/react
 import { PHONE_COUNTRIES } from "./constants";
 import type { PhoneCountryId } from "./types";
 import { formatPhoneFull, formatPhoneLocal, getPhoneCountry, normalizePhoneDigits } from "./utils";
+import "./phone-input.css";
 
 const FLAG_BY_ID: Record<PhoneCountryId, typeof RU> = {
   ru: RU,

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
+import "./cookie-consent.css";
 
 // Версия флага в localStorage. При смене политики/набора категорий — повышаем,
 // чтобы старые согласия не считались валидными и баннер показался снова.

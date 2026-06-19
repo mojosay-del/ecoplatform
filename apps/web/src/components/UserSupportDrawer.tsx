@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { ChevronLeft, MessageSquare, Plus, X } from "lucide-react";
 import { supportTicketCategories } from "@ecoplatform/shared";
+import "./support-drawer.css";
 import { SendActionIcon } from "./app-shell/nav-icons";
 import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { api, apiFetch } from "../lib/api";

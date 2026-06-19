@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import "../../src/components/legal-document.css";
 
 // Публичный layout для /legal/* страниц: без AppShell-сайдбара, без auth.
 // Простой контейнер с шапкой логотипа и контентом по центру — пользователь

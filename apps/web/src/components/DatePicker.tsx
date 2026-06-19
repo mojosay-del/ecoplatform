@@ -8,6 +8,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import "./date-picker.css";
 import { RU_MONTHS, RU_WEEKDAYS, buildMonthGrid, formatRuDate, parseIsoDate, toIsoDate } from "./date-picker-utils";
 
 export function DatePicker({

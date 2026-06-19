@@ -1,0 +1,103 @@
+/*  Стили компонента (вынесено из globals.css). Импортируется самим компонентом, поэтому едет за ним во все разделы.  */
+/* /legal/* публичные страницы — отдельный layout без сайдбара. */
+.legal-shell {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.legal-shell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--white);
+}
+.legal-shell-brand {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+.legal-shell-nav {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+}
+.legal-shell-nav a {
+  color: var(--text);
+  text-decoration: none;
+}
+.legal-shell-nav a:hover {
+  text-decoration: underline;
+}
+.legal-shell-content {
+  flex: 1;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+.legal-shell-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--white);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.legal-shell-foot a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.legal-shell-foot a:hover {
+  text-decoration: underline;
+  color: var(--text);
+}
+.legal-doc h1 {
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-align: left;
+  margin: 0 0 8px;
+}
+.legal-doc-head {
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.legal-doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.legal-doc-summary {
+  font-size: 15px;
+  color: var(--text-muted);
+  margin: 0;
+}
+.legal-doc-body {
+  line-height: 1.6;
+  font-size: 15px;
+}
+.legal-doc-body p {
+  margin: 0 0 16px;
+}
+.legal-doc-body h2 {
+  font-size: 22px;
+  margin: 24px 0 12px;
+}
+.legal-doc-body h3 {
+  font-size: 18px;
+  margin: 20px 0 8px;
+}
+.legal-doc-empty {
+  color: var(--text-muted);
+  margin: 24px 0;
+}
