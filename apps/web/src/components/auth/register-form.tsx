@@ -32,7 +32,7 @@ const REGISTRATION_TRUST_ITEMS = ["Соответствие 152-ФЗ", "Защи
 
 export function RegisterForm() {
   const router = useRouter();
-  const { register, verifyRegistration } = useAuth();
+  const { register, resendRegistrationCode, verifyRegistration } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
   const verificationInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const verificationAttemptRef = useRef(0);
@@ -47,6 +47,8 @@ export function RegisterForm() {
   const [verificationPhase, setVerificationPhase] = useState<VerificationPhase>("typing");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resendingCode, setResendingCode] = useState(false);
+  const [resendStatus, setResendStatus] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState<boolean | null>(null);
   const [legalDocs, setLegalDocs] = useState<LegalDocumentSummary[]>([]);
   const [legalLoadError, setLegalLoadError] = useState(false);
@@ -106,7 +108,7 @@ export function RegisterForm() {
   const verificationCode = verificationDigits.join("");
   const verificationIsComplete = verificationCode.length === VERIFICATION_CODE_LENGTH;
   const verificationIsAnimating = verificationPhase !== "typing";
-  const verificationInputLocked = verificationIsAnimating || (step === "verification" && submitting);
+  const verificationInputLocked = verificationIsAnimating || resendingCode || (step === "verification" && submitting);
   const verificationStatusText =
     verificationPhase === "checking"
       ? "Проверяем код"
@@ -172,6 +174,7 @@ export function RegisterForm() {
 
   function goBackToCompanyStep() {
     setError("");
+    setResendStatus("");
     setStep("company");
   }
 
@@ -201,6 +204,7 @@ export function RegisterForm() {
 
     setSubmitting(true);
     setError("");
+    setResendStatus("");
     try {
       const result = await register(registrationPayload());
       clearVerificationTimers();
@@ -257,6 +261,7 @@ export function RegisterForm() {
     clearVerificationTimers();
     setSubmitting(true);
     setError("");
+    setResendStatus("");
     setVerificationPhase("checking");
 
     try {
@@ -280,6 +285,32 @@ export function RegisterForm() {
     }
   }
 
+  async function resendVerificationCode() {
+    if (!verification || resendingCode) return;
+
+    clearVerificationTimers();
+    setError("");
+    setResendStatus("");
+    setVerificationPhase("typing");
+    setResendingCode(true);
+
+    try {
+      const result = await resendRegistrationCode({ verificationId: verification.verificationId });
+      setVerification(result);
+      setVerificationDigits(emptyVerificationDigits());
+      setResendStatus("Новый код отправлен.");
+      focusVerificationInput(0);
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.message
+          ? err.message
+          : "Не удалось отправить код повторно. Попробуйте через минуту.",
+      );
+    } finally {
+      setResendingCode(false);
+    }
+  }
+
   function setVerificationDigit(index: number, rawValue: string) {
     if (verificationInputLocked) return;
 
@@ -288,6 +319,7 @@ export function RegisterForm() {
       .slice(0, VERIFICATION_CODE_LENGTH - index)
       .split("");
     setError("");
+    setResendStatus("");
     setVerificationDigits((current) => {
       const next = [...current];
       if (digits.length === 0) {
@@ -410,6 +442,12 @@ export function RegisterForm() {
           />
         )}
 
+        {step === "verification" && resendStatus ? (
+          <p className="auth-verification-resend-status" role="status">
+            {resendStatus}
+          </p>
+        ) : null}
+
         {error ? <p className="form-error">{error}</p> : null}
 
         {step === "company" ? (
@@ -462,6 +500,7 @@ export function RegisterForm() {
                 onClick={() => {
                   clearVerificationTimers();
                   setError("");
+                  setResendStatus("");
                   setVerificationPhase("typing");
                   setStep("person");
                 }}
@@ -472,11 +511,11 @@ export function RegisterForm() {
               <button
                 className="form-text-button"
                 type="button"
-                onClick={requestVerificationCode}
-                disabled={submitting}
+                onClick={resendVerificationCode}
+                disabled={submitting || resendingCode}
               >
                 <SendActionIcon size={16} />
-                Отправить код ещё раз
+                {resendingCode ? "Отправляем..." : "Отправить код ещё раз"}
               </button>
             </div>
           </div>

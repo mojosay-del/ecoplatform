@@ -91,8 +91,10 @@ export const accountContactChangeApplyDtoSchema = z.discriminatedUnion("field", 
 
 export type AccountContactChangeApplyDto = z.infer<typeof accountContactChangeApplyDtoSchema>;
 
+const registrationVerificationIdSchema = z.string().trim().min(1);
+
 export const registrationVerifyDtoSchema = z.object({
-  verificationId: z.string().trim().min(1),
+  verificationId: registrationVerificationIdSchema,
   code: z
     .string()
     .trim()
@@ -100,6 +102,12 @@ export const registrationVerifyDtoSchema = z.object({
 });
 
 export type RegistrationVerifyDto = z.infer<typeof registrationVerifyDtoSchema>;
+
+export const registrationResendDtoSchema = z.object({
+  verificationId: registrationVerificationIdSchema,
+});
+
+export type RegistrationResendDto = z.infer<typeof registrationResendDtoSchema>;
 
 export const consentSubmitDtoSchema = z.object({
   documentIds: z.array(z.string().min(1)).min(1, "Не указан ни один документ"),

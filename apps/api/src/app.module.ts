@@ -32,6 +32,7 @@ import { createLoggerModuleOptions } from "./common/logging";
 
 const AUTH_THROTTLE_PATHS = new Set([
   "/api/auth/register",
+  "/api/auth/register/resend",
   "/api/auth/register/verify",
   "/api/auth/login",
   "/api/auth/refresh",

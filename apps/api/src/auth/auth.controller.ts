@@ -5,6 +5,7 @@ import {
   changePasswordDtoSchema,
   loginDtoSchema,
   registerDtoSchema,
+  registrationResendDtoSchema,
   registrationVerifyDtoSchema,
 } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
@@ -18,6 +19,7 @@ import { AuthService } from "./auth.service";
 // Жёсткое окно «10 запросов в минуту на IP» именно для login/register/refresh —
 // чтобы перебор паролей и массовая регистрация ботов сразу натыкались на 429.
 const AUTH_THROTTLE = { auth: { limit: 10, ttl: 60_000 } };
+const REGISTRATION_RESEND_THROTTLE = { auth: { limit: 5, ttl: 60_000 } };
 const REFRESH_COOKIE_NAME = "refreshToken";
 const REFRESH_COOKIE_PATH = "/api/auth";
 const REFRESH_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -56,6 +58,13 @@ export class AuthController {
   async register(@Body() body: unknown, @Req() request: Request) {
     const input = parseBody(registerDtoSchema, body);
     return this.auth.register(input, this.meta(request));
+  }
+
+  @Throttle(REGISTRATION_RESEND_THROTTLE)
+  @Post("register/resend")
+  async resendRegistrationCode(@Body() body: unknown) {
+    const input = parseBody(registrationResendDtoSchema, body);
+    return this.auth.resendRegistrationCode(input);
   }
 
   @Throttle(AUTH_THROTTLE)

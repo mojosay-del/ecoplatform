@@ -11,6 +11,7 @@ import {
   createOfferDtoSchema,
   legalDocumentCreateDtoSchema,
   registerDtoSchema,
+  registrationResendDtoSchema,
 } from "../src";
 
 function listingPositions(count: number) {
@@ -41,6 +42,11 @@ describe("DTO size limits", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("validates registration resend payloads", () => {
+    expect(registrationResendDtoSchema.safeParse({ verificationId: "v1" }).success).toBe(true);
+    expect(registrationResendDtoSchema.safeParse({ verificationId: "" }).success).toBe(false);
   });
 
   it("validates partial profile updates but rejects an empty patch", () => {

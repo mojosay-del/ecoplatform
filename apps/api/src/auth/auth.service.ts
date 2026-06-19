@@ -3,9 +3,13 @@ import { JwtService } from "@nestjs/jwt";
 import { CompanyRole, CompanyStatus, NotificationCategory } from "@prisma/client";
 import { hash } from "bcryptjs";
 import { randomUUID } from "crypto";
-import { type LoginDto, type RegisterDto, type RegistrationVerifyDto } from "@ecoplatform/shared";
+import {
+  type LoginDto,
+  type RegisterDto,
+  type RegistrationResendDto,
+  type RegistrationVerifyDto,
+} from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
-import { swallowAndLog } from "../common/silent-catch";
 import { EmailService } from "../email/email.service";
 import { recordUserRegistered } from "../observability/metrics.registry";
 import { PrismaService } from "../prisma/prisma.service";
@@ -95,20 +99,52 @@ export class AuthService {
       },
     });
 
-    this.sendRegistrationCodeInBackground({ verificationId, email: prepared.email, code, expiresAt });
+    await this.sendRegistrationCode({ email: prepared.email, code, expiresAt });
 
     return { verificationId, email: prepared.email, expiresAt: expiresAt.toISOString() };
   }
 
-  private sendRegistrationCodeInBackground(input: {
-    verificationId: string;
+  async resendRegistrationCode(input: RegistrationResendDto): Promise<RegistrationVerificationStart> {
+    const now = new Date();
+    const challenge = await this.prisma.emailVerificationChallenge.findUnique({
+      where: { id: input.verificationId },
+      select: { id: true, email: true, verifiedAt: true, expiresAt: true },
+    });
+
+    if (!challenge || challenge.verifiedAt || challenge.expiresAt <= now) {
+      throw new BadRequestException("Код устарел. Отправьте новый код подтверждения.");
+    }
+
+    const code = generateEmailVerificationCode();
+    const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS);
+    const updated = await this.prisma.emailVerificationChallenge.updateMany({
+      where: {
+        id: challenge.id,
+        verifiedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: {
+        codeHash: hashEmailVerificationCode(challenge.id, challenge.email, code),
+        attempts: 0,
+        expiresAt,
+      },
+    });
+
+    if (updated.count !== 1) {
+      throw new BadRequestException("Код устарел. Отправьте новый код подтверждения.");
+    }
+
+    await this.sendRegistrationCode({ email: challenge.email, code, expiresAt });
+
+    return { verificationId: challenge.id, email: challenge.email, expiresAt: expiresAt.toISOString() };
+  }
+
+  private async sendRegistrationCode(input: {
     email: string;
     code: string;
     expiresAt: Date;
-  }): void {
-    void this.email
-      .sendRegistrationCode({ to: input.email, code: input.code, expiresAt: input.expiresAt })
-      .catch(swallowAndLog("auth.registration.email.background", { verificationId: input.verificationId }));
+  }): Promise<void> {
+    await this.email.sendRegistrationCode({ to: input.email, code: input.code, expiresAt: input.expiresAt });
   }
 
   async verifyRegistration(

@@ -520,6 +520,13 @@
   gap: 18px;
   flex-wrap: wrap;
 }
+.auth-verification-resend-status {
+  margin: -2px 0 0;
+  color: var(--success, #047857);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+}
 .auth-sr-only {
   position: absolute;
   width: 1px;

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { AuthMeUser } from "@ecoplatform/shared";
+import type { AuthMeUser, RegistrationResendDto, RegistrationVerifyDto } from "@ecoplatform/shared";
 import {
   apiFetch,
   clearAccessToken,
@@ -19,7 +19,8 @@ type AuthContextValue = {
   ready: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (input: Record<string, string | string[]>) => Promise<RegistrationStartResult>;
-  verifyRegistration: (input: { verificationId: string; code: string }) => Promise<void>;
+  resendRegistrationCode: (input: RegistrationResendDto) => Promise<RegistrationStartResult>;
+  verifyRegistration: (input: RegistrationVerifyDto) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
 };
@@ -103,7 +104,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }
 
-  async function verifyRegistration(input: { verificationId: string; code: string }) {
+  async function resendRegistrationCode(input: RegistrationResendDto): Promise<RegistrationStartResult> {
+    return apiFetch<RegistrationStartResult>("/auth/register/resend", {
+      method: "POST",
+      body: input,
+    });
+  }
+
+  async function verifyRegistration(input: RegistrationVerifyDto) {
     const result = await apiFetch<{ accessToken: string }>("/auth/register/verify", {
       method: "POST",
       body: input,
@@ -131,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value = useMemo(
-    () => ({ token, user, ready, login, register, verifyRegistration, logout, refreshMe }),
+    () => ({ token, user, ready, login, register, resendRegistrationCode, verifyRegistration, logout, refreshMe }),
     [token, user, ready],
   );
 

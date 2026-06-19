@@ -42,6 +42,42 @@ describe("Auth — регистрация и профиль", () => {
     expect(me.body.email).toBe("pending-code@test.local");
   });
 
+  it("повторная отправка кода остаётся в текущем challenge, сбрасывает попытки и позволяет завершить регистрацию", async () => {
+    const start = await submitRegistration({
+      organizationName: "ООО Код Ещё Раз",
+      companyType: "collector",
+      firstName: "Иван",
+      lastName: "Повторов",
+      phone: "+79000001006",
+      email: "resend-code@test.local",
+      password: "User12345678",
+    });
+    const previousExpiresAt = new Date(Date.now() + 60_000);
+
+    await ctx.prisma.emailVerificationChallenge.update({
+      where: { id: start.verificationId },
+      data: { attempts: 2, expiresAt: previousExpiresAt },
+    });
+
+    const resend = await ctx.http
+      .post("/api/auth/register/resend")
+      .send({ verificationId: start.verificationId });
+    expect(resend.status).toBe(201);
+    expect(resend.body.verificationId).toBe(start.verificationId);
+    expect(resend.body.email).toBe("resend-code@test.local");
+
+    const challenge = await ctx.prisma.emailVerificationChallenge.findUniqueOrThrow({
+      where: { id: start.verificationId },
+    });
+    expect(challenge.attempts).toBe(0);
+    expect(challenge.expiresAt.getTime()).toBeGreaterThan(previousExpiresAt.getTime());
+
+    const token = await verifyRegistration(start.verificationId);
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(me.status).toBe(200);
+    expect(me.body.email).toBe("resend-code@test.local");
+  });
+
   it("без загруженного фото аватар профиля пустой (нейтральная иконка на фронте)", async () => {
     const adminToken = await loginAdmin();
     const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);

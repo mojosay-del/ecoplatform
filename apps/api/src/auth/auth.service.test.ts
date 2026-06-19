@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from "@nestjs/common";
 import { compare, hash } from "bcryptjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthService } from "./auth.service";
@@ -173,6 +174,7 @@ describe("AuthService registration email", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     if (ORIGINAL_JWT_ACCESS_SECRET === undefined) {
       delete process.env.JWT_ACCESS_SECRET;
     } else {
@@ -180,7 +182,7 @@ describe("AuthService registration email", () => {
     }
   });
 
-  it("возвращает шаг ввода кода, не ожидая завершения SMTP-отправки", async () => {
+  it("возвращает шаг ввода кода только после успешной SMTP-отправки", async () => {
     const prisma = {
       user: {
         findFirst: vi.fn().mockResolvedValue(null),
@@ -194,7 +196,7 @@ describe("AuthService registration email", () => {
       },
     };
     const email = {
-      sendRegistrationCode: vi.fn(() => new Promise<void>(() => undefined)),
+      sendRegistrationCode: vi.fn().mockResolvedValue(undefined),
     };
     const service = createService(prisma, email);
 
@@ -204,7 +206,6 @@ describe("AuthService registration email", () => {
         companyType: "collector",
         firstName: "Иван",
         lastName: "Петров",
-        gender: "male",
         phone: "+79990000000",
         email: "Fast@Example.Test",
         password: "Password12345",
@@ -224,5 +225,113 @@ describe("AuthService registration email", () => {
         code: expect.stringMatching(/^\d{4}$/),
       }),
     );
+  });
+
+  it("не возвращает verificationId, если SMTP не принял письмо", async () => {
+    const prisma = {
+      user: {
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+      legalDocument: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      emailVerificationChallenge: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({}),
+      },
+    };
+    const email = {
+      sendRegistrationCode: vi.fn().mockRejectedValue(new ServiceUnavailableException("SMTP недоступен.")),
+    };
+    const service = createService(prisma, email);
+
+    await expect(
+      service.register(
+        {
+          organizationName: "ООО Быстрая регистрация",
+          companyType: "collector",
+          firstName: "Иван",
+          lastName: "Петров",
+          phone: "+79990000001",
+          email: "Fail@Example.Test",
+          password: "Password12345",
+          acceptedDocumentIds: [],
+        },
+        { userAgent: "test" },
+      ),
+    ).rejects.toThrow("SMTP недоступен.");
+
+    expect(email.sendRegistrationCode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "fail@example.test",
+        code: expect.stringMatching(/^\d{4}$/),
+      }),
+    );
+  });
+
+  it("повторно отправляет новый код по активному registration challenge и сбрасывает попытки", async () => {
+    const now = new Date("2026-06-19T12:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const prisma = {
+      emailVerificationChallenge: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "verification-1",
+          email: "user@example.test",
+          verifiedAt: null,
+          expiresAt: new Date("2026-06-19T12:05:00.000Z"),
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const email = {
+      sendRegistrationCode: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = createService(prisma, email);
+
+    const result = await service.resendRegistrationCode({ verificationId: "verification-1" });
+
+    expect(prisma.emailVerificationChallenge.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "verification-1",
+        verifiedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: {
+        codeHash: expect.any(String),
+        attempts: 0,
+        expiresAt: new Date("2026-06-19T12:15:00.000Z"),
+      },
+    });
+    expect(email.sendRegistrationCode).toHaveBeenCalledWith({
+      to: "user@example.test",
+      code: expect.stringMatching(/^\d{4}$/),
+      expiresAt: new Date("2026-06-19T12:15:00.000Z"),
+    });
+    expect(result).toEqual({
+      verificationId: "verification-1",
+      email: "user@example.test",
+      expiresAt: "2026-06-19T12:15:00.000Z",
+    });
+  });
+
+  it("не переотправляет код по истёкшему или подтверждённому challenge", async () => {
+    const prisma = {
+      emailVerificationChallenge: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn(),
+      },
+    };
+    const email = {
+      sendRegistrationCode: vi.fn(),
+    };
+    const service = createService(prisma, email);
+
+    await expect(service.resendRegistrationCode({ verificationId: "missing" })).rejects.toThrow(
+      "Код устарел. Отправьте новый код подтверждения.",
+    );
+
+    expect(prisma.emailVerificationChallenge.updateMany).not.toHaveBeenCalled();
+    expect(email.sendRegistrationCode).not.toHaveBeenCalled();
   });
 });
