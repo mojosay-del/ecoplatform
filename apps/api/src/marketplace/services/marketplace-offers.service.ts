@@ -1,5 +1,4 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { NotificationCategory, Prisma } from "@prisma/client";
 import {
   type CreateOfferDto,
   type DealDecisionDto,
@@ -16,15 +15,20 @@ import {
 import { ModuleAccessService } from "../../common/module-access.service";
 import { paginatedResponse, resolvePagination } from "../../common/pagination";
 import type { RequestUser } from "../../common/request-user";
-import { swallowAndLog } from "../../common/silent-catch";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AddressGeocoderService } from "../../geo/address-geocoder.service";
 import { type OfferWithRelations, offerInclude, toListingOfferItem, toMyOfferItem } from "./marketplace-offers.helpers";
-
-const DECISION_WINDOW_MS = 24 * 60 * 60 * 1000;
-const CREATE_OFFER_TRANSACTION_RETRIES = 3;
-const DUPLICATE_ACTIVE_OFFER_MESSAGE = "У вас уже есть активное предложение по этому объявлению — измените его.";
+import {
+  acceptOfferWithRaceGuard,
+  assertOfferPositions,
+  autoResolveExpiredOfferAcceptances,
+  createOfferAtomically,
+  notifyMarketplaceOffer,
+  offerCity,
+  offerPositionCreateData,
+  resolveOfferRegion,
+} from "./marketplace-offers-workflow.helpers";
 type ListParams = { limit?: number; offset?: number };
 
 // Сервис предложений (закрытый аукцион). Покупатель (трейдер/переработчик) шлёт
@@ -81,14 +85,14 @@ export class MarketplaceOffersService {
       throw new ForbiddenException("Нельзя делать предложение на собственное объявление.");
     }
 
-    this.assertOfferPositions(
+    assertOfferPositions(
       dto,
       listing.positions.map((position) => position.id),
     );
 
     const city = offerCity(dto);
-    const region = await this.resolveOfferRegion(city);
-    const offer = await this.createOfferAtomically({
+    const region = await resolveOfferRegion(this.geocoder, city);
+    const offer = await createOfferAtomically(this.prisma, {
       listingId,
       buyerCompanyId,
       data: {
@@ -103,14 +107,14 @@ export class MarketplaceOffersService {
       },
     });
 
-    await this.notify(
-      listing.createdById,
-      "marketplace.offer.created",
-      "Новое предложение",
-      "По вашему объявлению поступило новое ценовое предложение.",
-      `/marketplace/${listingId}`,
-      offer.id,
-    );
+    await notifyMarketplaceOffer(this.notifications, {
+      userId: listing.createdById,
+      eventType: "marketplace.offer.created",
+      title: "Новое предложение",
+      body: "По вашему объявлению поступило новое ценовое предложение.",
+      link: `/marketplace/${listingId}`,
+      sourceId: offer.id,
+    });
     return toMyOfferItem(offer);
   }
 
@@ -123,13 +127,13 @@ export class MarketplaceOffersService {
     if (offer.status !== "active") {
       throw new BadRequestException("Изменить можно только активное предложение (до его принятия).");
     }
-    this.assertOfferPositions(
+    assertOfferPositions(
       dto,
       offer.listing.positions.map((position) => position.id),
     );
 
     const city = offerCity(dto);
-    const region = await this.resolveOfferRegion(city);
+    const region = await resolveOfferRegion(this.geocoder, city);
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.offerPosition.deleteMany({ where: { offerId } });
       await tx.offerPosition.createMany({
@@ -147,14 +151,14 @@ export class MarketplaceOffersService {
       });
     });
 
-    await this.notify(
-      offer.listing.createdById,
-      "marketplace.offer.updated",
-      "Предложение изменено",
-      "Покупатель изменил предложение по вашему объявлению.",
-      `/marketplace/${offer.listingId}`,
-      offerId,
-    );
+    await notifyMarketplaceOffer(this.notifications, {
+      userId: offer.listing.createdById,
+      eventType: "marketplace.offer.updated",
+      title: "Предложение изменено",
+      body: "Покупатель изменил предложение по вашему объявлению.",
+      link: `/marketplace/${offer.listingId}`,
+      sourceId: offerId,
+    });
     return toMyOfferItem(updated);
   }
 
@@ -169,14 +173,14 @@ export class MarketplaceOffersService {
       data: { status: "withdrawn", resolvedAt: new Date() },
       include: offerInclude,
     });
-    await this.notify(
-      offer.listing.createdById,
-      "marketplace.offer.withdrawn",
-      "Предложение отозвано",
-      "Покупатель отозвал предложение по вашему объявлению.",
-      `/marketplace/${offer.listingId}`,
-      offerId,
-    );
+    await notifyMarketplaceOffer(this.notifications, {
+      userId: offer.listing.createdById,
+      eventType: "marketplace.offer.withdrawn",
+      title: "Предложение отозвано",
+      body: "Покупатель отозвал предложение по вашему объявлению.",
+      link: `/marketplace/${offer.listingId}`,
+      sourceId: offerId,
+    });
     return toMyOfferItem(updated);
   }
 
@@ -244,15 +248,15 @@ export class MarketplaceOffersService {
     }
 
     const now = new Date();
-    const updated = await this.acceptOfferWithRaceGuard(offer, now);
-    await this.notify(
-      offer.createdById,
-      "marketplace.offer.accepted",
-      "Предложение принято",
-      "Продавец принял ваше предложение. Контакты раскрыты — свяжитесь для сделки.",
-      "/marketplace/offers",
-      offerId,
-    );
+    const updated = await acceptOfferWithRaceGuard(this.prisma, offer, now);
+    await notifyMarketplaceOffer(this.notifications, {
+      userId: offer.createdById,
+      eventType: "marketplace.offer.accepted",
+      title: "Предложение принято",
+      body: "Продавец принял ваше предложение. Контакты раскрыты — свяжитесь для сделки.",
+      link: "/marketplace/offers",
+      sourceId: offerId,
+    });
     return toListingOfferItem(updated);
   }
 
@@ -270,14 +274,14 @@ export class MarketplaceOffersService {
         data: { status: "declined", dealResult: "not_agreed", resolvedAt: now },
         include: offerInclude,
       });
-      await this.notify(
-        offer.createdById,
-        "marketplace.deal.failed",
-        "Сделка не состоялась",
-        "Продавец отметил, что договориться не удалось. Объявление снова активно.",
-        "/marketplace/offers",
-        offerId,
-      );
+      await notifyMarketplaceOffer(this.notifications, {
+        userId: offer.createdById,
+        eventType: "marketplace.deal.failed",
+        title: "Сделка не состоялась",
+        body: "Продавец отметил, что договориться не удалось. Объявление снова активно.",
+        link: "/marketplace/offers",
+        sourceId: offerId,
+      });
       return toListingOfferItem(updated);
     }
 
@@ -303,24 +307,24 @@ export class MarketplaceOffersService {
       return result;
     });
 
-    await this.notify(
-      offer.createdById,
-      "marketplace.deal.agreed",
-      "Сделка состоялась",
-      "Продавец подтвердил сделку. Скоро можно будет оставить отзыв.",
-      "/marketplace/offers",
-      offerId,
-    );
+    await notifyMarketplaceOffer(this.notifications, {
+      userId: offer.createdById,
+      eventType: "marketplace.deal.agreed",
+      title: "Сделка состоялась",
+      body: "Продавец подтвердил сделку. Скоро можно будет оставить отзыв.",
+      link: "/marketplace/offers",
+      sourceId: offerId,
+    });
     await Promise.all(
       competitors.map((competitor) =>
-        this.notify(
-          competitor.createdById,
-          "marketplace.offer.declined",
-          "Выбрали другого покупателя",
-          "По объявлению, на которое вы делали предложение, продавец выбрал другого покупателя.",
-          "/marketplace/offers",
-          competitor.id,
-        ),
+        notifyMarketplaceOffer(this.notifications, {
+          userId: competitor.createdById,
+          eventType: "marketplace.offer.declined",
+          title: "Выбрали другого покупателя",
+          body: "По объявлению, на которое вы делали предложение, продавец выбрал другого покупателя.",
+          link: "/marketplace/offers",
+          sourceId: competitor.id,
+        }),
       ),
     );
     return toListingOfferItem(updated);
@@ -329,34 +333,7 @@ export class MarketplaceOffersService {
   // Cron: принятые предложения без решения за 24ч — архивируем объявление
   // (not_settled), сами предложения и конкурентов закрываем. Возвращает число.
   async autoResolveExpiredAcceptances(now = new Date()): Promise<number> {
-    const expired = await this.prisma.offer.findMany({
-      where: { status: "accepted", dealResult: null, decisionDeadline: { lt: now } },
-      select: { id: true, listingId: true, createdById: true },
-    });
-    if (expired.length === 0) return 0;
-
-    for (const offer of expired) {
-      await this.prisma.$transaction([
-        this.prisma.offer.update({ where: { id: offer.id }, data: { status: "declined", resolvedAt: now } }),
-        this.prisma.marketplaceListing.update({
-          where: { id: offer.listingId },
-          data: { status: "archived", archivedAt: now, archiveReason: "not_settled" },
-        }),
-        this.prisma.offer.updateMany({
-          where: { listingId: offer.listingId, status: "active" },
-          data: { status: "declined", resolvedAt: now },
-        }),
-      ]);
-      await this.notify(
-        offer.createdById,
-        "marketplace.deal.timeout",
-        "Время на решение истекло",
-        "Продавец не подтвердил сделку за 24 часа. Объявление перемещено в архив.",
-        "/marketplace/offers",
-        offer.id,
-      );
-    }
-    return expired.length;
+    return autoResolveExpiredOfferAcceptances(this.prisma, this.notifications, now);
   }
 
   // ── Внутреннее ──────────────────────────────────────────────────────────
@@ -371,122 +348,4 @@ export class MarketplaceOffersService {
     }
     return offer;
   }
-
-  private async createOfferAtomically(params: {
-    listingId: string;
-    buyerCompanyId: string;
-    data: Prisma.OfferCreateArgs["data"];
-  }): Promise<OfferWithRelations> {
-    let attempts = 0;
-
-    while (true) {
-      try {
-        return await this.prisma.$transaction(
-          async (tx) => {
-            const existing = await tx.offer.findFirst({
-              where: {
-                listingId: params.listingId,
-                buyerCompanyId: params.buyerCompanyId,
-                status: { in: ["active", "accepted"] },
-                positions: { some: { pricePerTonRub: { gt: 0 } } },
-              },
-              select: { id: true },
-            });
-            if (existing) {
-              throw new BadRequestException(DUPLICATE_ACTIVE_OFFER_MESSAGE);
-            }
-
-            return tx.offer.create({ data: params.data, include: offerInclude });
-          },
-          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-        );
-      } catch (error) {
-        attempts += 1;
-        if (!isTransactionWriteConflictError(error) || attempts >= CREATE_OFFER_TRANSACTION_RETRIES) {
-          throw error;
-        }
-      }
-    }
-  }
-
-  private async acceptOfferWithRaceGuard(offer: OfferWithRelations, now: Date): Promise<OfferWithRelations> {
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        const pending = await tx.offer.findFirst({
-          where: { listingId: offer.listingId, status: "accepted", id: { not: offer.id } },
-          select: { id: true },
-        });
-        if (pending) {
-          throw new BadRequestException("По объявлению уже есть принятое предложение, ожидающее решения.");
-        }
-
-        const accepted = await tx.offer.updateMany({
-          where: { id: offer.id, status: "active" },
-          data: { status: "accepted", acceptedAt: now, decisionDeadline: new Date(now.getTime() + DECISION_WINDOW_MS) },
-        });
-        if (accepted.count === 0) {
-          throw new BadRequestException("Принять можно только активное предложение.");
-        }
-
-        const updated = await tx.offer.findUnique({ where: { id: offer.id }, include: offerInclude });
-        if (!updated) {
-          throw new NotFoundException("Предложение не найдено.");
-        }
-        return updated;
-      });
-    } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        throw new BadRequestException("По объявлению уже есть принятое предложение, ожидающее решения.");
-      }
-      throw error;
-    }
-  }
-
-  private assertOfferPositions(dto: CreateOfferDto, listingPositionIds: string[]) {
-    const ids = dto.positions.map((position) => position.listingPositionId);
-    if (new Set(ids).size !== ids.length) {
-      throw new BadRequestException("В предложении есть дублирующиеся позиции.");
-    }
-    const allowed = new Set(listingPositionIds);
-    if (!ids.every((id) => allowed.has(id))) {
-      throw new BadRequestException("Позиция предложения не принадлежит этому объявлению.");
-    }
-    if (!dto.positions.some((position) => position.pricePerTonRub != null && position.pricePerTonRub > 0)) {
-      throw new BadRequestException("Укажите цену хотя бы по одной позиции.");
-    }
-    if (dto.priceCondition === "at_gate" && !dto.city?.trim()) {
-      throw new BadRequestException("Для условия «цена на воротах» укажите город доставки.");
-    }
-  }
-
-  private async resolveOfferRegion(city: string | null): Promise<string | null> {
-    if (!city) return null;
-    const result = await this.geocoder.geocode(city);
-    return result?.region?.trim() || null;
-  }
-
-  private async notify(userId: string, eventType: string, title: string, body: string, link: string, sourceId: string) {
-    await this.notifications
-      .createInApp({ userId, eventType, category: NotificationCategory.marketplace, title, body, link, sourceId })
-      .catch(swallowAndLog(eventType, { userId, sourceId }));
-  }
-}
-
-function offerCity(dto: CreateOfferDto): string | null {
-  return dto.priceCondition === "at_gate" ? dto.city?.trim() || null : null;
-}
-
-function offerPositionCreateData(dto: CreateOfferDto) {
-  return dto.positions.map((position) => ({
-    listingPositionId: position.listingPositionId,
-    pricePerTonRub: position.pricePerTonRub ?? null,
-  }));
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
-}
-
-function isTransactionWriteConflictError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
 }
