@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { KnowledgeNode } from "@ecoplatform/shared";
-import { countKnowledgeNodes, findPreferredKnowledgeNode } from "./knowledge-base-utils";
+import {
+  buildKnowledgeBreadcrumbs,
+  countKnowledgeNodes,
+  findKnowledgePath,
+  findPreferredKnowledgeNode,
+  knowledgeNodeContainsSlug,
+} from "./knowledge-base-utils";
 
 function knowledgeNode(slug: string, overrides: Partial<KnowledgeNode> = {}): KnowledgeNode {
   return {
@@ -67,5 +73,41 @@ describe("countKnowledgeNodes", () => {
     ];
 
     expect(countKnowledgeNodes(tree)).toBe(6);
+  });
+});
+
+describe("knowledge tree helpers", () => {
+  const tree = [
+    knowledgeNode("makulatura", {
+      title: "Макулатура",
+      children: [
+        knowledgeNode("karton", {
+          title: "Картон",
+          children: [knowledgeNode("gofrokarton", { title: "Гофрокартон" })],
+        }),
+      ],
+    }),
+    knowledgeNode("plastiki", { title: "Пластики" }),
+  ];
+
+  it("находит путь до вложенного материала", () => {
+    expect(findKnowledgePath(tree, "gofrokarton")?.map((node) => node.slug)).toEqual([
+      "makulatura",
+      "karton",
+      "gofrokarton",
+    ]);
+  });
+
+  it("строит хлебные крошки без текущего материала", () => {
+    expect(buildKnowledgeBreadcrumbs(tree, knowledgeNode("gofrokarton"))).toEqual([
+      { title: "Макулатура", slug: "makulatura" },
+      { title: "Картон", slug: "karton" },
+    ]);
+  });
+
+  it("проверяет, содержит ли ветка активный slug", () => {
+    expect(knowledgeNodeContainsSlug(tree[0]!, "gofrokarton")).toBe(true);
+    expect(knowledgeNodeContainsSlug(tree[1]!, "gofrokarton")).toBe(false);
+    expect(knowledgeNodeContainsSlug(tree[0]!, undefined)).toBe(false);
   });
 });
