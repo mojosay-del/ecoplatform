@@ -186,8 +186,8 @@ magic-byte валидация загрузок, приватный S3-бакет
         `personal-profile-utils.ts`.
     - [x] **M-1.3.** `apps/web/src/views/knowledge-base-view.tsx`
       - **Исполнитель/заметка:** Codex 2026-06-19 — декомпозирован `knowledge-base-view.tsx` на layout/article/navigation/search/drawer/hooks; файлы: `knowledge-base-*`, `use-knowledge-*`, `knowledge-base-utils*`.
-    - [ ] **M-1.4.** `apps/web/src/views/account/SubscriptionDialog.tsx`
-      - **Исполнитель/заметка:**
+    - [x] **M-1.4.** `apps/web/src/views/account/SubscriptionDialog.tsx`
+      - **Исполнитель/заметка:** Codex 2026-06-19 — декомпозирован диалог подписки на plans/payment/utils/hooks, добавлен unit-тест; файлы: `SubscriptionDialog.tsx`, `SubscriptionPlans.tsx`, `PaymentDialog.tsx`, `subscription-dialog-*`, `hooks.ts`.
     - [ ] **M-1.5.** `apps/api/src/marketplace/services/marketplace-offers.service.ts`
       - **Исполнитель/заметка:**
     - [ ] **M-1.6.** `apps/api/src/moderation/moderation-decision.helpers.ts`
