@@ -74,6 +74,14 @@ Postgres-контейнере и сами накатывают миграции 
 (общий харнесс — в `apps/api/src/test/`) и идёт последовательно (одна тест-БД).
 GitHub Actions гоняет проверки и integration-тесты на каждый push в `main`.
 
+## Контракт API-ошибок
+
+Все HTTP-ошибки API отдаются JSON-объектом `{ message, error, statusCode }`.
+`message` — строка или массив строк для ошибок валидации, `error` — короткий
+класс ошибки, `statusCode` совпадает с HTTP-статусом. Общий тип находится в
+`@ecoplatform/shared` как `ApiErrorResponse`; web-клиент разворачивает `message`
+в человекочитаемый текст через `extractApiErrorMessage`.
+
 ## Архитектура
 
 ```

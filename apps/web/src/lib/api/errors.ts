@@ -1,3 +1,5 @@
+import type { ApiErrorResponse } from "@ecoplatform/shared";
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -13,7 +15,7 @@ export class ApiError extends Error {
 export function extractApiErrorMessage(raw: string): string {
   if (!raw) return "";
   try {
-    const parsed = JSON.parse(raw) as { message?: string | string[] };
+    const parsed = JSON.parse(raw) as Partial<ApiErrorResponse>;
     if (Array.isArray(parsed.message)) return parsed.message.join("; ");
     if (typeof parsed.message === "string") return parsed.message;
     return raw;

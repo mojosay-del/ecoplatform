@@ -48,6 +48,14 @@ export type PaginationQuery = {
   offset?: number;
 };
 
+// Единый JSON-формат ошибок HTTP API. Backend отдаёт его для Nest
+// HttpException/Zod-ошибок, frontend берёт отсюда тип для разбора message.
+export type ApiErrorResponse = {
+  message: string | string[];
+  error: string;
+  statusCode: number;
+};
+
 export type CommentLikeCount = {
   likes: number;
 };

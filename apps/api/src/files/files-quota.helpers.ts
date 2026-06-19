@@ -51,8 +51,13 @@ export async function assertDailyUploadQuota(
     return;
   }
 
+  const statusCode = HttpStatus.TOO_MANY_REQUESTS;
   throw new HttpException(
-    `Дневной лимит загрузок исчерпан. Будет сброшен через ${quotaResetHours(windowStart)} ч.`,
-    HttpStatus.TOO_MANY_REQUESTS,
+    {
+      message: `Дневной лимит загрузок исчерпан. Будет сброшен через ${quotaResetHours(windowStart)} ч.`,
+      error: "Too Many Requests",
+      statusCode,
+    },
+    statusCode,
   );
 }

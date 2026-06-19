@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, clearAccessToken, getAccessToken, tryRestoreSession } from "./core";
+import { extractApiErrorMessage } from "./errors";
 
 describe("apiFetch", () => {
   afterEach(() => {
@@ -50,6 +51,21 @@ describe("apiFetch", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("Нет доступа", { status: 403 })));
 
     await expect(apiFetch("/closed")).rejects.toMatchObject({ message: "Нет доступа", status: 403 });
+  });
+
+  it("extracts standardized API error payloads", () => {
+    expect(
+      extractApiErrorMessage(JSON.stringify({ message: "Нет доступа", error: "Forbidden", statusCode: 403 })),
+    ).toBe("Нет доступа");
+    expect(
+      extractApiErrorMessage(
+        JSON.stringify({
+          message: ["Поле email обязательно", "Пароль слишком короткий"],
+          error: "Bad Request",
+          statusCode: 400,
+        }),
+      ),
+    ).toBe("Поле email обязательно; Пароль слишком короткий");
   });
 
   it("does not add JSON content type to GET requests without body", async () => {
