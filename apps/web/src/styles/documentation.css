@@ -150,6 +150,23 @@
   font-size: var(--text-xs);
 }
 
+.doc-download-error {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-elevated));
+  color: var(--danger);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.doc-download-error.is-panel {
+  width: 100%;
+  margin: 4px 0 0;
+}
+
 .doc-empty {
   padding: 40px 0;
 }

@@ -138,6 +138,7 @@ export class VideoTranscodeService {
       await this.setStatus(assetId, "failed", []).catch(() => undefined);
       return false;
     } finally {
+      client.destroy();
       await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
     }
   }

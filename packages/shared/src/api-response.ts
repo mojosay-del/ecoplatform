@@ -354,8 +354,8 @@ export type DocumentationDetail = DocumentationNode & {
   breadcrumbs: DocumentationBreadcrumb[];
 };
 
-// Ответ эндпоинта скачивания: свежая короткоживущая presigned-ссылка на
-// приватный файл (или null, если файла нет / S3 не настроен).
+// Ответ эндпоинта скачивания: свежая короткоживущая ссылка на файл. Если файл
+// есть, но хранилище временно недоступно, API возвращает 503 с ошибкой.
 export type DocumentationDownload = {
   url: string | null;
 };

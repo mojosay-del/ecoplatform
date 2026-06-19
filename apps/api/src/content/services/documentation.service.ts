@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { ContentStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
@@ -165,6 +165,9 @@ export class DocumentationService {
     }
 
     const url = await this.files.createSignedDownloadUrl(row.file);
+    if (!url) {
+      throw new ServiceUnavailableException("Файловое хранилище временно недоступно. Попробуйте скачать файл позже.");
+    }
     return { url };
   }
 

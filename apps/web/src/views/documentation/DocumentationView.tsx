@@ -57,6 +57,7 @@ export function DocumentationView() {
   const [format, setFormat] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<DocumentationNode[] | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const navDrawerRef = useRef<HTMLElement>(null);
 
   useDialogA11y(navDrawerRef, { bodyLock: true, enabled: navOpen, onEscape: () => setNavOpen(false) });
@@ -123,8 +124,10 @@ export function DocumentationView() {
     return () => media.removeEventListener("change", onMediaChange);
   }, [navOpen]);
 
-  const onDownload = useCallback((node: DocumentationNode) => {
-    void triggerDocumentDownload(node);
+  const onDownload = useCallback(async (node: DocumentationNode) => {
+    setDownloadError(null);
+    const message = await triggerDocumentDownload(node);
+    if (message) setDownloadError(message);
   }, []);
 
   const resetSearch = useCallback(() => {
@@ -199,6 +202,11 @@ export function DocumentationView() {
           </form>
           <p className="doc-header-metric">{documentsAddedLabel(allDocuments.length)}</p>
         </header>
+        {downloadError ? (
+          <p className="doc-download-error" role="alert">
+            {downloadError}
+          </p>
+        ) : null}
 
         {tree.length === 0 ? (
           <div className="doc-empty">

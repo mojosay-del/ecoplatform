@@ -1,4 +1,12 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
@@ -31,8 +39,10 @@ import {
 import { assertDailyUploadQuota, type FilesQuotaDeps } from "./files-quota.helpers";
 import {
   bucketForAccessLevel,
+  externalStorageErrorCode,
   getS3Client,
   readS3HealthConfig,
+  S3_UNAVAILABLE_MESSAGE,
   s3PingBucket,
   signS3DownloadUrls,
 } from "./files-storage.helpers";
@@ -71,6 +81,8 @@ const S3_HEALTH_TIMEOUT_MS = 1_000;
 
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly settings?: PlatformSettingsService,
@@ -296,29 +308,36 @@ export class FilesService {
       storageKey: storageKeyWithExtension(storageKey, variant.extension),
     }));
 
-    await Promise.all([
-      client.send(
-        new PutObjectCommand({
-          Bucket: targetBucket,
-          Key: storageKey,
-          Body: upload.buffer,
-          ContentType: upload.mimeType,
-          ContentDisposition: upload.contentDisposition,
-          ContentLength: upload.buffer.length,
-        }),
-      ),
-      ...variantUploads.map((variant) =>
+    try {
+      await Promise.all([
         client.send(
           new PutObjectCommand({
             Bucket: targetBucket,
-            Key: variant.storageKey,
-            Body: variant.buffer,
-            ContentType: variant.mimeType,
-            ContentLength: variant.buffer.length,
+            Key: storageKey,
+            Body: upload.buffer,
+            ContentType: upload.mimeType,
+            ContentDisposition: upload.contentDisposition,
+            ContentLength: upload.buffer.length,
           }),
         ),
-      ),
-    ]);
+        ...variantUploads.map((variant) =>
+          client.send(
+            new PutObjectCommand({
+              Bucket: targetBucket,
+              Key: variant.storageKey,
+              Body: variant.buffer,
+              ContentType: variant.mimeType,
+              ContentLength: variant.buffer.length,
+            }),
+          ),
+        ),
+      ]);
+    } catch (error) {
+      this.logger.warn(`S3 upload failed: ${externalStorageErrorCode(error)}`);
+      throw new ServiceUnavailableException(S3_UNAVAILABLE_MESSAGE);
+    } finally {
+      client.destroy();
+    }
 
     const variants =
       variantUploads.length > 0

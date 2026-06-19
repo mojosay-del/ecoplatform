@@ -3,6 +3,7 @@ import { FileAccessLevel } from "@prisma/client";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import sharp from "sharp";
 import { FilesService } from "./files.service";
+import { serializeVideoRenditions } from "./video-renditions";
 
 // Presigner мокаем: реальная подпись ходит к конфигу S3, нам же важна только
 // логика выбора бакета и того, что для приватных файлов вызывается presign.
@@ -17,7 +18,7 @@ vi.mock("@aws-sdk/s3-request-presigner", () => ({
 // new S3Client() отдаёт фейк с общим s3Send. Тесты задают окружение через withEnv*
 // (CONFIGURED_S3_ENV), реальный getS3Config создаёт мок-клиент, а ассерты идут по
 // s3Send. Так тест не зависит от того, где физически лежит S3-логика.
-const { s3Send } = vi.hoisted(() => ({ s3Send: vi.fn() }));
+const { s3Destroy, s3Send } = vi.hoisted(() => ({ s3Destroy: vi.fn(), s3Send: vi.fn() }));
 vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@aws-sdk/client-s3")>();
   // new S3Client() должен быть конструируемым — поэтому function, а не стрелка.
@@ -25,12 +26,13 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
     ...actual,
     S3Client: vi.fn(function MockS3Client(this: { send: typeof s3Send; destroy: () => void }) {
       this.send = s3Send;
-      this.destroy = () => {};
+      this.destroy = s3Destroy;
     }),
   };
 });
 
 beforeEach(() => {
+  s3Destroy.mockReset();
   s3Send.mockReset();
   s3Send.mockResolvedValue({});
   vi.mocked(getSignedUrl).mockClear();
@@ -489,6 +491,38 @@ describe("FilesService upload validation", () => {
     expect(result.mimeType).toBe("application/pdf");
   });
 
+  it("возвращает понятную ошибку и не создаёт metadata, если S3 upload недоступен", async () => {
+    const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
+        create: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+    s3Send.mockRejectedValueOnce(Object.assign(new Error("Access denied"), { name: "AccessDenied" }));
+
+    await expect(
+      withEnvAsync(CONFIGURED_S3_ENV, () =>
+        service.upload(
+          {
+            originalname: "report.pdf",
+            mimetype: "application/pdf",
+            size: pdf.length,
+            buffer: pdf,
+          },
+          {},
+          "user-1",
+        ),
+      ),
+    ).rejects.toThrow("Файловое хранилище временно недоступно");
+
+    expect(prisma.fileAsset.create).not.toHaveBeenCalled();
+    expect(s3Destroy).toHaveBeenCalledTimes(1);
+  });
+
   it("отклоняет PDF в режиме загрузки медиа пользователем компании", async () => {
     const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
     const prisma = referencePrisma({
@@ -801,6 +835,37 @@ describe("FilesService приватный бакет + signed URL", () => {
     expect(dispositions.some((value) => typeof value === "string")).toBe(true);
   });
 
+  it("findManyByIds: failed video-transcode оставляет доступным оригинальный streamUrl", async () => {
+    const prisma = referencePrisma({
+      fileAsset: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "vid-failed",
+            storageKey: "uploads/2026-06-06/original.mp4",
+            accessLevel: FileAccessLevel.authenticated,
+            originalName: "original.mp4",
+            mimeType: "video/mp4",
+            sizeBytes: 100,
+            variants: null,
+            videoRenditions: serializeVideoRenditions({ status: "failed", renditions: [] }),
+            createdAt: new Date("2026-06-06T00:00:00.000Z"),
+          },
+        ]),
+        findUnique: vi.fn(),
+        aggregate: vi.fn(),
+        delete: vi.fn(),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    const result = await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: "private-bucket" }, () =>
+      service.findManyByIds(["vid-failed"], { id: "cm-1", platformRoles: ["content_manager"] } as any),
+    );
+
+    expect(result[0]?.videoRenditions).toEqual({ status: "failed", sources: [] });
+    expect(result[0]?.streamUrl).toBe("https://signed.example/private-bucket/uploads/2026-06-06/original.mp4");
+  });
+
   it("signDownloadUrls: public → прямая публичная ссылка", async () => {
     const service = serviceWithPrisma(referencePrisma());
 
@@ -828,6 +893,24 @@ describe("FilesService приватный бакет + signed URL", () => {
     );
 
     expect(urls.get("priv")).toBe("https://signed.example/private-bucket/uploads/x/doc.pdf");
+  });
+
+  it("signDownloadUrls: ошибка presign даёт null для файла, а не роняет весь ответ", async () => {
+    const service = serviceWithPrisma(referencePrisma());
+    vi.mocked(getSignedUrl).mockRejectedValueOnce(Object.assign(new Error("S3 timeout"), { name: "TimeoutError" }));
+
+    const urls = await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: "private-bucket" }, () =>
+      service.signDownloadUrls([
+        {
+          id: "priv",
+          storageKey: "uploads/x/doc.pdf",
+          accessLevel: FileAccessLevel.authenticated,
+          originalName: "doc.pdf",
+        },
+      ]),
+    );
+
+    expect(urls.get("priv")).toBeNull();
   });
 
   it("signDownloadUrls: приватный файл без приватного бакета → null без публичного fallback", async () => {

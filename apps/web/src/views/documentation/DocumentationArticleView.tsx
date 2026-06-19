@@ -5,7 +5,7 @@ import "../../styles/documentation.css";
 // датой «действует с». Фокусный вид для чтения и скачивания.
 
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { ArrowLeft, Download } from "lucide-react";
 import type { DocumentationDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
@@ -17,14 +17,18 @@ import { formatBytes, formatRuDate } from "./doc-helpers";
 import { triggerDocumentDownload } from "./download";
 
 export function DocumentationArticleView({ slug }: { slug: string }) {
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const { data, state, errorMessage } = useApiQuery<DocumentationDetail | null>(
     `doc:${slug}`,
     () => api.documentation.getDocument(slug),
     null,
   );
 
-  const onDownload = useCallback(() => {
-    if (data) void triggerDocumentDownload(data);
+  const onDownload = useCallback(async () => {
+    if (!data) return;
+    setDownloadError(null);
+    const message = await triggerDocumentDownload(data);
+    if (message) setDownloadError(message);
   }, [data]);
 
   if (state === "unauthenticated") return <AuthRequired title="Документация" />;
@@ -85,6 +89,11 @@ export function DocumentationArticleView({ slug }: { slug: string }) {
                   <Download size={15} aria-hidden="true" />
                   Скачать
                 </button>
+                {downloadError ? (
+                  <p className="doc-download-error is-panel" role="alert">
+                    {downloadError}
+                  </p>
+                ) : null}
               </>
             ) : (
               <p className="page-subtitle">Файл не прикреплён.</p>

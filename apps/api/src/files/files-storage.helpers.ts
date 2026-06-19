@@ -1,8 +1,12 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, Logger } from "@nestjs/common";
 import { GetObjectCommand, HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { FileAccessLevel, type FileAsset } from "@prisma/client";
 import { downloadContentDisposition } from "./files-validation.helpers";
+
+const logger = new Logger("FilesStorage");
+
+export const S3_UNAVAILABLE_MESSAGE = "Файловое хранилище временно недоступно. Попробуйте ещё раз через минуту.";
 
 function isPlaceholderS3Value(value: string) {
   return value.startsWith("replace-with-");
@@ -190,7 +194,12 @@ export async function signS3DownloadUrls(
         Key: asset.storageKey,
         ...(options.inline ? {} : { ResponseContentDisposition: downloadContentDisposition(asset.originalName) }),
       });
-      urls.set(asset.id, await getSignedUrl(config.client, command, { expiresIn: ttlSeconds }));
+      try {
+        urls.set(asset.id, await getSignedUrl(config.client, command, { expiresIn: ttlSeconds }));
+      } catch (error) {
+        logger.warn(`S3 presign failed: ${externalStorageErrorCode(error)}`);
+        urls.set(asset.id, null);
+      }
     }
   } finally {
     // getS3Config() создаёт клиента заново на каждый вызов — закрываем его,
@@ -199,4 +208,14 @@ export async function signS3DownloadUrls(
   }
 
   return urls;
+}
+
+export function externalStorageErrorCode(error: unknown): string {
+  if (!error || typeof error !== "object") {
+    return "unknown";
+  }
+  const candidate = error as { code?: unknown; name?: unknown; $metadata?: { httpStatusCode?: unknown } };
+  const code = candidate.code ?? candidate.name;
+  const status = candidate.$metadata?.httpStatusCode;
+  return [code ? String(code) : "unknown", status ? `status=${String(status)}` : null].filter(Boolean).join(" ");
 }

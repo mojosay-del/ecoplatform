@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FileAccessLevel } from "@prisma/client";
 import { setupIntegrationContext } from "./test/integration-context";
+import { withEnv } from "./test/integration-helpers";
 
 const ctx = setupIntegrationContext();
 const { loginAdmin, loginContentManager, registerCompany } = ctx;
@@ -363,6 +364,21 @@ describe("Documentation: download & roles", () => {
     const ok = await ctx.http.get(`/api/documentation/${withFile.id}/download`).set(auth(reader.token));
     expect(ok.status).toBe(200);
     expect(ok.body).toHaveProperty("url");
+
+    await withEnv(
+      {
+        S3_PUBLIC_BASE_URL: undefined,
+        S3_ENDPOINT: undefined,
+        S3_BUCKET: undefined,
+        S3_ACCESS_KEY_ID: undefined,
+        S3_SECRET_ACCESS_KEY: undefined,
+      },
+      async () => {
+        const unavailable = await ctx.http.get(`/api/documentation/${withFile.id}/download`).set(auth(reader.token));
+        expect(unavailable.status).toBe(503);
+        expect(unavailable.body.message).toContain("Файловое хранилище временно недоступно");
+      },
+    );
 
     const noFile = await createDraftDocument(adminToken, {
       title: "Только описание",

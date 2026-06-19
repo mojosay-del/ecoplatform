@@ -15,7 +15,6 @@ import type {
   AuthMeUser,
 } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
-import { swallowAndLog } from "../common/silent-catch";
 import { getAuthMeUser } from "../auth/auth-profile.helpers";
 import {
   EMAIL_VERIFICATION_MAX_ATTEMPTS,
@@ -103,13 +102,22 @@ export class AccountService {
       },
     });
 
-    this.sendContactChangeCodeInBackground({
-      verificationId,
-      email: user.email,
-      field: input.field,
-      code,
-      expiresAt,
-    });
+    try {
+      await this.sendContactChangeCode({
+        email: user.email,
+        field: input.field,
+        code,
+        expiresAt,
+      });
+    } catch (error) {
+      await this.prisma.accountContactChangeChallenge
+        .updateMany({
+          where: { id: verificationId, consumedAt: null },
+          data: { expiresAt: now },
+        })
+        .catch(() => undefined);
+      throw error;
+    }
 
     return { verificationId, email: user.email, expiresAt: expiresAt.toISOString() };
   }
@@ -262,21 +270,18 @@ export class AccountService {
     return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
   }
 
-  private sendContactChangeCodeInBackground(input: {
-    verificationId: string;
+  private async sendContactChangeCode(input: {
     email: string;
     field: AccountContactChangeField;
     code: string;
     expiresAt: Date;
-  }): void {
-    void this.email
-      .sendAccountContactChangeCode({
-        to: input.email,
-        field: input.field,
-        code: input.code,
-        expiresAt: input.expiresAt,
-      })
-      .catch(swallowAndLog("account.contact-change.email.background", { verificationId: input.verificationId }));
+  }): Promise<void> {
+    await this.email.sendAccountContactChangeCode({
+      to: input.email,
+      field: input.field,
+      code: input.code,
+      expiresAt: input.expiresAt,
+    });
   }
 
   private async assertContactValueAvailable(userId: string, field: AccountContactChangeField, value: string) {
