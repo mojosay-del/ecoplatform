@@ -7,6 +7,7 @@ import { AudioMessagePlayer } from "../../components/AudioMessagePlayer";
 import { LikeActionIcon } from "../../components/app-shell/nav-icons";
 import { preferredFileAssetImageUrl, preferredFileAssetMediaUrl, type FileAsset } from "../../lib/api";
 import { CoverImage } from "../../components/CoverImage";
+import "../../components/cover.css";
 import { NewsMetaItem, formatNewsDate } from "../shared";
 import { shouldRenderCoveredCardSkeleton } from "../shared/covered-card-readiness";
 

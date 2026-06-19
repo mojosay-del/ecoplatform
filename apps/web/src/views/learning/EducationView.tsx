@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { LearningChapterSummary, LearningModuleListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { CoverImage } from "../../components/CoverImage";
+import "../../components/cover.css";
 import { StatusPill } from "../../components/StatusPill";
 import { api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useCoverAssets } from "../../lib/use-cover-assets";

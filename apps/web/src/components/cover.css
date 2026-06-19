@@ -1,0 +1,29 @@
+/* Скелетон обложки (см. CoverImage): пульсирующая плитка под картинкой, пока
+   изображение не догрузилось; затем картинка плавно проявляется поверх. */
+.cover-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(90deg, var(--surface-muted), var(--surface-elevated), var(--surface-muted));
+  background-size: 220% 100%;
+  animation: app-shell-loading-shimmer 1200ms ease-in-out infinite;
+}
+
+.cover-image {
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+
+.cover-image.is-loaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover-skeleton {
+    animation: none;
+  }
+
+  .cover-image {
+    transition: none;
+  }
+}

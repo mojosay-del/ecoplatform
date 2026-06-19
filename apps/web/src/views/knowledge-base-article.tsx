@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import "./content-blocks/content-article.css";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
 import { CoverImage } from "../components/CoverImage";
+import "../components/cover.css";
 import { AppShell } from "../components/AppShell";
 import { preferredFileAssetImageUrl } from "../lib/api";
 import { useCoverAssets } from "../lib/use-cover-assets";
