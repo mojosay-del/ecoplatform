@@ -1824,7 +1824,7 @@ input[type="checkbox"]:focus-visible {
   font-size: 13px;
 }
 
-.auth-copy-status {
+.copy-status {
   margin: -4px 0 0;
   color: var(--muted);
   font-size: 13px;
@@ -4486,9 +4486,9 @@ input[type="checkbox"]:focus-visible {
   color: var(--text-muted);
 }
 
-/* Footer внутри AuthShell — компактная строка ссылок под формой. */
+/* Компактный футер со ссылками под формой или маркетинговой карточкой. */
 
-.auth-footer {
+.page-footer {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -4502,12 +4502,12 @@ input[type="checkbox"]:focus-visible {
   color: var(--text-muted);
 }
 
-.auth-footer a {
+.page-footer a {
   color: var(--text-muted);
   text-decoration: none;
 }
 
-.auth-footer a:hover {
+.page-footer a:hover {
   color: var(--text);
   text-decoration: underline;
 }

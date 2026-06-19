@@ -91,7 +91,7 @@ export function AuthShell({ children, mode }: { children: ReactNode; mode: AuthM
             <span>ЭкоПлатформа</span>
           </div>
           {children}
-          <footer className="auth-footer">
+          <footer className="page-footer">
             <Link href="/legal/privacy">Конфиденциальность</Link>
             <Link href="/legal/terms">Соглашение</Link>
             <Link href="/legal/personal-data">152-ФЗ</Link>

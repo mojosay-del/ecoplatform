@@ -18,7 +18,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
         </Link>
       </header>
       <section className="marketing-content">{children}</section>
-      <footer className="auth-footer marketing-footer">
+      <footer className="page-footer marketing-footer">
         {LEGAL_LINKS.map((link) => (
           <Link href={link.href} key={link.href}>
             {link.label}

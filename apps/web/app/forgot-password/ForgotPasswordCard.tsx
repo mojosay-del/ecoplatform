@@ -61,7 +61,7 @@ export function ForgotPasswordCard({ supportEmail }: { supportEmail: string }) {
         </button>
       </div>
       {copyStatus === "failed" ? (
-        <p className="auth-copy-status" role="status">
+        <p className="copy-status" role="status">
           Не удалось скопировать автоматически. Выделите email вручную.
         </p>
       ) : null}
