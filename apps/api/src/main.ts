@@ -17,6 +17,7 @@ import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Logger as PinoNestLogger } from "nestjs-pino";
 import { AppModule } from "./app.module";
+import { createCorsOrigin } from "./common/cors-origin";
 import { csrfCookieMiddleware, CsrfGuard } from "./common/csrf.guard";
 import { GlobalExceptionFilter, registerProcessErrorHandlers } from "./common/global-exception.filter";
 import { FilesService } from "./files/files.service";
@@ -62,7 +63,7 @@ async function bootstrap() {
   // и журнал сессий/будущий rate-limit будут привязаны к одной точке.
   app.set("trust proxy", 1);
   app.enableCors({
-    origin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
+    origin: createCorsOrigin(),
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-CSRF-Token"],
     // CORS-preflight кешируется браузером на сутки — иначе на каждый запрос
