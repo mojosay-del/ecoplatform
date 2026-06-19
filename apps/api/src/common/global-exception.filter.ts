@@ -1,5 +1,6 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, HttpStatus, Logger } from "@nestjs/common";
 import type { Request, Response } from "express";
+import { redactLogString, redactLogValue, requestPath } from "./logging";
 import { captureApiException } from "./sentry";
 
 // Глобальный filter ловит ВСЁ, что вылетает из контроллеров/сервисов.
@@ -31,14 +32,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     // чтобы шум 404/403 не забивал error-канал.
     const isServerError = status >= 500;
     const actorId = (request as Request & { user?: { id?: string } }).user?.id ?? "anonymous";
-    const baseContext = `${request.method} ${request.originalUrl} [${actorId}] →${status}`;
+    const baseContext = `${request.method} ${requestPath(request)} [${actorId}] →${status}`;
 
     if (isServerError) {
-      const stack = exception instanceof Error ? exception.stack : String(exception);
+      const stack = exception instanceof Error ? (exception.stack ?? exception.message) : String(exception);
       captureApiException(exception, request, status);
-      this.logger.error(baseContext, stack);
+      this.logger.error(baseContext, redactLogString(stack));
     } else if (status >= 400) {
-      this.logger.warn(`${baseContext} ${JSON.stringify(payload)}`);
+      this.logger.warn(`${baseContext} ${JSON.stringify(redactLogValue(payload))}`);
     }
 
     response.status(status).json(payload);
@@ -51,10 +52,11 @@ export function registerProcessErrorHandlers() {
   const logger = new Logger("Process");
   process.on("unhandledRejection", (reason) => {
     captureApiException(reason);
-    logger.error(`unhandledRejection: ${reason instanceof Error ? reason.stack : String(reason)}`);
+    const message = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
+    logger.error(`unhandledRejection: ${redactLogString(message)}`);
   });
   process.on("uncaughtException", (error) => {
     captureApiException(error);
-    logger.error(`uncaughtException: ${error.stack ?? error.message}`);
+    logger.error(`uncaughtException: ${redactLogString(error.stack ?? error.message)}`);
   });
 }

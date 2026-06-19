@@ -1,4 +1,5 @@
 import { Logger } from "@nestjs/common";
+import { redactLogString, redactLogValue } from "./logging";
 
 // Возвращает callback, который логирует ошибку через NestJS Logger и
 // «глотает» её. Используйте вместо `.catch(() => undefined)` в местах,
@@ -13,7 +14,8 @@ export function swallowAndLog(context: string, payload?: Record<string, unknown>
   return (error: unknown) => {
     const message =
       error instanceof Error ? `${error.name}: ${error.message}` : typeof error === "string" ? error : "unknown error";
-    logger.warn(`[${context}] suppressed: ${message}${payload ? ` ${JSON.stringify(payload)}` : ""}`);
+    const safePayload = payload ? ` ${JSON.stringify(redactLogValue(payload))}` : "";
+    logger.warn(`[${context}] suppressed: ${redactLogString(message)}${safePayload}`);
     return undefined;
   };
 }
