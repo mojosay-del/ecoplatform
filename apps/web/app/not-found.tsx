@@ -11,7 +11,7 @@ export default function NotFound() {
           Возможно, ссылка устарела или адрес введён с опечаткой. Из этой точки удобнее вернуться к ленте новостей или
           войти в кабинет.
         </p>
-        <div className="auth-actions marketing-actions">
+        <div className="form-actions marketing-actions">
           <Link className="button" href="/news">
             К новостям
           </Link>

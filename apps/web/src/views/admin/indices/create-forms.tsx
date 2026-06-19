@@ -41,7 +41,7 @@ export function NomenclatureCreateForm({ onMutate, onClose }: { onMutate: Mutate
           required
         />
       </label>
-      <div className="auth-actions">
+      <div className="form-actions">
         <button className="button" type="submit">
           Создать
         </button>

@@ -21,7 +21,7 @@ export function AuthRequired({ title }: { title: string }) {
           <h1 className="page-title">{title}</h1>
           <p className="page-subtitle">Раздел доступен после входа и активного demo или подписки.</p>
         </header>
-        <div className="auth-actions">
+        <div className="form-actions">
           <Link className="button" href="/login">
             Войти
           </Link>
@@ -60,7 +60,7 @@ export function AccessClosed({ title }: { title: string }) {
           <h1 className="page-title">{title}</h1>
           <p className="page-subtitle">{description}</p>
         </header>
-        <div className="auth-actions">
+        <div className="form-actions">
           <Link className="button" href={actionHref}>
             {actionLabel}
           </Link>

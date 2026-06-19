@@ -65,7 +65,7 @@ export function ForgotPasswordCard({ supportEmail }: { supportEmail: string }) {
           Не удалось скопировать автоматически. Выделите email вручную.
         </p>
       ) : null}
-      <div className="auth-actions marketing-actions">
+      <div className="form-actions marketing-actions">
         <Link className="button" href="/login">
           Вернуться к входу
         </Link>

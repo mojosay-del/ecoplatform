@@ -114,7 +114,7 @@ export function NotificationsView() {
             <h1 className="page-title">Уведомления</h1>
             <p className="page-subtitle">Войдите, чтобы видеть свои уведомления.</p>
           </header>
-          <div className="auth-actions">
+          <div className="form-actions">
             <Link className="button" href="/login">
               Войти
             </Link>

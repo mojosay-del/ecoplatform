@@ -178,7 +178,7 @@ export function AdminModerationView() {
                     <div className="moderation-detail-side">
                       <span className="technical-id">ID кейса: {selectedCase.id}</span>
                       <span className="technical-id">ID сущности: {selectedCase.entityId}</span>
-                      <div className="auth-actions">
+                      <div className="form-actions">
                         <button
                           className="button secondary"
                           onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/lock`)}

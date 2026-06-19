@@ -188,7 +188,7 @@ export function AdminStaffView() {
         ) : null}
         {staffQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
-        <div className="auth-actions">
+        <div className="form-actions">
           <button className="button" onClick={() => setCreateOpen((value) => !value)} type="button">
             {createOpen ? "Скрыть форму" : "Добавить сотрудника"}
           </button>
@@ -250,7 +250,7 @@ export function AdminStaffView() {
               type="password"
               value={createForm.password}
             />
-            <div className="auth-actions">
+            <div className="form-actions">
               {allRoles.map((role) => (
                 <label className="checklist-item" key={role}>
                   <input

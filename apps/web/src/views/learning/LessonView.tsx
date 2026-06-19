@@ -281,7 +281,7 @@ export function LessonView({
               <ContentBlocks blocks={lessonContentBlocks} />
             </div>
             {!preview ? (
-              <div className="auth-actions lesson-actions" style={{ marginTop: 24 }}>
+              <div className="form-actions lesson-actions" style={{ marginTop: 24 }}>
                 <div className="lesson-actions-left">
                   <Link className="button secondary" href={moduleHref}>
                     ← К модулю
@@ -319,7 +319,7 @@ export function LessonView({
                 </div>
               </div>
             ) : (
-              <div className="auth-actions lesson-actions" style={{ marginTop: 24 }}>
+              <div className="form-actions lesson-actions" style={{ marginTop: 24 }}>
                 <div className="lesson-actions-left">
                   <Link className="button secondary" href={moduleHref}>
                     ← К модулю

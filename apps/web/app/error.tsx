@@ -25,7 +25,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             Код инцидента: {error.digest}
           </StatusPill>
         ) : null}
-        <div className="auth-actions marketing-actions">
+        <div className="form-actions marketing-actions">
           <button className="button" type="button" onClick={reset}>
             Попробовать снова
           </button>
