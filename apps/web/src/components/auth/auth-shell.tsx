@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Factory, Forklift, Package, RussianRuble, Truck } from "lucide-react";
 import type { AuthIcon, AuthMode } from "./types";
+import "./auth-shell.css";
 
 const AUTH_ICONS: AuthIcon[] = [
   {

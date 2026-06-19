@@ -1641,260 +1641,6 @@ input[type="checkbox"]:focus-visible {
   gap: 14px;
 }
 
-/* Split-layout логина/регистрации. Страница делится по вертикали:
-   слева — оранжевая премиум-панель с brand-сообщением и анимированной
-   иконкой, справа — нейтральная off-white панель с формой. Никаких
-   внешних отступов у страницы — половины уходят к краям экрана. */
-
-.auth-page {
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-}
-
-.auth-layout {
-  min-height: 100vh;
-  display: grid;
-  /* Две равные половины: билборд бренда и зона формы выглядят симметрично. */
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
-}
-
-.auth-visual {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  align-items: center;
-  color: var(--white);
-  padding: 36px 40px;
-  /* Тонкая разделяющая полоска вместо «жёсткого стыка» двух цветов. */
-  border-right: 1px solid rgb(var(--white-rgb) / 0.12);
-  /* Глубокий «ember»: тёмный угол снизу-справа + тёплый свет сверху-слева
-     дают объём вместо плоской ярко-оранжевой плашки. */
-  background:
-    radial-gradient(80% 70% at 16% 12%, rgb(var(--auth-glow-rgb) / 0.42), transparent 55%),
-    radial-gradient(90% 90% at 88% 100%, rgb(var(--brand-ink-rgb) / 0.55), transparent 58%),
-    linear-gradient(155deg, #b85a2a 0%, #e0703a 46%, #f79152 100%);
-}
-
-.auth-visual::before,
-.auth-visual::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* Тонкая световая моделировка поверх градиента — даёт «премиальность». */
-
-.auth-visual::before {
-  opacity: 0.7;
-  background:
-    linear-gradient(135deg, rgb(var(--white-rgb) / 0.22), transparent 36%),
-    linear-gradient(315deg, rgb(var(--brand-ink-rgb) / 0.22), transparent 44%);
-}
-
-/* Лёгкий grain/noise через SVG turbulence. */
-
-.auth-visual::after {
-  opacity: 0.18;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
-  background-size: 200px 200px;
-  mix-blend-mode: overlay;
-}
-
-/* Анимированная «аврора»: два больших размытых световых пятна медленно
-   дрейфуют — фон дышит, но не отвлекает. На transform/opacity = дёшево для GPU. */
-
-.auth-visual-aurora {
-  position: absolute;
-  inset: -25%;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(closest-side, rgb(var(--auth-glow-rgb) / 0.55), transparent 70%) 18% 22% / 58% 58% no-repeat,
-    radial-gradient(closest-side, rgb(var(--brand-ember-rgb) / 0.6), transparent 70%) 82% 78% / 64% 64% no-repeat;
-  filter: blur(36px);
-  animation: auth-aurora-drift 26s ease-in-out infinite alternate;
-}
-
-@keyframes auth-aurora-drift {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(2.5%, -3%, 0) scale(1.08);
-  }
-  100% {
-    transform: translate3d(-2.5%, 2.5%, 0) scale(1.05);
-  }
-}
-
-/* Wordmark в верхнем углу — пользователь всегда видит где он. */
-
-.auth-visual-wordmark {
-  position: relative;
-  z-index: 1;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0;
-  color: var(--white);
-  opacity: 0.92;
-  justify-self: start;
-}
-
-/* Центральный блок с иконкой. Stage даёт стабильную геометрию, чтобы
-   иконка не «прыгала» при смене кадра. */
-
-/* Левый «герой» — единый левый-выровненный блок, вертикально центрированный
-   в своей строке грид-сетки. Больше нет разрыва «иконка по центру / текст в
-   углу». */
-
-/* Центрированный «герой»: крупный тайл-знак над одним обещанием. */
-
-.auth-visual-hero {
-  position: relative;
-  z-index: 1;
-  max-width: 440px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 30px;
-  animation: auth-hero-enter 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes auth-hero-enter {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Крупный стеклянный тайл со знаком бренда — центральный акцент билборда. */
-
-.auth-visual-tile {
-  position: relative;
-  width: 128px;
-  height: 128px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 30px;
-  background: rgb(var(--white-rgb) / 0.14);
-  border: 1px solid rgb(var(--white-rgb) / 0.3);
-  box-shadow:
-    0 26px 60px rgb(var(--brand-ink-rgb) / 0.45),
-    inset 0 1px 0 rgb(var(--white-rgb) / 0.4);
-  backdrop-filter: blur(8px);
-  animation: auth-icon-float 5.4s ease-in-out infinite;
-}
-
-/* Мягкое пульсирующее свечение за тайлом — добавляет «жизни». */
-
-.auth-visual-tile::after {
-  content: "";
-  position: absolute;
-  inset: -34%;
-  z-index: -1;
-  border-radius: inherit;
-  background: radial-gradient(closest-side, rgb(var(--white-rgb) / 0.42), transparent 72%);
-  filter: blur(18px);
-  animation: auth-tile-glow 4.2s ease-in-out infinite;
-}
-
-@keyframes auth-tile-glow {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 0.9;
-  }
-}
-
-.auth-visual-tile-icon {
-  width: 66px;
-  height: 66px;
-  display: grid;
-  place-items: center;
-  color: var(--white);
-  animation: auth-icon-enter 420ms ease-out both;
-}
-
-.auth-visual-tile-icon svg {
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 8px 16px rgb(var(--brand-ink-rgb) / 0.4));
-}
-
-/* Логотип — заливка вместо обводки + лёгкий апскейл (реальный силуэт знака
-   занимает только центр viewBox). */
-
-.auth-visual-tile-icon.is-logo svg {
-  fill: var(--white);
-  stroke: none;
-  transform: scale(1.28);
-}
-
-@keyframes auth-icon-enter {
-  from {
-    opacity: 0;
-    transform: scale(0.86);
-    filter: blur(4px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
-  }
-}
-
-@keyframes auth-icon-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-.auth-visual-title {
-  margin: 0;
-  font-size: clamp(23px, 2.2vw, 30px);
-  line-height: 1.28;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  color: var(--white);
-  text-wrap: balance;
-  text-shadow: 0 2px 18px rgb(var(--brand-ink-rgb) / 0.35);
-}
-
-/* Правая панель: белая поверхность, как основное меню приложения. */
-
-.auth-form-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 56px;
-  background: var(--surface-elevated);
-  min-width: 0;
-}
-
 .auth-card {
   width: 100%;
   max-width: 420px;
@@ -1998,87 +1744,6 @@ input[type="checkbox"]:focus-visible {
   line-height: 1.45;
   color: var(--text-muted);
   text-align: center;
-}
-
-/* Состояние «регистрация закрыта»: аккуратный empty-state с иконкой-бейджем,
-   статус-пилюлей и одной основной кнопкой. */
-
-.auth-closed {
-  align-items: center;
-  text-align: center;
-  gap: 16px;
-}
-
-.auth-closed-badge {
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
-  color: var(--brand);
-  background: rgb(var(--brand-rgb) / 0.1);
-  box-shadow: inset 0 0 0 1px rgb(var(--brand-rgb) / 0.16);
-}
-
-.auth-closed-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--brand);
-  background: rgb(var(--brand-rgb) / 0.08);
-  box-shadow: inset 0 0 0 1px rgb(var(--brand-rgb) / 0.16);
-}
-
-.auth-closed-pill-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--brand);
-  animation: auth-closed-pulse 1800ms ease-in-out infinite;
-}
-
-@keyframes auth-closed-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgb(var(--brand-rgb) / 0.45);
-  }
-  50% {
-    transform: scale(0.82);
-    box-shadow: 0 0 0 5px rgb(var(--brand-rgb) / 0);
-  }
-}
-
-.auth-closed .auth-card-head {
-  margin-bottom: 0;
-}
-
-.auth-closed .auth-card-sub {
-  max-width: 38ch;
-  margin: 0 auto;
-  line-height: 1.55;
-}
-
-.auth-closed-cta {
-  width: auto;
-  min-width: 220px;
-  align-self: center;
-  margin-top: 2px;
-}
-
-.auth-closed-foot {
-  margin-top: -4px;
-  font-size: 13px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .auth-closed-pill-dot {
-    animation: none;
-  }
 }
 
 /* Микрокопия доверия под основной кнопкой. */
@@ -2242,88 +1907,6 @@ input[type="checkbox"]:focus-visible {
   }
 }
 
-/* Сегментированный степпер регистрации: кружок-номер (или галочка) + подпись,
-   соединённые линией. Заменил тонкую полоску прогресса. */
-
-.auth-stepper {
-  display: flex;
-  list-style: none;
-  margin: 2px 0 10px;
-  padding: 0;
-}
-
-.auth-stepper-item {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  text-align: center;
-  min-width: 0;
-}
-
-/* Соединительная линия до следующего кружка (от центра текущего). */
-
-.auth-stepper-item:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  top: 15px;
-  left: 50%;
-  width: 100%;
-  height: 2px;
-  background: var(--border-strong);
-  transition: background 220ms ease;
-}
-
-.auth-stepper-item.is-done::before {
-  background: var(--brand);
-}
-
-.auth-stepper-dot {
-  position: relative;
-  z-index: 1;
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  font-size: 13px;
-  font-weight: 700;
-  background: var(--surface-elevated);
-  border: 2px solid var(--border-strong);
-  color: var(--text-muted);
-  transition:
-    background 220ms ease,
-    border-color 220ms ease,
-    color 220ms ease,
-    box-shadow 220ms ease;
-}
-
-.auth-stepper-item.is-active .auth-stepper-dot {
-  border-color: var(--brand);
-  color: var(--brand);
-  box-shadow: 0 0 0 4px rgb(var(--brand-rgb) / 0.14);
-}
-
-.auth-stepper-item.is-done .auth-stepper-dot {
-  background: var(--brand);
-  border-color: var(--brand);
-  color: var(--white);
-}
-
-.auth-stepper-label {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-  transition: color 220ms ease;
-}
-
-.auth-stepper-item.is-active .auth-stepper-label,
-.auth-stepper-item.is-done .auth-stepper-label {
-  color: var(--text);
-}
-
 /* Поле формы: label сверху, контрол снизу. Один паттерн для всех. */
 
 .auth-field {
@@ -2371,95 +1954,6 @@ input[type="checkbox"]:focus-visible {
   padding-left: 40px;
 }
 
-/* Кастомный селект auth-форм: триггер копирует обычное поле, список —
-   анимированный поповер. Иконка слева переиспользует .auth-field-affix-icon. */
-
-.auth-select {
-  position: relative;
-}
-
-.auth-select-trigger {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 12px 38px 12px 40px;
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-button);
-  background: var(--field-bg);
-  font-size: 14px;
-  color: var(--field-text);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    box-shadow 120ms ease;
-}
-
-.auth-select-trigger:hover {
-  border-color: var(--field-border-hover);
-  background: var(--field-bg-hover);
-}
-
-.auth-select-trigger:focus-visible {
-  outline: none;
-  border-color: var(--field-border-focus);
-  box-shadow: var(--focus-ring);
-}
-
-.auth-select.is-open .auth-select-trigger {
-  border-color: var(--field-border-focus);
-  box-shadow: var(--focus-ring);
-}
-
-.auth-select.is-open .auth-field-affix-icon,
-.auth-select-trigger:focus-visible .auth-field-affix-icon {
-  color: var(--brand);
-}
-
-.auth-select-value {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.auth-select-chevron {
-  position: absolute;
-  right: 13px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-subtle);
-  pointer-events: none;
-  transition:
-    transform 180ms ease,
-    color 150ms ease;
-}
-
-.auth-select.is-open .auth-select-chevron {
-  color: var(--brand);
-  transform: translateY(-50%) rotate(180deg);
-}
-
-.auth-select-list {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  margin: 0;
-  padding: 6px;
-  list-style: none;
-  max-height: 240px;
-  overflow-y: auto;
-  background: var(--surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-lg);
-  animation: auth-select-pop 140ms ease;
-  transform-origin: top center;
-}
-
 @keyframes auth-select-pop {
   from {
     opacity: 0;
@@ -2468,44 +1962,6 @@ input[type="checkbox"]:focus-visible {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
-  }
-}
-
-.auth-select-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  color: var(--field-text);
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    color 120ms ease;
-}
-
-.auth-select-option.is-active {
-  background: var(--brand-soft);
-  color: var(--brand);
-}
-
-.auth-select-option.is-selected {
-  color: var(--brand);
-  font-weight: 600;
-}
-
-.auth-select-option.is-selected svg {
-  flex: none;
-  color: var(--brand);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .auth-select-chevron,
-  .auth-select-list {
-    transition: none;
-    animation: none;
   }
 }
 
@@ -2756,63 +2212,6 @@ input[type="checkbox"]:focus-visible {
   padding: 12px 16px;
 }
 
-.auth-step-actions {
-  display: grid;
-  grid-template-columns: minmax(112px, 0.44fr) 1fr;
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.auth-step-actions .auth-submit {
-  margin-top: 0;
-}
-
-.auth-verification-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.auth-verification-section {
-  align-items: center;
-  gap: 14px;
-  text-align: center;
-}
-
-.auth-verification-title {
-  display: grid;
-  justify-items: center;
-  gap: 12px;
-  margin: 2px 0 0;
-  font-size: 24px;
-  line-height: 1.2;
-}
-
-.auth-verification-badge {
-  width: 64px;
-  height: 64px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--brand);
-  background: var(--brand-soft);
-  border: 1px solid var(--brand-soft-strong);
-  box-shadow: 0 10px 26px rgb(var(--brand-rgb) / 0.18);
-}
-
-.auth-verification-copy {
-  max-width: 360px;
-  line-height: 1.45;
-}
-
-.auth-verification-hint {
-  margin: 6px 0 0;
-  max-width: 360px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .auth-code-stage {
   position: relative;
   width: 100%;
@@ -2954,17 +2353,6 @@ input[type="checkbox"]:focus-visible {
   animation: auth-code-spin 760ms linear infinite;
 }
 
-.auth-verification-submit {
-  width: 100%;
-}
-
-.auth-verification-secondary {
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-  flex-wrap: wrap;
-}
-
 .auth-text-button {
   display: inline-flex;
   align-items: center;
@@ -2991,18 +2379,6 @@ input[type="checkbox"]:focus-visible {
 .auth-text-button:disabled {
   cursor: not-allowed;
   color: var(--text-disabled);
-}
-
-.auth-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 @keyframes auth-code-spin {
@@ -3088,10 +2464,6 @@ input[type="checkbox"]:focus-visible {
 }
 
 @media (max-width: 540px) {
-  .auth-step-actions {
-    grid-template-columns: 1fr;
-  }
-
   .auth-code-digits {
     gap: 9px;
   }
@@ -3105,11 +2477,6 @@ input[type="checkbox"]:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   /* При системной настройке «уменьшить движение» — анимаций нет. */
-  .auth-visual-aurora,
-  .auth-visual-hero,
-  .auth-visual-tile,
-  .auth-visual-tile::after,
-  .auth-visual-tile-icon,
   .auth-card,
   .auth-code-digits,
   .auth-code-box,
@@ -3124,62 +2491,7 @@ input[type="checkbox"]:focus-visible {
   }
 }
 
-@media (max-width: 960px) {
-  .auth-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .auth-visual {
-    min-height: 220px;
-    padding: 28px 24px;
-    grid-template-rows: auto 1fr;
-    border-right: none;
-    border-bottom: 1px solid rgb(var(--white-rgb) / 0.12);
-  }
-
-  /* На мобильном grain отвлекает на маленькой плоскости — выключаем. */
-  .auth-visual::after {
-    display: none;
-  }
-
-  /* Билборд сжимается в узкую верхнюю полосу — обещание там не помещается.
-     Оставляем тайл-знак бренда. */
-  .auth-visual-title {
-    display: none;
-  }
-
-  .auth-visual-tile {
-    width: 72px;
-    height: 72px;
-    border-radius: 18px;
-  }
-
-  .auth-visual-tile-icon {
-    width: 38px;
-    height: 38px;
-  }
-
-  .auth-form-panel {
-    padding: 28px 20px 40px;
-  }
-}
-
 @media (max-width: 540px) {
-  .auth-visual {
-    min-height: 160px;
-    padding: 22px 20px;
-  }
-
-  .auth-visual-tile {
-    width: 56px;
-    height: 56px;
-  }
-
-  .auth-visual-tile-icon {
-    width: 30px;
-    height: 30px;
-  }
-
   .auth-card-title {
     font-size: var(--text-2xl);
   }
@@ -5215,13 +4527,6 @@ input[type="checkbox"]:focus-visible {
    сворачивается в 0 там, где выреза/домашней полосы нет.
    ========================================================================= */
 
-/* --- Auth: на десктопе оранжевый «билборд» остаётся; на мобильном его
-       заменяет компактная шапка бренда, а экран отдаётся форме. --- */
-
-.auth-mobile-brand {
-  display: none;
-}
-
 @media (max-width: 640px) {
   .app-shell-footer {
     align-items: center;
@@ -5250,41 +4555,6 @@ input[type="checkbox"]:focus-visible {
 
   .app-shell-footer-separator {
     display: none;
-  }
-}
-
-@media (max-width: 640px) {
-  .auth-visual {
-    display: none;
-  }
-
-  .auth-layout {
-    grid-template-columns: 1fr;
-    min-height: 100dvh;
-  }
-
-  .auth-mobile-brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 17px;
-    font-weight: 900;
-    color: var(--text);
-    margin-bottom: 22px;
-  }
-
-  .auth-mobile-brand-logo {
-    width: 36px;
-    height: 36px;
-    border-radius: 9px;
-    display: block;
-  }
-
-  .auth-form-panel {
-    /* safe-area сверху + резерв под cookie-баннер снизу, чтобы кнопка «Войти»
-       и футер не прятались за ним. */
-    padding-top: calc(28px + env(safe-area-inset-top));
-    padding-bottom: calc(40px + env(safe-area-inset-bottom) + var(--cookie-banner-height, 0px));
   }
 }
 
