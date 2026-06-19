@@ -13,6 +13,7 @@ import { useFileAssets } from "./content-block-assets";
 import { ChecklistBlock, HeadingIcon } from "./content-block-checklist";
 import { ImageBlock, MissingAsset, VideoBlock } from "./content-block-media";
 import type { ChecklistPayload, ContentBlocksVariant, RenderableBlock } from "./content-block-types";
+import "./gallery.css";
 
 export { collectContentBlockImageFileIds } from "./content-block-assets";
 

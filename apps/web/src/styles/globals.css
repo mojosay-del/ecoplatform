@@ -4054,12 +4054,6 @@ input[type="checkbox"]:focus-visible {
   }
 }
 
-.gallery-block {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
 .file-block {
   display: flex;
   align-items: center;
@@ -4670,7 +4664,7 @@ input[type="checkbox"]:focus-visible {
     position: static;
   }
 
-  .gallery-block,
+  .content-blocks .gallery-block,
   .image-checklist-block {
     grid-template-columns: 1fr;
   }
@@ -4929,138 +4923,6 @@ input[type="checkbox"]:focus-visible {
 
 .tree > li > ul.tree-children > li.tree-add-row {
   padding-left: 24px;
-}
-
-/* --- Gallery block editor --- */
-
-.gallery-editor {
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-soft);
-}
-
-.gallery-editor-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.gallery-editor-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: stretch;
-  gap: 12px;
-}
-
-.gallery-editor-tile {
-  position: relative;
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.gallery-editor-input {
-  width: 100%;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.3;
-  padding: 8px 10px;
-  outline: none;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease;
-}
-
-.gallery-editor-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
-}
-
-.gallery-editor-remove {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgb(var(--white-rgb) / 0.72);
-  border-radius: 8px;
-  background: rgb(var(--white-rgb) / 0.9);
-  color: var(--muted);
-  box-shadow: var(--shadow-soft);
-  cursor: pointer;
-  opacity: 0;
-  transition:
-    opacity 120ms ease,
-    color 120ms ease,
-    background-color 120ms ease;
-}
-
-.gallery-editor-tile:hover .gallery-editor-remove,
-.gallery-editor-remove.is-placeholder {
-  opacity: 1;
-}
-
-.gallery-editor-remove:hover:not(:disabled) {
-  background: var(--panel);
-  color: var(--red);
-}
-
-.gallery-editor-remove:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.gallery-editor-add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--line-strong);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--muted);
-  cursor: pointer;
-  transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-.gallery-editor-add:hover {
-  border-color: var(--primary-soft-strong);
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-
-.gallery-editor-add.is-rail {
-  width: 44px;
-  min-height: 100%;
-  justify-self: start;
-  align-self: stretch;
-}
-
-.gallery-editor-add.is-square {
-  width: 100%;
-  aspect-ratio: 1;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: center;
-}
-
-.gallery-editor-add.is-square span {
-  max-width: 100%;
-  overflow-wrap: anywhere;
 }
 
 /* --- Attachments --- */
