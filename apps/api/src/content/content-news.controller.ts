@@ -11,6 +11,7 @@ import {
   newsInputSchema,
   newsListQuerySchema,
   newsTagsQuerySchema,
+  optionalReasonBodySchema,
 } from "./content.schemas";
 import { isPreviewQuery, parseStringArrayQuery } from "./content-query.helpers";
 import { NewsService } from "./services/news.service";
@@ -106,22 +107,14 @@ export class ContentNewsController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/news/:id/unpublish")
-  async unpublishNews(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.news.unpublishNews(id, user, body?.reason);
+  async unpublishNews(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.news.unpublishNews(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Delete("admin/content/news/:id")
-  async deleteNews(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.news.deleteNews(id, user, body?.reason);
+  async deleteNews(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.news.deleteNews(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 }

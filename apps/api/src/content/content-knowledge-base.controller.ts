@@ -10,6 +10,7 @@ import {
   knowledgeArticleInputSchema,
   knowledgeMoveInputSchema,
   knowledgeTreeQuerySchema,
+  optionalReasonBodySchema,
 } from "./content.schemas";
 import { KnowledgeBaseService } from "./services/knowledge-base.service";
 
@@ -64,12 +65,8 @@ export class ContentKnowledgeBaseController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/knowledge-base/:id/unpublish")
-  async unpublishKnowledgeArticle(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.knowledgeBase.unpublishKnowledgeArticle(id, user, body?.reason);
+  async unpublishKnowledgeArticle(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.knowledgeBase.unpublishKnowledgeArticle(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)
@@ -82,11 +79,7 @@ export class ContentKnowledgeBaseController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Delete("admin/content/knowledge-base/:id")
-  async deleteKnowledgeArticle(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.knowledgeBase.deleteKnowledgeArticle(id, user, body?.reason);
+  async deleteKnowledgeArticle(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.knowledgeBase.deleteKnowledgeArticle(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 }

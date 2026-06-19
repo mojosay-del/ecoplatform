@@ -114,6 +114,15 @@ export type PlatformSettingValue<K extends PlatformSettingKey> = z.infer<
 
 export const platformSettingKeys = Object.keys(platformSettingDefinitions) as PlatformSettingKey[];
 
+export const platformSettingUpdateBodySchema = z
+  .object({
+    value: z.unknown(),
+  })
+  .refine((body) => body.value !== undefined, {
+    message: "Нужно передать поле value.",
+    path: ["value"],
+  });
+
 export function isPlatformSettingKey(value: string): value is PlatformSettingKey {
   return (platformSettingKeys as string[]).includes(value);
 }

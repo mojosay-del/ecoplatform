@@ -13,6 +13,7 @@ import {
   learningModuleUpdateInputSchema,
   lessonInputSchema,
   lessonUpdateInputSchema,
+  optionalReasonBodySchema,
   publicContentListQuerySchema,
 } from "./content.schemas";
 import { isPreviewQuery } from "./content-query.helpers";
@@ -69,23 +70,15 @@ export class ContentLearningController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/education/modules/:id/unpublish")
-  async unpublishLearningModule(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.learning.unpublishLearningModule(id, user, body?.reason);
+  async unpublishLearningModule(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.learning.unpublishLearningModule(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Delete("admin/content/education/modules/:id")
-  async deleteLearningModule(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.learning.deleteLearningModule(id, user, body?.reason);
+  async deleteLearningModule(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.learning.deleteLearningModule(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)
@@ -105,12 +98,8 @@ export class ContentLearningController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Delete("admin/content/education/chapters/:id")
-  async deleteChapter(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.learning.deleteChapter(id, user, body?.reason);
+  async deleteChapter(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.learning.deleteChapter(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)
@@ -130,23 +119,15 @@ export class ContentLearningController {
   @UseGuards(RolesGuard)
   @Roles("admin", "content_manager")
   @Delete("admin/content/education/lessons/:id")
-  async deleteLesson(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.learning.deleteLesson(id, user, body?.reason);
+  async deleteLesson(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.learning.deleteLesson(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/education/lessons/:id/unpublish")
-  async unpublishLesson(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.learning.unpublishLesson(id, user, body?.reason);
+  async unpublishLesson(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.learning.unpublishLesson(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)

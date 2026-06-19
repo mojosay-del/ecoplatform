@@ -10,6 +10,7 @@ import {
   nomenclatureInputSchema,
   nomenclatureMoveInputSchema,
   nomenclatureUpdateInputSchema,
+  optionalReasonBodySchema,
   priceIndexInputSchema,
   priceIndexValueInputSchema,
   publicContentListQuerySchema,
@@ -57,12 +58,8 @@ export class ContentIndicesController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Delete("admin/content/indices/nomenclature/:id")
-  async deleteNomenclature(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.indices.deleteNomenclature(id, user, body?.reason);
+  async deleteNomenclature(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.indices.deleteNomenclature(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)
@@ -96,22 +93,14 @@ export class ContentIndicesController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/indices/:id/unpublish")
-  async unpublishPriceIndex(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.indices.unpublishPriceIndex(id, user, body?.reason);
+  async unpublishPriceIndex(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.indices.unpublishPriceIndex(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Delete("admin/content/indices/:id")
-  async deletePriceIndex(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.indices.deletePriceIndex(id, user, body?.reason);
+  async deletePriceIndex(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.indices.deletePriceIndex(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 }

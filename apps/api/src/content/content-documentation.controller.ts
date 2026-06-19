@@ -11,6 +11,7 @@ import {
   documentationMoveInputSchema,
   documentationRecentQuerySchema,
   documentationTreeQuerySchema,
+  optionalReasonBodySchema,
 } from "./content.schemas";
 import { DocumentationService } from "./services/documentation.service";
 
@@ -80,12 +81,8 @@ export class ContentDocumentationController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post("admin/content/documentation/:id/unpublish")
-  async unpublish(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.documentation.unpublishDocument(id, user, body?.reason);
+  async unpublish(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.documentation.unpublishDocument(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 
   @UseGuards(RolesGuard)
@@ -98,11 +95,7 @@ export class ContentDocumentationController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Delete("admin/content/documentation/:id")
-  async remove(
-    @Param("id") id: string,
-    @Body() body: { reason?: string } | undefined,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.documentation.deleteDocument(id, user, body?.reason);
+  async remove(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.documentation.deleteDocument(id, user, parseBody(optionalReasonBodySchema, body).reason);
   }
 }

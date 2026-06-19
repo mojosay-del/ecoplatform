@@ -34,6 +34,12 @@ export const adminNewsListQuerySchema = paginationQuerySchema(100).extend({
   q: z.string().trim().max(120).optional(),
 });
 export const adminContentListQuerySchema = paginationQuerySchema(200);
+export const optionalReasonBodySchema = z
+  .object({
+    reason: z.string().trim().optional(),
+  })
+  .optional()
+  .transform((body) => ({ reason: body?.reason || undefined }));
 
 export const knowledgeTreeQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
