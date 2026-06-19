@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Check, X } from "lucide-react";
+import "./quiz.css";
 
 export type QuizPayload = {
   question: string;
