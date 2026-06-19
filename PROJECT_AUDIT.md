@@ -285,14 +285,14 @@ magic-byte валидация загрузок, приватный S3-бакет
     «отправить код повторно» с лимитом. Проверить, что resend существует и виден.
   - **Исполнитель/заметка:**
 
-- [ ] **M-3. helmet с выключенным CSP на API.**
+- [x] **M-3. helmet с выключенным CSP на API.**
   `main.ts:47 contentSecurityPolicy:false`. CSP по памяти навешивается прокси-слоем (Caddy) на web —
   для JSON-API это приемлемо, но стоит подтвердить, что прод-заголовки покрывают и api-домен, и зафиксировать
   где именно CSP/security-headers задаются (единый источник).
   - **Файлы:** `apps/api/src/main.ts`, `deploy/proxy/*`, `Dockerfile.proxy`.
   - **Фикс:** задокументировать слой security-headers; убедиться, что `X-Content-Type-Options`,
     `Referrer-Policy`, `Permissions-Policy`, HSTS присутствуют на проде (ручная проверка заголовков).
-  - **Исполнитель/заметка:**
+  - **Исполнитель/заметка:** Codex 2026-06-19 — добавлены Caddy security headers для web/api, зафиксирован слой в `deploy/PRODUCTION.md`; файлы: `deploy/Caddyfile`, `deploy/proxy/Caddyfile`, `deploy/PRODUCTION.md`.
 
 - [ ] **M-4. CORS — единственный origin из env.**
   `main.ts:64 origin: WEB_ORIGIN ?? localhost`. Если появятся `www.`/доп-домен/превью — отвалятся.

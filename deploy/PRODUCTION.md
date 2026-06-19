@@ -24,6 +24,25 @@
 - Маршрутизация (Caddy, `deploy/Caddyfile`): `ecoplatform.pro/api/*` → `api:4000`,
   всё остальное → `web:3000` (один origin, без CORS).
 
+## Security headers
+
+Внешняя точка входа для прода — Caddy. Он задаёт baseline security-заголовков
+для всех ответов (`Strict-Transport-Security`, `X-Content-Type-Options`,
+`Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options`) через default-режим:
+если upstream уже выставил свой заголовок, Caddy его не перетирает.
+
+- **Web (Next.js):** CSP и web-специфичные security headers задаются в
+  `apps/web/next.config.ts`; Caddy остаётся страховочным слоем.
+- **API (NestJS):** Helmet остаётся приложенческим слоем, но CSP в API
+  выключен осознанно (`contentSecurityPolicy:false`), поэтому Caddy добавляет
+  строгую fallback-CSP только на `/api/*`.
+
+Ручная проверка после деплоя:
+```bash
+curl -I https://ecoplatform.pro
+curl -I https://ecoplatform.pro/api/health
+```
+
 ## Особенности сборки (почему так)
 
 Docker Hub и CDN Alpine режутся/блокируются из РФ, поэтому:

@@ -5,8 +5,24 @@
 :8080 {
 	encode zstd gzip
 
+	# Edge-default security headers. Upstream web/api can override them, but
+	# every public response gets a safe baseline from the proxy entrypoint.
+	header {
+		?Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		?X-Content-Type-Options "nosniff"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		?X-Frame-Options "DENY"
+	}
+
 	# Всё, что начинается с /api/, — в бэкенд (NestJS).
 	handle /api/* {
+		# JSON API не исполняет браузерные скрипты/стили, поэтому строгая
+		# fallback-CSP безопасна и закрывает путь, где Helmet CSP выключен.
+		header {
+			?Content-Security-Policy "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+		}
+
 		reverse_proxy api:4000
 	}
 
