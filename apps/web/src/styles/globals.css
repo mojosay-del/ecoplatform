@@ -2212,7 +2212,7 @@ input[type="checkbox"]:focus-visible {
   padding: 12px 16px;
 }
 
-.auth-code-stage {
+.otp-stage {
   position: relative;
   width: 100%;
   min-height: 96px;
@@ -2221,7 +2221,7 @@ input[type="checkbox"]:focus-visible {
   margin-top: 8px;
 }
 
-.auth-code-digits {
+.otp-digits {
   width: 100%;
   max-width: 400px;
   display: grid;
@@ -2234,10 +2234,10 @@ input[type="checkbox"]:focus-visible {
     filter 220ms ease;
 }
 
-.auth-code-box {
+.otp-box {
   /* --ring управляет насыщенностью рамки, --glow — силой свечения.
      Состояния (hover/focus/filled) меняют только эти переменные, а саму
-     «дышащую» подсветку рисует анимация auth-code-glow по тем же значениям —
+     «дышащую» подсветку рисует анимация otp-glow по тем же значениям —
      поэтому статичный box-shadow служит фолбэком при reduce-motion. */
   --ring: 0.34;
   --glow: 0.28;
@@ -2262,25 +2262,25 @@ input[type="checkbox"]:focus-visible {
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
-  animation: auth-code-glow 2.6s ease-in-out infinite;
+  animation: otp-glow 2.6s ease-in-out infinite;
 }
 
-.auth-code-box.is-filled {
+.otp-box.is-filled {
   --ring: 0.9;
   --glow: 0.5;
   border-color: var(--brand);
   /* Цифра «прилетает» с пружинкой, при этом свечение продолжает дышать. */
   animation:
-    auth-code-pop 280ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both,
-    auth-code-glow 2.6s ease-in-out infinite;
+    otp-pop 280ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both,
+    otp-glow 2.6s ease-in-out infinite;
 }
 
-.auth-code-box:hover:not(:disabled) {
+.otp-box:hover:not(:disabled) {
   --ring: 0.55;
   --glow: 0.42;
 }
 
-.auth-code-box:focus {
+.otp-box:focus {
   --ring: 1;
   --glow: 0.66;
   outline: none;
@@ -2288,11 +2288,11 @@ input[type="checkbox"]:focus-visible {
   transform: scale(1.05);
 }
 
-.auth-code-box:disabled {
+.otp-box:disabled {
   opacity: 1;
 }
 
-.auth-code-orb {
+.otp-orb {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -2312,45 +2312,45 @@ input[type="checkbox"]:focus-visible {
     background 180ms ease;
 }
 
-.auth-code-stage.is-checking .auth-code-digits,
-.auth-code-stage.is-success .auth-code-digits,
-.auth-code-stage.is-error .auth-code-digits {
+.otp-stage.is-checking .otp-digits,
+.otp-stage.is-success .otp-digits,
+.otp-stage.is-error .otp-digits {
   opacity: 0;
   filter: blur(7px);
   transform: scaleX(0.16) scaleY(0.76);
 }
 
-.auth-code-stage.is-checking .auth-code-orb,
-.auth-code-stage.is-success .auth-code-orb,
-.auth-code-stage.is-error .auth-code-orb {
+.otp-stage.is-checking .otp-orb,
+.otp-stage.is-success .otp-orb,
+.otp-stage.is-error .otp-orb {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
 }
 
-.auth-code-stage.is-checking .auth-code-orb {
+.otp-stage.is-checking .otp-orb {
   /* Пока крутится спиннер — мягкое бренд-свечение «дышит». */
-  animation: auth-code-halo-brand 1.4s ease-in-out infinite;
+  animation: otp-halo-brand 1.4s ease-in-out infinite;
 }
 
-.auth-code-stage.is-success .auth-code-orb {
+.otp-stage.is-success .otp-orb {
   background: var(--success);
   /* Зелёное свечение пульсирует — как «Verified successfully» в референсе. */
-  animation: auth-code-halo-success 1.6s ease-in-out infinite;
+  animation: otp-halo-success 1.6s ease-in-out infinite;
 }
 
-.auth-code-stage.is-error .auth-code-orb {
+.otp-stage.is-error .otp-orb {
   background: var(--danger);
   box-shadow: 0 0 30px 4px rgb(var(--danger-rgb) / 0.5);
-  animation: auth-code-error-shake 360ms ease both;
+  animation: otp-error-shake 360ms ease both;
 }
 
-.auth-code-spinner {
+.otp-spinner {
   width: 28px;
   height: 28px;
   border-radius: 999px;
   border: 3px solid rgb(var(--white-rgb) / 0.34);
   border-top-color: var(--white);
-  animation: auth-code-spin 760ms linear infinite;
+  animation: otp-spin 760ms linear infinite;
 }
 
 .auth-text-button {
@@ -2381,7 +2381,7 @@ input[type="checkbox"]:focus-visible {
   color: var(--text-disabled);
 }
 
-@keyframes auth-code-spin {
+@keyframes otp-spin {
   to {
     transform: rotate(360deg);
   }
@@ -2390,7 +2390,7 @@ input[type="checkbox"]:focus-visible {
 /* «Дышащее» бренд-свечение ячеек: интенсивность берётся из --glow,
    так что одно правило обслуживает все состояния (idle/hover/focus/filled). */
 
-@keyframes auth-code-glow {
+@keyframes otp-glow {
   0%,
   100% {
     box-shadow:
@@ -2408,7 +2408,7 @@ input[type="checkbox"]:focus-visible {
 
 /* Пружинка появления цифры. */
 
-@keyframes auth-code-pop {
+@keyframes otp-pop {
   0% {
     transform: scale(0.72);
   }
@@ -2422,7 +2422,7 @@ input[type="checkbox"]:focus-visible {
 
 /* Пульсирующий ореол орба при успехе/проверке. */
 
-@keyframes auth-code-halo-success {
+@keyframes otp-halo-success {
   0%,
   100% {
     box-shadow:
@@ -2436,7 +2436,7 @@ input[type="checkbox"]:focus-visible {
   }
 }
 
-@keyframes auth-code-halo-brand {
+@keyframes otp-halo-brand {
   0%,
   100% {
     box-shadow:
@@ -2450,7 +2450,7 @@ input[type="checkbox"]:focus-visible {
   }
 }
 
-@keyframes auth-code-error-shake {
+@keyframes otp-error-shake {
   0%,
   100% {
     transform: translate(-50%, -50%) scale(1);
@@ -2464,11 +2464,11 @@ input[type="checkbox"]:focus-visible {
 }
 
 @media (max-width: 540px) {
-  .auth-code-digits {
+  .otp-digits {
     gap: 9px;
   }
 
-  .auth-code-box {
+  .otp-box {
     min-height: 68px;
     border-radius: 12px;
     font-size: 32px;
@@ -2478,14 +2478,14 @@ input[type="checkbox"]:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   /* При системной настройке «уменьшить движение» — анимаций нет. */
   .ui-card,
-  .auth-code-digits,
-  .auth-code-box,
-  .auth-code-box.is-filled,
-  .auth-code-orb,
-  .auth-code-spinner,
-  .auth-code-stage.is-checking .auth-code-orb,
-  .auth-code-stage.is-success .auth-code-orb,
-  .auth-code-stage.is-error .auth-code-orb {
+  .otp-digits,
+  .otp-box,
+  .otp-box.is-filled,
+  .otp-orb,
+  .otp-spinner,
+  .otp-stage.is-checking .otp-orb,
+  .otp-stage.is-success .otp-orb,
+  .otp-stage.is-error .otp-orb {
     animation: none;
     transition: none;
   }

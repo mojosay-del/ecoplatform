@@ -186,18 +186,18 @@ export function VerificationStepFields({
       </p>
       <p className="auth-verification-hint">Не пришёл код? Проверьте папку «Спам» — иногда письмо попадает туда.</p>
       <div
-        className={`auth-code-stage is-${verificationPhase}`}
+        className={`otp-stage is-${verificationPhase}`}
         aria-busy={verificationPhase === "checking"}
         data-phase={verificationPhase}
       >
-        <div className="auth-code-digits" aria-hidden={verificationIsAnimating}>
+        <div className="otp-digits" aria-hidden={verificationIsAnimating}>
           {verificationDigits.map((digit, index) => (
             <input
               key={index}
               ref={(element) => {
                 verificationInputRefs.current[index] = element;
               }}
-              className={`auth-code-box${digit ? " is-filled" : ""}`}
+              className={`otp-box${digit ? " is-filled" : ""}`}
               type="text"
               inputMode="numeric"
               autoComplete={index === 0 ? "one-time-code" : "off"}
@@ -212,8 +212,8 @@ export function VerificationStepFields({
             />
           ))}
         </div>
-        <div className="auth-code-orb" aria-hidden={!verificationIsAnimating}>
-          {verificationPhase === "checking" ? <span className="auth-code-spinner" /> : null}
+        <div className="otp-orb" aria-hidden={!verificationIsAnimating}>
+          {verificationPhase === "checking" ? <span className="otp-spinner" /> : null}
           {verificationPhase === "success" ? <Check size={34} strokeWidth={3} aria-hidden="true" /> : null}
           {verificationPhase === "error" ? <X size={34} strokeWidth={3} aria-hidden="true" /> : null}
         </div>

@@ -243,13 +243,13 @@ export function ContactChangeDialog({
               </div>
             </div>
             {verification ? (
-              <div className={`auth-code-stage is-${phase}`} aria-busy={phase === "checking"} data-phase={phase}>
-                <div className="auth-code-digits" aria-hidden={phase !== "typing"}>
+              <div className={`otp-stage is-${phase}`} aria-busy={phase === "checking"} data-phase={phase}>
+                <div className="otp-digits" aria-hidden={phase !== "typing"}>
                   {codeDigits.map((digit, index) => (
                     <input
                       aria-label={`Цифра ${index + 1} из ${VERIFICATION_CODE_LENGTH}`}
                       autoComplete={index === 0 ? "one-time-code" : "off"}
-                      className={`auth-code-box${digit ? " is-filled" : ""}`}
+                      className={`otp-box${digit ? " is-filled" : ""}`}
                       disabled={phase !== "typing"}
                       inputMode="numeric"
                       key={index}
@@ -265,8 +265,8 @@ export function ContactChangeDialog({
                     />
                   ))}
                 </div>
-                <div className="auth-code-orb" aria-hidden={phase === "typing"}>
-                  {phase === "checking" ? <span className="auth-code-spinner" /> : null}
+                <div className="otp-orb" aria-hidden={phase === "typing"}>
+                  {phase === "checking" ? <span className="otp-spinner" /> : null}
                   {phase === "success" ? <Check size={34} strokeWidth={3} aria-hidden="true" /> : null}
                   {phase === "error" ? <X size={34} strokeWidth={3} aria-hidden="true" /> : null}
                 </div>
