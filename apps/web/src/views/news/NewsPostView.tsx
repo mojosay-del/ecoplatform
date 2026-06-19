@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import "../content-blocks/content-article.css";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageCircle } from "lucide-react";
 import type { NewsPostDetail } from "@ecoplatform/shared";

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import "./content-blocks/content-article.css";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
 import { CoverImage } from "../components/CoverImage";
 import { AppShell } from "../components/AppShell";

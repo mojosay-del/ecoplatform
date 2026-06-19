@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import "./notifications.css";
 import { BellOff, CheckCheck, CreditCard, HelpCircle, type LucideIcon, MessageSquare, Settings } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { StatusPill } from "./StatusPill";

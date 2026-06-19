@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
+import "./notifications.css";
 import type { InfinitePage } from "../lib/use-infinite-api-query";
 import { useAuth } from "../lib/auth";
 import { NotificationsPopover } from "./NotificationsPopover";

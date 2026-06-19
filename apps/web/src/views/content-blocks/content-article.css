@@ -1,0 +1,20 @@
+/*  Стили компонента (вынесено из globals.css). Импортируется самим компонентом, поэтому едет за ним во все разделы.  */
+.knowledge-article-card.content-article {
+  max-width: none;
+  font-size: 16px;
+  line-height: 1.62;
+}
+.content-article {
+  max-width: 860px;
+  display: grid;
+  gap: 12px;
+  font-size: 18px;
+  line-height: 1.65;
+}
+.content-article blockquote {
+  margin: 0;
+  border-left: 4px solid var(--blue);
+  padding: 10px 16px;
+  color: var(--muted);
+  background: var(--panel-soft);
+}

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import "./account-menu.css";
 import type { User } from "../../lib/auth";
 import {
   ACCOUNT_SECTION_NAVIGATE_EVENT,

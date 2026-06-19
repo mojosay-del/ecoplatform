@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
+import "./news-modal.css";
 import type { NewsPostDetail } from "@ecoplatform/shared";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";

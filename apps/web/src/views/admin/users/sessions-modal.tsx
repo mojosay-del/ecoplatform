@@ -2,6 +2,7 @@
 
 import { useEffect, useId } from "react";
 import { createPortal } from "react-dom";
+import "../../news/news-modal.css";
 import { X } from "lucide-react";
 import { StatusPill } from "../../../components/StatusPill";
 import type { AdminUserDetail, AdminUserSession } from "./types";

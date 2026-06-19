@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { DocumentEditorProps } from "./DocumentEditor";
+import "./rich-text-editor.css";
 
 const DynamicDocumentEditor = dynamic<DocumentEditorProps>(
   () => import("./DocumentEditor").then((module) => module.DocumentEditor),

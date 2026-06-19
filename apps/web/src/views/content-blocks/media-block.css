@@ -1,0 +1,32 @@
+/*  Стили компонента (вынесено из globals.css). Импортируется самим компонентом, поэтому едет за ним во все разделы.  */
+.media-block {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.media-block img,
+.media-block iframe,
+.media-block video {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+.media-block video {
+  max-height: 620px;
+}
+.media-block img {
+  height: auto;
+  max-height: 620px;
+  object-fit: contain;
+}
+.media-block iframe {
+  aspect-ratio: 16 / 9;
+}
+.media-block audio {
+  width: 100%;
+}
+.media-block figcaption {
+  color: var(--muted);
+  font-size: 14px;
+}

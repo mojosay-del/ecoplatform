@@ -1,0 +1,374 @@
+/*  Стили компонента (вынесено из globals.css). Импортируется самим компонентом, поэтому едет за ним во все разделы.  */
+/* --- Blocks editor (Notion-style) --- */
+.blocks-editor {
+  display: flex;
+  flex-direction: column;
+}
+.blocks-editor-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 40px 24px;
+  min-height: 140px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-card);
+  background: var(--panel);
+}
+.blocks-editor-empty-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+.block-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 4px;
+  align-items: flex-start;
+  padding: 4px 0;
+  border-radius: 10px;
+  position: relative;
+}
+.block-row:hover {
+  background: rgb(var(--brand-rgb) / 0.04);
+}
+.block-row-handle {
+  width: 28px;
+  height: 28px;
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: grab;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease;
+}
+.block-row-handle:hover {
+  background: var(--line);
+  color: var(--text);
+}
+.block-row-handle:active {
+  cursor: grabbing;
+}
+.block-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+}
+.block-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+.block-row-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.block-row-delete {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    background-color 120ms ease;
+}
+.block-row:hover .block-row-delete {
+  opacity: 1;
+}
+.block-row-delete:hover {
+  background: rgb(var(--danger-rgb) / 0.1);
+  color: var(--red);
+}
+/* «+» между блоками: тонкая невидимая полоса, разворачивается на ховере. */
+.block-insert-slot {
+  position: relative;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.block-insert {
+  position: relative;
+}
+.block-insert.sm .block-insert-button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+.block-insert-slot:hover .block-insert-button,
+.block-insert-button.is-open {
+  opacity: 1;
+}
+.block-insert.sm .block-insert-button:hover,
+.block-insert.sm .block-insert-button.is-open {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.block-insert.lg .block-insert-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--white);
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+.block-insert.lg .block-insert-button:hover {
+  background: var(--primary-hover);
+}
+.block-insert-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card-hover);
+  padding: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  min-width: 280px;
+}
+.block-insert-menu-item {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+.block-insert-menu-item:hover {
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
+.block-insert-menu-icon {
+  display: inline-flex;
+  color: var(--muted);
+}
+.block-insert-menu-item:hover .block-insert-menu-icon {
+  color: var(--primary);
+}
+/* --- Rich text editor (TipTap) --- */
+.rich-text-editor {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--panel);
+  overflow: hidden;
+}
+.document-editor-loading {
+  padding: 16px 18px;
+  min-height: 96px;
+  color: var(--muted);
+}
+.rich-text-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--panel-soft);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.rich-text-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.rich-text-toolbar-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--line-strong);
+  margin: 0 4px;
+}
+.rich-text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.rich-text-button:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+.rich-text-button.is-active {
+  background: var(--primary-soft);
+  border-color: var(--primary-soft-strong);
+  color: var(--primary-hover);
+}
+.rich-text-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.rich-text-select {
+  height: 32px;
+  padding: 0 26px 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.rich-text-select:focus {
+  outline: 2px solid var(--primary-soft-strong);
+  outline-offset: 1px;
+}
+.rich-text-color-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+.rich-text-color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--line);
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease;
+}
+.rich-text-color-swatch:hover {
+  transform: scale(1.1);
+}
+.rich-text-color-swatch.is-active {
+  border-color: var(--text);
+}
+.rich-text-surface {
+  min-width: 0;
+  padding: 14px 16px;
+  min-height: 160px;
+  max-height: 600px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.rich-text-content {
+  outline: none;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.rich-text-content p {
+  margin: 0 0 0.75em;
+}
+.rich-text-content p:last-child {
+  margin-bottom: 0;
+}
+.rich-text-content h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 1em 0 0.4em;
+  letter-spacing: 0;
+}
+.rich-text-content h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0.9em 0 0.35em;
+}
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 0 0 0.75em;
+  padding-left: 1.4em;
+}
+.rich-text-content li {
+  margin-bottom: 0.25em;
+}
+.rich-text-content blockquote {
+  margin: 0.5em 0;
+  padding: 6px 14px;
+  border-left: 3px solid var(--primary);
+  background: var(--primary-soft);
+  border-radius: 0 8px 8px 0;
+  color: var(--text);
+}
+.rich-text-content a {
+  color: var(--blue);
+  text-decoration: underline;
+}
+.rich-text-content strong {
+  font-weight: 700;
+}
+.rich-text-content em {
+  font-style: italic;
+}
+.rich-text-content u {
+  text-decoration: underline;
+}
+/* Плейсхолдер от TipTap. */
+.rich-text-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

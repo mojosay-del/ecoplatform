@@ -1,0 +1,119 @@
+/*  Стили компонента (вынесено из globals.css). Импортируется самим компонентом, поэтому едет за ним во все разделы.  */
+.account-menu-root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-menu-avatar {
+  border: 1px solid var(--line);
+  cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--white);
+  font: inherit;
+}
+.account-menu-avatar-initials {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--white);
+}
+.account-menu-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 95;
+  width: min(320px, calc(100vw - 24px));
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 18px 40px -16px rgb(var(--shadow-deep-rgb) / 0.25);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: notif-pop-in 140ms ease;
+}
+.account-menu-head {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.account-menu-head-avatar {
+  cursor: default;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--white);
+}
+.account-menu-head-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.account-menu-head strong {
+  color: var(--text);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-menu-head-email {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-menu-section {
+  display: grid;
+  gap: 2px;
+}
+.account-menu-section p {
+  margin: 6px 8px 2px;
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.account-menu-link,
+.account-menu-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+.account-menu-link:hover,
+.account-menu-logout:hover {
+  background: var(--panel-soft);
+  color: var(--text);
+}
+.account-menu-link.active {
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
+.account-menu-logout {
+  margin-top: 2px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+  color: var(--danger-text-strong);
+}

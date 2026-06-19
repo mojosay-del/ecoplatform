@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { preferredFileAssetMediaUrl, type FileAsset } from "../../lib/api";
 import { VideoPlayer, type VideoPlayerSource } from "./VideoPlayer";
+import "./media-block.css";
 
 export function ImageBlock({
   asset,

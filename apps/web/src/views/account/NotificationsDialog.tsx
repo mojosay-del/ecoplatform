@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useAccountDialogBodyLock } from "./hooks";
+import "../../components/notifications.css";
 
 type NotificationRow = {
   category: string;

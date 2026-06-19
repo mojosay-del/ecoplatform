@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
+import "./rich-text-editor.css";
 import Placeholder from "@tiptap/extension-placeholder";
 import {
   Bold,

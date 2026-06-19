@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef } from "react";
+import "./notifications.css";
 import { CheckCheck } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
