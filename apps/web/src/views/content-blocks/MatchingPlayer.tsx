@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import "./matching.css";
 import "./quiz.css";
 
 export type MatchingPayload = {
