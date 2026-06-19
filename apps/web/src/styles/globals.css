@@ -1722,23 +1722,23 @@ input[type="checkbox"]:focus-visible {
 /* Главная кнопка — мягкий вертикальный градиент бренда + тёплая тень.
    Раньше была плоско-ровной. На :disabled остаётся серой (правило .button). */
 
-.auth-submit:not(:disabled) {
+.form-submit:not(:disabled) {
   background: linear-gradient(180deg, var(--auth-gradient-start) 0%, var(--brand) 100%);
   box-shadow: 0 8px 20px rgb(var(--brand-shadow-rgb) / 0.22);
 }
 
-.auth-submit:not(:disabled):hover {
+.form-submit:not(:disabled):hover {
   background: linear-gradient(180deg, var(--brand) 0%, var(--brand-hover) 100%);
   box-shadow: 0 10px 24px rgb(var(--brand-shadow-rgb) / 0.28);
 }
 
-.auth-submit:not(:disabled):active {
+.form-submit:not(:disabled):active {
   box-shadow: 0 4px 12px rgb(var(--brand-shadow-rgb) / 0.2);
 }
 
 /* Подсказка-причина под заблокированной кнопкой регистрации. */
 
-.auth-submit-hint {
+.form-submit-hint {
   margin: -4px 0 0;
   font-size: 12.5px;
   line-height: 1.45;
@@ -1748,7 +1748,7 @@ input[type="checkbox"]:focus-visible {
 
 /* Микрокопия доверия под основной кнопкой. */
 
-.auth-secure-note {
+.form-secure-note {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1758,11 +1758,11 @@ input[type="checkbox"]:focus-visible {
   color: var(--text-muted);
 }
 
-.auth-secure-note svg {
+.form-secure-note svg {
   color: var(--success-text);
 }
 
-.auth-inline-trust {
+.form-inline-trust {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1778,13 +1778,13 @@ input[type="checkbox"]:focus-visible {
   text-align: center;
 }
 
-.auth-inline-trust li {
+.form-inline-trust li {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.auth-inline-trust li::before {
+.form-inline-trust li::before {
   content: "";
   flex: none;
   width: 5px;
@@ -1909,13 +1909,13 @@ input[type="checkbox"]:focus-visible {
 
 /* Поле формы: label сверху, контрол снизу. Один паттерн для всех. */
 
-.auth-field {
+.form-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.auth-field-label {
+.form-field-label {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
@@ -1926,17 +1926,17 @@ input[type="checkbox"]:focus-visible {
 
 /* Фокус поля мягко подсвечивает его лейбл — «анимация при вводе». */
 
-.auth-field:focus-within .auth-field-label {
+.form-field:focus-within .form-field-label {
   color: var(--brand);
 }
 
 /* Поле с ведущей иконкой (email/пароль): иконка слева, при фокусе — бренд. */
 
-.auth-field-affix {
+.form-field-affix {
   position: relative;
 }
 
-.auth-field-affix-icon {
+.form-field-affix-icon {
   position: absolute;
   left: 13px;
   top: 50%;
@@ -1946,11 +1946,11 @@ input[type="checkbox"]:focus-visible {
   transition: color 150ms ease;
 }
 
-.auth-field-affix:focus-within .auth-field-affix-icon {
+.form-field-affix:focus-within .form-field-affix-icon {
   color: var(--brand);
 }
 
-.auth-input-leading {
+.form-input-leading {
   padding-left: 40px;
 }
 
@@ -1967,17 +1967,17 @@ input[type="checkbox"]:focus-visible {
 
 /* Спиннер внутри кнопки во время отправки. */
 
-.auth-btn-spinner {
+.form-btn-spinner {
   width: 16px;
   height: 16px;
   flex: none;
   border-radius: 50%;
   border: 2px solid rgb(var(--text-rgb) / 0.2);
   border-top-color: var(--brand);
-  animation: auth-btn-spin 0.7s linear infinite;
+  animation: form-btn-spin 0.7s linear infinite;
 }
 
-@keyframes auth-btn-spin {
+@keyframes form-btn-spin {
   to {
     transform: rotate(360deg);
   }
@@ -2074,23 +2074,9 @@ input[type="checkbox"]:focus-visible {
   color: var(--success-text);
 }
 
-/* Парные поля в строку, на мобильном схлопываются в столбец. */
-
-.auth-grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-@media (max-width: 540px) {
-  .auth-grid-2 {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* Секция: визуально группирует связанные поля без громких рамок. */
 
-.auth-section {
+.form-section {
   border: none;
   padding: 0;
   margin: 0;
@@ -2099,7 +2085,7 @@ input[type="checkbox"]:focus-visible {
   gap: 14px;
 }
 
-.auth-section-title {
+.form-section-title {
   /* Title секции должен явно отличаться от field-label сверху: крупнее,
      не uppercase, темнее. Иначе глаз не считывает иерархию. */
   font-size: 15px;
@@ -2109,14 +2095,14 @@ input[type="checkbox"]:focus-visible {
   margin: 0 0 2px;
 }
 
-.auth-section + .auth-section {
+.form-section + .form-section {
   /* Воздух между секциями, чтобы группировка читалась. */
   margin-top: 16px;
 }
 
 /* Строка «запомнить меня» + «забыли пароль» — стандартный паттерн. */
 
-.auth-row {
+.form-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2124,7 +2110,7 @@ input[type="checkbox"]:focus-visible {
   margin: 2px 0 4px;
 }
 
-.auth-check {
+.form-check {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -2135,7 +2121,7 @@ input[type="checkbox"]:focus-visible {
   user-select: none;
 }
 
-.auth-check-input {
+.form-check-input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2143,7 +2129,7 @@ input[type="checkbox"]:focus-visible {
   pointer-events: none;
 }
 
-.auth-check-box {
+.form-check-box {
   width: 18px;
   height: 18px;
   flex: 0 0 18px;
@@ -2157,7 +2143,7 @@ input[type="checkbox"]:focus-visible {
     box-shadow 120ms ease;
 }
 
-.auth-check-box::after {
+.form-check-box::after {
   content: "";
   position: absolute;
   left: 5px;
@@ -2173,29 +2159,29 @@ input[type="checkbox"]:focus-visible {
     transform 120ms ease;
 }
 
-.auth-check-input:checked + .auth-check-box {
+.form-check-input:checked + .form-check-box {
   border-color: var(--primary);
   background: var(--primary);
   box-shadow: 0 6px 14px rgb(var(--brand-rgb) / 0.24);
 }
 
-.auth-check-input:checked + .auth-check-box::after {
+.form-check-input:checked + .form-check-box::after {
   opacity: 1;
   transform: rotate(45deg) scale(1);
 }
 
-.auth-check-input:focus-visible + .auth-check-box {
+.form-check-input:focus-visible + .form-check-box {
   border-color: var(--primary);
   box-shadow: var(--focus-ring);
 }
 
-.auth-row-link {
+.form-row-link {
   font-size: 13px;
   font-weight: 600;
   color: var(--brand);
 }
 
-.auth-error {
+.form-error {
   margin: 0;
   padding: 8px 12px;
   background: rgb(var(--danger-rgb) / 0.1);
@@ -2205,7 +2191,7 @@ input[type="checkbox"]:focus-visible {
   font-size: 13px;
 }
 
-.auth-submit {
+.form-submit {
   margin-top: 4px;
   font-size: 15px;
   font-weight: 700;
@@ -2353,7 +2339,7 @@ input[type="checkbox"]:focus-visible {
   animation: otp-spin 760ms linear infinite;
 }
 
-.auth-text-button {
+.form-text-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2367,16 +2353,16 @@ input[type="checkbox"]:focus-visible {
   cursor: pointer;
 }
 
-.auth-text-button:hover:not(:disabled) {
+.form-text-button:hover:not(:disabled) {
   color: var(--brand);
 }
 
-.auth-text-button:focus-visible {
+.form-text-button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
 
-.auth-text-button:disabled {
+.form-text-button:disabled {
   cursor: not-allowed;
   color: var(--text-disabled);
 }
@@ -3967,6 +3953,12 @@ input[type="checkbox"]:focus-visible {
   gap: 12px;
 }
 
+@media (max-width: 540px) {
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .indices-inline-form .form-field > span {
   color: var(--muted);
   font-size: 11px;
@@ -4587,9 +4579,9 @@ input[type="checkbox"]:focus-visible {
   .input,
   .textarea,
   .select,
-  .auth-field input,
-  .auth-field select,
-  .auth-field textarea {
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
     font-size: 16px;
   }
 

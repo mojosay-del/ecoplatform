@@ -22,7 +22,7 @@ type SetRegisterField = <K extends keyof RegisterFormValues>(field: K, value: Re
 
 export function CompanyStepFields({ values, setField }: { values: RegisterFormValues; setField: SetRegisterField }) {
   return (
-    <div className="auth-section">
+    <div className="form-section">
       <AuthField label="Наименование компании">
         <FieldAffix icon={Building2}>
           <OrganizationNameInput
@@ -31,8 +31,8 @@ export function CompanyStepFields({ values, setField }: { values: RegisterFormVa
           />
         </FieldAffix>
       </AuthField>
-      <div className="auth-field">
-        <span className="auth-field-label">Тип компании</span>
+      <div className="form-field">
+        <span className="form-field-label">Тип компании</span>
         <AuthSelect
           icon={Tag}
           label="Тип компании"
@@ -65,12 +65,12 @@ export function PersonStepFields({
 }) {
   return (
     <>
-      <fieldset className="auth-section" aria-label="О вас">
-        <div className="auth-grid-2">
+      <fieldset className="form-section" aria-label="О вас">
+        <div className="form-grid-2">
           <AuthField label="Фамилия">
             <FieldAffix icon={User}>
               <input
-                className="input auth-input-leading"
+                className="input form-input-leading"
                 name="lastName"
                 value={values.lastName}
                 onChange={(event) => setField("lastName", event.currentTarget.value)}
@@ -81,7 +81,7 @@ export function PersonStepFields({
           <AuthField label="Имя">
             <FieldAffix icon={User}>
               <input
-                className="input auth-input-leading"
+                className="input form-input-leading"
                 name="firstName"
                 value={values.firstName}
                 onChange={(event) => setField("firstName", event.currentTarget.value)}
@@ -90,7 +90,7 @@ export function PersonStepFields({
             </FieldAffix>
           </AuthField>
         </div>
-        <div className="auth-grid-2">
+        <div className="form-grid-2">
           <AuthField label="Email">
             <EmailInput
               name="email"
@@ -121,10 +121,10 @@ export function PersonStepFields({
         </AuthField>
       </fieldset>
 
-      <fieldset className="auth-section">
-        <legend className="auth-section-title">Согласия</legend>
+      <fieldset className="form-section">
+        <legend className="form-section-title">Согласия</legend>
         {legalLoadError ? (
-          <p className="auth-error">Не удалось загрузить юридические документы. Обновите страницу.</p>
+          <p className="form-error">Не удалось загрузить юридические документы. Обновите страницу.</p>
         ) : legalDocs.length === 0 ? (
           <p className="ui-card-sub">Загружаем актуальные документы…</p>
         ) : (
@@ -173,8 +173,8 @@ export function VerificationStepFields({
   verificationStatusText: string;
 }) {
   return (
-    <fieldset className="auth-section auth-verification-section">
-      <legend className="auth-section-title auth-verification-title">
+    <fieldset className="form-section auth-verification-section">
+      <legend className="form-section-title auth-verification-title">
         <span className="auth-verification-badge" aria-hidden="true">
           <Mail size={26} strokeWidth={2} />
         </span>

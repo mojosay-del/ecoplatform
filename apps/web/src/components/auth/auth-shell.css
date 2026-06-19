@@ -359,7 +359,7 @@
   color: var(--text);
 }
 /* Кастомный селект auth-форм: триггер копирует обычное поле, список —
-   анимированный поповер. Иконка слева переиспользует .auth-field-affix-icon. */
+   анимированный поповер. Иконка слева переиспользует .form-field-affix-icon. */
 .auth-select {
   position: relative;
 }
@@ -393,8 +393,8 @@
   border-color: var(--field-border-focus);
   box-shadow: var(--focus-ring);
 }
-.auth-select.is-open .auth-field-affix-icon,
-.auth-select-trigger:focus-visible .auth-field-affix-icon {
+.auth-select.is-open .form-field-affix-icon,
+.auth-select-trigger:focus-visible .form-field-affix-icon {
   color: var(--brand);
 }
 .auth-select-value {
@@ -468,7 +468,7 @@
   gap: 12px;
   margin-top: 4px;
 }
-.auth-step-actions .auth-submit {
+.auth-step-actions .form-submit {
   margin-top: 0;
 }
 .auth-verification-actions {

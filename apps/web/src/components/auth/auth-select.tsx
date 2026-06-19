@@ -117,14 +117,14 @@ export function AuthSelect({
       <input type="hidden" name={name} value={value} />
       <button
         type="button"
-        className="auth-select-trigger auth-input-leading"
+        className="auth-select-trigger form-input-leading"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={label}
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={onKeyDown}
       >
-        <Icon className="auth-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
+        <Icon className="form-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
         <span className="auth-select-value">{selected?.label}</span>
         <ChevronDown className="auth-select-chevron" size={18} strokeWidth={2} aria-hidden="true" />
       </button>

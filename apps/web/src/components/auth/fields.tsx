@@ -15,18 +15,18 @@ import { normalizeEmailValue, passwordStrength } from "./utils";
 
 export function AuthField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <label className="auth-field">
-      <span className="auth-field-label">{label}</span>
+    <label className="form-field">
+      <span className="form-field-label">{label}</span>
       {children}
-      {hint ? <span className="auth-field-hint">{hint}</span> : null}
+      {hint ? <span className="form-field-hint">{hint}</span> : null}
     </label>
   );
 }
 
 export function FieldAffix({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
   return (
-    <div className="auth-field-affix">
-      <Icon className="auth-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
+    <div className="form-field-affix">
+      <Icon className="form-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
       {children}
     </div>
   );
@@ -44,10 +44,10 @@ export function EmailInput({
   onValueChange?: (value: string) => void;
 }) {
   return (
-    <div className="auth-field-affix">
-      <Mail className="auth-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
+    <div className="form-field-affix">
+      <Mail className="form-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
       <input
-        className="input auth-input-leading"
+        className="input form-input-leading"
         name={name}
         type="email"
         autoComplete={autoComplete}
@@ -134,7 +134,7 @@ export function OrganizationNameInput({
 
   return (
     <input
-      className="input auth-input-leading"
+      className="input form-input-leading"
       name="organizationName"
       placeholder={placeholder}
       autoComplete="organization"
@@ -162,10 +162,10 @@ export function PasswordInput({
   const iconRef = useRef<AnimatedNavIconHandle | null>(null);
 
   return (
-    <div className="password-input-wrap auth-field-affix">
-      <Lock className="auth-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
+    <div className="password-input-wrap form-field-affix">
+      <Lock className="form-field-affix-icon" size={17} strokeWidth={2} aria-hidden="true" />
       <input
-        className="input password-input auth-input-leading"
+        className="input password-input form-input-leading"
         name={name}
         type={visible ? "text" : "password"}
         autoComplete={autoComplete}

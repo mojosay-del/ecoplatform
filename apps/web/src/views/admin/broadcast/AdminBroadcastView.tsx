@@ -113,7 +113,7 @@ export function AdminBroadcastView() {
           subtitle="Сообщение от платформы появится у получателей в колокольчике уведомлений."
         />
         {flash ? <p className="cms-flash">{flash}</p> : null}
-        {error ? <p className="auth-error">{error}</p> : null}
+        {error ? <p className="form-error">{error}</p> : null}
 
         <form className="form news-form" onSubmit={submit} style={{ maxWidth: 720 }}>
           <label className="indices-title-field">
@@ -149,9 +149,9 @@ export function AdminBroadcastView() {
             />
           </label>
 
-          <fieldset className="auth-section">
-            <legend className="auth-section-title">Аудитория</legend>
-            <div className="auth-grid-2">
+          <fieldset className="form-section">
+            <legend className="form-section-title">Аудитория</legend>
+            <div className="form-grid-2">
               <label className="form-field">
                 <span>Тип компании</span>
                 <select

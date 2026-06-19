@@ -354,7 +354,7 @@ export function RegisterForm() {
               компаний.
             </p>
           </header>
-          <Link className="button auth-submit auth-closed-cta" href="/login">
+          <Link className="button form-submit auth-closed-cta" href="/login">
             Войти в аккаунт
           </Link>
           <p className="ui-card-sub auth-closed-foot">Уже есть аккаунт? Войдите по кнопке выше.</p>
@@ -410,10 +410,10 @@ export function RegisterForm() {
           />
         )}
 
-        {error ? <p className="auth-error">{error}</p> : null}
+        {error ? <p className="form-error">{error}</p> : null}
 
         {step === "company" ? (
-          <button className="button auth-submit" type="button" onClick={goToPersonStep}>
+          <button className="button form-submit" type="button" onClick={goToPersonStep}>
             Далее
           </button>
         ) : step === "person" ? (
@@ -422,10 +422,10 @@ export function RegisterForm() {
               <button className="button secondary" type="button" onClick={goBackToCompanyStep} disabled={submitting}>
                 Назад
               </button>
-              <button className="button auth-submit" type="submit" disabled={submitting || !canSubmit}>
+              <button className="button form-submit" type="submit" disabled={submitting || !canSubmit}>
                 {submitting ? (
                   <>
-                    <span className="auth-btn-spinner" aria-hidden="true" />
+                    <span className="form-btn-spinner" aria-hidden="true" />
                     Отправляем код…
                   </>
                 ) : (
@@ -433,8 +433,8 @@ export function RegisterForm() {
                 )}
               </button>
             </div>
-            {!canSubmit && submitHint ? <p className="auth-submit-hint">{submitHint}</p> : null}
-            <ul className="auth-inline-trust" aria-label="Гарантии регистрации">
+            {!canSubmit && submitHint ? <p className="form-submit-hint">{submitHint}</p> : null}
+            <ul className="form-inline-trust" aria-label="Гарантии регистрации">
               {REGISTRATION_TRUST_ITEMS.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -443,7 +443,7 @@ export function RegisterForm() {
         ) : (
           <div className="auth-verification-actions">
             <button
-              className="button auth-submit auth-verification-submit"
+              className="button form-submit auth-verification-submit"
               type="submit"
               disabled={verificationInputLocked || !verificationIsComplete}
             >
@@ -457,7 +457,7 @@ export function RegisterForm() {
             </button>
             <div className="auth-verification-secondary">
               <button
-                className="auth-text-button"
+                className="form-text-button"
                 type="button"
                 onClick={() => {
                   clearVerificationTimers();
@@ -470,7 +470,7 @@ export function RegisterForm() {
                 Назад
               </button>
               <button
-                className="auth-text-button"
+                className="form-text-button"
                 type="button"
                 onClick={requestVerificationCode}
                 disabled={submitting}

@@ -54,23 +54,23 @@ export function LoginForm() {
           <PasswordInput name="password" autoComplete="current-password" />
         </AuthField>
 
-        <div className="auth-row">
-          <label className="auth-check">
-            <input className="auth-check-input" type="checkbox" name="rememberMe" defaultChecked />
-            <span className="auth-check-box" aria-hidden="true" />
+        <div className="form-row">
+          <label className="form-check">
+            <input className="form-check-input" type="checkbox" name="rememberMe" defaultChecked />
+            <span className="form-check-box" aria-hidden="true" />
             <span>Запомнить меня</span>
           </label>
-          <Link className="auth-row-link" href="/forgot-password">
+          <Link className="form-row-link" href="/forgot-password">
             Забыли пароль?
           </Link>
         </div>
 
-        {error ? <p className="auth-error">{error}</p> : null}
+        {error ? <p className="form-error">{error}</p> : null}
 
-        <button className="button auth-submit" type="submit" disabled={submitting}>
+        <button className="button form-submit" type="submit" disabled={submitting}>
           {submitting ? (
             <>
-              <span className="auth-btn-spinner" aria-hidden="true" />
+              <span className="form-btn-spinner" aria-hidden="true" />
               Входим…
             </>
           ) : (
@@ -78,7 +78,7 @@ export function LoginForm() {
           )}
         </button>
 
-        <p className="auth-secure-note">
+        <p className="form-secure-note">
           <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
           Соединение защищено
         </p>
