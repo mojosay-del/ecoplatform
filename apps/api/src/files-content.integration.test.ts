@@ -44,27 +44,17 @@ const {
 } = ctx;
 
 describe("Files API", () => {
-  it("metadata-only endpoint применяет safe-type проверку и нормализует MIME", async () => {
+  it("metadata-only endpoint снят с поддержки", async () => {
     const managerToken = await loginContentManager();
 
-    const svg = await ctx.http.post("/api/files/metadata").set("Authorization", `Bearer ${managerToken}`).send({
-      originalName: "vector.svg",
-      mimeType: "image/svg+xml",
-      sizeBytes: 512,
+    const response = await ctx.http.post("/api/files/metadata").set("Authorization", `Bearer ${managerToken}`).send({
+      originalName: "report final.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1024,
       accessLevel: "public",
     });
-    expect(svg.status).toBe(400);
-    expect(svg.body.message).toContain("Формат файла не поддерживается");
 
-    const pdf = await ctx.http.post("/api/files/metadata").set("Authorization", `Bearer ${managerToken}`).send({
-      originalName: "report final.pdf",
-      mimeType: "application/x-pdf",
-      sizeBytes: 1024,
-      accessLevel: "authenticated",
-    });
-    expect(pdf.status).toBe(201);
-    expect(pdf.body.mimeType).toBe("application/pdf");
-    expect(pdf.body.storageKey).toMatch(/^uploads\/\d{4}-\d{2}-\d{2}\/.+-report-final\.pdf$/);
+    expect(response.status).toBe(404);
   });
 
   it("content manager не может удалить чужой неиспользуемый файл", async () => {

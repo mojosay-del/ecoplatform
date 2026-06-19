@@ -20,9 +20,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { processCoverImage, type ProcessedImageVariant } from "./image-presets";
 import {
   BLOCKED_UPLOAD_MIME_TYPES,
-  GENERIC_DECLARED_MIME_TYPES,
   buildStorageKey,
-  canonicalMimeType,
   contentDisposition,
   hasBlockedExtension,
   isAllowedDetectedMime,
@@ -197,31 +195,6 @@ export class FilesService {
     };
   }
 
-  private validateMetadataInput(input: {
-    originalName: string;
-    mimeType: string;
-    sizeBytes: number;
-    accessLevel?: FileAccessLevel;
-  }) {
-    const declaredMime = normalizeMimeType(input.mimeType);
-    const mimeType = canonicalMimeType(declaredMime);
-
-    if (
-      !mimeType ||
-      GENERIC_DECLARED_MIME_TYPES.has(mimeType) ||
-      BLOCKED_UPLOAD_MIME_TYPES.has(mimeType) ||
-      hasBlockedExtension(input.originalName) ||
-      !isAllowedDetectedMime(mimeType)
-    ) {
-      throw new BadRequestException("Формат файла не поддерживается.");
-    }
-
-    return {
-      ...input,
-      mimeType,
-    };
-  }
-
   private get quotaDeps(): FilesQuotaDeps {
     return { prisma: this.prisma, dailyQuotaMb: () => this.dailyQuotaMb() };
   }
@@ -244,31 +217,6 @@ export class FilesService {
     if (!user.platformRoles.includes("admin") && asset.uploadedById !== user.id) {
       throw new ForbiddenException("В качестве обложки можно использовать только файл, загруженный вами.");
     }
-  }
-
-  async createMetadata(
-    input: { originalName: string; mimeType: string; sizeBytes: number; accessLevel?: FileAccessLevel },
-    userId: string,
-  ) {
-    const metadata = this.validateMetadataInput(input);
-    const maxUploadMb = await this.maxUploadMb();
-    if (metadata.sizeBytes > maxUploadMb * MB_IN_BYTES) {
-      throw new BadRequestException(`Файл больше ${maxUploadMb} МБ.`);
-    }
-    await assertDailyUploadQuota(this.quotaDeps, userId, metadata.sizeBytes);
-
-    const asset = await this.prisma.fileAsset.create({
-      data: {
-        originalName: metadata.originalName,
-        mimeType: metadata.mimeType,
-        sizeBytes: metadata.sizeBytes,
-        accessLevel: metadata.accessLevel ?? FileAccessLevel.authenticated,
-        storageKey: buildStorageKey(metadata.originalName),
-        uploadedById: userId,
-      },
-    });
-
-    return toFileAssetResponse(asset);
   }
 
   async upload(
