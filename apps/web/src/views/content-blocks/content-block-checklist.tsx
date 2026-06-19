@@ -1,5 +1,6 @@
 import { Ban, Check, CircleDot, type LucideIcon } from "lucide-react";
 import type { ChecklistPayload, ContentBlocksVariant } from "./content-block-types";
+import "./checklist.css";
 
 export function ChecklistBlock({ payload, variant }: { payload: ChecklistPayload; variant: ContentBlocksVariant }) {
   const isKnowledge = variant === "knowledge";

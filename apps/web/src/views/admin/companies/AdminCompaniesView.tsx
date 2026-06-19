@@ -25,6 +25,7 @@ import {
   USER_STATUS_LABELS,
 } from "../../../lib/display-labels";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
+import "../../content-blocks/checklist.css";
 
 type AdminCompanyListItem = {
   id: string;

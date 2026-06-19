@@ -3661,72 +3661,6 @@ input[type="checkbox"]:focus-visible {
   gap: 12px;
 }
 
-.checklist-block {
-  --checklist-accent-rgb: var(--info-rgb);
-  --checklist-accent-text: var(--text);
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgb(var(--checklist-accent-rgb) / 0.18);
-  border-radius: 8px;
-  padding: 18px 20px;
-  background:
-    linear-gradient(135deg, rgb(var(--white-rgb) / 0.9), rgb(var(--checklist-accent-rgb) / 0.045)),
-    rgb(var(--white-rgb) / 0.82);
-  box-shadow:
-    inset 0 1px 0 rgb(var(--white-rgb) / 0.88),
-    0 8px 22px rgb(var(--shadow-rgb) / 0.06);
-  backdrop-filter: blur(8px) saturate(125%);
-}
-
-.checklist-block::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: rgb(var(--checklist-accent-rgb) / 0.72);
-}
-
-.checklist-block::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  background: linear-gradient(90deg, rgb(var(--white-rgb) / 0.88), transparent);
-}
-
-.checklist-block h3 {
-  position: relative;
-  color: var(--checklist-accent-text);
-}
-
-.checklist-block ul {
-  position: relative;
-}
-
-.checklist-block li::marker {
-  color: rgb(var(--checklist-accent-rgb) / 0.82);
-}
-
-.checklist-positive {
-  --checklist-accent-rgb: var(--success-rgb);
-  --checklist-accent-text: var(--success-text-strong);
-}
-
-.checklist-negative {
-  --checklist-accent-rgb: var(--danger-rgb);
-  --checklist-accent-text: var(--danger-text-strong);
-}
-
-.checklist-warning {
-  --checklist-accent-rgb: var(--warning-strong-rgb);
-  --checklist-accent-text: var(--warning-text);
-}
-
-.checklist-info {
-  --checklist-accent-rgb: var(--info-rgb);
-  --checklist-accent-text: var(--text);
-}
-
 .empty-chart {
   display: grid;
   place-items: center;
@@ -4063,13 +3997,6 @@ input[type="checkbox"]:focus-visible {
   border-radius: 8px;
   padding: 14px;
   background: var(--panel-soft);
-}
-
-.image-checklist-block {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.1fr);
-  gap: 16px;
-  align-items: start;
 }
 
 .comment-avatar {
@@ -4664,8 +4591,7 @@ input[type="checkbox"]:focus-visible {
     position: static;
   }
 
-  .content-blocks .gallery-block,
-  .image-checklist-block {
+  .content-blocks .gallery-block {
     grid-template-columns: 1fr;
   }
 

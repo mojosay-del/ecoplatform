@@ -17,6 +17,7 @@ import {
   MODERATION_DECISION_LABELS,
   MODERATION_REASON_LABELS,
 } from "../../../lib/display-labels";
+import "../../content-blocks/checklist.css";
 
 type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
