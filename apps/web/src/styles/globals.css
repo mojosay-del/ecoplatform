@@ -4824,20 +4824,6 @@ input[type="checkbox"]:focus-visible {
   padding-left: 24px;
 }
 
-/* --- Attachments --- */
-
-.attachments {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.attachments-empty {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
 .lesson-save-bar-actions .button {
   white-space: nowrap;
 }

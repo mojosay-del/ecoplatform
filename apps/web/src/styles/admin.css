@@ -3018,6 +3018,18 @@ li.tree-add-row + li.tree-add-row,
   margin: 0;
 }
 
+.attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attachments-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .attachments-list {
   list-style: none;
   margin: 0;
