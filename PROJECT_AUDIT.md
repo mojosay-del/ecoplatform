@@ -167,15 +167,15 @@ magic-byte валидация загрузок, приватный S3-бакет
 
 ## 🟡 Medium — технический долг и улучшения
 
-- [~] **M-1. Крупные файлы — риск god-компонентов.**
+- [x] **M-1. Крупные файлы — риск god-компонентов.**
   `views/forum/ForumQuestionView.tsx` (681), `views/account/PersonalProfileFields.tsx` (630),
   `views/knowledge-base-view.tsx` (597), `views/account/SubscriptionDialog.tsx` (518),
   `marketplace/services/marketplace-offers.service.ts` (492), `moderation/*-decision.helpers.ts` (452).
   - **Риск:** сложнее тестировать и менять, выше связность.
   - **Фикс:** декомпозировать на под-компоненты/хуки (`use-*.ts`) и доменные helpers по сложившейся в проекте
     модульной конвенции. Без изменения поведения.
-  - **Исполнитель/заметка:** Codex 2026-06-19 — в работе; задача разбита по каждому god-файлу, закрывается
-    подпунктами ниже.
+  - **Исполнитель/заметка:** Codex 2026-06-19 — закрыта серия M-1; все перечисленные god-файлы
+    декомпозированы подпунктами ниже.
   - **Ход выполнения:**
     - [x] **M-1.1.** `apps/web/src/views/forum/ForumQuestionView.tsx`
       - **Исполнитель/заметка:** Codex 2026-06-19 — вынесены ответы/реплики, report-control, auto-size textarea и helpers; файлы: `ForumQuestionView.tsx`, `forum-question-answers.tsx`, `forum-question-controls.tsx`, `forum-question-utils.ts`, `forum-question-types.ts`.
@@ -190,8 +190,11 @@ magic-byte валидация загрузок, приватный S3-бакет
       - **Исполнитель/заметка:** Codex 2026-06-19 — декомпозирован диалог подписки на plans/payment/utils/hooks, добавлен unit-тест; файлы: `SubscriptionDialog.tsx`, `SubscriptionPlans.tsx`, `PaymentDialog.tsx`, `subscription-dialog-*`, `hooks.ts`.
     - [x] **M-1.5.** `apps/api/src/marketplace/services/marketplace-offers.service.ts`
       - **Исполнитель/заметка:** Codex 2026-06-19 — декомпозирован сервис предложений площадки: фасад + `marketplace-offers-workflow.helpers.ts`; файлы: `marketplace-offers.service.ts`, `marketplace-offers-workflow.helpers.ts`.
-    - [ ] **M-1.6.** `apps/api/src/moderation/moderation-decision.helpers.ts`
-      - **Исполнитель/заметка:**
+    - [x] **M-1.6.** `apps/api/src/moderation/moderation-decision.helpers.ts`
+      - **Исполнитель/заметка:** Codex 2026-06-19 — декомпозирован decision workflow модерации на
+        фасад/transaction/removal/notify; файлы: `moderation-decision.helpers.ts`,
+        `moderation-decision-workflow.helpers.ts`, `moderation-decision-removal.helpers.ts`,
+        `moderation-decision-notify.helpers.ts`.
 
 - [ ] **M-1b. `globals.css` — god-файл и лишний вес на каждой странице.**
   `apps/web/src/styles/globals.css` — **9480 строк, 1211 классов, 34 keyframes, 40 media-блоков** (всего CSS в
