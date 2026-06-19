@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { CookieConsent } from "../src/components/CookieConsent";
 import { AuthProvider } from "../src/lib/auth";
 import { AppQueryProvider } from "../src/lib/query";
+import { createPageMetadata, getSiteUrl, SITE_NAME } from "../src/lib/seo";
 import "../src/styles/tokens.css";
 import "../src/styles/globals.css";
 
@@ -15,13 +16,17 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ЭкоПлатформа",
-  description: "MVP SaaS-платформы для рынка вторсырья",
-  applicationName: "ЭкоПлатформа",
+  ...createPageMetadata({
+    title: SITE_NAME,
+    description: "B2B-платформа для рынка вторсырья: новости, индексы цен, база знаний и документация.",
+    path: "/",
+  }),
+  metadataBase: new URL(getSiteUrl()),
+  applicationName: SITE_NAME,
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "ЭкоПлатформа",
+    title: SITE_NAME,
   },
   icons: {
     icon: [

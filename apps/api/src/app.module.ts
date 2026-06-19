@@ -25,6 +25,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { RedisModule } from "./redis/redis.module";
 import { RedisThrottlerStorageService } from "./redis/redis-throttler-storage.service";
 import { SchedulerModule } from "./scheduler/scheduler.module";
+import { SeoModule } from "./seo/seo.module";
 import { SupportModule } from "./support/support.module";
 import { TripCalculatorModule } from "./trip-calculator/trip-calculator.module";
 import { createLoggerModuleOptions } from "./common/logging";
@@ -90,6 +91,7 @@ function skipAuthThrottleOutsideAuthRoutes(context: ExecutionContext) {
     NotificationsModule,
     ObservabilityModule,
     SchedulerModule,
+    SeoModule,
     SupportModule,
     TripCalculatorModule,
   ],

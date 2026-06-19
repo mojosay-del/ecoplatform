@@ -52,6 +52,30 @@ export type CommentLikeCount = {
   likes: number;
 };
 
+// ── SEO ───────────────────────────────────────────────────────────────────
+export type SeoPageType = "news" | "knowledge_base" | "documentation" | "forum_question";
+
+export type SeoPageSummary = {
+  type: SeoPageType;
+  path: string;
+  title: string;
+  description: string;
+  imageUrl: string | null;
+  publishedAt: IsoDateString | null;
+  updatedAt: IsoDateString;
+};
+
+export type SeoSitemapEntry = {
+  type: SeoPageType;
+  path: string;
+  publishedAt: IsoDateString | null;
+  updatedAt: IsoDateString;
+};
+
+export type SeoSitemapResponse = {
+  items: SeoSitemapEntry[];
+};
+
 // ── News ──────────────────────────────────────────────────────────────────
 export type NewsTag = {
   id: string;

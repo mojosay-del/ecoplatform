@@ -153,13 +153,15 @@ magic-byte валидация загрузок, приватный S3-бакет
     либо общий zod-`ValidationPipe`, применяемый по DTO-метадате. Зафиксировать правило в `AGENTS.md`.
   - **Исполнитель/заметка:** Codex 2026-06-19 — добавлен unit-инвариант `parseBody`, довалидированы reason/settings body, обновлён `AGENTS.md`; `pnpm lint` + api unit зелёные, integration пропущен из-за C-1.
 
-- [ ] **H-4. SEO-минимум для публичной платформы отсутствует.**
+- [x] **H-4. SEO-минимум для публичной платформы отсутствует.**
   Только 6 из 49 `page.tsx` экспортируют `metadata`/`generateMetadata`; нет `robots.txt` и `sitemap.xml`.
   - **Файлы:** `apps/web/app/**`, отсутствуют `apps/web/app/robots.ts` и `apps/web/app/sitemap.ts`.
   - **Риск:** публичные разделы (новости, БЗ, документация, форум) плохо индексируются; нет canonical/OG.
   - **Фикс:** добавить `metadata` (title/description/canonical/OG) на публичные страницы, `app/robots.ts`,
     `app/sitemap.ts` (динамический по опубликованным сущностям).
-  - **Исполнитель/заметка:**
+  - **Исполнитель/заметка:** Codex 2026-06-19 — добавлены публичный SEO API `/seo`, shared SEO-типы,
+    web metadata/canonical/OG, `robots.ts`, `sitemap.ts`; файлы `apps/api/src/seo/*`, `apps/web/src/lib/seo.ts`,
+    `apps/web/app/robots.ts`, `apps/web/app/sitemap.ts`.
 
 ---
 
