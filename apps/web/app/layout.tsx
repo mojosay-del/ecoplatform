@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { CookieConsent } from "../src/components/CookieConsent";
 import { AuthProvider } from "../src/lib/auth";
+import { AppQueryProvider } from "../src/lib/query";
 import "../src/styles/tokens.css";
 import "../src/styles/globals.css";
 
@@ -45,10 +46,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a className="skip-link" href="#main-content">
           К содержимому
         </a>
-        <AuthProvider>
-          {children}
-          <CookieConsent />
-        </AuthProvider>
+        <AppQueryProvider>
+          <AuthProvider>
+            {children}
+            <CookieConsent />
+          </AuthProvider>
+        </AppQueryProvider>
       </body>
     </html>
   );

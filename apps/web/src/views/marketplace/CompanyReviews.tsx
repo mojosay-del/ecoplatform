@@ -4,22 +4,24 @@
 // опубликованных отзывов. Адресат отзыва может оставить один публичный ответ.
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { CompanyRatingSummary, ReviewItem } from "@ecoplatform/shared";
 import { SendActionIcon } from "../../components/app-shell/nav-icons";
 import { ApiError, api } from "../../lib/api";
+import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { useApiQuery } from "../shared";
 import { ReportControl } from "./ReportControl";
 import { REVIEW_CRITERION_LABEL, RatingBadge, Stars } from "./review-ui";
 
 export function CompanyReviews({ companyId }: { companyId: string }) {
-  const [refresh, setRefresh] = useState(0);
+  const queryClient = useQueryClient();
   const { data: rating } = useApiQuery(
-    `company-rating-${companyId}-${refresh}`,
+    queryKeys.marketplace.companyRating(companyId),
     () => api.marketplace.reviews.rating(companyId),
     { overall: null, reviewCount: 0, byCriterion: [] } as CompanyRatingSummary,
   );
   const { data: reviews, state } = useApiQuery(
-    `company-reviews-${companyId}-${refresh}`,
+    queryKeys.marketplace.companyReviews(companyId),
     () => api.marketplace.reviews.forCompany(companyId),
     [] as ReviewItem[],
   );
@@ -33,7 +35,7 @@ export function CompanyReviews({ companyId }: { companyId: string }) {
       await api.marketplace.reviews.respond(reviewId, responseText.trim());
       setRespondingId(null);
       setResponseText("");
-      setRefresh((value) => value + 1);
+      await invalidateQueryFamilies(queryClient, ["marketplace"]);
     } catch (respondError) {
       setError(respondError instanceof ApiError ? respondError.message : "Не удалось ответить.");
     }

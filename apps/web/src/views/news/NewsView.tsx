@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import type { NewsPostDetail } from "@ecoplatform/shared";
 import { AnimatedSearchPlaceholder } from "../../components/AnimatedSearchPlaceholder";
@@ -10,6 +11,7 @@ import { NewsOnboardingCard } from "../../components/NewsOnboardingCard";
 import { NEWS_ONBOARDING_STORAGE_KEY, shouldShowNewsOnboarding } from "../../components/news-onboarding-state";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { queryKeys } from "../../lib/query";
 import { useCoverAssets, useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
 import { AccessClosed, AuthRequired, ErrorState, getNewsFeedSnapshot } from "../shared";
@@ -26,6 +28,7 @@ export function NewsView() {
   const [onboardingDismissed, setOnboardingDismissed] = useState<boolean | null>(null);
   const [newsSearchQuery, setNewsSearchQuery] = useState("");
   const [debouncedNewsSearchQuery, setDebouncedNewsSearchQuery] = useState("");
+  const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSearch = searchParams.toString();
@@ -33,23 +36,23 @@ export function NewsView() {
     () => normaliseNewsTagSelection(new URLSearchParams(currentSearch).getAll("tag")),
     [currentSearch],
   );
-  const selectedTagKey = selectedTags.join("\u001f");
   const activeNewsSearchQuery = debouncedNewsSearchQuery.length >= 2 ? debouncedNewsSearchQuery : "";
-  const feed = useInfiniteApiQuery(
-    ready && token ? `news-feed:${selectedTagKey}:${activeNewsSearchQuery}` : null,
-    NEWS_PAGE_SIZE,
-    ({ limit, offset }) =>
-      api.news.list(
-        {
-          limit,
-          offset,
-          q: activeNewsSearchQuery || undefined,
-          tags: selectedTags,
-        },
-        {
-          token,
-        },
-      ),
+  const feedKey = queryKeys.news.list({
+    q: activeNewsSearchQuery || undefined,
+    tags: selectedTags,
+  });
+  const feed = useInfiniteApiQuery(ready && token ? feedKey : null, NEWS_PAGE_SIZE, ({ limit, offset }) =>
+    api.news.list(
+      {
+        limit,
+        offset,
+        q: activeNewsSearchQuery || undefined,
+        tags: selectedTags,
+      },
+      {
+        token,
+      },
+    ),
   );
   const { items, setItems, state, errorMessage, hasMore, isLoadingMore, sentinelRef } = feed;
   const covers = useCoverAssets(items);
@@ -115,6 +118,7 @@ export function NewsView() {
     setItems((current) =>
       current.map((post) => (post.id === updatedPost.id ? { ...post, ...getNewsFeedSnapshot(updatedPost) } : post)),
     );
+    queryClient.setQueryData(queryKeys.news.detail(updatedPost.slug), updatedPost);
   }
 
   function dismissOnboarding() {

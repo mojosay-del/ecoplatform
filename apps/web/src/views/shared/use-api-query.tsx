@@ -1,66 +1,98 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
+import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 
 export type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
+type ApiQueryKey = string | QueryKey | null;
 
-// Хук загрузки данных через типизированный fetcher (`api.news.get`,
-// `api.learning.getModule`, …) с четырьмя состояниями loading/ready/forbidden/
-// error (unauthenticated отдельно — пока токен не прогружен). Параметр `key` —
-// стабильная строка, в которой кодируются все переменные fetcher'а (id/slug):
-// меняется key → перезапрашиваем; идентичность функции fetcher НЕ важна.
-export function useApiQuery<T>(key: string | null, fetcher: () => Promise<T>, initial: T) {
+function normalizeQueryKey(key: ApiQueryKey): QueryKey {
+  return Array.isArray(key) ? key : ["api", key ?? "disabled"];
+}
+
+export function useApiQuery<T>(key: ApiQueryKey, fetcher: () => Promise<T>, initial: T) {
   const { token } = useAuth();
+  const queryClient = useQueryClient();
   const initialRef = useRef(initial);
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
-  const [data, setData] = useState<T>(initial);
-  const [state, setState] = useState<ApiState>("unauthenticated");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isActive = true;
-    if (!token) {
-      setData(initialRef.current);
-      setState("unauthenticated");
-      setErrorMessage(null);
-      return;
-    }
-    if (!key) {
-      setData(initialRef.current);
-      setState("ready");
-      setErrorMessage(null);
-      return;
-    }
-    setState("loading");
-    setErrorMessage(null);
-    fetcherRef
-      .current()
-      .then((result) => {
-        if (!isActive) return;
-        setData(result);
-        setState("ready");
-      })
-      .catch((error) => {
-        if (!isActive) return;
-        if (error instanceof ApiError && error.status === 401) {
-          setState("unauthenticated");
-          return;
-        }
-        if (error instanceof ApiError && error.status === 403) {
-          setState("forbidden");
-          return;
-        }
-        setData(initialRef.current);
-        setState("error");
-        setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить данные");
+  const queryKey = useMemo(() => normalizeQueryKey(key), [key]);
+  const enabled = Boolean(token && key);
+  const query = useQuery<T>({
+    queryKey,
+    queryFn: () => fetcherRef.current(),
+    enabled,
+  });
+
+  const setData: Dispatch<SetStateAction<T>> = useCallback(
+    (next) => {
+      if (!key) return;
+      queryClient.setQueryData<T>(queryKey, (current) => {
+        const previous = current ?? initialRef.current;
+        return typeof next === "function" ? (next as (value: T) => T)(previous) : next;
       });
-    return () => {
-      isActive = false;
-    };
-  }, [key, token]);
+    },
+    [key, queryClient, queryKey],
+  );
 
-  return { data, setData, state, errorMessage };
+  if (!token) {
+    return {
+      data: initialRef.current,
+      setData,
+      state: "unauthenticated" as ApiState,
+      errorMessage: null,
+      refetch: query.refetch,
+    };
+  }
+
+  if (!key) {
+    return {
+      data: initialRef.current,
+      setData,
+      state: "ready" as ApiState,
+      errorMessage: null,
+      refetch: query.refetch,
+    };
+  }
+
+  if (query.error instanceof ApiError && query.error.status === 401) {
+    return {
+      data: initialRef.current,
+      setData,
+      state: "unauthenticated" as ApiState,
+      errorMessage: null,
+      refetch: query.refetch,
+    };
+  }
+
+  if (query.error instanceof ApiError && query.error.status === 403) {
+    return {
+      data: initialRef.current,
+      setData,
+      state: "forbidden" as ApiState,
+      errorMessage: null,
+      refetch: query.refetch,
+    };
+  }
+
+  if (query.error) {
+    return {
+      data: initialRef.current,
+      setData,
+      state: "error" as ApiState,
+      errorMessage: query.error instanceof Error ? query.error.message : "Не удалось загрузить данные",
+      refetch: query.refetch,
+    };
+  }
+
+  return {
+    data: query.data ?? initialRef.current,
+    setData,
+    state: query.isPending ? ("loading" as ApiState) : ("ready" as ApiState),
+    errorMessage: null,
+    refetch: query.refetch,
+  };
 }

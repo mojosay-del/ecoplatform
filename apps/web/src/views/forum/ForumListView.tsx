@@ -13,6 +13,7 @@ import { AnimatedSearchPlaceholder } from "../../components/AnimatedSearchPlaceh
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { queryKeys } from "../../lib/query";
 import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
 import { AccessClosed, AuthRequired, ErrorState, pluralizeRu, useApiQuery } from "../shared";
 import { AsideProfile, PinnedNewsCard, QuestionCard } from "./components";
@@ -197,9 +198,9 @@ export function ForumListView() {
   const [questionTypeId, setQuestionTypeId] = useState("");
   const [sort, setSort] = useState<ForumSort>("newest");
 
-  const taxonomy = useApiQuery("forum-taxonomy", () => api.forum.taxonomy(), EMPTY_TAXONOMY);
-  const pinned = useApiQuery("forum-pinned", () => api.forum.pinnedNews(), [] as ForumPinnedNews[]);
-  const summary = useApiQuery("forum-summary", () => api.forum.summary(), EMPTY_SUMMARY);
+  const taxonomy = useApiQuery(queryKeys.forum.taxonomy(), () => api.forum.taxonomy(), EMPTY_TAXONOMY);
+  const pinned = useApiQuery(queryKeys.forum.pinnedNews(), () => api.forum.pinnedNews(), [] as ForumPinnedNews[]);
+  const summary = useApiQuery(queryKeys.forum.summary(), () => api.forum.summary(), EMPTY_SUMMARY);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -208,7 +209,12 @@ export function ForumListView() {
     return () => window.clearTimeout(timeout);
   }, [queryDraft]);
 
-  const key = `forum-${sort}-${rawMaterialId}-${questionTypeId}-${searchTerm}`;
+  const key = queryKeys.forum.list({
+    sort,
+    rawMaterialId: rawMaterialId || undefined,
+    questionTypeId: questionTypeId || undefined,
+    q: searchTerm || undefined,
+  });
   const feed = useInfiniteApiQuery<ForumQuestionListItem>(key, 20, ({ limit, offset }) =>
     api.forum.questions({
       sort,

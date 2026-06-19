@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { apiFetch, type FileAsset } from "./api";
 import { useAuth } from "./auth";
+import { queryKeys } from "./query";
 
 // Батчит загрузку обложек по списку элементов, у каждого из которых может быть
 // coverImageId. Возвращает Map<assetId, FileAsset>. Используется в каталогах
@@ -17,24 +19,14 @@ export function useCoverAssets(items: Array<{ coverImageId?: string | null }>) {
 
 export function useFileAssetsByIds(ids: string[]) {
   const { token } = useAuth();
-  const [assets, setAssets] = useState<Map<string, FileAsset>>(new Map());
-  const idsKey = useMemo(
-    () =>
-      Array.from(new Set(ids.filter(Boolean)))
-        .sort()
-        .join(","),
-    [ids],
-  );
+  const normalizedIds = useMemo(() => Array.from(new Set(ids.filter(Boolean))).sort(), [ids]);
+  const idsKey = useMemo(() => normalizedIds.join(","), [normalizedIds]);
+  const query = useQuery({
+    queryKey: queryKeys.files.byIds(normalizedIds),
+    queryFn: () => apiFetch<FileAsset[]>(`/files?ids=${encodeURIComponent(idsKey)}`, { token }),
+    enabled: Boolean(token && idsKey),
+    staleTime: 5 * 60_000,
+  });
 
-  useEffect(() => {
-    if (!token || !idsKey) {
-      setAssets(new Map());
-      return;
-    }
-    apiFetch<FileAsset[]>(`/files?ids=${encodeURIComponent(idsKey)}`, { token })
-      .then((result) => setAssets(new Map(result.map((asset) => [asset.id, asset]))))
-      .catch(() => setAssets(new Map()));
-  }, [idsKey, token]);
-
-  return assets;
+  return useMemo(() => new Map((query.data ?? []).map((asset) => [asset.id, asset])), [query.data]);
 }

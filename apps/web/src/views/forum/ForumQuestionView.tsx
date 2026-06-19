@@ -8,6 +8,7 @@ import "../../styles/forum.css";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Bell, BellOff, CircleCheck, Clock, Eye, Flag, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import type { ForumAnswerItem, ForumAnswerReplyItem, ForumQuestionDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
@@ -20,6 +21,7 @@ import {
 import { api } from "../../lib/api";
 import { ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
 import { Reputation, StatusBadge, TagChips } from "./components";
 import { bodyParagraphs, relativeTime } from "./forum-helpers";
@@ -43,8 +45,9 @@ type Flash = { text: string; error?: boolean } | null;
 export function ForumQuestionView({ id }: { id: string }) {
   const { user } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data, setData, state, errorMessage } = useApiQuery<ForumQuestionDetail | null>(
-    `forum-q-${id}`,
+    queryKeys.forum.detail(id),
     () => api.forum.question(id),
     null,
   );
@@ -74,6 +77,8 @@ export function ForumQuestionView({ id }: { id: string }) {
   const refresh = async () => {
     const fresh = await api.forum.question(id);
     setData(fresh);
+    queryClient.setQueryData(queryKeys.forum.detail(id), fresh);
+    await invalidateQueryFamilies(queryClient, ["forum"]);
   };
 
   const isStaff = (user?.platformRoles?.length ?? 0) > 0;
@@ -107,6 +112,7 @@ export function ForumQuestionView({ id }: { id: string }) {
             }
           : current,
       );
+      await invalidateQueryFamilies(queryClient, ["forum"]);
     } catch (error) {
       setFlash({ text: messageFrom(error), error: true });
     }
@@ -147,6 +153,7 @@ export function ForumQuestionView({ id }: { id: string }) {
         await api.forum.subscribe(id);
       }
       setData((current) => (current ? { ...current, subscribed: !current.subscribed } : current));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.forum.detail(id) });
     } catch (error) {
       setFlash({ text: messageFrom(error), error: true });
     }
@@ -156,6 +163,7 @@ export function ForumQuestionView({ id }: { id: string }) {
     if (!window.confirm("Удалить вопрос вместе со всеми ответами?")) return;
     try {
       await api.forum.deleteQuestion(id);
+      await invalidateQueryFamilies(queryClient, ["forum"]);
       router.push("/forum");
     } catch (error) {
       setFlash({ text: messageFrom(error), error: true });

@@ -5,20 +5,22 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { MyOfferItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { ApiError, api } from "../../lib/api";
+import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
 import { OfferStatusBadge, PRICE_CONDITION_LABEL, formatPrice } from "./offer-ui";
 import { ReviewForm } from "./ReviewForm";
 
 export function MyOffersView() {
-  const [refresh, setRefresh] = useState(0);
+  const queryClient = useQueryClient();
   const {
     data: page,
     state,
     errorMessage,
-  } = useApiQuery(`my-offers-${refresh}`, () => api.marketplace.offers.mine({ limit: 100 }), {
+  } = useApiQuery(queryKeys.marketplace.myOffers(), () => api.marketplace.offers.mine({ limit: 100 }), {
     items: [],
     total: 0,
     hasMore: false,
@@ -44,7 +46,7 @@ export function MyOffersView() {
     setError(null);
     try {
       await api.marketplace.offers.withdraw(id);
-      setRefresh((value) => value + 1);
+      await invalidateQueryFamilies(queryClient, ["marketplace"]);
     } catch (withdrawError) {
       setError(withdrawError instanceof ApiError ? withdrawError.message : "Не удалось отозвать предложение.");
     } finally {
@@ -124,7 +126,7 @@ export function MyOffersView() {
                       direction="buyer_to_seller"
                       onDone={() => {
                         setReviewingId(null);
-                        setRefresh((value) => value + 1);
+                        void invalidateQueryFamilies(queryClient, ["marketplace"]);
                       }}
                     />
                   </div>

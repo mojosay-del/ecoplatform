@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MessageCircle } from "lucide-react";
 import type { NewsPostDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { StatusPill } from "../../components/StatusPill";
-import { ApiError, api } from "../../lib/api";
+import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { queryKeys } from "../../lib/query";
 import {
   AccessClosed,
   AuthRequired,
@@ -16,7 +18,7 @@ import {
   formatNewsDate,
   withUpdatedCommentLike,
   withUpdatedNewsLike,
-  type ApiState,
+  useApiQuery,
 } from "../shared";
 import { ContentBlocks } from "../content-blocks";
 import { NewsLikeButton } from "./NewsArticleContent";
@@ -24,45 +26,24 @@ import { CommentsSection } from "./comments";
 
 export function NewsPostView({ slug, preview = false }: { slug: string; preview?: boolean }) {
   const { token } = useAuth();
-  const [post, setPost] = useState<NewsPostDetail | null>(null);
-  const [state, setState] = useState<ApiState>("unauthenticated");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const {
+    data: post,
+    setData: setPost,
+    state,
+    errorMessage,
+    refetch,
+  } = useApiQuery(
+    queryKeys.news.detail(slug, preview),
+    () => api.news.get(slug, { preview }),
+    null as NewsPostDetail | null,
+  );
   const [commentText, setCommentText] = useState("");
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("offensive_content");
   const [reportComment, setReportComment] = useState("");
   const [likePending, setLikePending] = useState(false);
   const [commentLikePendingId, setCommentLikePendingId] = useState<string | null>(null);
-
-  async function load(options: { silent?: boolean } = {}) {
-    if (!token) {
-      setState("unauthenticated");
-      setPost(null);
-      return;
-    }
-
-    if (!options.silent) {
-      setState("loading");
-    }
-    setErrorMessage(null);
-    try {
-      const data = await api.news.get(slug, { preview });
-      setPost(data);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить новость");
-    }
-  }
-
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, token, preview]);
 
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -71,7 +52,8 @@ export function NewsPostView({ slug, preview = false }: { slug: string; preview?
     const scrollTop = window.scrollY;
     await api.news.addComment(post.id, { text: commentText.trim() });
     setCommentText("");
-    await load({ silent: true });
+    await refetch();
+    await queryClient.invalidateQueries({ queryKey: queryKeys.news.lists() });
     window.requestAnimationFrame(() => window.scrollTo({ top: scrollTop, behavior: "auto" }));
   }
 
@@ -96,7 +78,14 @@ export function NewsPostView({ slug, preview = false }: { slug: string; preview?
     setLikePending(true);
     try {
       const result = await api.news.like(post.id);
-      setPost((current) => (current ? withUpdatedNewsLike(current, result) : current));
+      setPost((current) => {
+        const updatedPost = current ? withUpdatedNewsLike(current, result) : current;
+        if (updatedPost) {
+          queryClient.setQueryData(queryKeys.news.detail(updatedPost.slug, preview), updatedPost);
+        }
+        return updatedPost;
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.news.lists() });
     } finally {
       setLikePending(false);
     }
@@ -108,7 +97,14 @@ export function NewsPostView({ slug, preview = false }: { slug: string; preview?
     setCommentLikePendingId(commentId);
     try {
       const result = await api.news.likeComment(commentId);
-      setPost((current) => (current ? withUpdatedCommentLike(current, commentId, result) : current));
+      setPost((current) => {
+        const updatedPost = current ? withUpdatedCommentLike(current, commentId, result) : current;
+        if (updatedPost) {
+          queryClient.setQueryData(queryKeys.news.detail(updatedPost.slug, preview), updatedPost);
+        }
+        return updatedPost;
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.news.lists() });
     } finally {
       setCommentLikePendingId(null);
     }

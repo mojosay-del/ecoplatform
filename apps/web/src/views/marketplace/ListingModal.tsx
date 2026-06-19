@@ -7,6 +7,7 @@
 // /marketplace/[id]. Цену продавец не ставит (закрытый аукцион), мини-карты нет.
 
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
   CreditCard,
@@ -29,6 +30,7 @@ import {
 import type { MarketplaceListingDetail } from "@ecoplatform/shared";
 import { api, preferredFileAssetImageUrl, preferredFileAssetMediaUrl } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { pluralizeRu } from "../../lib/ru-plural";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useApiQuery } from "../shared";
@@ -61,15 +63,16 @@ function tons(kg: number | null): string {
 export function ListingModal({
   listingId,
   onClose,
+  onChanged,
 }: {
   listingId: string;
   onClose: () => void;
   onChanged?: () => void;
 }) {
   const { user } = useAuth();
-  const [refresh, setRefresh] = useState(0);
+  const queryClient = useQueryClient();
   const { data, state, errorMessage } = useApiQuery(
-    `marketplace-listing-${listingId}-${refresh}`,
+    queryKeys.marketplace.detail(listingId),
     () => api.marketplace.get(listingId),
     null as MarketplaceListingDetail | null,
   );
@@ -98,6 +101,11 @@ export function ListingModal({
     setActiveMedia(0);
     setLightboxOpen(false);
   }, [listingId]);
+
+  function handleListingChanged() {
+    void invalidateQueryFamilies(queryClient, ["marketplace"]);
+    onChanged?.();
+  }
 
   const isBuyer = user?.company?.type === "trader" || user?.company?.type === "processor";
 
@@ -326,7 +334,7 @@ export function ListingModal({
                       </p>
                       {isBuyer && listing.status === "active" ? (
                         <>
-                          <MakeOfferForm listing={listing} onSubmitted={() => setRefresh((value) => value + 1)} />
+                          <MakeOfferForm listing={listing} onSubmitted={handleListingChanged} />
                           <p className="mp-modal-reveal">
                             После отправки предложения ваш телефон станет доступен заготовителю только после его
                             согласия.
@@ -366,7 +374,7 @@ export function ListingModal({
 
                 {listing.isOwner ? (
                   <div className="mp-modal-section">
-                    <ListingOffersPanel listingId={listing.id} onChanged={() => setRefresh((value) => value + 1)} />
+                    <ListingOffersPanel listingId={listing.id} onChanged={handleListingChanged} />
                   </div>
                 ) : null}
 

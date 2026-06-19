@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import type { NewsPostDetail } from "@ecoplatform/shared";
-import { ApiError, api } from "../../lib/api";
+import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { queryKeys } from "../../lib/query";
 import { withUpdatedCommentLike, withUpdatedNewsLike } from "../shared";
+import { useApiQuery } from "../shared";
 import { NewsArticleContent } from "./NewsArticleContent";
 
 const NEWS_MODAL_READY_TIMEOUT_MS = 6000;
@@ -19,10 +22,17 @@ export function NewsModal({
   onPostUpdate?: (post: NewsPostDetail) => void;
 }) {
   const { token } = useAuth();
-  const [post, setPost] = useState<NewsPostDetail | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "error" | "forbidden">("loading");
+  const queryClient = useQueryClient();
+  const onPostUpdateRef = useRef(onPostUpdate);
+  onPostUpdateRef.current = onPostUpdate;
+  const {
+    data: post,
+    setData: setPost,
+    state,
+    errorMessage,
+    refetch,
+  } = useApiQuery(queryKeys.news.detail(slug), () => api.news.get(slug), null as NewsPostDetail | null);
   const [modalContentReady, setModalContentReady] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("offensive_content");
@@ -32,38 +42,11 @@ export function NewsModal({
   const backdropRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  async function load(options: { silent?: boolean } = {}) {
-    if (!token) {
-      setState("forbidden");
-      setModalContentReady(false);
-      return;
-    }
-    if (!options.silent) {
-      setState("loading");
-      setModalContentReady(false);
-    }
-    setErrorMessage(null);
-    try {
-      const data = await api.news.get(slug);
-      setPost(data);
-      onPostUpdate?.(data);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        setModalContentReady(false);
-        return;
-      }
-      setState("error");
-      setModalContentReady(false);
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить новость");
-    }
-  }
-
   useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, token]);
+    if (post) {
+      onPostUpdateRef.current?.(post);
+    }
+  }, [post]);
 
   // Закрытие по Esc, блокируем прокрутку и расфокусируем фон пока модалка открыта.
   useEffect(() => {
@@ -156,7 +139,12 @@ export function NewsModal({
     const scrollTop = backdropRef.current?.scrollTop ?? 0;
     await api.news.addComment(post.id, { text: commentText.trim() });
     setCommentText("");
-    await load({ silent: true });
+    const result = await refetch();
+    const freshPost = result.data ?? post;
+    if (freshPost) {
+      onPostUpdateRef.current?.(freshPost);
+    }
+    await queryClient.invalidateQueries({ queryKey: queryKeys.news.lists() });
     window.requestAnimationFrame(() => {
       if (backdropRef.current) {
         backdropRef.current.scrollTop = scrollTop;
@@ -172,7 +160,9 @@ export function NewsModal({
       const result = await api.news.like(post.id);
       const updatedPost = withUpdatedNewsLike(post, result);
       setPost(updatedPost);
-      onPostUpdate?.(updatedPost);
+      queryClient.setQueryData(queryKeys.news.detail(updatedPost.slug), updatedPost);
+      onPostUpdateRef.current?.(updatedPost);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.news.lists() });
     } finally {
       setLikePending(false);
     }
@@ -184,7 +174,14 @@ export function NewsModal({
     setCommentLikePendingId(commentId);
     try {
       const result = await api.news.likeComment(commentId);
-      setPost((current) => (current ? withUpdatedCommentLike(current, commentId, result) : current));
+      setPost((current) => {
+        const updatedPost = current ? withUpdatedCommentLike(current, commentId, result) : current;
+        if (updatedPost) {
+          queryClient.setQueryData(queryKeys.news.detail(updatedPost.slug), updatedPost);
+        }
+        return updatedPost;
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.news.lists() });
     } finally {
       setCommentLikePendingId(null);
     }
@@ -233,7 +230,7 @@ export function NewsModal({
           <div className="news-modal-loading-shell" aria-hidden="true" />
         ) : state === "error" ? (
           <div className="news-modal-loading">{errorMessage ?? "Ошибка."}</div>
-        ) : state === "forbidden" || !post ? (
+        ) : state === "forbidden" || state === "unauthenticated" || !post ? (
           <div className="news-modal-loading">Доступ ограничен.</div>
         ) : (
           <NewsArticleContent

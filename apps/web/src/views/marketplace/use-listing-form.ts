@@ -6,11 +6,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { MarketplaceAddressSuggestion, MarketplaceListingDetail } from "@ecoplatform/shared";
 import { LISTING_MIN_WEIGHT_KG } from "@ecoplatform/shared";
 import type { PhoneCountryId } from "../../components/auth/types";
 import { ApiError, api, apiDeleteFile } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { useApiQuery } from "../shared";
 import { formatWeight, useNomenclatureOptions } from "./listing-ui";
 import {
@@ -33,12 +35,13 @@ import {
 
 export function useListingForm(listingId?: string) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const nomenclature = useNomenclatureOptions();
   const isCollector = user?.company?.type === "collector";
 
   const { data: existing, state } = useApiQuery(
-    listingId ? `listing-edit-${listingId}` : null,
+    listingId ? queryKeys.marketplace.detail(listingId) : null,
     () => api.marketplace.get(listingId as string),
     null as MarketplaceListingDetail | null,
   );
@@ -273,6 +276,7 @@ export function useListingForm(listingId?: string) {
       if (publish) {
         await api.marketplace.publish(saved.id);
       }
+      await invalidateQueryFamilies(queryClient, ["files", "marketplace"]);
       router.push(`/marketplace/${saved.id}`);
     } catch (saveError) {
       setError(saveError instanceof ApiError ? saveError.message : "Не удалось сохранить объявление.");

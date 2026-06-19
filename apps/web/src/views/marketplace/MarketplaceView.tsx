@@ -7,12 +7,14 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { BillingStatus } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { queryKeys } from "../../lib/query";
 import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
+import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
 import { useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
 import { MATERIAL_LEGEND } from "./materials";
@@ -43,12 +45,16 @@ export function MarketplaceView() {
   const isBuyer = user?.company?.type === "trader" || user?.company?.type === "processor";
 
   const nomenclature = useNomenclatureOptions();
-  const [regions, setRegions] = useState<string[]>([]);
+  const regionsQuery = useApiQuery(queryKeys.marketplace.regions(), () => api.marketplace.regions(), [] as string[]);
+  const billingStatusQuery = useApiQuery<BillingStatus | null>(
+    queryKeys.billing.status(),
+    () => api.billing.status(),
+    null,
+  );
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [selectedNomenclature, setSelectedNomenclature] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortMode>("date");
   const [openPopover, setOpenPopover] = useState<FilterPopover | null>(null);
-  const [companyPoint, setCompanyPoint] = useState<CompanyPoint | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Hover-синхронизация ленты и карты (id объявления под курсором).
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -61,24 +67,12 @@ export function MarketplaceView() {
   const filtersRef = useRef<HTMLDivElement>(null);
 
   useMarketplaceFilterDismiss(filtersRef, setOpenPopover);
-
-  useEffect(() => {
-    if (!ready || !token) return;
-    api.marketplace
-      .regions()
-      .then(setRegions)
-      .catch(() => setRegions([]));
-    // Координаты компании для сортировки по расстоянию (если адрес геокодирован).
-    api.billing
-      .status()
-      .then((status) => {
-        const address = status.factualAddress;
-        if (address?.latitude && address?.longitude) {
-          setCompanyPoint({ lat: Number(address.latitude), lon: Number(address.longitude) });
-        }
-      })
-      .catch(() => undefined);
-  }, [ready, token]);
+  const regions = regionsQuery.data;
+  const companyPoint = useMemo<CompanyPoint | null>(() => {
+    const address = billingStatusQuery.data?.factualAddress;
+    if (!address?.latitude || !address.longitude) return null;
+    return { lat: Number(address.latitude), lon: Number(address.longitude) };
+  }, [billingStatusQuery.data]);
 
   useEffect(() => {
     if (sortBy === "distance" && !companyPoint) {
@@ -86,9 +80,14 @@ export function MarketplaceView() {
     }
   }, [companyPoint, sortBy]);
 
-  const filterKey = `${selectedRegions.join(",")}|${selectedNomenclature.join(",")}|${mapBbox ?? ""}`;
   const { items, total, hasMore, state, errorMessage, isLoadingMore, reload, sentinelRef } = useInfiniteApiQuery(
-    ready && token ? `marketplace-listings-${filterKey}` : null,
+    ready && token
+      ? queryKeys.marketplace.listings({
+          region: selectedRegions,
+          nomenclatureId: selectedNomenclature,
+          bbox: mapBbox,
+        })
+      : null,
     MARKETPLACE_FEED_PAGE_SIZE,
     ({ limit, offset }) =>
       api.marketplace.listings({

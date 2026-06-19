@@ -5,7 +5,6 @@
 // кабинет и детальная карточка не дублировали разметку.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import type {
   ListingStatus,
   MarketplaceListingListItem,
@@ -14,6 +13,8 @@ import type {
 } from "@ecoplatform/shared";
 import { Mail, Star } from "lucide-react";
 import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/query";
+import { useApiQuery } from "../shared";
 import { expiryLabel, formatDistanceKm, isExpiringSoon } from "./listing-card-meta";
 import { formatWeight } from "./listing-format";
 import { materialColor } from "./materials";
@@ -66,22 +67,11 @@ export function totalWeightKg(positions: MarketplaceListingPositionSummary[]): n
 
 // Справочник видов сырья для селектов формы объявления.
 export function useNomenclatureOptions(): MarketplaceNomenclatureOption[] {
-  const [options, setOptions] = useState<MarketplaceNomenclatureOption[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    api.marketplace
-      .nomenclature()
-      .then((result) => {
-        if (!cancelled) setOptions(result);
-      })
-      .catch(() => {
-        if (!cancelled) setOptions([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return options;
+  return useApiQuery(
+    queryKeys.marketplace.nomenclature(),
+    () => api.marketplace.nomenclature(),
+    [] as MarketplaceNomenclatureOption[],
+  ).data;
 }
 
 // Карточка объявления в публичной ленте. coverUrl резолвится в родителе по

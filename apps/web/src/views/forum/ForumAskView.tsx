@@ -8,19 +8,22 @@ import "../../styles/forum.css";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Lock, Search } from "lucide-react";
 import type { ForumTaxonomy } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { SendActionIcon } from "../../components/app-shell/nav-icons";
 import { api } from "../../lib/api";
 import { ApiError } from "../../lib/api";
+import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
 
 const EMPTY_TAXONOMY: ForumTaxonomy = { rawMaterials: [], questionTypes: [] };
 
 export function ForumAskView() {
   const router = useRouter();
-  const taxonomy = useApiQuery("forum-taxonomy", () => api.forum.taxonomy(), EMPTY_TAXONOMY);
+  const queryClient = useQueryClient();
+  const taxonomy = useApiQuery(queryKeys.forum.taxonomy(), () => api.forum.taxonomy(), EMPTY_TAXONOMY);
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -46,6 +49,7 @@ export function ForumAskView() {
     setSubmitting(true);
     try {
       const created = await api.forum.ask({ title: title.trim(), body: body.trim(), rawMaterialId, questionTypeId });
+      await invalidateQueryFamilies(queryClient, ["forum"]);
       router.push(`/forum/q/${created.id}`);
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Не удалось опубликовать вопрос.");

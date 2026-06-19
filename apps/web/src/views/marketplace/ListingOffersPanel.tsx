@@ -5,8 +5,10 @@
 // появляются кнопки «Договорились / Не договорились».
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ListingOfferItem, PriceCondition } from "@ecoplatform/shared";
 import { ApiError, api } from "../../lib/api";
+import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { useApiQuery } from "../shared";
 import { OfferStatusBadge, formatPrice } from "./offer-ui";
 import { ReviewForm } from "./ReviewForm";
@@ -22,9 +24,9 @@ function offerConditionText(condition: PriceCondition, region: string | null, re
 }
 
 export function ListingOffersPanel({ listingId, onChanged }: { listingId: string; onChanged?: () => void }) {
-  const [refresh, setRefresh] = useState(0);
+  const queryClient = useQueryClient();
   const { data: offers, state } = useApiQuery(
-    `listing-offers-${listingId}-${refresh}`,
+    queryKeys.marketplace.listingOffers(listingId),
     () => api.marketplace.offers.forListing(listingId),
     [] as ListingOfferItem[],
   );
@@ -37,7 +39,7 @@ export function ListingOffersPanel({ listingId, onChanged }: { listingId: string
     setError(null);
     try {
       await fn();
-      setRefresh((value) => value + 1);
+      await invalidateQueryFamilies(queryClient, ["marketplace"]);
       onChanged?.();
     } catch (actionError) {
       setError(actionError instanceof ApiError ? actionError.message : "Не удалось выполнить действие.");
@@ -137,7 +139,8 @@ export function ListingOffersPanel({ listingId, onChanged }: { listingId: string
                 direction="seller_to_buyer"
                 onDone={() => {
                   setReviewingId(null);
-                  setRefresh((value) => value + 1);
+                  void invalidateQueryFamilies(queryClient, ["marketplace"]);
+                  onChanged?.();
                 }}
               />
             ) : null}

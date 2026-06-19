@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, type FormEvent } from "react";
 import { MessageCircle } from "lucide-react";
 import type { NewsPostDetail } from "@ecoplatform/shared";
 import {
@@ -7,8 +7,8 @@ import {
   type AnimatedNavIconHandle,
   useAnimatedNavIconPlayback,
 } from "../../components/app-shell/nav-icons";
-import { api, preferredFileAssetImageUrl, type FileAsset } from "../../lib/api";
-import { useAuth } from "../../lib/auth";
+import { preferredFileAssetImageUrl } from "../../lib/api";
+import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { ContentBlocks } from "../content-blocks";
 import { NewsMetaItem, formatNewsDate } from "../shared";
 import { CommentsSection } from "./comments";
@@ -48,21 +48,10 @@ export function NewsArticleContent({
   onToggleCommentLike,
   commentLikePendingId,
 }: NewsArticleProps) {
-  const { token } = useAuth();
-  const [cover, setCover] = useState<FileAsset | null>(null);
+  const coverAssets = useFileAssetsByIds(post.coverImageId ? [post.coverImageId] : []);
+  const cover = post.coverImageId ? (coverAssets.get(post.coverImageId) ?? null) : null;
   const coverUrl = preferredFileAssetImageUrl(cover);
   const publishedDate = post.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
-
-  useEffect(() => {
-    if (!token || !post?.coverImageId) {
-      setCover(null);
-      return;
-    }
-    api.files
-      .listByIds([post.coverImageId])
-      .then((result) => setCover(result[0] ?? null))
-      .catch(() => setCover(null));
-  }, [post?.coverImageId, token]);
 
   return (
     <div className="news-article">

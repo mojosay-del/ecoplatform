@@ -7,6 +7,7 @@ import "../styles/knowledge.css";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { PanelRightOpen, X } from "lucide-react";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
@@ -14,6 +15,7 @@ import { AnimatedSearchPlaceholder } from "../components/AnimatedSearchPlacehold
 import { AppShell } from "../components/AppShell";
 import { CoverImage } from "../components/CoverImage";
 import { api, preferredFileAssetImageUrl } from "../lib/api";
+import { queryKeys } from "../lib/query";
 import { useCoverAssets } from "../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, pluralizeRu, useApiQuery } from "./shared";
 import { collectContentBlockImageFileIds, ContentBlocks } from "./content-blocks";
@@ -35,7 +37,11 @@ function materialsAddedLabel(count: number): string {
 }
 
 export function KnowledgeBaseView() {
-  const { data, state, errorMessage } = useApiQuery("kb-tree", () => api.knowledgeBase.tree(), [] as KnowledgeNode[]);
+  const { data, state, errorMessage } = useApiQuery(
+    queryKeys.knowledgeBase.tree(),
+    () => api.knowledgeBase.tree(),
+    [] as KnowledgeNode[],
+  );
 
   if (state === "unauthenticated") {
     return <AuthRequired title="База знаний" />;
@@ -51,9 +57,9 @@ export function KnowledgeBaseView() {
 }
 
 export function KnowledgeArticleView({ slug }: { slug: string }) {
-  const tree = useApiQuery("kb-tree", () => api.knowledgeBase.tree(), [] as KnowledgeNode[]);
+  const tree = useApiQuery(queryKeys.knowledgeBase.tree(), () => api.knowledgeBase.tree(), [] as KnowledgeNode[]);
   const article = useApiQuery<KnowledgeArticleDetail | null>(
-    `kb-article:${slug}`,
+    queryKeys.knowledgeBase.article(slug),
     () => api.knowledgeBase.getArticle(slug),
     null,
   );
@@ -103,7 +109,6 @@ function KnowledgeBaseLayout({
   const [materialNavOpen, setMaterialNavOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<KnowledgeNode[] | null>(null);
   const active = activeArticle ?? null;
   const activeNavSlug = activeSlug ?? active?.slug;
   const breadcrumbs = active ? buildKnowledgeBreadcrumbs(tree, active) : [];
@@ -144,27 +149,11 @@ function KnowledgeBaseLayout({
     return () => clearTimeout(id);
   }, [query]);
 
-  useEffect(() => {
-    let ignore = false;
-    if (debouncedQuery.length < 2) {
-      setSearchResults(null);
-      return;
-    }
-
-    setSearchResults(null);
-    api.knowledgeBase
-      .search(debouncedQuery)
-      .then((results) => {
-        if (!ignore) setSearchResults(results);
-      })
-      .catch(() => {
-        if (!ignore) setSearchResults([]);
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [debouncedQuery]);
+  const searchQuery = useQuery({
+    queryKey: queryKeys.knowledgeBase.search(debouncedQuery),
+    queryFn: () => api.knowledgeBase.search(debouncedQuery),
+    enabled: debouncedQuery.length >= 2,
+  });
 
   useEffect(() => {
     setMaterialNavOpen(false);
@@ -210,7 +199,6 @@ function KnowledgeBaseLayout({
   const resetSearch = useCallback(() => {
     setQuery("");
     setDebouncedQuery("");
-    setSearchResults(null);
   }, []);
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -219,7 +207,8 @@ function KnowledgeBaseLayout({
   };
 
   const searching = debouncedQuery.length >= 2;
-  const searchLoading = searching && searchResults === null;
+  const searchLoading = searching && searchQuery.isPending;
+  const searchResults = searching ? (searchQuery.error ? [] : (searchQuery.data ?? null)) : null;
   const hasSearchDraft = query.length > 0;
   const mobileTopbarAction =
     tree.length > 0 ? (

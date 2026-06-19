@@ -5,9 +5,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { MyMarketplaceListingItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { ApiError, api, preferredFileAssetImageUrl } from "../../lib/api";
+import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
 import {
@@ -19,12 +21,12 @@ import {
 } from "./listing-ui";
 
 export function MyListingsView() {
-  const [refresh, setRefresh] = useState(0);
+  const queryClient = useQueryClient();
   const {
     data: page,
     state,
     errorMessage,
-  } = useApiQuery(`my-listings-${refresh}`, () => api.marketplace.myListings({ limit: 100 }), {
+  } = useApiQuery(queryKeys.marketplace.myListings(), () => api.marketplace.myListings({ limit: 100 }), {
     items: [],
     total: 0,
     hasMore: false,
@@ -51,7 +53,7 @@ export function MyListingsView() {
     setError(null);
     try {
       await fn();
-      setRefresh((value) => value + 1);
+      await invalidateQueryFamilies(queryClient, ["marketplace"]);
     } catch (actionError) {
       setError(actionError instanceof ApiError ? actionError.message : "Не удалось выполнить действие.");
     } finally {
