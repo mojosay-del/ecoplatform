@@ -179,8 +179,11 @@ magic-byte валидация загрузок, приватный S3-бакет
   - **Ход выполнения:**
     - [x] **M-1.1.** `apps/web/src/views/forum/ForumQuestionView.tsx`
       - **Исполнитель/заметка:** Codex 2026-06-19 — вынесены ответы/реплики, report-control, auto-size textarea и helpers; файлы: `ForumQuestionView.tsx`, `forum-question-answers.tsx`, `forum-question-controls.tsx`, `forum-question-utils.ts`, `forum-question-types.ts`.
-    - [ ] **M-1.2.** `apps/web/src/views/account/PersonalProfileFields.tsx`
-      - **Исполнитель/заметка:**
+    - [x] **M-1.2.** `apps/web/src/views/account/PersonalProfileFields.tsx`
+      - **Исполнитель/заметка:** Codex 2026-06-19 — декомпозирован фасад профиля на Name/Gender/Contact диалоги,
+        phone/options helpers; файлы: `PersonalProfileFields.tsx`, `PersonalProfileNameDialog.tsx`,
+        `PersonalProfileGenderDialog.tsx`, `PersonalProfileContactDialog.tsx`, `personal-profile-options.ts`,
+        `personal-profile-utils.ts`.
     - [ ] **M-1.3.** `apps/web/src/views/knowledge-base-view.tsx`
       - **Исполнитель/заметка:**
     - [ ] **M-1.4.** `apps/web/src/views/account/SubscriptionDialog.tsx`
