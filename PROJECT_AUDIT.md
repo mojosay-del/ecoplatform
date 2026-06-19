@@ -167,14 +167,28 @@ magic-byte валидация загрузок, приватный S3-бакет
 
 ## 🟡 Medium — технический долг и улучшения
 
-- [ ] **M-1. Крупные файлы — риск god-компонентов.**
+- [~] **M-1. Крупные файлы — риск god-компонентов.**
   `views/forum/ForumQuestionView.tsx` (681), `views/account/PersonalProfileFields.tsx` (630),
   `views/knowledge-base-view.tsx` (597), `views/account/SubscriptionDialog.tsx` (518),
   `marketplace/services/marketplace-offers.service.ts` (492), `moderation/*-decision.helpers.ts` (452).
   - **Риск:** сложнее тестировать и менять, выше связность.
   - **Фикс:** декомпозировать на под-компоненты/хуки (`use-*.ts`) и доменные helpers по сложившейся в проекте
     модульной конвенции. Без изменения поведения.
-  - **Исполнитель/заметка:**
+  - **Исполнитель/заметка:** Codex 2026-06-19 — в работе; задача разбита по каждому god-файлу, закрывается
+    подпунктами ниже.
+  - **Ход выполнения:**
+    - [x] **M-1.1.** `apps/web/src/views/forum/ForumQuestionView.tsx`
+      - **Исполнитель/заметка:** Codex 2026-06-19 — вынесены ответы/реплики, report-control, auto-size textarea и helpers; файлы: `ForumQuestionView.tsx`, `forum-question-answers.tsx`, `forum-question-controls.tsx`, `forum-question-utils.ts`, `forum-question-types.ts`.
+    - [ ] **M-1.2.** `apps/web/src/views/account/PersonalProfileFields.tsx`
+      - **Исполнитель/заметка:**
+    - [ ] **M-1.3.** `apps/web/src/views/knowledge-base-view.tsx`
+      - **Исполнитель/заметка:**
+    - [ ] **M-1.4.** `apps/web/src/views/account/SubscriptionDialog.tsx`
+      - **Исполнитель/заметка:**
+    - [ ] **M-1.5.** `apps/api/src/marketplace/services/marketplace-offers.service.ts`
+      - **Исполнитель/заметка:**
+    - [ ] **M-1.6.** `apps/api/src/moderation/moderation-decision.helpers.ts`
+      - **Исполнитель/заметка:**
 
 - [ ] **M-1b. `globals.css` — god-файл и лишний вес на каждой странице.**
   `apps/web/src/styles/globals.css` — **9480 строк, 1211 классов, 34 keyframes, 40 media-блоков** (всего CSS в
