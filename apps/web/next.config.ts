@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import bundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -185,4 +186,11 @@ const shouldEnableSentryBuildPlugin = Boolean(
   (process.env.SENTRY_PROJECT_WEB ?? process.env.SENTRY_PROJECT),
 );
 
-export default shouldEnableSentryBuildPlugin ? withSentryConfig(nextConfig, sentryBuildConfig) : nextConfig;
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+  openAnalyzer: false,
+});
+
+const nextConfigWithSentry = shouldEnableSentryBuildPlugin ? withSentryConfig(nextConfig, sentryBuildConfig) : nextConfig;
+
+export default withBundleAnalyzer(nextConfigWithSentry);

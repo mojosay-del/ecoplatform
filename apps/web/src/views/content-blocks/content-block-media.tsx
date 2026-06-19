@@ -1,9 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import { preferredFileAssetMediaUrl, type FileAsset } from "../../lib/api";
-import { VideoPlayer, type VideoPlayerSource } from "./VideoPlayer";
+import type { VideoPlayerProps, VideoPlayerSource } from "./VideoPlayer";
 import "./media-block.css";
+
+const DynamicVideoPlayer = dynamic<VideoPlayerProps>(
+  () => import("./VideoPlayer").then((module) => module.VideoPlayer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="video-fallback" aria-busy="true">
+        <p className="video-fallback-text">Плеер загружается...</p>
+      </div>
+    ),
+  },
+);
 
 export function ImageBlock({
   asset,
@@ -87,7 +100,7 @@ export function VideoBlock({ asset, caption }: { asset: FileAsset | null | undef
         )
       ) : (
         <div className="video-player">
-          <VideoPlayer sources={sources} title={asset?.originalName} />
+          <DynamicVideoPlayer sources={sources} title={asset?.originalName} />
         </div>
       )}
       {caption ? <figcaption>{caption}</figcaption> : null}

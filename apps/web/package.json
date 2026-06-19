@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "analyze": "ANALYZE=true next build --webpack",
     "build": "next build",
     "dev": "next dev --webpack --port ${WEB_PORT:-3000}",
     "lint": "tsc -p tsconfig.json --noEmit",
@@ -38,6 +39,7 @@
     "react-dom": "^19.2.1"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.9",
     "@playwright/test": "^1.60.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

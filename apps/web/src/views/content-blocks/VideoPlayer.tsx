@@ -14,6 +14,7 @@ import "@vidstack/react/player/styles/default/theme.css";
 import "@vidstack/react/player/styles/default/layouts/video.css";
 
 export type VideoPlayerSource = { src: string; type: string; width?: number; height?: number };
+export type VideoPlayerProps = { sources: VideoPlayerSource[]; title?: string };
 
 // Полная локализация интерфейса Vidstack на русский (тип гарантирует, что ни
 // один ключ DefaultLayoutWord не пропущен — TS подсветит недостающие).
@@ -76,7 +77,7 @@ const RU_VIDEO_TRANSLATIONS: DefaultLayoutTranslations = {
   Volume: "Громкость",
 };
 
-export function VideoPlayer({ sources, title }: { sources: VideoPlayerSource[]; title?: string }) {
+export function VideoPlayer({ sources, title }: VideoPlayerProps) {
   // type у нас — обычная строка (mp4/исходный mime), а Vidstack типизирует её
   // как VideoMimeType. На границе с библиотекой приводим тип.
   const src = sources as unknown as MediaSrc[];
