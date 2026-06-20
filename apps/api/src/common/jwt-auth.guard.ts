@@ -35,6 +35,9 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwt.verifyAsync<{ sub: string; sessionId: string }>(token, {
         // Секрет проверяется в bootstrap() — без него процесс не стартует.
         secret: process.env.JWT_ACCESS_SECRET as string,
+        // Пин алгоритма: токены симметричные (HMAC), принимаем только HS256 —
+        // защита от alg-confusion (alg:none / RS↔HS подмена).
+        algorithms: ["HS256"],
       });
 
       const cached = await this.sessionCache?.get(payload.sessionId);

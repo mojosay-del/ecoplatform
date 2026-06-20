@@ -53,6 +53,8 @@ export async function createAuthSession(
       // Секрет проверяется в bootstrap() — здесь полагаемся, что он валиден.
       secret: process.env.JWT_ACCESS_SECRET as string,
       expiresIn: "15m",
+      // Подписываем строго HS256 (симметричный секрет) — парно с пином в guard.
+      algorithm: "HS256",
     },
   );
 
