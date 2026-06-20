@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { Injectable, Logger } from "@nestjs/common";
 import { GetObjectCommand, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
-import { FileAccessLevel, Prisma } from "@prisma/client";
+import { FileAccessLevel, Prisma, VideoTranscodeStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { bucketForAccessLevel, getS3Config } from "./files-storage.helpers";
 import { storageKeyWithExtension } from "./files-validation.helpers";
@@ -22,6 +22,10 @@ import {
 
 const FFMPEG_BIN = process.env.FFMPEG_PATH ?? "ffmpeg";
 const FFPROBE_BIN = process.env.FFPROBE_PATH ?? "ffprobe";
+
+// Жёсткий лимит на один прогон ffmpeg/ffprobe (M-11): зависший процесс не должен
+// вешать весь конвейер. По умолчанию 15 минут, настраивается env.
+const TRANSCODE_TIMEOUT_MS = Math.max(10_000, Number(process.env.VIDEO_TRANSCODE_TIMEOUT_MS) || 15 * 60 * 1000);
 
 /**
  * Перекодирует загруженные видео в H.264/AAC MP4 в 1–3 разрешениях. Зачем:
@@ -55,9 +59,9 @@ export class VideoTranscodeService {
     let processed = 0;
     try {
       for (let i = 0; i < limit; i += 1) {
-        const asset = await this.findNextPending();
-        if (!asset) break;
-        const ok = await this.processAsset(asset.id);
+        const assetId = await this.claimNextPending();
+        if (!assetId) break;
+        const ok = await this.processAsset(assetId);
         if (ok) processed += 1;
       }
     } finally {
@@ -66,22 +70,28 @@ export class VideoTranscodeService {
     return processed;
   }
 
-  // Видео без готовых ренишенов: либо videoRenditions IS NULL, либо статус
-  // pending/processing (processing добираем — мог упасть процесс на полпути).
-  private async findNextPending() {
-    const candidates = await this.prisma.fileAsset.findMany({
-      where: { mimeType: { startsWith: "video/" } },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      select: { id: true, videoRenditions: true },
-    });
-    for (const candidate of candidates) {
-      const data = parseVideoRenditions(candidate.videoRenditions);
-      if (!data || data.status === "pending" || data.status === "processing") {
-        return candidate;
-      }
-    }
-    return null;
+  // Атомарно «забирает» самое СТАРОЕ незавершённое видео (pending или
+  // зависшее в processing после краша) и помечает processing. Раньше брались
+  // только 50 свежих с фильтром в JS — бэклог старее топ-50 голодал (M-10).
+  // `FOR UPDATE SKIP LOCKED` + перевод в processing исключают двойную обработку
+  // одного видео на нескольких инстансах API (часть L-7). Возвращает id или null.
+  private async claimNextPending(): Promise<string | null> {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      UPDATE "FileAsset"
+      SET "videoStatus" = ${VideoTranscodeStatus.processing}::"VideoTranscodeStatus"
+      WHERE "id" = (
+        SELECT "id" FROM "FileAsset"
+        WHERE "videoStatus" IN (
+          ${VideoTranscodeStatus.pending}::"VideoTranscodeStatus",
+          ${VideoTranscodeStatus.processing}::"VideoTranscodeStatus"
+        )
+        ORDER BY "createdAt" ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING "id"
+    `);
+    return rows[0]?.id ?? null;
   }
 
   async processAsset(assetId: string): Promise<boolean> {
@@ -151,7 +161,9 @@ export class VideoTranscodeService {
     await this.prisma.fileAsset.update({
       where: { id: assetId },
       data: {
+        // Держим JSON и индексируемую колонку в синхроне.
         videoRenditions: serializeVideoRenditions({ status, renditions }) as Prisma.InputJsonValue,
+        videoStatus: status as VideoTranscodeStatus,
       },
     });
   }
@@ -212,21 +224,43 @@ export class VideoTranscodeService {
   }
 
   // Тонкая обёртка над spawn: собирает stdout, отклоняется при ненулевом коде.
+  // Жёсткий таймаут (M-11): зависший ffmpeg/ffprobe убивается SIGKILL и промис
+  // отклоняется, иначе processAsset не дойдёт до finally и флаг running залипнет
+  // навсегда — весь видеоконвейер встанет до рестарта процесса.
   private run(bin: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
       let stdout = "";
       let stderr = "";
+      let settled = false;
+
+      const finish = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn();
+      };
+
+      const timer = setTimeout(() => {
+        finish(() => {
+          child.kill("SIGKILL");
+          reject(new Error(`${bin} превысил таймаут ${TRANSCODE_TIMEOUT_MS} мс и был остановлен.`));
+        });
+      }, TRANSCODE_TIMEOUT_MS);
+      timer.unref?.();
+
       child.stdout.on("data", (chunk) => {
         stdout += chunk.toString();
       });
       child.stderr.on("data", (chunk) => {
         stderr += chunk.toString();
       });
-      child.on("error", (error) => reject(error));
+      child.on("error", (error) => finish(() => reject(error)));
       child.on("close", (code) => {
-        if (code === 0) resolve(stdout);
-        else reject(new Error(`${bin} завершился с кодом ${code}: ${stderr.slice(-500)}`));
+        finish(() => {
+          if (code === 0) resolve(stdout);
+          else reject(new Error(`${bin} завершился с кодом ${code}: ${stderr.slice(-500)}`));
+        });
       });
     });
   }

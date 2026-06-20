@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { spawn } from "node:child_process";
 import { FileAccessLevel } from "@prisma/client";
 import { VideoTranscodeService } from "./video-transcode.service";
 import { parseVideoRenditions } from "./video-renditions";
+
+vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
+const spawnMock = vi.mocked(spawn);
 
 const CONFIGURED_S3_ENV = {
   S3_ENDPOINT: "https://s3.twcstorage.ru",
@@ -66,5 +70,33 @@ describe("VideoTranscodeService", () => {
     expect(prisma.fileAsset.update).toHaveBeenCalledTimes(2);
     const failedUpdate = prisma.fileAsset.update.mock.calls[1]?.[0];
     expect(parseVideoRenditions(failedUpdate?.data.videoRenditions)?.status).toBe("failed");
+    // setStatus синхронит индексируемую колонку (M-10).
+    expect(failedUpdate?.data.videoStatus).toBe("failed");
+  });
+
+  it("убивает зависший ffmpeg по таймауту и отклоняет промис (M-11)", async () => {
+    vi.useFakeTimers();
+    try {
+      const kill = vi.fn();
+      // Дочерний процесс, который НИКОГДА не закрывается (имитация зависания).
+      spawnMock.mockReturnValue({
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(),
+        kill,
+      } as never);
+
+      const service = new VideoTranscodeService({} as never);
+      const run = (service as unknown as { run: (bin: string, args: string[]) => Promise<string> }).run.bind(service);
+
+      const promise = run("ffmpeg", ["-i", "stuck"]);
+      const expectation = expect(promise).rejects.toThrow(/таймаут/);
+      // Таймаут по умолчанию 15 минут — проматываем за него.
+      await vi.advanceTimersByTimeAsync(15 * 60 * 1000 + 1000);
+      await expectation;
+      expect(kill).toHaveBeenCalledWith("SIGKILL");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

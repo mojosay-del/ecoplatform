@@ -129,6 +129,14 @@ enum FileAccessLevel {
   conversation_private
 }
 
+// Статус фоновой перекодировки видео (зеркалит status в FileAsset.videoRenditions).
+enum VideoTranscodeStatus {
+  pending
+  processing
+  ready
+  failed
+}
+
 enum NotificationCategory {
   security
   billing
@@ -671,6 +679,10 @@ model FileAsset {
   // Формат: { status, renditions: [{ height, width, storageKey, sizeBytes }] }.
   // null — либо не видео, либо ещё не обработано.
   videoRenditions       Json?
+  // Индексируемое зеркало статуса перекодировки (тот же статус, что в JSON выше).
+  // Нужно, чтобы транскодер выбирал самый старый pending по индексу, а не
+  // фильтровал «топ-50 свежих» в JS (см. M-10). null — не видео.
+  videoStatus           VideoTranscodeStatus?
   accessLevel           FileAccessLevel        @default(authenticated)
   uploadedById          String?
   createdAt             DateTime               @default(now())
@@ -679,6 +691,9 @@ model FileAsset {
   documentationArticles DocumentationArticle[] @relation("DocumentationFile")
   // Пользователи, у которых этот файл выбран аватаром (см. User.avatarFile).
   avatarUsers           User[]                 @relation("UserAvatar")
+
+  // Подбор следующего видео к перекодировке: самый старый незавершённый.
+  @@index([videoStatus, createdAt])
 }
 
 // Полиморфная таблица «кто на какой файл ссылается». Content-блоки,

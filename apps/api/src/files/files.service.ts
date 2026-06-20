@@ -8,7 +8,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { FileAccessLevel, Prisma, type FileAsset } from "@prisma/client";
+import { FileAccessLevel, Prisma, VideoTranscodeStatus, type FileAsset } from "@prisma/client";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 // file-type ≥17 поставляется только как ESM. apps/api собирается в CommonJS:
 // tsc эмитит require("file-type"), который Node ≥20 грузит синхронно через
@@ -309,8 +309,10 @@ export class FilesService {
         : undefined;
 
     // Видео сразу помечаем pending — фоновый транскодер (VideoTranscodeService)
-    // перекодирует его в H.264/AAC MP4 в нескольких разрешениях.
-    const videoRenditions = isVideoMime(upload.mimeType)
+    // перекодирует его в H.264/AAC MP4 в нескольких разрешениях. videoStatus —
+    // индексируемое зеркало статуса, по нему транскодер находит работу (M-10).
+    const isVideo = isVideoMime(upload.mimeType);
+    const videoRenditions = isVideo
       ? (serializeVideoRenditions({ status: "pending", renditions: [] }) as Prisma.InputJsonValue)
       : undefined;
 
@@ -323,6 +325,7 @@ export class FilesService {
         storageKey,
         variants,
         videoRenditions,
+        videoStatus: isVideo ? VideoTranscodeStatus.pending : null,
         uploadedById: userId,
       },
     });
