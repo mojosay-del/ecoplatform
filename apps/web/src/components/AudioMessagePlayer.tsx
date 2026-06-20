@@ -12,6 +12,7 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import "./audio-message-player.css";
 
 // Скорости перебираются по кругу одной кнопкой: 1 → 1.5 → 2 → снова 1.
 const SPEED_STEPS = [1, 1.5, 2] as const;

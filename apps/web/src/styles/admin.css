@@ -3939,3 +3939,375 @@ li.tree-add-row + li.tree-add-row,
 .lesson-attach-reveal {
   align-self: flex-start;
 }
+
+
+
+
+.indices-admin-page {
+  max-width: 1560px;
+}
+
+.indices-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 430px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.indices-admin-sidebar,
+.indices-admin-workspace {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.indices-admin-card,
+.indices-admin-workspace,
+.indices-detail-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+}
+
+.indices-admin-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.indices-admin-workspace {
+  padding: 18px;
+}
+
+.indices-admin-card-head,
+.indices-workspace-head,
+.indices-detail-head,
+.indices-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.indices-admin-card-head h2,
+.indices-workspace-head h2,
+.indices-detail-head h2,
+.indices-section-head h3 {
+  margin: 0;
+}
+
+.indices-admin-card-head h2 {
+  font-size: 18px;
+}
+
+.indices-admin-card-head span {
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.indices-compact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.indices-nomenclature-list {
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.indices-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 10px;
+}
+
+.indices-list-row.editing {
+  align-items: stretch;
+}
+
+.indices-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.indices-row-main strong,
+.indices-nomenclature-tab strong {
+  overflow-wrap: anywhere;
+}
+
+.indices-row-main p {
+  margin: 0;
+}
+
+.indices-row-description {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.indices-row-actions,
+.indices-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.indices-row-actions .button,
+.indices-value-row .button {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.indices-create-form {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.indices-category-form {
+  grid-template-columns: minmax(0, 1fr) 92px auto;
+  align-items: center;
+}
+
+.indices-nomenclature-form,
+.indices-edit-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.indices-nomenclature-form .textarea,
+.indices-nomenclature-form .button,
+.indices-edit-form .textarea {
+  grid-column: 1 / -1;
+}
+
+.indices-edit-form {
+  min-width: min(100%, 440px);
+}
+
+.indices-workspace-head {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+
+.indices-workspace-head p {
+  margin-top: 4px;
+}
+
+.indices-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.indices-nomenclature-nav {
+  display: grid;
+  gap: 8px;
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.indices-nomenclature-tab {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 11px 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.indices-nomenclature-tab:hover {
+  border-color: var(--line-strong);
+  background: var(--panel-soft);
+}
+
+.indices-nomenclature-tab.active {
+  border-color: var(--primary-soft-strong);
+  background: var(--primary-soft);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.indices-nomenclature-tab span,
+.indices-nomenclature-tab em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.indices-detail-panel {
+  min-width: 0;
+}
+
+.indices-detail-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.indices-detail-head {
+  align-items: center;
+}
+
+.indices-detail-category {
+  display: inline-flex;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.indices-index-description {
+  margin: 0;
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.indices-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.indices-detail-summary div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 12px;
+}
+
+.indices-detail-summary span,
+.indices-section-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.indices-detail-summary strong {
+  overflow-wrap: anywhere;
+}
+
+.indices-price-input .input {
+  width: 100%;
+  padding-right: 52px;
+}
+
+.indices-detail-actions {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.indices-empty-state {
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  padding: 18px;
+}
+
+.indices-inline-form .form-field > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.indices-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.indices-summary-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--panel-soft);
+  border-radius: 10px;
+}
+
+.indices-summary-grid span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.indices-summary-grid strong {
+  font-size: 15px;
+  color: var(--text);
+}
+
+@media (max-width: 1500px) {
+  .indices-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+  .indices-nomenclature-nav {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    max-height: 260px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .indices-nomenclature-nav {
+    max-height: 360px;
+  }
+}
+
+@media (max-width: 880px) {
+  .indices-workspace-grid,
+  .indices-detail-summary,
+  .indices-category-form,
+  .indices-nomenclature-form,
+  .indices-edit-form,
+  .indices-value-form,
+  .indices-value-row,
+  .indices-list-row {
+    grid-template-columns: 1fr;
+  }
+  .indices-row-actions,
+  .indices-detail-actions {
+    justify-content: flex-start;
+  }
+  .indices-nomenclature-list,
+  .indices-nomenclature-nav,
+  .indices-values-list {
+    max-height: none;
+  }
+}
