@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { PaginatedResponse } from "@ecoplatform/shared";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
@@ -196,7 +196,7 @@ export function useAdminDocumentation() {
       setMessage("Раздел создан.");
       return true;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось создать раздел.");
+      setMessage(errorText(error, "Не удалось создать раздел."));
       return false;
     }
   }
@@ -279,7 +279,7 @@ export function useAdminDocumentation() {
         startNewDocument(parentId, nextPosition);
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось сохранить документ.");
+      setMessage(errorText(error, "Не удалось сохранить документ."));
     } finally {
       setSubmitting(false);
     }
@@ -291,7 +291,7 @@ export function useAdminDocumentation() {
       try {
         await persistDocDraft();
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Не удалось сохранить перед публикацией.");
+        setMessage(errorText(error, "Не удалось сохранить перед публикацией."));
         return;
       }
     }
@@ -305,7 +305,7 @@ export function useAdminDocumentation() {
       await reload();
       setMessage(article.status === "published" ? `${label} снят с публикации.` : `${label} опубликован.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось изменить статус.");
+      setMessage(errorText(error, "Не удалось изменить статус."));
     }
   }
 
@@ -321,7 +321,7 @@ export function useAdminDocumentation() {
       if (draft.id === article.id) setDraft(EMPTY_DOCUMENT_DRAFT);
       setMessage(isDocCategory(article) ? "Раздел удалён." : "Документ удалён.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось удалить запись.");
+      setMessage(errorText(error, "Не удалось удалить запись."));
     }
   }
 

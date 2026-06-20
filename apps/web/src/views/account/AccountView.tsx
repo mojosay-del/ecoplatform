@@ -11,7 +11,7 @@ import {
   normalizeAccountProfileModal,
   type AccountSectionId,
 } from "../../components/app-shell-nav";
-import { api, clearAccessToken } from "../../lib/api";
+import { errorText, api, clearAccessToken } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useApiQuery } from "../shared";
 import { accountNotificationRowsForRoles } from "../account-notification-rows";
@@ -252,7 +252,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
       setSessions((current) => current.filter((session) => session.current));
       window.dispatchEvent(new Event("notifications:changed"));
     } catch (error) {
-      setPasswordMessage(error instanceof Error ? error.message : "Не удалось изменить пароль.");
+      setPasswordMessage(errorText(error, "Не удалось изменить пароль."));
     } finally {
       setPasswordSaving(false);
     }
@@ -305,7 +305,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
       setExportMessage("Архив с данными подготовлен.");
       window.dispatchEvent(new Event("notifications:changed"));
     } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : "Не удалось подготовить экспорт.");
+      setExportMessage(errorText(error, "Не удалось подготовить экспорт."));
     } finally {
       setExportBusy(false);
     }
@@ -327,7 +327,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
       );
       window.dispatchEvent(new Event("notifications:changed"));
     } catch (error) {
-      setDeletionMessage(error instanceof Error ? error.message : "Не удалось запланировать удаление.");
+      setDeletionMessage(errorText(error, "Не удалось запланировать удаление."));
     } finally {
       setDeletionBusy(false);
     }
@@ -343,7 +343,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
       setDeletionMessage("Запрос на удаление отменён.");
       window.dispatchEvent(new Event("notifications:changed"));
     } catch (error) {
-      setDeletionMessage(error instanceof Error ? error.message : "Не удалось отменить удаление.");
+      setDeletionMessage(errorText(error, "Не удалось отменить удаление."));
     } finally {
       setDeletionBusy(false);
     }

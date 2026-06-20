@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useMemo, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
-import { api, apiFetch, preferredFileAssetImageUrl } from "../../../lib/api";
+import { errorText, api, apiFetch, preferredFileAssetImageUrl } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
@@ -171,7 +171,7 @@ export function AdminNewsView() {
       setMessage(wasNew ? "Новость создана как черновик." : "Новость обновлена.");
       if (wasNew) startNew();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось сохранить новость.");
+      setMessage(errorText(error, "Не удалось сохранить новость."));
     } finally {
       setSubmitting(false);
     }
@@ -185,7 +185,7 @@ export function AdminNewsView() {
       try {
         await persistNewsDraft();
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Не удалось сохранить перед публикацией.");
+        setMessage(errorText(error, "Не удалось сохранить перед публикацией."));
         return;
       }
     }
@@ -198,7 +198,7 @@ export function AdminNewsView() {
       newsQuery.reload();
       setMessage(item.status === "published" ? "Снято с публикации." : "Опубликовано.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось изменить статус.");
+      setMessage(errorText(error, "Не удалось изменить статус."));
     }
   }
 
@@ -211,7 +211,7 @@ export function AdminNewsView() {
       if (draft.id === item.id) startNew();
       setMessage("Новость удалена.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось удалить новость.");
+      setMessage(errorText(error, "Не удалось удалить новость."));
     }
   }
 

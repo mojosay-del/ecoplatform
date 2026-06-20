@@ -1,4 +1,4 @@
-export { ApiError } from "./errors";
+export { ApiError, errorText } from "./errors";
 export type { FileAsset } from "./file-assets";
 export { preferredFileAssetImageUrl, preferredFileAssetMediaUrl } from "./file-assets";
 export type { ApiOptions } from "./requests";

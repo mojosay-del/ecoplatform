@@ -8,7 +8,7 @@ import type {
   ForumTaxonomyValue,
   PaginatedResponse,
 } from "@ecoplatform/shared";
-import { ApiError, apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { queryKeys } from "../../../lib/query/keys";
 import { useApiQuery, type ApiState } from "../../shared";
@@ -20,11 +20,6 @@ const BASE = "/admin/content/forum";
 const EMPTY_TAXONOMY: ForumTaxonomy = { rawMaterials: [], questionTypes: [] };
 
 type SeedInput = { title: string; body: string; rawMaterialId: string; questionTypeId: string };
-
-function messageFrom(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) return error.message;
-  return error instanceof Error ? error.message : fallback;
-}
 
 // Сводим состояния двух запросов (справочники + вопросы) в одно для экрана.
 function combineState(a: ApiState, b: ApiState): AdminForumState {
@@ -83,7 +78,7 @@ export function useAdminForum() {
         await reloadTaxonomy();
         setMessage("Значение добавлено.");
       } catch (error) {
-        setMessage(messageFrom(error, "Не удалось добавить значение."));
+        setMessage(errorText(error, "Не удалось добавить значение."));
       }
     },
     [reloadTaxonomy],
@@ -97,7 +92,7 @@ export function useAdminForum() {
         await reloadTaxonomy();
         setMessage("Значение переименовано.");
       } catch (error) {
-        setMessage(messageFrom(error, "Не удалось переименовать значение."));
+        setMessage(errorText(error, "Не удалось переименовать значение."));
       }
     },
     [reloadTaxonomy],
@@ -116,7 +111,7 @@ export function useAdminForum() {
         await Promise.all([reloadTaxonomy(), reloadQuestions()]);
         setMessage(`Значение удалено. Затронуто вопросов: ${result.affectedQuestions}.`);
       } catch (error) {
-        setMessage(messageFrom(error, "Не удалось удалить значение."));
+        setMessage(errorText(error, "Не удалось удалить значение."));
       }
     },
     [reloadQuestions, reloadTaxonomy],
@@ -138,7 +133,7 @@ export function useAdminForum() {
           action === "delete" ? "Вопрос удалён." : action === "hide" ? "Вопрос скрыт." : "Вопрос восстановлен.",
         );
       } catch (error) {
-        setMessage(messageFrom(error, "Не удалось выполнить действие."));
+        setMessage(errorText(error, "Не удалось выполнить действие."));
       }
     },
     [reloadQuestions],
@@ -152,7 +147,7 @@ export function useAdminForum() {
         setMessage("Вопрос засеян.");
         return true;
       } catch (error) {
-        setMessage(messageFrom(error, "Не удалось засеять вопрос."));
+        setMessage(errorText(error, "Не удалось засеять вопрос."));
         return false;
       }
     },

@@ -8,7 +8,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { AdminDashboardSummary } from "@ecoplatform/shared";
-import { api } from "../../../lib/api";
+import { errorText, api } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { AppShell } from "../../../components/AppShell";
 import { AdminDashboard } from "../home/dashboard";
@@ -51,7 +51,7 @@ export function AdminAnalyticsView() {
         if (!isActive) return;
         setDashboard(null);
         setDashboardState("error");
-        setDashboardError(error instanceof Error ? error.message : "Не удалось загрузить сводку.");
+        setDashboardError(errorText(error, "Не удалось загрузить сводку."));
       });
 
     return () => {

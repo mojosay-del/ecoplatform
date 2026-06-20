@@ -14,7 +14,7 @@ import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-ki
 import { FolderOpen, Plus } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { queryKeys } from "../../../lib/query/keys";
 import { useApiQuery } from "../../shared";
 import { formatPriceValuesCount } from "./format";
@@ -51,7 +51,7 @@ export function AdminIndicesView() {
       setMessage(null);
       return true;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка сохранения.");
+      setMessage(errorText(error, "Ошибка сохранения."));
       return false;
     }
   };
@@ -113,7 +113,7 @@ export function AdminIndicesView() {
           <h1 className="page-title">Индексы цен</h1>
           <p className="page-subtitle">Номенклатура и история цен. Выберите позицию слева — справа откроется индекс.</p>
         </header>
-        {message ?? errorMessage ? <p className="cms-flash">{message ?? errorMessage}</p> : null}
+        {(message ?? errorMessage) ? <p className="cms-flash">{message ?? errorMessage}</p> : null}
 
         <div className="moderation-layout cms-vertical-layout">
           <div className="education-tree">

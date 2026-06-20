@@ -4,7 +4,7 @@ import { FormEvent, useRef, useState, type SetStateAction } from "react";
 import { subscriptionPlans } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "../../../components/StatusPill";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { queryKeys } from "../../../lib/query/keys";
 import {
   COMPANY_STATUS_LABELS,
@@ -83,7 +83,7 @@ export function AdminBillingView() {
       // Список — react-query: инвалидируем, чтобы подтянуть новый статус.
       companiesQuery.reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось активировать подписку");
+      setErrorMessage(errorText(error, "Не удалось активировать подписку"));
     } finally {
       submitInFlight.current = false;
       setSubmitting(false);

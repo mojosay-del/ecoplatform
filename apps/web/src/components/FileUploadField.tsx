@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FileText, RefreshCcw, Upload, X } from "lucide-react";
 import "./file-upload.css";
 import {
+  errorText,
   api,
   apiDeleteFile,
   apiUploadFileWithProgress,
@@ -67,11 +68,7 @@ export function FileUploadField({
     queryFn: () => api.files.listByIds([value]),
     enabled: Boolean(token && value) && !hasLocalForValue,
   });
-  const uploaded: FileAsset | null = value
-    ? hasLocalForValue
-      ? uploadedLocal
-      : (metaQuery.data?.[0] ?? null)
-    : null;
+  const uploaded: FileAsset | null = value ? (hasLocalForValue ? uploadedLocal : (metaQuery.data?.[0] ?? null)) : null;
 
   useEffect(() => {
     return () => {
@@ -108,7 +105,7 @@ export function FileUploadField({
       onChange(asset.id, asset);
     } catch (uploadError) {
       if (!controller.signal.aborted) {
-        setError(uploadError instanceof Error ? uploadError.message : "Не удалось загрузить файл.");
+        setError(errorText(uploadError, "Не удалось загрузить файл."));
       }
     } finally {
       if (uploadAbortRef.current === controller) {

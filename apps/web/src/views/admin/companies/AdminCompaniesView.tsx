@@ -13,7 +13,7 @@ import {
   userStatusPillVariant,
 } from "../../../components/StatusPill";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import {
   COMPANY_STATUS_LABELS,
@@ -142,7 +142,7 @@ export function AdminCompaniesView() {
       const data = await apiFetch<AdminCompanyDetail>(`/admin/companies/${id}`, { token });
       setSelected(data);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить компанию");
+      setErrorMessage(errorText(error, "Не удалось загрузить компанию"));
     }
   }
 
@@ -163,7 +163,7 @@ export function AdminCompaniesView() {
       setStatusComment("");
       companiesQuery.reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось сменить статус");
+      setErrorMessage(errorText(error, "Не удалось сменить статус"));
     }
   }
 

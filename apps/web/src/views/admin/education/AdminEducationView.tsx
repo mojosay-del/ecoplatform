@@ -7,7 +7,7 @@ import { useCallback, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { queryKeys } from "../../../lib/query/keys";
 import { useApiQuery } from "../../shared";
 import { DetailPanel } from "./detail-panel";
@@ -36,7 +36,7 @@ export function AdminEducationView() {
         await refetch();
         return true;
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Ошибка сохранения.");
+        setMessage(errorText(error, "Ошибка сохранения."));
         return false;
       }
     },
@@ -72,7 +72,7 @@ export function AdminEducationView() {
           <h1 className="page-title">Обучение</h1>
           <p className="page-subtitle">Терминал управления обучающего сектора.</p>
         </header>
-        {message ?? errorMessage ? (
+        {(message ?? errorMessage) ? (
           <StatusPill as="p" variant="danger">
             {message ?? errorMessage}
           </StatusPill>

@@ -9,7 +9,7 @@
 import Image from "next/image";
 import { Camera, UserRound } from "lucide-react";
 import { useRef, useState } from "react";
-import { api, apiUploadFileWithProgress } from "../../lib/api";
+import { errorText, api, apiUploadFileWithProgress } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 
 export function AccountAvatarEditor() {
@@ -30,7 +30,7 @@ export function AccountAvatarEditor() {
       await api.account.setAvatar(asset.id);
       await refreshMe();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось загрузить фото.");
+      setError(errorText(cause, "Не удалось загрузить фото."));
     } finally {
       setBusy(false);
     }
@@ -43,7 +43,7 @@ export function AccountAvatarEditor() {
       await api.account.removeAvatar();
       await refreshMe();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось убрать фото.");
+      setError(errorText(cause, "Не удалось убрать фото."));
     } finally {
       setBusy(false);
     }

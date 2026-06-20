@@ -4,7 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 import { useAuth } from "../../../lib/auth";
 import type { AdminUserDetail, AdminUserList, AdminUserListItem, UserSortKey } from "./types";
@@ -80,7 +80,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       setSelected(data);
       setRolesDraft(data.platformStaff?.roles ?? []);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить пользователя");
+      setErrorMessage(errorText(error, "Не удалось загрузить пользователя"));
     }
   }
 
@@ -97,7 +97,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       setBlockComment("");
       usersQuery.reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось заблокировать пользователя");
+      setErrorMessage(errorText(error, "Не удалось заблокировать пользователя"));
     }
   }
 
@@ -112,7 +112,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       setSelected(data);
       usersQuery.reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось разблокировать пользователя");
+      setErrorMessage(errorText(error, "Не удалось разблокировать пользователя"));
     }
   }
 
@@ -127,7 +127,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       setSelected(data);
       usersQuery.reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось обновить роли");
+      setErrorMessage(errorText(error, "Не удалось обновить роли"));
     }
   }
 

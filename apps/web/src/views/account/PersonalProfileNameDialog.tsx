@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
-import { api } from "../../lib/api";
+import { errorText, api } from "../../lib/api";
 import type { User } from "../../lib/auth";
 import { useAccountDialogBodyLock } from "./hooks";
 
@@ -36,7 +36,7 @@ export function NameEditDialog({
       await onSaved();
       onClose();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось сохранить имя.");
+      setMessage(errorText(error, "Не удалось сохранить имя."));
     } finally {
       setSaving(false);
     }

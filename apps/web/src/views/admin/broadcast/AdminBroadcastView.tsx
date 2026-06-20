@@ -7,7 +7,7 @@
 import { FormEvent, useState } from "react";
 import { AppShell } from "../../../components/AppShell";
 import { SendActionIcon } from "../../../components/app-shell/nav-icons";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { COMPANY_TYPE_LABELS, SUBSCRIPTION_PLAN_LABELS, USER_GENDER_LABELS } from "../../../lib/display-labels";
 import { PageHeader } from "../../shared";
@@ -68,7 +68,7 @@ export function AdminBroadcastView() {
       });
       setRecipientCount(res.recipientCount);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось посчитать аудиторию.");
+      setError(errorText(err, "Не удалось посчитать аудиторию."));
     } finally {
       setPreviewing(false);
     }
@@ -99,7 +99,7 @@ export function AdminBroadcastView() {
       setLink("");
       setRecipientCount(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отправить рассылку.");
+      setError(errorText(err, "Не удалось отправить рассылку."));
     } finally {
       setSending(false);
     }

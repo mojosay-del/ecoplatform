@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useInfiniteQuery, useQueryClient, type InfiniteData, type QueryKey } from "@tanstack/react-query";
-import { ApiError } from "./api";
+import { errorText, ApiError } from "./api";
 import { useAuth } from "./auth";
 
 export type InfiniteApiState = "idle" | "loading" | "ready" | "unauthenticated" | "forbidden" | "error";
@@ -107,7 +107,7 @@ export function useInfiniteApiQuery<T>(
     state = "forbidden";
   } else if (query.error) {
     state = "error";
-    errorMessage = query.error instanceof Error ? query.error.message : "Не удалось загрузить данные";
+    errorMessage = errorText(query.error, "Не удалось загрузить данные");
   } else if (query.isPending) {
     state = "loading";
   } else {

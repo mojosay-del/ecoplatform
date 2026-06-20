@@ -1,4 +1,4 @@
-import { ApiError } from "../../lib/api";
+import { errorText } from "../../lib/api";
 
 const VIEW_RECORD_WINDOW_MS = 10_000;
 const recentlyRecordedViews = new Map<string, number>();
@@ -22,6 +22,5 @@ export function shouldRecordQuestionView(questionId: string): boolean {
 }
 
 export function messageFrom(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-  return error instanceof Error ? error.message : "Не удалось выполнить действие";
+  return errorText(error, "Не удалось выполнить действие");
 }

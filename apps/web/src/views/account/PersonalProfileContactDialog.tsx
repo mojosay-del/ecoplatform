@@ -14,7 +14,7 @@ import {
   getPhoneCountry,
   normalizeEmailValue,
 } from "../../components/auth/utils";
-import { api } from "../../lib/api";
+import { errorText, api } from "../../lib/api";
 import { useAccountDialogBodyLock } from "./hooks";
 import type { ContactField } from "./personal-profile-options";
 import { phoneStateFromValue } from "./personal-profile-utils";
@@ -86,7 +86,7 @@ export function ContactChangeDialog({
       window.setTimeout(() => inputRefs.current[0]?.focus(), 0);
     } catch (error) {
       if (requestIdRef.current !== requestId) return;
-      setMessage(error instanceof Error ? error.message : "Не удалось отправить код.");
+      setMessage(errorText(error, "Не удалось отправить код."));
     } finally {
       if (requestIdRef.current === requestId) setRequesting(false);
     }
@@ -122,7 +122,7 @@ export function ContactChangeDialog({
     } catch (error) {
       if (attemptRef.current !== attempt) return;
       setPhase("error");
-      setMessage(error instanceof Error ? error.message : "Код не подошёл.");
+      setMessage(errorText(error, "Код не подошёл."));
       resetTimerRef.current = window.setTimeout(() => {
         if (attemptRef.current !== attempt) return;
         setCodeDigits(emptyVerificationDigits());
@@ -190,7 +190,7 @@ export function ContactChangeDialog({
       await onSaved();
       onClose();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось сохранить новое значение.");
+      setMessage(errorText(error, "Не удалось сохранить новое значение."));
     } finally {
       setSaving(false);
     }

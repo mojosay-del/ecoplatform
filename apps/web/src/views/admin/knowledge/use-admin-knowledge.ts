@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { PaginatedResponse } from "@ecoplatform/shared";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
@@ -187,7 +187,7 @@ export function useAdminKnowledge() {
       setMessage("Категория создана.");
       return true;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось создать категорию.");
+      setMessage(errorText(error, "Не удалось создать категорию."));
       return false;
     }
   }
@@ -269,7 +269,7 @@ export function useAdminKnowledge() {
         startNewMaterial(parentId, nextPosition);
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось сохранить базу знаний.");
+      setMessage(errorText(error, "Не удалось сохранить базу знаний."));
     } finally {
       setSubmitting(false);
     }
@@ -281,7 +281,7 @@ export function useAdminKnowledge() {
       try {
         await persistKnowledgeDraft();
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Не удалось сохранить перед публикацией.");
+        setMessage(errorText(error, "Не удалось сохранить перед публикацией."));
         return;
       }
     }
@@ -295,7 +295,7 @@ export function useAdminKnowledge() {
       await reload();
       setMessage(article.status === "published" ? `${label} снят с публикации.` : `${label} опубликован.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось изменить статус.");
+      setMessage(errorText(error, "Не удалось изменить статус."));
     }
   }
 
@@ -314,7 +314,7 @@ export function useAdminKnowledge() {
       if (draft.id === article.id) setDraft(EMPTY_MATERIAL_DRAFT);
       setMessage(isKnowledgeCategory(article) ? "Категория удалена." : "Материал удалён.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось удалить запись.");
+      setMessage(errorText(error, "Не удалось удалить запись."));
     }
   }
 

@@ -7,7 +7,7 @@ import { supportTicketCategories } from "@ecoplatform/shared";
 import "./support-drawer.css";
 import { SendActionIcon } from "./app-shell/nav-icons";
 import { StatusPill, supportStatusPillVariant } from "./StatusPill";
-import { api } from "../lib/api";
+import { errorText, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../lib/display-labels";
 import { useDialogA11y } from "../lib/use-dialog-a11y";
@@ -77,7 +77,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
       window.dispatchEvent(new Event("support:changed"));
     },
     onError: (error) => {
-      setMessage(error instanceof Error ? error.message : "Не удалось создать обращение.");
+      setMessage(errorText(error, "Не удалось создать обращение."));
     },
   });
 

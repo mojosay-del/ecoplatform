@@ -1,6 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiFetch, clearAccessToken, getAccessToken, tryRestoreSession } from "./core";
+import { ApiError, apiFetch, clearAccessToken, errorText, getAccessToken, tryRestoreSession } from "./core";
 import { extractApiErrorMessage } from "./errors";
+
+describe("errorText", () => {
+  it("возвращает message из ApiError (контракт сервера долетает до UI)", () => {
+    expect(errorText(new ApiError("Нет доступа", 403), "fallback")).toBe("Нет доступа");
+  });
+
+  it("возвращает message из обычного Error (сетевой сбой)", () => {
+    expect(errorText(new Error("Load failed"), "fallback")).toBe("Load failed");
+  });
+
+  it("возвращает fallback для не-Error значений", () => {
+    expect(errorText("строка", "fallback")).toBe("fallback");
+    expect(errorText(undefined, "fallback")).toBe("fallback");
+    expect(errorText({ message: "ad-hoc" }, "fallback")).toBe("fallback");
+  });
+});
 
 describe("apiFetch", () => {
   afterEach(() => {

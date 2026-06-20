@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Check, X } from "lucide-react";
 import type { UserGender } from "@ecoplatform/shared";
-import { api } from "../../lib/api";
+import { errorText, api } from "../../lib/api";
 import { useAccountDialogBodyLock } from "./hooks";
 import { GENDER_OPTIONS } from "./personal-profile-options";
 
@@ -42,7 +42,7 @@ export function GenderEditDialog({
       onClose();
     } catch (error) {
       setSelected(currentValue);
-      setMessage(error instanceof Error ? error.message : "Не удалось сохранить пол.");
+      setMessage(errorText(error, "Не удалось сохранить пол."));
     } finally {
       setSaving(false);
     }

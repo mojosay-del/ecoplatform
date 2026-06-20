@@ -8,7 +8,7 @@ import { AdminSortButton } from "../../../components/AdminSortButton";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import {
   PLATFORM_ROLE_SHORT_LABELS,
@@ -130,7 +130,7 @@ export function AdminStaffView() {
       });
       staffQuery.reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось создать сотрудника");
+      setErrorMessage(errorText(error, "Не удалось создать сотрудника"));
     }
   }
 
@@ -140,7 +140,7 @@ export function AdminStaffView() {
       await apiFetch(`/admin/staff/${userId}`, { method: "PATCH", token, body: patch });
       staffQuery.reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось обновить сотрудника");
+      setErrorMessage(errorText(error, "Не удалось обновить сотрудника"));
     }
   }
 

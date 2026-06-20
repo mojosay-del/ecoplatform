@@ -1,7 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { X } from "lucide-react";
 import type { BillingStatus, CompanyProfileUpdateDto } from "@ecoplatform/shared";
-import { api } from "../../lib/api";
+import { errorText, api } from "../../lib/api";
 import { COMPANY_FIELD_CONFIG } from "./constants";
 import { useAccountDialogBodyLock } from "./hooks";
 import { AccountDetailList, AccountEditableValue } from "./shared";
@@ -71,7 +71,7 @@ export function CompanyProfileForm({
     } catch (error) {
       setMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Не удалось сохранить.",
+        text: errorText(error, "Не удалось сохранить."),
       });
     } finally {
       setSaving(false);

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { BillingStatus, SubscriptionPlan } from "@ecoplatform/shared";
-import { api } from "../../lib/api";
+import { errorText, api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import type { SubscriptionPlanTier } from "../../lib/subscription-plans";
 import type { ApiState } from "../shared/use-api-query";
@@ -84,7 +84,7 @@ export function SubscriptionDialog({
       }
       return nextBilling;
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось включить пробный доступ.");
+      setErrorMessage(errorText(error, "Не удалось включить пробный доступ."));
     } finally {
       setBusyPlan(null);
     }
@@ -111,7 +111,7 @@ export function SubscriptionDialog({
       }
       return nextBilling;
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось активировать подписку.");
+      setErrorMessage(errorText(error, "Не удалось активировать подписку."));
     } finally {
       setBusyPlan(null);
     }

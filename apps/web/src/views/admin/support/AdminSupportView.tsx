@@ -9,7 +9,7 @@ import { AppShell } from "../../../components/AppShell";
 import { StatusPill, supportStatusPillVariant } from "../../../components/StatusPill";
 import { SendActionIcon } from "../../../components/app-shell/nav-icons";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../../../lib/display-labels";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 import { useAuth } from "../../../lib/auth";
@@ -147,7 +147,7 @@ export function AdminSupportView() {
       formElement.reset();
       ticketsQuery.reload();
     } catch (error) {
-      setResult(error instanceof Error ? error.message : "Не удалось отправить ответ.");
+      setResult(errorText(error, "Не удалось отправить ответ."));
     } finally {
       setSending(false);
     }

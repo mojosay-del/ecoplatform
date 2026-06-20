@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
-import { apiFetch } from "../../../lib/api";
+import { errorText, apiFetch } from "../../../lib/api";
 import { queryKeys } from "../../../lib/query/keys";
 import { useApiQuery } from "../../shared";
 import { useAuth } from "../../../lib/auth";
@@ -139,7 +139,7 @@ export function AdminSettingsView() {
         await refreshMe();
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить настройку");
+      setErrorMessage(errorText(error, "Не удалось сохранить настройку"));
     } finally {
       setSavingKey(null);
     }
@@ -226,7 +226,7 @@ export function AdminSettingsView() {
           </p>
         </header>
 
-        {errorMessage ?? readError ? (
+        {(errorMessage ?? readError) ? (
           <StatusPill as="p" variant="danger">
             {errorMessage ?? readError}
           </StatusPill>
