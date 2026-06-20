@@ -51,6 +51,11 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Бюджет клиентского бандла (M-7): считает shared/total JS из .next после
+      # сборки и валит CI при превышении порогов в apps/web/bundle-budget.json.
+      - name: Bundle budget (web)
+        run: pnpm --filter @ecoplatform/web budget
+
   integration-tests:
     name: integration tests (Postgres)
     runs-on: ubuntu-latest
