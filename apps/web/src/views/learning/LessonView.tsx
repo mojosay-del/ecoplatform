@@ -262,7 +262,7 @@ export function LessonView({
             {lessonCoverUrl ? (
               <figure className="lesson-cover">
                 <CoverImage
-                  alt={lessonCover?.originalName ?? lesson.title}
+                  alt={lesson.title}
                   src={lessonCoverUrl}
                   eager
                   sizes="(max-width: 1100px) 100vw, 760px"

@@ -59,19 +59,27 @@ export function AppSidebar({
           )}
         </button>
       </div>
-      {visibleNav.map((section) => (
-        <nav className="nav-section" key={section.title}>
-          <p className="nav-title">{section.title}</p>
-          {section.items.map((item) => (
-            <NavEntry
-              activeAccountSection={activeAccountSection}
-              item={item}
-              key={item.href ?? item.label}
-              pathname={pathname}
-            />
-          ))}
-        </nav>
-      ))}
+      {visibleNav.map((section, sectionIndex) => {
+        const titleId = `nav-section-${sectionIndex}`;
+        return (
+          // Группа внутри единственного navigation-лендмарка (<aside>), а не
+          // отдельный безымянный <nav> — иначе скринридер слышит «navigation»
+          // несколько раз подряд без различия. Имя группы — её видимый заголовок.
+          <div className="nav-section" key={section.title} role="group" aria-labelledby={titleId}>
+            <p className="nav-title" id={titleId}>
+              {section.title}
+            </p>
+            {section.items.map((item) => (
+              <NavEntry
+                activeAccountSection={activeAccountSection}
+                item={item}
+                key={item.href ?? item.label}
+                pathname={pathname}
+              />
+            ))}
+          </div>
+        );
+      })}
     </aside>
   );
 }

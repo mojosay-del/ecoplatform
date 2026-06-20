@@ -75,7 +75,7 @@ export function KnowledgeArticlePanel({ active, tree }: { active: KnowledgeArtic
               <figure className="knowledge-cover">
                 {activeCoverUrl ? (
                   <CoverImage
-                    alt={activeCover?.originalName ?? active.title}
+                    alt={active.title}
                     src={activeCoverUrl}
                     eager
                     onLoadSettled={() => {

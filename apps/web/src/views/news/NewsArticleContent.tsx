@@ -58,7 +58,7 @@ export function NewsArticleContent({
       {coverUrl ? (
         <div className="news-article-cover">
           <Image
-            alt={cover?.originalName ?? post.title}
+            alt={post.title}
             src={coverUrl}
             fill
             sizes="(max-width: 1024px) 100vw, 1024px"

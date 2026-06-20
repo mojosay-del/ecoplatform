@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyboardEvent, MutableRefObject } from "react";
+import { useId, type KeyboardEvent, type MutableRefObject } from "react";
 import { Building2, Check, Mail, Tag, User, X } from "lucide-react";
 import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
 import { companyTypeOptions, VERIFICATION_CODE_LENGTH } from "./constants";
@@ -21,6 +21,7 @@ import { normalizeEmailValue } from "./utils";
 type SetRegisterField = <K extends keyof RegisterFormValues>(field: K, value: RegisterFormValues[K]) => void;
 
 export function CompanyStepFields({ values, setField }: { values: RegisterFormValues; setField: SetRegisterField }) {
+  const companyTypeLabelId = useId();
   return (
     <div className="form-section">
       <AuthField label="Наименование компании">
@@ -32,10 +33,13 @@ export function CompanyStepFields({ values, setField }: { values: RegisterFormVa
         </FieldAffix>
       </AuthField>
       <div className="form-field">
-        <span className="form-field-label">Тип компании</span>
+        <span className="form-field-label" id={companyTypeLabelId}>
+          Тип компании
+        </span>
         <AuthSelect
           icon={Tag}
           label="Тип компании"
+          labelId={companyTypeLabelId}
           name="companyType"
           value={values.companyType}
           options={companyTypeOptions}

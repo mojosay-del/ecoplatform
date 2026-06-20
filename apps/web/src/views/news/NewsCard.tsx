@@ -64,7 +64,7 @@ export function NewsCard({
             <a className="news-tile-cover news-tile-cover-link" href={href} onClick={openFromLink}>
               {coverUrl ? (
                 <CoverImage
-                  alt={cover?.originalName ?? post.title}
+                  alt={post.title}
                   src={coverUrl}
                   eager={index < 4}
                   onLoadSettled={() => setSettledCoverUrl(coverUrl)}

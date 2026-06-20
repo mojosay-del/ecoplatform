@@ -289,5 +289,5 @@ export function ListingMap({
     );
   }
 
-  return <div ref={containerRef} className="mp-map" />;
+  return <div ref={containerRef} className="mp-map" role="region" aria-label="Карта объявлений" />;
 }

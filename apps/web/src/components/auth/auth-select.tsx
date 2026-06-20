@@ -20,6 +20,7 @@ export function AuthSelect({
   options,
   onChange,
   label,
+  labelId,
 }: {
   icon: LucideIcon;
   name: string;
@@ -27,6 +28,9 @@ export function AuthSelect({
   options: AuthSelectOption[];
   onChange: (value: string) => void;
   label: string;
+  // Если рядом есть видимый `<label>`, передаём его id — тогда он становится
+  // программным именем (aria-labelledby) вместо дублирующего aria-label.
+  labelId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const indexOfValue = () => {
@@ -118,9 +122,12 @@ export function AuthSelect({
       <button
         type="button"
         className="auth-select-trigger form-input-leading"
+        role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label}
+        aria-controls={open ? listboxId : undefined}
+        aria-activedescendant={open ? `${listboxId}-${activeIndex}` : undefined}
+        {...(labelId ? { "aria-labelledby": labelId } : { "aria-label": label })}
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={onKeyDown}
       >
@@ -136,6 +143,7 @@ export function AuthSelect({
             return (
               <li
                 key={option.value}
+                id={`${listboxId}-${index}`}
                 role="option"
                 aria-selected={isSelected}
                 className={`auth-select-option${isActive ? " is-active" : ""}${isSelected ? " is-selected" : ""}`}
