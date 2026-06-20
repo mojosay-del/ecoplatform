@@ -139,11 +139,7 @@ export class AuthService {
     return { verificationId: challenge.id, email: challenge.email, expiresAt: expiresAt.toISOString() };
   }
 
-  private async sendRegistrationCode(input: {
-    email: string;
-    code: string;
-    expiresAt: Date;
-  }): Promise<void> {
+  private async sendRegistrationCode(input: { email: string; code: string; expiresAt: Date }): Promise<void> {
     await this.email.sendRegistrationCode({ to: input.email, code: input.code, expiresAt: input.expiresAt });
   }
 

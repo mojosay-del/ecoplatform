@@ -59,9 +59,7 @@ describe("Auth — регистрация и профиль", () => {
       data: { attempts: 2, expiresAt: previousExpiresAt },
     });
 
-    const resend = await ctx.http
-      .post("/api/auth/register/resend")
-      .send({ verificationId: start.verificationId });
+    const resend = await ctx.http.post("/api/auth/register/resend").send({ verificationId: start.verificationId });
     expect(resend.status).toBe(201);
     expect(resend.body.verificationId).toBe(start.verificationId);
     expect(resend.body.email).toBe("resend-code@test.local");

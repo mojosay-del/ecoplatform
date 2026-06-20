@@ -15,12 +15,16 @@ describe("mapWithConcurrency", () => {
   it("never exceeds the concurrency limit", async () => {
     let active = 0;
     let maxActive = 0;
-    await mapWithConcurrency(Array.from({ length: 20 }, (_, i) => i), 4, async () => {
-      active += 1;
-      maxActive = Math.max(maxActive, active);
-      await new Promise((resolve) => setTimeout(resolve, 1));
-      active -= 1;
-    });
+    await mapWithConcurrency(
+      Array.from({ length: 20 }, (_, i) => i),
+      4,
+      async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        active -= 1;
+      },
+    );
     expect(maxActive).toBeLessThanOrEqual(4);
     expect(maxActive).toBeGreaterThan(1);
   });

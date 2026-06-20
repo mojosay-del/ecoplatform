@@ -26,7 +26,11 @@ describe("VideoTranscodeService.claimNextPending (M-10)", () => {
 
     // Самый старый — pending (в бэклоге, старше топ-50).
     const oldestPending = await prisma.fileAsset.create({
-      data: videoData({ storageKey: "videos/oldest-pending", createdAt: base, videoStatus: VideoTranscodeStatus.pending }),
+      data: videoData({
+        storageKey: "videos/oldest-pending",
+        createdAt: base,
+        videoStatus: VideoTranscodeStatus.pending,
+      }),
     });
 
     // 55 более свежих уже готовых видео — раньше они вытеснили бы pending из выборки.

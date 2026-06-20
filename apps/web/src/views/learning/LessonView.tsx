@@ -261,12 +261,7 @@ export function LessonView({
             {!articleReady ? <div className="lesson-loading-overlay" aria-hidden="true" /> : null}
             {lessonCoverUrl ? (
               <figure className="lesson-cover">
-                <CoverImage
-                  alt={lesson.title}
-                  src={lessonCoverUrl}
-                  eager
-                  sizes="(max-width: 1100px) 100vw, 760px"
-                />
+                <CoverImage alt={lesson.title} src={lessonCoverUrl} eager sizes="(max-width: 1100px) 100vw, 760px" />
                 <div className="lesson-cover-title-wrap">
                   <div className="lesson-cover-caption">
                     <h1 className="lesson-title lesson-title-on-cover">{lesson.title}</h1>

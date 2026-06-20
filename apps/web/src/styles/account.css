@@ -1971,7 +1971,6 @@ body.account-password-modal-open {
   color: var(--success-text);
 }
 @media (max-width: 720px) {
-
   .account-subscription-modal-body,
   .account-payment-modal-body {
     padding: 18px 20px 20px;

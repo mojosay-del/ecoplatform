@@ -13,11 +13,7 @@ const ACCOUNT_SECTION_TITLES: Record<AccountSectionId, string> = {
   "data-privacy": "Данные и приватность",
 };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ section: string }>;
-}): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ section: string }> }): Promise<Metadata> {
   const { section } = await params;
   const normalized = normalizeAccountSection(section);
   return createPageMetadata({

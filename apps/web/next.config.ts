@@ -191,6 +191,8 @@ const withBundleAnalyzer = bundleAnalyzer({
   openAnalyzer: false,
 });
 
-const nextConfigWithSentry = shouldEnableSentryBuildPlugin ? withSentryConfig(nextConfig, sentryBuildConfig) : nextConfig;
+const nextConfigWithSentry = shouldEnableSentryBuildPlugin
+  ? withSentryConfig(nextConfig, sentryBuildConfig)
+  : nextConfig;
 
 export default withBundleAnalyzer(nextConfigWithSentry);

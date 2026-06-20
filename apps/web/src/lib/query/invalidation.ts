@@ -3,14 +3,7 @@
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { queryKeys } from "./keys";
 
-export type QueryFamily =
-  | "billing"
-  | "files"
-  | "forum"
-  | "knowledgeBase"
-  | "marketplace"
-  | "news"
-  | "notifications";
+export type QueryFamily = "billing" | "files" | "forum" | "knowledgeBase" | "marketplace" | "news" | "notifications";
 
 const FAMILY_ROOTS: Record<QueryFamily, QueryKey> = {
   billing: queryKeys.billing.all,
