@@ -10,6 +10,11 @@ type ParentStatusNode = {
   parent?: ParentStatusNode | null;
 } | null;
 
+// Протокол sitemap ограничивает один файл 50 000 URL. Держим явный кап на тип,
+// чтобы запрос/ответ оставались ограниченными при росте контента (суммарно ≤ 40k).
+// Если когда-нибудь упрёмся в лимит — переходим на sitemap-index с постранично.
+const SITEMAP_MAX_PER_TYPE = 10_000;
+
 const DEFAULT_DESCRIPTIONS: Record<SeoPageType, string> = {
   news: "Новость рынка вторсырья на ЭкоПлатформе.",
   knowledge_base: "Материал базы знаний ЭкоПлатформы для рынка вторсырья.",
@@ -26,11 +31,13 @@ export class SeoService {
       this.prisma.newsPost.findMany({
         where: { status: ContentStatus.published },
         orderBy: { firstPublishedAt: "desc" },
+        take: SITEMAP_MAX_PER_TYPE,
         select: { slug: true, firstPublishedAt: true, updatedAt: true },
       }),
       this.prisma.knowledgeBaseArticle.findMany({
         where: { status: ContentStatus.published },
         orderBy: [{ parentId: "asc" }, { position: "asc" }],
+        take: SITEMAP_MAX_PER_TYPE,
         select: {
           slug: true,
           firstPublishedAt: true,
@@ -41,6 +48,7 @@ export class SeoService {
       this.prisma.documentationArticle.findMany({
         where: { status: ContentStatus.published },
         orderBy: [{ parentId: "asc" }, { position: "asc" }],
+        take: SITEMAP_MAX_PER_TYPE,
         select: {
           slug: true,
           firstPublishedAt: true,
@@ -52,6 +60,7 @@ export class SeoService {
       this.prisma.forumQuestion.findMany({
         where: { status: { not: ForumQuestionStatus.hidden } },
         orderBy: { createdAt: "desc" },
+        take: SITEMAP_MAX_PER_TYPE,
         select: { id: true, createdAt: true, updatedAt: true },
       }),
     ]);

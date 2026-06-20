@@ -1,9 +1,15 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { CompanyStatus, NotificationCategory, SubscriptionStatus } from "@prisma/client";
+import { mapWithConcurrency } from "../common/concurrency";
 import { swallowAndLog } from "../common/silent-catch";
-import { NotificationsService } from "../notifications/notifications.service";
+import { NotificationsService, type CreateInAppNotificationInput } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { formatBillingNotificationDateTime } from "./billing-notification-dates";
+
+// Рассылка батчится с ограниченной конкуррентностью: каждое уведомление — это
+// отдельная транзакция, поэтому unbounded Promise.all мог бы исчерпать пул
+// соединений при массовом истечении демо/подписок.
+const NOTIFY_CONCURRENCY = 8;
 
 /**
  * Регулярная проверка биллинг-состояния компаний:
@@ -62,29 +68,23 @@ export class BillingNotificationsService {
       include: { users: { select: { id: true } } },
     });
 
-    let count = 0;
-    for (const company of companies) {
+    const messages = companies.flatMap((company) => {
       const endsAt = company.demoEndsAt!;
-      const dateKey = endsAt.toISOString().slice(0, 10);
-      const sourceId = `${company.id}:${dateKey}`;
+      const sourceId = `${company.id}:${endsAt.toISOString().slice(0, 10)}`;
+      return company.users.map((user) => ({
+        userId: user.id,
+        eventType: "billing.demo.expiring",
+        sourceId,
+        category: NotificationCategory.billing,
+        title: "Демо-доступ скоро закончится",
+        body: `Демо-период компании заканчивается ${formatBillingNotificationDateTime(endsAt)}. Активируйте подписку, чтобы сохранить доступ к разделам.`,
+        link: "/account",
+        payload: { companyId: company.id, demoEndsAt: endsAt.toISOString() },
+      }));
+    });
 
-      for (const user of company.users) {
-        await this.notifications
-          .createInApp({
-            userId: user.id,
-            eventType: "billing.demo.expiring",
-            sourceId,
-            category: NotificationCategory.billing,
-            title: "Демо-доступ скоро закончится",
-            body: `Демо-период компании заканчивается ${formatBillingNotificationDateTime(endsAt)}. Активируйте подписку, чтобы сохранить доступ к разделам.`,
-            link: "/account",
-            payload: { companyId: company.id, demoEndsAt: endsAt.toISOString() },
-          })
-          .catch(swallowAndLog("billing.notifications.dispatch"));
-      }
-      count += 1;
-    }
-    return count;
+    await this.dispatch(messages);
+    return companies.length;
   }
 
   private async expireDemo(now: Date): Promise<number> {
@@ -96,28 +96,32 @@ export class BillingNotificationsService {
       include: { users: { select: { id: true } } },
     });
 
-    for (const company of companies) {
-      await this.prisma.company.update({
-        where: { id: company.id },
-        data: { status: CompanyStatus.past_due },
-      });
-
-      const sourceId = `${company.id}:${company.demoEndsAt?.toISOString() ?? "unknown"}`;
-      for (const user of company.users) {
-        await this.notifications
-          .createInApp({
-            userId: user.id,
-            eventType: "billing.demo.expired",
-            sourceId,
-            category: NotificationCategory.billing,
-            title: "Демо-доступ закончился",
-            body: "Демо-период компании завершён. Для возобновления доступа активируйте подписку.",
-            link: "/account",
-            payload: { companyId: company.id },
-          })
-          .catch(swallowAndLog("billing.notifications.dispatch"));
-      }
+    if (companies.length === 0) {
+      return 0;
     }
+
+    // Одним запросом вместо update в цикле; where по статусу сохраняет
+    // идемпотентность при повторном тике.
+    await this.prisma.company.updateMany({
+      where: { id: { in: companies.map((company) => company.id) }, status: CompanyStatus.demo },
+      data: { status: CompanyStatus.past_due },
+    });
+
+    const messages = companies.flatMap((company) => {
+      const sourceId = `${company.id}:${company.demoEndsAt?.toISOString() ?? "unknown"}`;
+      return company.users.map((user) => ({
+        userId: user.id,
+        eventType: "billing.demo.expired",
+        sourceId,
+        category: NotificationCategory.billing,
+        title: "Демо-доступ закончился",
+        body: "Демо-период компании завершён. Для возобновления доступа активируйте подписку.",
+        link: "/account",
+        payload: { companyId: company.id },
+      }));
+    });
+
+    await this.dispatch(messages);
     return companies.length;
   }
 
@@ -132,33 +136,27 @@ export class BillingNotificationsService {
       include: { users: { select: { id: true } } },
     });
 
-    let count = 0;
-    for (const company of companies) {
+    const messages = companies.flatMap((company) => {
       const endsAt = company.subscriptionEndsAt!;
-      const dateKey = endsAt.toISOString().slice(0, 10);
-      const sourceId = `${company.id}:${dateKey}`;
+      const sourceId = `${company.id}:${endsAt.toISOString().slice(0, 10)}`;
+      return company.users.map((user) => ({
+        userId: user.id,
+        eventType: "billing.subscription.expiring",
+        sourceId,
+        category: NotificationCategory.billing,
+        title: "Подписка скоро закончится",
+        body: `Подписка компании заканчивается ${formatBillingNotificationDateTime(endsAt)}. Продлите, чтобы сохранить доступ.`,
+        link: "/account",
+        payload: {
+          companyId: company.id,
+          subscriptionEndsAt: endsAt.toISOString(),
+          plan: company.subscriptionPlan,
+        },
+      }));
+    });
 
-      for (const user of company.users) {
-        await this.notifications
-          .createInApp({
-            userId: user.id,
-            eventType: "billing.subscription.expiring",
-            sourceId,
-            category: NotificationCategory.billing,
-            title: "Подписка скоро закончится",
-            body: `Подписка компании заканчивается ${formatBillingNotificationDateTime(endsAt)}. Продлите, чтобы сохранить доступ.`,
-            link: "/account",
-            payload: {
-              companyId: company.id,
-              subscriptionEndsAt: endsAt.toISOString(),
-              plan: company.subscriptionPlan,
-            },
-          })
-          .catch(swallowAndLog("billing.notifications.dispatch"));
-      }
-      count += 1;
-    }
-    return count;
+    await this.dispatch(messages);
+    return companies.length;
   }
 
   private async expireSubscription(now: Date): Promise<number> {
@@ -170,34 +168,47 @@ export class BillingNotificationsService {
       include: { users: { select: { id: true } } },
     });
 
-    for (const company of companies) {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.company.update({
-          where: { id: company.id },
-          data: { status: CompanyStatus.past_due },
-        });
-        await tx.subscription.updateMany({
-          where: { companyId: company.id, status: SubscriptionStatus.active },
-          data: { status: SubscriptionStatus.expired },
-        });
-      });
-
-      const sourceId = `${company.id}:${company.subscriptionEndsAt?.toISOString() ?? "unknown"}`;
-      for (const user of company.users) {
-        await this.notifications
-          .createInApp({
-            userId: user.id,
-            eventType: "billing.subscription.expired",
-            sourceId,
-            category: NotificationCategory.billing,
-            title: "Подписка закончилась",
-            body: "Срок действия подписки истёк. Для продолжения работы оформите новую подписку.",
-            link: "/account",
-            payload: { companyId: company.id },
-          })
-          .catch(swallowAndLog("billing.notifications.dispatch"));
-      }
+    if (companies.length === 0) {
+      return 0;
     }
+
+    // Перевод статусов одним батчем (компании + их активные подписки) в одной
+    // транзакции вместо отдельной транзакции на каждую компанию.
+    const companyIds = companies.map((company) => company.id);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.company.updateMany({
+        where: { id: { in: companyIds }, status: CompanyStatus.active },
+        data: { status: CompanyStatus.past_due },
+      });
+      await tx.subscription.updateMany({
+        where: { companyId: { in: companyIds }, status: SubscriptionStatus.active },
+        data: { status: SubscriptionStatus.expired },
+      });
+    });
+
+    const messages = companies.flatMap((company) => {
+      const sourceId = `${company.id}:${company.subscriptionEndsAt?.toISOString() ?? "unknown"}`;
+      return company.users.map((user) => ({
+        userId: user.id,
+        eventType: "billing.subscription.expired",
+        sourceId,
+        category: NotificationCategory.billing,
+        title: "Подписка закончилась",
+        body: "Срок действия подписки истёк. Для продолжения работы оформите новую подписку.",
+        link: "/account",
+        payload: { companyId: company.id },
+      }));
+    });
+
+    await this.dispatch(messages);
     return companies.length;
+  }
+
+  // Батч-рассылка in-app уведомлений с ограниченной конкуррентностью. Сбой
+  // одного уведомления не валит весь тик (как и раньше — тихо логируется).
+  private async dispatch(messages: CreateInAppNotificationInput[]): Promise<void> {
+    await mapWithConcurrency(messages, NOTIFY_CONCURRENCY, (message) =>
+      this.notifications.createInApp(message).catch(swallowAndLog("billing.notifications.dispatch")),
+    );
   }
 }
