@@ -8,14 +8,15 @@
 //   PriceIndexCard.tsx  — правая панель номенклатуры и истории цен
 //   format.ts / types.ts — форматтеры и доменные типы
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { FolderOpen, Plus } from "lucide-react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { apiFetch } from "../../../lib/api";
-import { useAuth } from "../../../lib/auth";
+import { queryKeys } from "../../../lib/query/keys";
+import { useApiQuery } from "../../shared";
 import { formatPriceValuesCount } from "./format";
 import { SortableNomenclatureRow } from "./NomenclatureRow";
 import { NomenclatureCreateForm } from "./create-forms";
@@ -23,36 +24,30 @@ import { PriceIndexCard } from "./PriceIndexCard";
 import type { MutateFn, Nomenclature, Selection } from "./types";
 
 export function AdminIndicesView() {
-  const { token } = useAuth();
-  const [nomenclatures, setNomenclatures] = useState<Nomenclature[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>({ kind: "none" });
   const [createOpen, setCreateOpen] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-
-  useEffect(() => {
-    void loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  async function loadAll() {
-    if (!token) return;
-    try {
-      const data = await apiFetch<PaginatedResponse<Nomenclature>>("/admin/content/indices?limit=200", { token });
-      setNomenclatures(data.items);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось загрузить индексы");
-    }
-  }
+  const {
+    data: nomenclatures,
+    setData: setNomenclatures,
+    state,
+    errorMessage,
+    refetch,
+  } = useApiQuery<Nomenclature[]>(
+    queryKeys.admin.indices(),
+    async () => (await apiFetch<PaginatedResponse<Nomenclature>>("/admin/content/indices?limit=200")).items,
+    [],
+  );
 
   const mutate: MutateFn = async (path, method, body) => {
-    if (!token) {
+    if (state === "unauthenticated") {
       setMessage("Войдите как администратор или контент-менеджер.");
       return false;
     }
     try {
-      await apiFetch(path, { method, token, body });
-      await loadAll();
+      await apiFetch(path, { method, body });
+      await refetch();
       setMessage(null);
       return true;
     } catch (error) {
@@ -83,7 +78,7 @@ export function AdminIndicesView() {
   }
 
   async function reorderNomenclatures(event: DragEndEvent) {
-    if (!token) return;
+    if (state === "unauthenticated") return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -97,13 +92,12 @@ export function AdminIndicesView() {
     try {
       await apiFetch(`/admin/content/indices/nomenclature/${active.id}/move`, {
         method: "PATCH",
-        token,
         body: { position: to },
       });
-      await loadAll();
+      await refetch();
       setMessage("Порядок номенклатур сохранён.");
     } catch (error) {
-      await loadAll();
+      await refetch();
       setMessage(
         error instanceof Error
           ? `Не удалось сохранить порядок номенклатур: ${error.message}. Список обновлён с сервера.`
@@ -119,7 +113,7 @@ export function AdminIndicesView() {
           <h1 className="page-title">Индексы цен</h1>
           <p className="page-subtitle">Номенклатура и история цен. Выберите позицию слева — справа откроется индекс.</p>
         </header>
-        {message ? <p className="cms-flash">{message}</p> : null}
+        {message ?? errorMessage ? <p className="cms-flash">{message ?? errorMessage}</p> : null}
 
         <div className="moderation-layout cms-vertical-layout">
           <div className="education-tree">

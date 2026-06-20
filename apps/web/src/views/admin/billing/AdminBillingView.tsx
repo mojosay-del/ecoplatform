@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState, type SetStateAction } from "react";
+import { FormEvent, useRef, useState, type SetStateAction } from "react";
 import { subscriptionPlans } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "../../../components/StatusPill";
 import { apiFetch } from "../../../lib/api";
-import { useAuth } from "../../../lib/auth";
+import { queryKeys } from "../../../lib/query/keys";
 import {
   COMPANY_STATUS_LABELS,
   SUBSCRIPTION_PLAN_LABELS,
@@ -31,21 +31,15 @@ type CompanyItem = {
   }>;
 };
 
-type ViewState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
-
 export function AdminBillingView() {
-  const { token } = useAuth();
-  const [state, setState] = useState<ViewState>("unauthenticated");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const companiesQuery = useInfiniteApiQuery<CompanyItem>(
-    token ? "admin-billing-companies" : null,
+    queryKeys.admin.billingCompanies(""),
     50,
     async ({ limit, offset }) => {
       const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-      return apiFetch<{ items: CompanyItem[]; total: number; hasMore: boolean }>(`/admin/billing/companies?${query}`, {
-        token,
-      });
+      return apiFetch<{ items: CompanyItem[]; total: number; hasMore: boolean }>(`/admin/billing/companies?${query}`);
     },
   );
   const companies = companiesQuery.items;
@@ -65,19 +59,9 @@ export function AdminBillingView() {
     setForm(next);
   }
 
-  function loadCompanies() {
-    if (!token) {
-      setState("unauthenticated");
-      return;
-    }
-    setState("ready");
-    setErrorMessage(null);
-    companiesQuery.reload();
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token || submitInFlight.current) return;
+    if (submitInFlight.current) return;
     submitInFlight.current = true;
     setSubmitting(true);
     setErrorMessage(null);
@@ -85,7 +69,6 @@ export function AdminBillingView() {
     try {
       await apiFetch("/admin/billing/manual-subscriptions", {
         method: "POST",
-        token,
         headers: { "Idempotency-Key": idempotencyKey.current },
         body: {
           companyId: form.companyId,
@@ -97,7 +80,8 @@ export function AdminBillingView() {
       setSuccessMessage("Подписка активирована.");
       idempotencyKey.current = createIdempotencyKey();
       setForm((prev) => ({ ...prev, reason: "" }));
-      loadCompanies();
+      // Список — react-query: инвалидируем, чтобы подтянуть новый статус.
+      companiesQuery.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Не удалось активировать подписку");
     } finally {
@@ -106,12 +90,7 @@ export function AdminBillingView() {
     }
   }
 
-  useEffect(() => {
-    void loadCompanies();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  if (state === "unauthenticated" || companiesQuery.state === "unauthenticated") {
+  if (companiesQuery.state === "unauthenticated") {
     return (
       <AppShell>
         <section className="page">
@@ -122,7 +101,7 @@ export function AdminBillingView() {
     );
   }
 
-  if (state === "forbidden" || companiesQuery.state === "forbidden") {
+  if (companiesQuery.state === "forbidden") {
     return (
       <AppShell>
         <section className="page">
@@ -152,7 +131,7 @@ export function AdminBillingView() {
             {errorMessage ?? companiesQuery.errorMessage}
           </StatusPill>
         ) : null}
-        {state === "loading" || companiesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
+        {companiesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
         <form className="form" onSubmit={submit}>
           <label className="form-field">

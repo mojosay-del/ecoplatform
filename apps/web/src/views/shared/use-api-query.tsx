@@ -1,18 +1,29 @@
 "use client";
 
 import { useCallback, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
-import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 
 export type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 type ApiQueryKey = string | QueryKey | null;
 
+type ApiQueryOptions = {
+  // Держать прежние данные при смене ключа (напр. при смене фильтра), чтобы
+  // список не мигал в "Загрузка…" — состояние остаётся "ready" на время рефетча.
+  keepPreviousData?: boolean;
+};
+
 function normalizeQueryKey(key: ApiQueryKey): QueryKey {
   return Array.isArray(key) ? key : ["api", key ?? "disabled"];
 }
 
-export function useApiQuery<T>(key: ApiQueryKey, fetcher: () => Promise<T>, initial: T) {
+export function useApiQuery<T>(
+  key: ApiQueryKey,
+  fetcher: () => Promise<T>,
+  initial: T,
+  options: ApiQueryOptions = {},
+) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const initialRef = useRef(initial);
@@ -25,6 +36,7 @@ export function useApiQuery<T>(key: ApiQueryKey, fetcher: () => Promise<T>, init
     queryKey,
     queryFn: () => fetcherRef.current(),
     enabled,
+    placeholderData: options.keepPreviousData ? keepPreviousData : undefined,
   });
 
   const setData: Dispatch<SetStateAction<T>> = useCallback(

@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef } from "react";
 import "./notifications.css";
 import { CheckCheck } from "lucide-react";
-import { apiFetch } from "../lib/api";
-import { useAuth } from "../lib/auth";
+import { useNotificationMutations } from "../lib/notifications/use-notifications";
 import { AnimatedNavIcon, type AnimatedNavIconHandle } from "./app-shell/nav-icons";
 
 // Popover, который открывается по колокольчику в шапке. Цель — дать
@@ -32,11 +31,10 @@ type Props = {
   onClose: () => void;
   items: Notification[];
   loading: boolean;
-  onChanged: () => void;
 };
 
-export function NotificationsPopover({ open, onClose, items, loading, onChanged }: Props) {
-  const { token } = useAuth();
+export function NotificationsPopover({ open, onClose, items, loading }: Props) {
+  const { markRead, markAllRead } = useNotificationMutations();
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Закрытие по клику вне popover'а. Используем mousedown, а не click,
@@ -66,29 +64,21 @@ export function NotificationsPopover({ open, onClose, items, loading, onChanged 
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const markAllRead = useCallback(async () => {
-    if (!token) return;
-    try {
-      await apiFetch("/notifications/read-all", { method: "POST", token });
-      onChanged();
-      window.dispatchEvent(new Event("notifications:changed"));
-    } catch {
-      // тихо игнорируем — пользователь увидит, что счётчик не сбросился
-    }
-  }, [token, onChanged]);
+  // Мутации сами инвалидируют кэш уведомлений → счётчик и список popover'а
+  // обновятся согласованно, без ручной рассылки событий между компонентами.
+  const onMarkAllRead = useCallback(() => {
+    markAllRead.mutate();
+  }, [markAllRead]);
 
   const markOneRead = useCallback(
     async (id: string) => {
-      if (!token) return;
       try {
-        await apiFetch(`/notifications/${id}/read`, { method: "POST", token });
-        onChanged();
-        window.dispatchEvent(new Event("notifications:changed"));
+        await markRead.mutateAsync(id);
       } catch {
-        /* ignore */
+        /* тихо — пользователь увидит при следующем обновлении */
       }
     },
-    [token, onChanged],
+    [markRead],
   );
 
   if (!open) return null;
@@ -103,8 +93,8 @@ export function NotificationsPopover({ open, onClose, items, loading, onChanged 
         <button
           type="button"
           className="notif-popover-action"
-          onClick={markAllRead}
-          disabled={!hasUnread}
+          onClick={onMarkAllRead}
+          disabled={!hasUnread || markAllRead.isPending}
           title="Отметить все прочитанными"
         >
           <CheckCheck size={14} /> Прочитать все

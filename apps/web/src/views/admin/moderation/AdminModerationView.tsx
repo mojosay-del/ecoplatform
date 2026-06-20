@@ -10,16 +10,15 @@ import type {
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, moderationStatusPillVariant } from "../../../components/StatusPill";
 import { formatModerationCaseTitle, formatModerationEntityPreview } from "../../../components/admin-entity-display";
-import { ApiError, apiFetch } from "../../../lib/api";
-import { useAuth } from "../../../lib/auth";
+import { apiFetch } from "../../../lib/api";
+import { queryKeys } from "../../../lib/query/keys";
+import { useApiQuery } from "../../shared";
 import {
   MODERATION_CASE_STATUS_LABELS,
   MODERATION_DECISION_LABELS,
   MODERATION_REASON_LABELS,
 } from "../../../lib/display-labels";
 import "../../content-blocks/checklist.css";
-
-type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
 const decisionCodes = ["leave_as_is", "remove_content", "warn_company", "escalate_to_admin"] as const;
 const reasonCodes = [
@@ -34,63 +33,49 @@ const reasonCodes = [
 type ModerationReasonCode = (typeof reasonCodes)[number];
 
 export function AdminModerationView() {
-  const { token } = useAuth();
-  const [cases, setCases] = useState<ModerationCaseListItem[]>([]);
   const [selectedCase, setSelectedCase] = useState<ModerationCaseDetail | null>(null);
-  const [state, setState] = useState<ApiState>("unauthenticated");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [decisionType, setDecisionType] = useState<ModerationDecisionType>("leave_as_is");
   const [reasonCode, setReasonCode] = useState<ModerationReasonCode>("valid_complaint");
   const [comment, setComment] = useState("");
+  const {
+    data: cases,
+    state,
+    errorMessage,
+    refetch,
+  } = useApiQuery<ModerationCaseListItem[]>(
+    queryKeys.admin.moderationCases(),
+    async () => (await apiFetch<PaginatedResponse<ModerationCaseListItem>>("/admin/moderation/cases?limit=100")).items,
+    [],
+  );
 
-  async function loadCases(nextSelectedId?: string) {
-    if (!token) {
-      setState("unauthenticated");
-      setCases([]);
-      setSelectedCase(null);
-      return;
-    }
-
-    setState("loading");
-    setErrorMessage(null);
-    try {
-      const data = await apiFetch<PaginatedResponse<ModerationCaseListItem>>("/admin/moderation/cases?limit=100", {
-        token,
-      });
-      setCases(data.items);
-      const selected = data.items.find((item) => item.id === nextSelectedId) ?? data.items[0] ?? null;
-      setSelectedCase(selected);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить очередь модерации");
-    }
-  }
+  // Держим выбор синхронным со списком: при загрузке/обновлении очереди
+  // оставляем текущий кейс, если он ещё в списке, иначе выбираем первый.
+  useEffect(() => {
+    if (state !== "ready") return;
+    setSelectedCase((current) => {
+      if (current && cases.some((item) => item.id === current.id)) return current;
+      return cases[0] ?? null;
+    });
+  }, [state, cases]);
 
   async function openCase(id: string) {
-    if (!token) return;
-    const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${id}`, { token });
+    const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${id}`);
     setSelectedCase(data);
   }
 
   async function mutateCase(path: string) {
-    if (!token || !selectedCase) return;
-    const data = await apiFetch<ModerationCaseDetail>(path, { method: "POST", token });
+    if (!selectedCase) return;
+    const data = await apiFetch<ModerationCaseDetail>(path, { method: "POST" });
     setSelectedCase(data);
-    await loadCases(data.id);
+    await refetch();
   }
 
   async function submitDecision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token || !selectedCase) return;
+    if (!selectedCase) return;
 
     const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${selectedCase.id}/decisions`, {
       method: "POST",
-      token,
       body: {
         type: decisionType,
         reasonCode,
@@ -99,13 +84,8 @@ export function AdminModerationView() {
     });
     setComment("");
     setSelectedCase(data);
-    await loadCases(data.id);
+    await refetch();
   }
-
-  useEffect(() => {
-    void loadCases();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
 
   if (state === "unauthenticated") {
     return (

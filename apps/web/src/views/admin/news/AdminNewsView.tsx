@@ -1,23 +1,23 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
-import { ApiError, api, apiFetch, preferredFileAssetImageUrl } from "../../../lib/api";
+import { api, apiFetch, preferredFileAssetImageUrl } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
+import { queryKeys } from "../../../lib/query/keys";
+import { useApiQuery } from "../../shared";
 import { useCoverAssets } from "../../../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
-import type { DraftState, NewsDetail, NewsItem, NewsTagOption, TagSuggestion, ViewState } from "./types";
+import type { DraftState, NewsDetail, NewsItem, NewsTagOption, TagSuggestion } from "./types";
 import { EMPTY_DRAFT, NEWS_LIST_PAGE_SIZE } from "./constants";
 import { NewsEditorForm } from "./NewsEditorForm";
 import { NewsRow } from "./NewsRow";
 
 export function AdminNewsView() {
   const { token } = useAuth();
-  const [state, setState] = useState<ViewState>("unauthenticated");
-  const [tagOptions, setTagOptions] = useState<NewsTagOption[]>([]);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [editingOriginal, setEditingOriginal] = useState<NewsDetail | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -26,8 +26,10 @@ export function AdminNewsView() {
   const [appliedNewsSearch, setAppliedNewsSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const newsSearchQuery = appliedNewsSearch.trim();
+  // Список — react-query: ключ включает строку поиска, поэтому смена запроса
+  // сама триггерит загрузку (без ручного refetch).
   const newsQuery = useInfiniteApiQuery<NewsItem>(
-    token ? `admin-news:${newsSearchQuery}` : null,
+    queryKeys.admin.newsList(newsSearchQuery),
     NEWS_LIST_PAGE_SIZE,
     ({ limit, offset }) =>
       api.admin.news.list({ limit, offset, q: newsSearchQuery || undefined }) as Promise<{
@@ -37,6 +39,13 @@ export function AdminNewsView() {
       }>,
   );
   const items = newsQuery.items;
+  const state = newsQuery.state;
+  // Теги — основа автокомплита; их сбой не должен ронять страницу.
+  const { data: tagOptions } = useApiQuery<NewsTagOption[]>(
+    queryKeys.admin.newsTags(),
+    () => apiFetch<NewsTagOption[]>("/admin/content/news/tags"),
+    [],
+  );
 
   const covers = useCoverAssets(items);
 
@@ -106,28 +115,6 @@ export function AdminNewsView() {
     }
     return false;
   }, [draft, original]);
-
-  async function loadList() {
-    if (!token) {
-      setState("unauthenticated");
-      return;
-    }
-    setState("loading");
-    setMessage(null);
-    try {
-      const tags = await apiFetch<NewsTagOption[]>("/admin/content/news/tags", { token });
-      newsQuery.reload();
-      setTagOptions(tags);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setMessage(error instanceof Error ? error.message : "Не удалось загрузить новости");
-    }
-  }
 
   function startNew() {
     setDraft(EMPTY_DRAFT);
@@ -207,7 +194,7 @@ export function AdminNewsView() {
         ? `/admin/content/news/${item.id}/unpublish`
         : `/admin/content/news/${item.id}/publish`;
     try {
-      await apiFetch(path, { method: "POST", token });
+      await apiFetch(path, { method: "POST" });
       newsQuery.reload();
       setMessage(item.status === "published" ? "Снято с публикации." : "Опубликовано.");
     } catch (error) {
@@ -219,7 +206,7 @@ export function AdminNewsView() {
     if (!token) return;
     if (!confirm(`Полностью удалить новость «${item.title}»? Действие необратимо.`)) return;
     try {
-      await apiFetch(`/admin/content/news/${item.id}`, { method: "DELETE", token });
+      await apiFetch(`/admin/content/news/${item.id}`, { method: "DELETE" });
       newsQuery.reload();
       if (draft.id === item.id) startNew();
       setMessage("Новость удалена.");
@@ -252,8 +239,8 @@ export function AdminNewsView() {
     if (!token) throw new Error("Нет активной сессии.");
     const body = buildSaveBody();
     const saved = draft.id
-      ? ((await apiFetch(`/admin/content/news/${draft.id}`, { method: "PATCH", token, body })) as NewsDetail)
-      : ((await apiFetch("/admin/content/news", { method: "POST", token, body })) as NewsDetail);
+      ? ((await apiFetch(`/admin/content/news/${draft.id}`, { method: "PATCH", body })) as NewsDetail)
+      : ((await apiFetch("/admin/content/news", { method: "POST", body })) as NewsDetail);
     setEditingOriginal(saved);
     newsQuery.reload();
     return saved;
@@ -266,11 +253,6 @@ export function AdminNewsView() {
   });
 
   useUnsavedChangesWarning(Boolean(draft.id) && hasChanges);
-
-  useEffect(() => {
-    void loadList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
 
   if (state === "unauthenticated") {
     return (

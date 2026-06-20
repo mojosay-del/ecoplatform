@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FileText, RefreshCcw, Upload, X } from "lucide-react";
 import "./file-upload.css";
 import {
+  api,
   apiDeleteFile,
-  apiFetch,
   apiUploadFileWithProgress,
   preferredFileAssetImageUrl,
   type FileAsset,
 } from "../lib/api";
+import { queryKeys } from "../lib/query/keys";
 import { useAuth } from "../lib/auth";
 
 // Показываем миниатюру для image-MIME и для любого file, у которого
@@ -48,36 +50,28 @@ export function FileUploadField({
   const mountedRef = useRef(true);
   const uploadAbortRef = useRef<AbortController | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [uploaded, setUploaded] = useState<FileAsset | null>(null);
+  // Свежезагруженный/выбранный asset держим локально, чтобы показать превью
+  // мгновенно. Для уже сохранённого value (id из БД) мету подтягиваем
+  // react-query'ем — общий кэш дедуплицирует запросы между полями.
+  const [uploadedLocal, setUploadedLocal] = useState<FileAsset | null>(null);
   // progress: null — не грузим; 0..1 — доля отправленных байт.
   const [progress, setProgress] = useState<number | null>(null);
   const [uploadingName, setUploadingName] = useState("");
   const [dragActive, setDragActive] = useState(false);
 
-  // При открытии формы редактирования у нас уже есть value (id файла), но
-  // нет asset. Подтягиваем мету по id, чтобы сразу нарисовать миниатюру —
-  // пользователь не должен видеть «голый» id из БД.
-  useEffect(() => {
-    let cancelled = false;
-    if (!value || !token) {
-      setUploaded(null);
-      return;
-    }
-    if (uploaded?.id === value) {
-      return;
-    }
-    apiFetch<FileAsset[]>(`/files?ids=${encodeURIComponent(value)}`, { token })
-      .then((result) => {
-        if (cancelled) return;
-        setUploaded(result[0] ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setUploaded(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [value, token, uploaded?.id]);
+  // Если value (id файла) уже задан, а локального asset нет — подтягиваем мету
+  // по id, чтобы сразу нарисовать миниатюру (а не «голый» id из БД).
+  const hasLocalForValue = Boolean(value) && uploadedLocal?.id === value;
+  const metaQuery = useQuery({
+    queryKey: queryKeys.files.byIds(value ? [value] : []),
+    queryFn: () => api.files.listByIds([value]),
+    enabled: Boolean(token && value) && !hasLocalForValue,
+  });
+  const uploaded: FileAsset | null = value
+    ? hasLocalForValue
+      ? uploadedLocal
+      : (metaQuery.data?.[0] ?? null)
+    : null;
 
   useEffect(() => {
     return () => {
@@ -110,7 +104,7 @@ export function FileUploadField({
         },
       });
       if (!mountedRef.current || uploadAbortRef.current !== controller) return;
-      setUploaded(asset);
+      setUploadedLocal(asset);
       onChange(asset.id, asset);
     } catch (uploadError) {
       if (!controller.signal.aborted) {
@@ -132,7 +126,7 @@ export function FileUploadField({
 
   async function clear() {
     const fileId = uploaded?.id;
-    setUploaded(null);
+    setUploadedLocal(null);
     setError(null);
     onChange("");
 

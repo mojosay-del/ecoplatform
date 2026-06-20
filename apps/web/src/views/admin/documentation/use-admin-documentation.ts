@@ -4,26 +4,43 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { PaginatedResponse } from "@ecoplatform/shared";
-import { ApiError, apiFetch } from "../../../lib/api";
+import { apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
+import { queryKeys } from "../../../lib/query/keys";
+import { useApiQuery } from "../../shared";
 import { documentationDisplayIconNameForNode } from "../../documentation-icons";
 import { DOC_CATEGORY_ICON_TYPE, EMPTY_CATEGORY_DRAFT, EMPTY_DOCUMENT_DRAFT } from "./constants";
-import type { DocArticle, DocDraftKind, DocDraftState, ViewState } from "./types";
+import type { DocArticle, DocDraftKind, DocDraftState } from "./types";
 import { dateInputToIso, isDocCategory, isoToDateInput, sortByPosition } from "./utils";
 
 const DOC_LIST_PATH = "/admin/content/documentation";
 
 export function useAdminDocumentation() {
   const { token } = useAuth();
-  const [state, setState] = useState<ViewState>("unauthenticated");
-  const [items, setItems] = useState<DocArticle[]>([]);
   const [draft, setDraft] = useState<DocDraftState>(EMPTY_DOCUMENT_DRAFT);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [categoryCreateOpen, setCategoryCreateOpen] = useState(false);
+  const {
+    data: items,
+    setData: setItems,
+    state,
+    errorMessage,
+    refetch,
+  } = useApiQuery<DocArticle[]>(
+    queryKeys.admin.documentation(),
+    async () => (await apiFetch<PaginatedResponse<DocArticle>>(`${DOC_LIST_PATH}?limit=200`)).items,
+    [],
+  );
+
+  // Сохраняем контракт прежнего loadList(): возвращает свежий список.
+  const reload = useCallback(async (): Promise<DocArticle[]> => {
+    const result = await refetch();
+    return result.data ?? [];
+  }, [refetch]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -102,33 +119,6 @@ export function useAdminDocumentation() {
     return false;
   }, [draft, hasActiveDraft, original]);
 
-  const loadList = useCallback(async (): Promise<DocArticle[]> => {
-    if (!token) {
-      setState("unauthenticated");
-      return [];
-    }
-    setState("loading");
-    setMessage(null);
-    try {
-      const data = await apiFetch<PaginatedResponse<DocArticle>>(`${DOC_LIST_PATH}?limit=200`, { token });
-      setItems(data.items);
-      setState("ready");
-      return data.items;
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return [];
-      }
-      setState("error");
-      setMessage(error instanceof Error ? error.message : "Не удалось загрузить документацию");
-      return [];
-    }
-  }, [token]);
-
-  useEffect(() => {
-    void loadList();
-  }, [loadList]);
-
   useEffect(() => {
     if (draft.kind === "document" && draft.parentId) {
       setExpanded((prev) => (prev.has(draft.parentId!) ? prev : new Set(prev).add(draft.parentId!)));
@@ -194,7 +184,7 @@ export function useAdminDocumentation() {
           blocks: [],
         },
       });
-      await loadList();
+      await reload();
       setExpanded((prev) => new Set(prev).add(category.id));
       setDraft({
         ...EMPTY_CATEGORY_DRAFT,
@@ -269,9 +259,9 @@ export function useAdminDocumentation() {
     // и повторные «Сохранить» не бампили revisedAt каждый раз.
     setDraft((prev) => (prev.markRevised ? { ...prev, markRevised: false } : prev));
 
-    const nextItems = await loadList();
+    const nextItems = await reload();
     return { items: nextItems, saved };
-  }, [buildSaveBody, draft.id, draft.kind, draft.parentId, draft.position, loadList, original, token]);
+  }, [buildSaveBody, draft.id, draft.kind, draft.parentId, draft.position, reload, original, token]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -312,7 +302,7 @@ export function useAdminDocumentation() {
     const label = isDocCategory(article) ? "Раздел" : "Документ";
     try {
       await apiFetch(path, { method: "POST", token });
-      await loadList();
+      await reload();
       setMessage(article.status === "published" ? `${label} снят с публикации.` : `${label} опубликован.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось изменить статус.");
@@ -327,7 +317,7 @@ export function useAdminDocumentation() {
     }
     try {
       await apiFetch(`${DOC_LIST_PATH}/${article.id}`, { method: "DELETE", token });
-      await loadList();
+      await reload();
       if (draft.id === article.id) setDraft(EMPTY_DOCUMENT_DRAFT);
       setMessage(isDocCategory(article) ? "Раздел удалён." : "Документ удалён.");
     } catch (error) {
@@ -360,10 +350,10 @@ export function useAdminDocumentation() {
         token,
         body: { parentId: categoryId, position: to },
       });
-      await loadList();
+      await reload();
       setMessage("Порядок документов сохранён.");
     } catch (error) {
-      await loadList();
+      await reload();
       setMessage(
         error instanceof Error
           ? `Не удалось сохранить порядок: ${error.message}. Список обновлён с сервера.`
@@ -398,7 +388,7 @@ export function useAdminDocumentation() {
     hasActiveDraft,
     hasChanges,
     isEditingNew,
-    message,
+    message: message ?? errorMessage,
     original,
     publishToggle,
     remove,

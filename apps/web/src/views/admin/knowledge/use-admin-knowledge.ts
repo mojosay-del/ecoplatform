@@ -4,26 +4,44 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { PaginatedResponse } from "@ecoplatform/shared";
-import { ApiError, apiFetch } from "../../../lib/api";
+import { apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
+import { queryKeys } from "../../../lib/query/keys";
+import { useApiQuery } from "../../shared";
 import { knowledgeDisplayIconNameForNode } from "../../knowledge-base-icons";
 import { EMPTY_CATEGORY_DRAFT, EMPTY_MATERIAL_DRAFT, KNOWLEDGE_CATEGORY_ICON_TYPE } from "./constants";
-import type { Article, DraftKind, DraftState, ViewState } from "./types";
+import type { Article, DraftKind, DraftState } from "./types";
 import { isKnowledgeCategory, sortByPosition } from "./utils";
 
 const KNOWLEDGE_LIST_PATH = "/admin/content/knowledge-base";
 
 export function useAdminKnowledge() {
   const { token } = useAuth();
-  const [state, setState] = useState<ViewState>("unauthenticated");
-  const [items, setItems] = useState<Article[]>([]);
   const [draft, setDraft] = useState<DraftState>(EMPTY_MATERIAL_DRAFT);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [categoryCreateOpen, setCategoryCreateOpen] = useState(false);
+  const {
+    data: items,
+    setData: setItems,
+    state,
+    errorMessage,
+    refetch,
+  } = useApiQuery<Article[]>(
+    queryKeys.admin.knowledge(),
+    async () => (await apiFetch<PaginatedResponse<Article>>(`${KNOWLEDGE_LIST_PATH}?limit=200`)).items,
+    [],
+  );
+
+  // Сохраняем контракт прежнего loadList(): возвращает свежий список — нужен
+  // вызывающим (persist/create/submit считают позицию по актуальным items).
+  const reload = useCallback(async (): Promise<Article[]> => {
+    const result = await refetch();
+    return result.data ?? [];
+  }, [refetch]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -96,33 +114,6 @@ export function useAdminKnowledge() {
     return false;
   }, [draft, hasActiveDraft, original]);
 
-  const loadList = useCallback(async (): Promise<Article[]> => {
-    if (!token) {
-      setState("unauthenticated");
-      return [];
-    }
-    setState("loading");
-    setMessage(null);
-    try {
-      const data = await apiFetch<PaginatedResponse<Article>>(`${KNOWLEDGE_LIST_PATH}?limit=200`, { token });
-      setItems(data.items);
-      setState("ready");
-      return data.items;
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return [];
-      }
-      setState("error");
-      setMessage(error instanceof Error ? error.message : "Не удалось загрузить базу знаний");
-      return [];
-    }
-  }, [token]);
-
-  useEffect(() => {
-    void loadList();
-  }, [loadList]);
-
   useEffect(() => {
     if (draft.kind === "material" && draft.parentId) {
       setExpanded((prev) => (prev.has(draft.parentId!) ? prev : new Set(prev).add(draft.parentId!)));
@@ -184,7 +175,7 @@ export function useAdminKnowledge() {
           blocks: [],
         },
       });
-      await loadList();
+      await reload();
       setExpanded((prev) => new Set(prev).add(category.id));
       setDraft({
         ...EMPTY_CATEGORY_DRAFT,
@@ -256,9 +247,9 @@ export function useAdminKnowledge() {
       saved = await apiFetch<Article>(KNOWLEDGE_LIST_PATH, { method: "POST", token, body });
     }
 
-    const nextItems = await loadList();
+    const nextItems = await reload();
     return { items: nextItems, saved };
-  }, [buildSaveBody, draft.id, draft.kind, draft.parentId, draft.position, loadList, original, token]);
+  }, [buildSaveBody, draft.id, draft.kind, draft.parentId, draft.position, reload, original, token]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -301,7 +292,7 @@ export function useAdminKnowledge() {
     const label = isKnowledgeCategory(article) ? "Категория" : "Материал";
     try {
       await apiFetch(path, { method: "POST", token });
-      await loadList();
+      await reload();
       setMessage(article.status === "published" ? `${label} снят с публикации.` : `${label} опубликован.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось изменить статус.");
@@ -319,7 +310,7 @@ export function useAdminKnowledge() {
       return;
     try {
       await apiFetch(`${KNOWLEDGE_LIST_PATH}/${article.id}`, { method: "DELETE", token });
-      await loadList();
+      await reload();
       if (draft.id === article.id) setDraft(EMPTY_MATERIAL_DRAFT);
       setMessage(isKnowledgeCategory(article) ? "Категория удалена." : "Материал удалён.");
     } catch (error) {
@@ -352,10 +343,10 @@ export function useAdminKnowledge() {
         token,
         body: { parentId: categoryId, position: to },
       });
-      await loadList();
+      await reload();
       setMessage("Порядок материалов сохранён.");
     } catch (error) {
-      await loadList();
+      await reload();
       setMessage(
         error instanceof Error
           ? `Не удалось сохранить порядок материалов: ${error.message}. Список обновлён с сервера.`
@@ -390,7 +381,7 @@ export function useAdminKnowledge() {
     isEditingNew,
     knowledgeAutosave,
     materialsByCategory,
-    message,
+    message: message ?? errorMessage,
     original,
     publishToggle,
     remove,

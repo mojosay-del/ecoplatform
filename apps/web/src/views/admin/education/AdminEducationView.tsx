@@ -3,63 +3,45 @@
 // Экран CMS «Обучение»: слева дерево модулей/глав/уроков, справа редактор
 // выбранного узла. Этот файл держит auth, загрузку и общий API-mutator.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
-import { ApiError, apiFetch } from "../../../lib/api";
-import { useAuth } from "../../../lib/auth";
+import { apiFetch } from "../../../lib/api";
+import { queryKeys } from "../../../lib/query/keys";
+import { useApiQuery } from "../../shared";
 import { DetailPanel } from "./detail-panel";
 import { EducationTree } from "./tree";
-import type { EducationMutation, LearningModule, Selection, ViewState } from "./types";
+import type { EducationMutation, LearningModule, Selection } from "./types";
 
 export function AdminEducationView() {
-  const { token } = useAuth();
-  const [state, setState] = useState<ViewState>("unauthenticated");
-  const [modules, setModules] = useState<LearningModule[]>([]);
   const [selection, setSelection] = useState<Selection>({ kind: "none" });
   const [message, setMessage] = useState<string | null>(null);
-
-  const loadAll = useCallback(async () => {
-    if (!token) {
-      setState("unauthenticated");
-      return;
-    }
-    setState("loading");
-    setMessage(null);
-    try {
-      const data = await apiFetch<PaginatedResponse<LearningModule>>("/admin/content/education?limit=200", { token });
-      setModules(data.items);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setMessage(error instanceof Error ? error.message : "Не удалось загрузить курсы");
-    }
-  }, [token]);
+  const {
+    data: modules,
+    state,
+    errorMessage,
+    refetch,
+  } = useApiQuery<LearningModule[]>(
+    queryKeys.admin.education(),
+    async () => (await apiFetch<PaginatedResponse<LearningModule>>("/admin/content/education?limit=200")).items,
+    [],
+  );
 
   const mutate = useCallback<EducationMutation>(
     async (path, method, body) => {
-      if (!token) return false;
       setMessage(null);
       try {
-        await apiFetch(path, { method, token, body });
-        await loadAll();
+        await apiFetch(path, { method, body });
+        await refetch();
         return true;
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Ошибка сохранения.");
         return false;
       }
     },
-    [loadAll, token],
+    [refetch],
   );
-
-  useEffect(() => {
-    void loadAll();
-  }, [loadAll]);
 
   if (state === "unauthenticated") {
     return (
@@ -90,9 +72,9 @@ export function AdminEducationView() {
           <h1 className="page-title">Обучение</h1>
           <p className="page-subtitle">Терминал управления обучающего сектора.</p>
         </header>
-        {message ? (
+        {message ?? errorMessage ? (
           <StatusPill as="p" variant="danger">
-            {message}
+            {message ?? errorMessage}
           </StatusPill>
         ) : null}
 

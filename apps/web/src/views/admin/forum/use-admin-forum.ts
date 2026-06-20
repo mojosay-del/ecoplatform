@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   ForumAdminQuestionItem,
   ForumQuestionStatus,
@@ -10,6 +10,8 @@ import type {
 } from "@ecoplatform/shared";
 import { ApiError, apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
+import { queryKeys } from "../../../lib/query/keys";
+import { useApiQuery, type ApiState } from "../../shared";
 
 export type AdminForumState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 export type ForumAxis = "raw-materials" | "question-types";
@@ -24,107 +26,85 @@ function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+// Сводим состояния двух запросов (справочники + вопросы) в одно для экрана.
+function combineState(a: ApiState, b: ApiState): AdminForumState {
+  if (a === "unauthenticated" || b === "unauthenticated") return "unauthenticated";
+  if (a === "forbidden" || b === "forbidden") return "forbidden";
+  if (a === "error" || b === "error") return "error";
+  if (a === "loading" || b === "loading") return "loading";
+  return "ready";
+}
+
 // Состояние и операции CMS-экрана «Форум»: справочники (две оси), список вопросов
 // с фильтром и быстрая модерация, засев. View остаётся тонким. Права инфорсит
 // бэкенд; кнопки в UI дополнительно гейтятся по роли (canManageTaxonomy/canModerate).
 export function useAdminForum() {
-  const { token, user } = useAuth();
-  const [state, setState] = useState<AdminForumState>("loading");
+  const { user } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
-  const [taxonomy, setTaxonomy] = useState<ForumTaxonomy>(EMPTY_TAXONOMY);
-  const [questions, setQuestions] = useState<ForumAdminQuestionItem[]>([]);
   const [statusFilter, setStatusFilter] = useState<ForumQuestionStatus | "">("");
 
   const roles = user?.platformRoles ?? [];
   const canManageTaxonomy = roles.includes("admin") || roles.includes("content_manager");
   const canModerate = roles.includes("admin") || roles.includes("moderator");
 
-  const loadQuestions = useCallback(
-    async (status: ForumQuestionStatus | "") => {
-      if (!token) return;
-      const suffix = status ? `?status=${status}&limit=100` : "?limit=100";
-      const page = await apiFetch<PaginatedResponse<ForumAdminQuestionItem>>(`${BASE}/questions${suffix}`, { token });
-      setQuestions(page.items);
+  const taxonomyQuery = useApiQuery<ForumTaxonomy>(
+    queryKeys.admin.forumTaxonomy(),
+    () => apiFetch<ForumTaxonomy>(`${BASE}/taxonomy`),
+    EMPTY_TAXONOMY,
+  );
+  // Ключ включает фильтр → смена фильтра сама триггерит запрос; keepPreviousData
+  // держит прежний список на время рефетча (без мигания в "Загрузка…").
+  const questionsQuery = useApiQuery<ForumAdminQuestionItem[]>(
+    queryKeys.admin.forumQuestions(statusFilter),
+    async () => {
+      const suffix = statusFilter ? `?status=${statusFilter}&limit=100` : "?limit=100";
+      return (await apiFetch<PaginatedResponse<ForumAdminQuestionItem>>(`${BASE}/questions${suffix}`)).items;
     },
-    [token],
+    [],
+    { keepPreviousData: true },
   );
 
-  const loadAll = useCallback(async () => {
-    if (!token) {
-      setState("unauthenticated");
-      return;
-    }
-    setState("loading");
-    setMessage(null);
-    try {
-      const tax = await apiFetch<ForumTaxonomy>(`${BASE}/taxonomy`, { token });
-      setTaxonomy(tax);
-      await loadQuestions(statusFilter);
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 403) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setMessage(messageFrom(error, "Не удалось загрузить раздел форума."));
-    }
-  }, [loadQuestions, statusFilter, token]);
+  const taxonomy = taxonomyQuery.data;
+  const questions = questionsQuery.data;
+  const state = combineState(taxonomyQuery.state, questionsQuery.state);
+  const reloadTaxonomy = taxonomyQuery.refetch;
+  const reloadQuestions = questionsQuery.refetch;
 
-  useEffect(() => {
-    void loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  const changeStatusFilter = useCallback(
-    async (next: ForumQuestionStatus | "") => {
-      setStatusFilter(next);
-      try {
-        await loadQuestions(next);
-      } catch (error) {
-        setMessage(messageFrom(error, "Не удалось обновить список."));
-      }
-    },
-    [loadQuestions],
-  );
-
-  const reloadTaxonomy = useCallback(async () => {
-    if (!token) return;
-    const tax = await apiFetch<ForumTaxonomy>(`${BASE}/taxonomy`, { token });
-    setTaxonomy(tax);
-  }, [token]);
+  const changeStatusFilter = useCallback((next: ForumQuestionStatus | "") => {
+    // Запрос перезагрузится сам — ключ зависит от statusFilter.
+    setStatusFilter(next);
+  }, []);
 
   const createValue = useCallback(
     async (axis: ForumAxis, label: string) => {
-      if (!token || !label.trim()) return;
+      if (!label.trim()) return;
       try {
-        await apiFetch<ForumTaxonomyValue>(`${BASE}/${axis}`, { method: "POST", token, body: { label: label.trim() } });
+        await apiFetch<ForumTaxonomyValue>(`${BASE}/${axis}`, { method: "POST", body: { label: label.trim() } });
         await reloadTaxonomy();
         setMessage("Значение добавлено.");
       } catch (error) {
         setMessage(messageFrom(error, "Не удалось добавить значение."));
       }
     },
-    [reloadTaxonomy, token],
+    [reloadTaxonomy],
   );
 
   const renameValue = useCallback(
     async (axis: ForumAxis, id: string, label: string) => {
-      if (!token || !label.trim()) return;
+      if (!label.trim()) return;
       try {
-        await apiFetch(`${BASE}/${axis}/${id}`, { method: "PATCH", token, body: { label: label.trim() } });
+        await apiFetch(`${BASE}/${axis}/${id}`, { method: "PATCH", body: { label: label.trim() } });
         await reloadTaxonomy();
         setMessage("Значение переименовано.");
       } catch (error) {
         setMessage(messageFrom(error, "Не удалось переименовать значение."));
       }
     },
-    [reloadTaxonomy, token],
+    [reloadTaxonomy],
   );
 
   const deleteValue = useCallback(
     async (axis: ForumAxis, id: string) => {
-      if (!token) return;
       const axisLabel = axis === "raw-materials" ? "вид сырья" : "тип вопроса";
       if (!window.confirm(`Удалить ${axisLabel}? Тег пропадёт у вопросов, где он стоял, но сами вопросы останутся.`)) {
         return;
@@ -132,30 +112,28 @@ export function useAdminForum() {
       try {
         const result = await apiFetch<{ ok: true; affectedQuestions: number }>(`${BASE}/${axis}/${id}`, {
           method: "DELETE",
-          token,
         });
-        await Promise.all([reloadTaxonomy(), loadQuestions(statusFilter)]);
+        await Promise.all([reloadTaxonomy(), reloadQuestions()]);
         setMessage(`Значение удалено. Затронуто вопросов: ${result.affectedQuestions}.`);
       } catch (error) {
         setMessage(messageFrom(error, "Не удалось удалить значение."));
       }
     },
-    [loadQuestions, reloadTaxonomy, statusFilter, token],
+    [reloadQuestions, reloadTaxonomy],
   );
 
   const moderate = useCallback(
     async (action: "hide" | "restore" | "delete", id: string) => {
-      if (!token) return;
       if (action === "delete" && !window.confirm("Удалить вопрос вместе со всеми ответами?")) {
         return;
       }
       try {
         if (action === "delete") {
-          await apiFetch(`${BASE}/questions/${id}`, { method: "DELETE", token });
+          await apiFetch(`${BASE}/questions/${id}`, { method: "DELETE" });
         } else {
-          await apiFetch(`${BASE}/questions/${id}/${action}`, { method: "POST", token });
+          await apiFetch(`${BASE}/questions/${id}/${action}`, { method: "POST" });
         }
-        await loadQuestions(statusFilter);
+        await reloadQuestions();
         setMessage(
           action === "delete" ? "Вопрос удалён." : action === "hide" ? "Вопрос скрыт." : "Вопрос восстановлен.",
         );
@@ -163,15 +141,14 @@ export function useAdminForum() {
         setMessage(messageFrom(error, "Не удалось выполнить действие."));
       }
     },
-    [loadQuestions, statusFilter, token],
+    [reloadQuestions],
   );
 
   const seedQuestion = useCallback(
     async (input: SeedInput) => {
-      if (!token) return false;
       try {
-        await apiFetch<{ id: string }>(`${BASE}/questions`, { method: "POST", token, body: input });
-        await loadQuestions(statusFilter);
+        await apiFetch<{ id: string }>(`${BASE}/questions`, { method: "POST", body: input });
+        await reloadQuestions();
         setMessage("Вопрос засеян.");
         return true;
       } catch (error) {
@@ -179,13 +156,15 @@ export function useAdminForum() {
         return false;
       }
     },
-    [loadQuestions, statusFilter, token],
+    [reloadQuestions],
   );
+
+  const displayMessage = message ?? taxonomyQuery.errorMessage ?? questionsQuery.errorMessage;
 
   return useMemo(
     () => ({
       state,
-      message,
+      message: displayMessage,
       taxonomy,
       questions,
       statusFilter,
@@ -205,7 +184,7 @@ export function useAdminForum() {
       changeStatusFilter,
       createValue,
       deleteValue,
-      message,
+      displayMessage,
       moderate,
       questions,
       renameValue,

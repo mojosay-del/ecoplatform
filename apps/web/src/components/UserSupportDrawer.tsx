@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { ChevronLeft, MessageSquare, Plus, X } from "lucide-react";
 import { supportTicketCategories } from "@ecoplatform/shared";
 import "./support-drawer.css";
 import { SendActionIcon } from "./app-shell/nav-icons";
 import { StatusPill, supportStatusPillVariant } from "./StatusPill";
-import { api, apiFetch } from "../lib/api";
+import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../lib/display-labels";
 import { useDialogA11y } from "../lib/use-dialog-a11y";
@@ -44,7 +45,6 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
   const drawerRef = useRef<HTMLElement>(null);
   const [tab, setTab] = useState<"list" | "new">("list");
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const ticketsQuery = useInfiniteApiQuery<Ticket>(
     open && token ? "support-drawer-tickets" : null,
@@ -66,34 +66,35 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
     return () => window.removeEventListener("support:changed", handler);
   }, [open, ticketsQuery.reload]);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token) return;
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
-    setSubmitting(true);
-    setMessage(null);
-    try {
-      await apiFetch("/support/tickets", {
-        method: "POST",
-        token,
-        body: {
-          category: String(form.get("category")),
-          subject: String(form.get("subject")),
-          text: String(form.get("text")),
-        },
-      });
-      formElement.reset();
+  const createTicket = useMutation({
+    mutationFn: (input: { category: string; subject: string; text: string }) => api.support.createTicket(input),
+    onSuccess: () => {
       setMessage("Обращение создано. Мы ответим в ближайшее время.");
       // Переключаемся на список, чтобы пользователь увидел свежий тикет.
       ticketsQuery.reload();
       setTab("list");
+      // Кросс-компонентный мост: кабинет тоже показывает обращения.
       window.dispatchEvent(new Event("support:changed"));
-    } catch (error) {
+    },
+    onError: (error) => {
       setMessage(error instanceof Error ? error.message : "Не удалось создать обращение.");
-    } finally {
-      setSubmitting(false);
-    }
+    },
+  });
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    setMessage(null);
+    createTicket.mutate(
+      {
+        category: String(form.get("category")),
+        subject: String(form.get("subject")),
+        text: String(form.get("text")),
+      },
+      { onSuccess: () => formElement.reset() },
+    );
   }
 
   if (!open) return null;
@@ -216,9 +217,9 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                     rows={6}
                   />
                 </label>
-                <button className="button" type="submit" disabled={submitting}>
+                <button className="button" type="submit" disabled={createTicket.isPending}>
                   <SendActionIcon size={18} />
-                  {submitting ? "Отправляю…" : "Отправить обращение"}
+                  {createTicket.isPending ? "Отправляю…" : "Отправить обращение"}
                 </button>
                 {message ? <p className="support-drawer-flash">{message}</p> : null}
               </form>
@@ -233,25 +234,20 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
 function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => void }) {
   const { token } = useAuth();
   const [reply, setReply] = useState("");
-  const [sending, setSending] = useState(false);
 
-  async function send(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token || !reply.trim()) return;
-    setSending(true);
-    try {
-      await apiFetch(`/support/tickets/${ticket.id}/replies`, {
-        method: "POST",
-        token,
-        body: { text: reply.trim() },
-      });
+  const sendReply = useMutation({
+    mutationFn: (text: string) => api.support.replyToTicket(ticket.id, { text }),
+    onSuccess: () => {
       setReply("");
       onReplied();
-    } catch {
-      // оставляем текст в поле — пользователь сможет повторить
-    } finally {
-      setSending(false);
-    }
+    },
+    // оставляем текст в поле при ошибке — пользователь сможет повторить
+  });
+
+  function send(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !reply.trim()) return;
+    sendReply.mutate(reply.trim());
   }
 
   const messages = ticket.messages ?? [];
@@ -284,9 +280,9 @@ function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => 
           onChange={(event) => setReply(event.target.value)}
           rows={3}
         />
-        <button className="button" type="submit" disabled={sending || !reply.trim()}>
+        <button className="button" type="submit" disabled={sendReply.isPending || !reply.trim()}>
           <SendActionIcon size={18} />
-          {sending ? "Отправляю…" : "Ответить"}
+          {sendReply.isPending ? "Отправляю…" : "Ответить"}
         </button>
       </form>
     </div>

@@ -5,4 +5,4 @@
 // Новый код должен импортировать typed-namespace: `import { api } from "../lib/api"`.
 
 export * from "./core";
-export { api, type ApiClient, type LikeResult } from "./endpoints";
+export { api, type ApiClient, type LikeResult, type NotificationItem } from "./endpoints";

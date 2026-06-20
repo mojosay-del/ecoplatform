@@ -34,6 +34,30 @@ export const queryKeys = {
     all: ["billing"] as const,
     status: () => ["billing", "status"] as const,
   },
+  notifications: {
+    all: ["notifications"] as const,
+    unreadCount: () => ["notifications", "unread-count"] as const,
+    // Лента в popover'е (короткая) и полный список (infinite) держим под
+    // разными ключами, но в одном семействе — инвалидация бьёт по обоим.
+    popover: (limit: number) => ["notifications", "popover", limit] as const,
+    list: () => ["notifications", "list"] as const,
+  },
+  admin: {
+    all: ["admin"] as const,
+    education: () => ["admin", "education"] as const,
+    indices: () => ["admin", "indices"] as const,
+    settings: () => ["admin", "settings"] as const,
+    moderationCases: () => ["admin", "moderation", "cases"] as const,
+    // Списки с поиском кэшируются per-query — смена строки сама триггерит
+    // запрос (без ручного debounce-refetch в компоненте).
+    billingCompanies: (q: string) => ["admin", "billing", "companies", q.trim()] as const,
+    newsList: (q: string) => ["admin", "news", "list", q.trim()] as const,
+    newsTags: () => ["admin", "news", "tags"] as const,
+    knowledge: () => ["admin", "knowledge"] as const,
+    documentation: () => ["admin", "documentation"] as const,
+    forumTaxonomy: () => ["admin", "forum", "taxonomy"] as const,
+    forumQuestions: (status: string) => ["admin", "forum", "questions", status] as const,
+  },
   news: {
     all: ["news"] as const,
     lists: () => ["news", "list"] as const,

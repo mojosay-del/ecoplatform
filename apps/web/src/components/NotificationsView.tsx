@@ -1,27 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import "./notifications.css";
 import { BellOff, CheckCheck, CreditCard, HelpCircle, type LucideIcon, MessageSquare, Settings } from "lucide-react";
 import { AppShell } from "./AppShell";
 import { StatusPill } from "./StatusPill";
-import { api, apiFetch } from "../lib/api";
+import { api } from "../lib/api";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
+import { useNotificationMutations, type NotificationItem } from "../lib/notifications/use-notifications";
+import { queryKeys } from "../lib/query/keys";
 import { useAuth } from "../lib/auth";
 import { NOTIFICATION_CATEGORY_LABELS } from "../lib/display-labels";
-
-type Notification = {
-  id: string;
-  category: string;
-  eventType: string;
-  title: string;
-  body: string;
-  link: string | null;
-  readAt: string | null;
-  archivedAt: string | null;
-  createdAt: string;
-};
 
 const categoryIcons: Record<string, LucideIcon> = {
   billing: CreditCard,
@@ -32,81 +22,29 @@ const categoryIcons: Record<string, LucideIcon> = {
 
 const NOTIFICATIONS_PAGE_SIZE = 30;
 
-type ViewState = "unauthenticated" | "loading" | "ready" | "error";
-
 export function NotificationsView() {
   const { token } = useAuth();
-  const [state, setState] = useState<ViewState>("unauthenticated");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const notifications = useInfiniteApiQuery<Notification>(
-    token ? "notifications" : null,
+  const { markRead, markAllRead, archive } = useNotificationMutations();
+  const notifications = useInfiniteApiQuery<NotificationItem>(
+    token ? queryKeys.notifications.list() : null,
     NOTIFICATIONS_PAGE_SIZE,
     ({ limit, offset }) => api.notifications.list({ limit, offset }),
   );
   const items = notifications.items;
-  const setItems = notifications.setItems;
 
-  const load = useCallback(() => {
-    if (!token) {
-      setState("unauthenticated");
-      setErrorMessage(null);
-      return;
-    }
-    setState("ready");
-    setErrorMessage(null);
-  }, [token]);
-
+  // Открытие страницы помечает всё прочитанным — один раз за монтирование.
+  // Мутация инвалидирует кэш уведомлений → список и счётчик в колокольчике
+  // обновятся согласованно.
+  const autoMarkedRef = useRef(false);
   useEffect(() => {
-    load();
-  }, [load]);
+    if (autoMarkedRef.current) return;
+    if (notifications.state !== "ready") return;
+    if (!items.some((item) => !item.readAt)) return;
+    autoMarkedRef.current = true;
+    markAllRead.mutate();
+  }, [items, markAllRead, notifications.state]);
 
-  useEffect(() => {
-    if (!token || state !== "ready" || !items.some((item) => !item.readAt)) return;
-
-    const now = new Date().toISOString();
-    apiFetch("/notifications/read-all", { method: "POST", token })
-      .then(() => {
-        setItems((prev) => prev.map((item) => (item.readAt ? item : { ...item, readAt: now })));
-        window.dispatchEvent(new Event("notifications:changed"));
-      })
-      .catch(() => undefined);
-  }, [items, state, token]);
-
-  async function markRead(id: string) {
-    if (!token) return;
-    try {
-      await apiFetch(`/notifications/${id}/read`, { method: "POST", token });
-      setItems((prev) => prev.map((item) => (item.id === id ? { ...item, readAt: new Date().toISOString() } : item)));
-      window.dispatchEvent(new Event("notifications:changed"));
-    } catch {
-      /* пользователь увидит при следующей загрузке */
-    }
-  }
-
-  async function archive(id: string) {
-    if (!token) return;
-    try {
-      await apiFetch(`/notifications/${id}/archive`, { method: "POST", token });
-      setItems((prev) => prev.filter((item) => item.id !== id));
-      window.dispatchEvent(new Event("notifications:changed"));
-    } catch {
-      /* тихо */
-    }
-  }
-
-  async function markAllRead() {
-    if (!token) return;
-    try {
-      await apiFetch("/notifications/read-all", { method: "POST", token });
-      const now = new Date().toISOString();
-      setItems((prev) => prev.map((item) => (item.readAt ? item : { ...item, readAt: now })));
-      window.dispatchEvent(new Event("notifications:changed"));
-    } catch {
-      /* тихо */
-    }
-  }
-
-  if (state === "unauthenticated" || notifications.state === "unauthenticated") {
+  if (notifications.state === "unauthenticated") {
     return (
       <AppShell>
         <section className="page">
@@ -124,6 +62,8 @@ export function NotificationsView() {
     );
   }
 
+  const isReady = notifications.state === "ready";
+
   return (
     <AppShell>
       <section className="page">
@@ -131,16 +71,20 @@ export function NotificationsView() {
           <h1 className="page-title">Уведомления</h1>
           <p className="page-subtitle">Все системные сообщения по вашему аккаунту.</p>
         </header>
-        {(errorMessage || notifications.errorMessage) && state !== "loading" && !notifications.isInitialLoading ? (
+        {notifications.errorMessage && !notifications.isInitialLoading ? (
           <StatusPill as="p" variant="danger">
-            {errorMessage ?? notifications.errorMessage}
+            {notifications.errorMessage}
           </StatusPill>
         ) : null}
-        {state === "loading" || notifications.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
-        {state === "ready" && notifications.state !== "error" ? (
+        {notifications.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
+        {isReady ? (
           <>
             <div className="notifications-toolbar">
-              <button className="button secondary" onClick={markAllRead} disabled={items.every((item) => item.readAt)}>
+              <button
+                className="button secondary"
+                onClick={() => markAllRead.mutate()}
+                disabled={items.every((item) => item.readAt) || markAllRead.isPending}
+              >
                 <CheckCheck aria-hidden size={16} />
                 Отметить все прочитанными
               </button>
@@ -177,16 +121,16 @@ export function NotificationsView() {
                         <p className="notification-text">{item.body}</p>
                         <div className="notification-actions">
                           {item.link ? (
-                            <Link className="button" href={item.link} onClick={() => markRead(item.id)}>
+                            <Link className="button" href={item.link} onClick={() => markRead.mutate(item.id)}>
                               Перейти
                             </Link>
                           ) : null}
                           {!item.readAt ? (
-                            <button className="button ghost" onClick={() => markRead(item.id)}>
+                            <button className="button ghost" onClick={() => markRead.mutate(item.id)}>
                               Прочитано
                             </button>
                           ) : null}
-                          <button className="button ghost" onClick={() => archive(item.id)}>
+                          <button className="button ghost" onClick={() => archive.mutate(item.id)}>
                             В архив
                           </button>
                         </div>

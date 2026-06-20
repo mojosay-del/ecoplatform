@@ -24,7 +24,7 @@ import {
 } from "./user-endpoints";
 
 export type { LikeResult } from "./endpoint-utils";
-export type { AccountDeletionStatus } from "./user-endpoints";
+export type { AccountDeletionStatus, NotificationItem } from "./user-endpoints";
 
 export const api = {
   news: newsApi,

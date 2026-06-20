@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
-import { ApiError, apiFetch } from "../../../lib/api";
+import { apiFetch } from "../../../lib/api";
+import { queryKeys } from "../../../lib/query/keys";
+import { useApiQuery } from "../../shared";
 import { useAuth } from "../../../lib/auth";
 import { hasStaleAuthFeaturesAfterSettingsLoad, shouldRefreshAuthAfterSettingChange } from "./settings-auth-refresh";
-
-type ApiState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 
 type SettingItem = {
   key: string;
@@ -105,9 +105,7 @@ function isSettingsSection(id: string) {
 }
 
 export function AdminSettingsView() {
-  const { token, user, refreshMe } = useAuth();
-  const [state, setState] = useState<ApiState>("unauthenticated");
-  const [items, setItems] = useState<SettingItem[]>([]);
+  const { user, refreshMe } = useAuth();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -118,36 +116,25 @@ export function AdminSettingsView() {
     const fromHash = window.location.hash.replace("#", "");
     return isSettingsSection(fromHash) ? fromHash : "moderation";
   });
+  const {
+    data: items,
+    state,
+    errorMessage: readError,
+    refetch,
+  } = useApiQuery<SettingItem[]>(queryKeys.admin.settings(), () => apiFetch<SettingItem[]>("/admin/settings"), []);
 
-  async function loadList() {
-    if (!token) {
-      setState("unauthenticated");
-      return;
-    }
-    setState("loading");
-    setErrorMessage(null);
-    try {
-      const data = await apiFetch<SettingItem[]>("/admin/settings", { token });
-      setItems(data);
-      setDrafts(Object.fromEntries(data.map((item) => [item.key, String(item.value)])));
-      setState("ready");
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        setState("forbidden");
-        return;
-      }
-      setState("error");
-      setErrorMessage(error instanceof Error ? error.message : "Не удалось загрузить настройки");
-    }
-  }
+  // Драфты-инпуты пересеваем значениями с сервера при каждой загрузке/
+  // обновлении настроек (в т.ч. после сохранения — refetch обновит items).
+  useEffect(() => {
+    setDrafts(Object.fromEntries(items.map((item) => [item.key, String(item.value)])));
+  }, [items]);
 
   async function saveValue(key: string, value: number | boolean) {
-    if (!token) return;
     setSavingKey(key);
     setErrorMessage(null);
     try {
-      await apiFetch(`/admin/settings/${key}`, { method: "PATCH", token, body: { value } });
-      await loadList();
+      await apiFetch(`/admin/settings/${key}`, { method: "PATCH", body: { value } });
+      await refetch();
       if (shouldRefreshAuthAfterSettingChange(key)) {
         await refreshMe();
       }
@@ -166,11 +153,6 @@ export function AdminSettingsView() {
     }
     await saveValue(key, num);
   }
-
-  useEffect(() => {
-    void loadList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
 
   useEffect(() => {
     if (hasStaleAuthFeaturesAfterSettingsLoad(items, user?.features)) {
@@ -244,9 +226,9 @@ export function AdminSettingsView() {
           </p>
         </header>
 
-        {errorMessage ? (
+        {errorMessage ?? readError ? (
           <StatusPill as="p" variant="danger">
-            {errorMessage}
+            {errorMessage ?? readError}
           </StatusPill>
         ) : null}
         {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}

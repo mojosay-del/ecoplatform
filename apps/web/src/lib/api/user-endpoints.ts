@@ -39,7 +39,7 @@ type AuthSession = {
   current: boolean;
 };
 
-type NotificationItem = {
+export type NotificationItem = {
   id: string;
   category: string;
   eventType: string;
@@ -130,6 +130,10 @@ export const authApi = {
 export const notificationsApi = {
   list: (pagination: PaginationInput = {}) =>
     apiFetch<PaginatedResponse<NotificationItem>>(`/notifications${paginationSuffix(pagination)}`),
+  unreadCount: () => apiFetch<{ count: number }>("/notifications/unread-count"),
+  markRead: (id: string) => apiFetch<{ ok: true }>(`/notifications/${enc(id)}/read`, { method: "POST" }),
+  markAllRead: () => apiFetch<{ ok: true }>("/notifications/read-all", { method: "POST" }),
+  archive: (id: string) => apiFetch<{ ok: true }>(`/notifications/${enc(id)}/archive`, { method: "POST" }),
   preferences: {
     get: () => apiFetch<NotificationPreferences>("/notifications/preferences"),
     update: (body: { inAppMutedCategories?: string[]; emailMutedCategories?: string[] }) =>
@@ -147,6 +151,10 @@ export const supportApi = {
   // отдельного /tickets/:id-запроса.
   listMyTickets: (pagination: PaginationInput = {}) =>
     apiFetch<PaginatedResponse<SupportTicket>>(`/support/tickets${paginationSuffix(pagination)}`),
+  createTicket: (body: { category: string; subject: string; text: string }) =>
+    apiFetch<SupportTicket>("/support/tickets", { method: "POST", body }),
+  replyToTicket: (id: string, body: { text: string }) =>
+    apiFetch<{ ok: true }>(`/support/tickets/${enc(id)}/replies`, { method: "POST", body }),
 };
 
 export const moderationApi = {
