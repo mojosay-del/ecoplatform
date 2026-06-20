@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "analyze": "ANALYZE=true next build --webpack",
+    "budget": "node scripts/check-bundle-budget.mjs",
     "build": "next build",
     "dev": "next dev --webpack --port ${WEB_PORT:-3000}",
     "lint": "tsc -p tsconfig.json --noEmit",

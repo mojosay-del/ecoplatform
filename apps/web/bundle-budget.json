@@ -1,0 +1,5 @@
+{
+  "_comment": "Бюджет клиентского JS веб-приложения (M-7). Числа — gzip-килобайты. Базлайн снят 2026-06-20 с ШИПАЮЩЕЙ сборки `next build` (Turbopack): shared=245.8kB, total=1307kB. ВАЖНО: Turbopack и webpack (`pnpm analyze`) дают разный чанкинг/total — бюджет калибруется по `next build`. Лимиты с запасом ~6%/11%; при осознанном росте — поднять цифру здесь же. Проверка: pnpm --filter @ecoplatform/web build && pnpm --filter @ecoplatform/web budget. Детальный per-chunk разбор: pnpm --filter @ecoplatform/web analyze → .next/analyze/*.html",
+  "sharedFirstLoadGzipKb": 260,
+  "totalClientGzipKb": 1450
+}
