@@ -192,7 +192,11 @@ CORS-allowlist с валидацией origin, многоуровневый thro
         на react-query без смены API-контракта. Codex 2026-06-21; проверки: web tsc ✓, root lint ✓,
         web unit 222 ✓, format ✓, diff-check ✓. Live `/admin/staff` пропущен: локальный `.env`
         содержит prod-like S3/storage и SMTP/mail признаки.
-  - [ ] `views/marketplace/ListingModal.tsx` (424) — крупная модалка: подсекции (галерея/инфо/форма ставки) в под-компоненты.
+  - [x] `views/marketplace/ListingModal.tsx` (424 → 168) — модалка оставлена тонким контейнером,
+        галерея/шапка/характеристики/action-колонка вынесены в соседние под-компоненты, чистые вычисления —
+        в `listing-modal.helpers` без смены поведения. Codex 2026-06-21; проверки: web tsc ✓, root lint ✓,
+        web unit 222 ✓, format ✓, diff-check ✓. Live `/marketplace` пропущен: локальный `.env` содержит
+        prod-like S3/storage и SMTP/mail признаки.
   - [ ] `components/AudioMessagePlayer.tsx` (420) — логику воспроизведения в `use-audio-player`, презентацию отдельно.
   - [ ] `components/editor/DocumentEditor.tsx` (400) — конфиг расширений/тулбар/slash-команды в модули `lib/editor/*`
         (сериализатор уже там); сам компонент — тонкая оболочка.
