@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import "../content-blocks/content-article.css";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,7 +26,12 @@ import { ContentBlocks } from "../content-blocks";
 import { NewsLikeButton } from "./NewsArticleContent";
 import { CommentsSection } from "./comments";
 
-export function NewsPostView({ slug, preview = false }: { slug: string; preview?: boolean }) {
+export function NewsPostView({ slug }: { slug: string }) {
+  // Предпросмотр черновика определяется на клиенте (?preview=1|true). На сервере
+  // searchParams не читаем — это позволяет странице оставаться ISR (см. page.tsx).
+  const searchParams = useSearchParams();
+  const previewParam = searchParams.get("preview");
+  const preview = previewParam === "1" || previewParam === "true";
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const {

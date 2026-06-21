@@ -1,5 +1,5 @@
 import type { Metadata, MetadataRoute } from "next";
-import type { SeoPageSummary, SeoSitemapEntry, SeoSitemapResponse } from "@ecoplatform/shared";
+import type { SeoPageSummary, SeoPageType, SeoSitemapEntry, SeoSitemapResponse } from "@ecoplatform/shared";
 import { API_URL } from "./api/config";
 
 export const SITE_NAME = "ЭкоПлатформа";
@@ -174,6 +174,22 @@ export async function fetchSeoSitemap(): Promise<SeoSitemapResponse | null> {
   } catch {
     return null;
   }
+}
+
+// Параметры для `generateStaticParams` detail-страниц (ISR): берём из того же
+// SEO-sitemap, что и карта сайта, и достаём последний сегмент пути как slug/id.
+// Best-effort: на этапе сборки API может быть недоступен → fetchSeoSitemap
+// вернёт null, helper отдаст []. Тогда страницы рендерятся on-demand при первом
+// заходе и кэшируются по `revalidate` (ISR работает и без build-time префетча).
+export async function staticParamsForType(type: SeoPageType): Promise<string[]> {
+  const sitemap = await fetchSeoSitemap();
+  if (!sitemap) {
+    return [];
+  }
+  return sitemap.items
+    .filter((entry) => entry.type === type)
+    .map((entry) => cleanPath(entry.path).split("/").filter(Boolean).pop())
+    .filter((slug): slug is string => Boolean(slug));
 }
 
 export function buildSitemapEntries(dynamicEntries: SeoSitemapEntry[] = []): MetadataRoute.Sitemap {
