@@ -8,6 +8,7 @@ import type { z } from "zod";
 import type { newsInputSchema } from "../content.schemas";
 import type { ContentCommonService } from "./content-common.service";
 import { refreshTagUsage, replaceNewsTags } from "./news-tag.helpers";
+import { publishedLifecycleData } from "./publish-lifecycle.helpers";
 
 type NewsInput = z.infer<typeof newsInputSchema>;
 
@@ -153,10 +154,7 @@ export async function publishNewsPost({ prisma, auditLog }: NewsAdminWorkflowDep
 
   const updated = await prisma.newsPost.update({
     where: { id },
-    data: {
-      status: ContentStatus.published,
-      firstPublishedAt: existing.firstPublishedAt ?? new Date(),
-    },
+    data: publishedLifecycleData(existing),
   });
 
   await auditLog.record({

@@ -10,6 +10,7 @@ import type { ContentCommonService } from "./content-common.service";
 import { assertLearningModulePublishable } from "./learning-access.helpers";
 import { refreshLearningModuleFileReferences } from "./learning-file-references.helpers";
 import { repositionLearningModule } from "./learning-position.helpers";
+import { publishedLifecycleData } from "./publish-lifecycle.helpers";
 
 type LearningModuleInput = z.infer<typeof learningModuleInputSchema>;
 type LearningModuleUpdateInput = z.infer<typeof learningModuleUpdateInputSchema>;
@@ -85,10 +86,7 @@ export async function publishLearningModule(
   const result = await prisma.$transaction(async (tx) => {
     const module = await tx.learningModule.update({
       where: { id },
-      data: {
-        status: ContentStatus.published,
-        firstPublishedAt: existing.firstPublishedAt ?? now,
-      },
+      data: publishedLifecycleData(existing, now),
       include: { chapters: { include: { lessons: true } } },
     });
 

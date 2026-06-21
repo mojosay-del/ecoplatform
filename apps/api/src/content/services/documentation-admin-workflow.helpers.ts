@@ -10,6 +10,7 @@ import type { ContentCommonService } from "./content-common.service";
 import { assertDocumentationDepth, isDocumentationCategory } from "./documentation-depth.helpers";
 import { compactDocumentationAfterRemoval, repositionDocumentationInGroup } from "./documentation-position.helpers";
 import { mapDocumentationNode, type DocumentationArticleRow } from "./documentation-response.helpers";
+import { publishedLifecycleData } from "./publish-lifecycle.helpers";
 
 type DocumentationInput = z.infer<typeof documentationArticleInputSchema>;
 
@@ -194,14 +195,12 @@ export async function publishDocumentationArticle(
     throw new ForbiddenException("Нельзя опубликовать документ без файла или описания.");
   }
 
-  const now = new Date();
-  const firstPublishedAt = existing.firstPublishedAt ?? now;
+  const lifecycle = publishedLifecycleData(existing);
   const document = await prisma.documentationArticle.update({
     where: { id },
     data: {
-      status: ContentStatus.published,
-      firstPublishedAt,
-      revisedAt: existing.revisedAt ?? firstPublishedAt,
+      ...lifecycle,
+      revisedAt: existing.revisedAt ?? lifecycle.firstPublishedAt,
     },
     include: { file: true, blocks: { orderBy: { position: "asc" } } },
   });

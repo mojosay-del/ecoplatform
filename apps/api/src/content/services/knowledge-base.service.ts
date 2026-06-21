@@ -11,6 +11,7 @@ import { ContentCommonService } from "./content-common.service";
 import { buildKnowledgeTreeInclude } from "./knowledge-base-tree.helpers";
 import { assertKnowledgeDepth, isKnowledgeCategory } from "./knowledge-base-depth.helpers";
 import { compactKnowledgeAfterRemoval, repositionKnowledgeInGroup } from "./knowledge-base-position.helpers";
+import { publishedLifecycleData } from "./publish-lifecycle.helpers";
 
 type KnowledgeArticleInput = z.infer<typeof knowledgeArticleInputSchema>;
 
@@ -234,10 +235,7 @@ export class KnowledgeBaseService {
 
     const article = await this.prisma.knowledgeBaseArticle.update({
       where: { id },
-      data: {
-        status: ContentStatus.published,
-        firstPublishedAt: existing.firstPublishedAt ?? new Date(),
-      },
+      data: publishedLifecycleData(existing),
     });
 
     await this.auditLog.record({

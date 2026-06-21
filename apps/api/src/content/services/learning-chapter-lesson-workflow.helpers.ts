@@ -14,6 +14,7 @@ import type {
 import type { ContentCommonService } from "./content-common.service";
 import { refreshLearningModuleFileReferences } from "./learning-file-references.helpers";
 import { repositionChapter, repositionLesson } from "./learning-position.helpers";
+import { publishedLifecycleData } from "./publish-lifecycle.helpers";
 
 type ChapterInput = z.infer<typeof chapterInputSchema>;
 type ChapterUpdateInput = z.infer<typeof chapterUpdateInputSchema>;
@@ -365,10 +366,7 @@ export async function publishLesson(
 
   const lesson = await prisma.lesson.update({
     where: { id },
-    data: {
-      status: ContentStatus.published,
-      firstPublishedAt: existing.firstPublishedAt ?? new Date(),
-    },
+    data: publishedLifecycleData(existing),
   });
 
   await auditLog.record({

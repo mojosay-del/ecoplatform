@@ -17,6 +17,7 @@ import type {
 import { ContentCommonService } from "./content-common.service";
 import { buildPriceIndexChart } from "./indices-chart.helpers";
 import { nextNomenclaturePosition, reorderNomenclature } from "./indices-position.helpers";
+import { publishedLifecycleData } from "./publish-lifecycle.helpers";
 
 type NomenclatureInput = z.infer<typeof nomenclatureInputSchema>;
 type NomenclatureMoveInput = z.infer<typeof nomenclatureMoveInputSchema>;
@@ -257,10 +258,7 @@ export class IndicesService {
 
     const priceIndex = await this.prisma.priceIndex.update({
       where: { id },
-      data: {
-        status: ContentStatus.published,
-        firstPublishedAt: existing.firstPublishedAt ?? new Date(),
-      },
+      data: publishedLifecycleData(existing),
     });
 
     await this.auditLog.record({
