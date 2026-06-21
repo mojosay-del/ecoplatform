@@ -11,6 +11,7 @@ import {
   newsCommentAuthorSelect,
 } from "./news-comment.helpers";
 import { normaliseTagFilters } from "./news-tag.helpers";
+import { sanitizeContentBlocksForResponse } from "./content-block-response.helpers";
 
 export type NewsReadOptions = { preview?: boolean };
 
@@ -173,6 +174,7 @@ export async function getPublishedNews(
   const { likes, _count, ...payload } = post;
   return {
     ...payload,
+    blocks: sanitizeContentBlocksForResponse(post.blocks),
     audioAttachment: toNewsAudioAttachment(post.blocks),
     _count: { likes: _count.likes, comments: commentsCount },
     comments: comments.map((comment) => decorateNewsComment(comment)),
@@ -238,7 +240,7 @@ export async function getAdminNewsPost({ prisma }: NewsReadDeps, id: string) {
   if (!post) {
     throw new NotFoundException("Новость не найдена.");
   }
-  return post;
+  return { ...post, blocks: sanitizeContentBlocksForResponse(post.blocks) };
 }
 
 function canPreviewAuthoredContent(user: RequestUser, createdById: string) {

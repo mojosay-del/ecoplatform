@@ -8,6 +8,7 @@ import type { RequestUser } from "../../common/request-user";
 import type { z } from "zod";
 import type { knowledgeArticleInputSchema } from "../content.schemas";
 import { ContentCommonService } from "./content-common.service";
+import { sanitizeContentBlocksForResponse } from "./content-block-response.helpers";
 import { buildKnowledgeTreeInclude } from "./knowledge-base-tree.helpers";
 import { assertKnowledgeDepth, isKnowledgeCategory } from "./knowledge-base-depth.helpers";
 import { compactKnowledgeAfterRemoval, repositionKnowledgeInGroup } from "./knowledge-base-position.helpers";
@@ -32,12 +33,13 @@ export class KnowledgeBaseService {
     const rawDepth = Number.isFinite(options.depth) ? Math.trunc(options.depth!) : 3;
     const depth = Math.min(Math.max(rawDepth, 1), 3);
 
-    return this.prisma.knowledgeBaseArticle.findMany({
+    const articles = await this.prisma.knowledgeBaseArticle.findMany({
       where: { parentId: null, status: ContentStatus.published },
       orderBy: { position: "asc" },
       take: width,
       include: buildKnowledgeTreeInclude(depth, width),
     });
+    return articles.map((article) => sanitizeKnowledgeArticleForResponse(article));
   }
 
   async getKnowledgeArticle(slug: string, user: RequestUser) {
@@ -56,7 +58,7 @@ export class KnowledgeBaseService {
       throw new NotFoundException("Статья не найдена.");
     }
 
-    return article;
+    return sanitizeKnowledgeArticleForResponse(article);
   }
 
   async searchKnowledge(query: string, user: RequestUser) {
@@ -86,7 +88,11 @@ export class KnowledgeBaseService {
       }),
     ]);
 
-    return paginatedResponse(items, total, pagination);
+    return paginatedResponse(
+      items.map((item) => sanitizeKnowledgeArticleForResponse(item)),
+      total,
+      pagination,
+    );
   }
 
   async createKnowledgeArticle(input: KnowledgeArticleInput, user: RequestUser) {
@@ -363,4 +369,25 @@ export class KnowledgeBaseService {
     }
     return validateContentBlocks(blocks);
   }
+}
+
+type KnowledgeArticleWithBlocks = {
+  blocks?: Array<{ type: string; payload: unknown }>;
+  children?: unknown[];
+};
+
+function sanitizeKnowledgeArticleForResponse<TArticle extends KnowledgeArticleWithBlocks>(article: TArticle): TArticle {
+  return {
+    ...article,
+    ...(article.blocks ? { blocks: sanitizeContentBlocksForResponse(article.blocks) } : {}),
+    ...(article.children
+      ? {
+          children: article.children.map((child) =>
+            child && typeof child === "object"
+              ? sanitizeKnowledgeArticleForResponse(child as KnowledgeArticleWithBlocks)
+              : child,
+          ),
+        }
+      : {}),
+  } as TArticle;
 }

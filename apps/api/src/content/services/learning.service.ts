@@ -40,6 +40,7 @@ import {
   unpublishLearningModule as unpublishLearningModuleWorkflow,
   updateLearningModule as updateLearningModuleWorkflow,
 } from "./learning-module-workflow.helpers";
+import { sanitizeContentBlocksForResponse } from "./content-block-response.helpers";
 
 type LearningModuleInput = z.infer<typeof learningModuleInputSchema>;
 type LearningModuleUpdateInput = z.infer<typeof learningModuleUpdateInputSchema>;
@@ -152,6 +153,7 @@ export class LearningService {
           }
           return {
             ...lessonWithoutProgress,
+            blocks: sanitizeContentBlocksForResponse(lessonWithoutProgress.blocks),
             attachments: lessonWithoutProgress.attachments.map((attachment) =>
               mapLessonAttachment(attachment, attachmentMeta.get(attachment.fileId)),
             ),
@@ -199,7 +201,20 @@ export class LearningService {
       }),
     ]);
 
-    return paginatedResponse(items, total, pagination);
+    return paginatedResponse(
+      items.map((module) => ({
+        ...module,
+        chapters: module.chapters.map((chapter) => ({
+          ...chapter,
+          lessons: chapter.lessons.map((lesson) => ({
+            ...lesson,
+            blocks: sanitizeContentBlocksForResponse(lesson.blocks),
+          })),
+        })),
+      })),
+      total,
+      pagination,
+    );
   }
 
   createLearningModule(input: LearningModuleInput, user: RequestUser) {

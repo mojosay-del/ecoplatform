@@ -6,7 +6,6 @@
 
 import { AudioMessagePlayer } from "../../components/AudioMessagePlayer";
 import { preferredFileAssetMediaUrl } from "../../lib/api";
-import { sanitizeParagraphHtml } from "../../lib/sanitize-html";
 import { MatchingPlayer, type MatchingPayload } from "./MatchingPlayer";
 import { QuizPlayer, type QuizPayload } from "./QuizPlayer";
 import { useFileAssets } from "./content-block-assets";
@@ -49,9 +48,8 @@ export function ContentBlocks({
         }
         if (block.type === "paragraph") {
           const html = (block.payload as { html: string }).html;
-          const safeHtml = sanitizeParagraphHtml(html);
-          // eslint-disable-next-line react/no-danger -- safeHtml прошёл render-time sanitizer перед вставкой CMS HTML.
-          return <div className="rendered-html" key={index} dangerouslySetInnerHTML={{ __html: safeHtml }} />;
+          // eslint-disable-next-line react/no-danger -- API отдаёт paragraph HTML после shared DOMPurify sanitizer.
+          return <div className="rendered-html" key={index} dangerouslySetInnerHTML={{ __html: html }} />;
         }
         if (block.type === "image") {
           const payload = block.payload as { fileId: string; caption?: string; altText?: string };

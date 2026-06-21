@@ -1,10 +1,10 @@
 import DOMPurify from "isomorphic-dompurify";
 
 // Единый whitelist для HTML, который ходит через content-block paragraph.
-// Используется и на сервере (перед записью в БД), и на клиенте (перед
-// рендером через dangerouslySetInnerHTML). Раньше код был задублирован
-// в apps/api/src/common и apps/web/src/lib — при расхождении whitelist
-// сервер сохранил бы безопасный HTML, а клиент отрендерил бы опасный.
+// Используется на сервере перед записью в БД и повторно на API-границе перед
+// отдачей legacy HTML во фронт. Раньше код был задублирован в
+// apps/api/src/common и apps/web/src/lib — при расхождении whitelist сервер
+// сохранил бы безопасный HTML, а клиент мог бы отрендерить опасный.
 //
 // `target="_blank"` принудительно дополняется `rel="noopener noreferrer"`
 // через afterSanitizeAttributes-hook (защита от tabnabbing). `style` оставлен

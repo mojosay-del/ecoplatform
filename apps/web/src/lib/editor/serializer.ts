@@ -21,9 +21,9 @@ export type EditorBlock = { type: string; payload: Record<string, unknown> };
  *   1) в КАЖДЫЙ payload добавляет служебный ключ `v: 1` (версия формата);
  *   2) у paragraph прогоняет html через sanitizeParagraphHtml.
  * Поэтому здесь отбрасываем `v` у всех блоков. Сам sanitizer намеренно не
- * импортируем: этот файл входит в client-graph редактора, а DOM/JSDOM-зависимый
- * sanitizer не должен попадать в SSR client-компонентов Next.js. Это форма
- * ТОЛЬКО для сравнения — на запись/рендер не влияет.
+ * импортируем: этот файл входит в client-graph редактора, а финальная очистка
+ * HTML выполняется на API-границе перед отдачей в web. Это форма ТОЛЬКО для
+ * сравнения — на запись/рендер не влияет.
  */
 export function canonicalizeBlocks(blocks: EditorBlock[]): EditorBlock[] {
   return blocks.map((block) => {

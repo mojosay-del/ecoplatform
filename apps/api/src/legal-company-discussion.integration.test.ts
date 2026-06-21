@@ -90,6 +90,25 @@ describe("Legal documents & consents", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("получение документа повторно санитизирует legacy body из БД", async () => {
+    await ctx.prisma.legalDocument.create({
+      data: {
+        type: LegalDocumentType.cookie_policy,
+        version: "9.1.0",
+        title: "Legacy cookies",
+        body: '<p onclick="alert(1)">Текст</p><script>alert(1)</script><a href="javascript:alert(1)" target="_blank">bad</a>',
+        isRequired: false,
+        isActive: true,
+        publishedAt: new Date(),
+      },
+    });
+
+    const res = await ctx.http.get("/api/legal/documents/cookie_policy/9.1.0");
+
+    expect(res.status).toBe(200);
+    expect(res.body.body).toBe('<p>Текст</p><a target="_blank" rel="noopener noreferrer">bad</a>');
+  });
+
   it("публичные legal endpoints отклоняют неизвестный тип и не отдают черновик", async () => {
     const invalidType = await ctx.http.get("/api/legal/documents/unknown_policy/1.0.0");
     expect(invalidType.status).toBe(400);

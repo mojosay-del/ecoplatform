@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { LegalDocumentDetail, LegalDocumentSummary, LegalDocumentType } from "@ecoplatform/shared";
-import { sanitizeParagraphHtml } from "../lib/sanitize-html";
 import "./legal-document.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
@@ -59,10 +58,7 @@ export async function LegalDocumentPage({ type }: { type: LegalDocumentType }) {
     );
   }
 
-  // sanitize-html на сервере перед dangerouslySetInnerHTML — двойная защита:
-  // body уже санитизирован на API при создании, но контент может прийти от
-  // старых документов или из seed. Здесь — финальный фильтр.
-  const safeHtml = sanitizeParagraphHtml(detail.body);
+  // body приходит из API уже после shared DOMPurify sanitizer.
   const publishedDate = detail.publishedAt ? new Date(detail.publishedAt).toLocaleDateString("ru-RU") : null;
 
   return (
@@ -75,8 +71,8 @@ export async function LegalDocumentPage({ type }: { type: LegalDocumentType }) {
         </div>
         {detail.summary ? <p className="legal-doc-summary">{detail.summary}</p> : null}
       </header>
-      {/* eslint-disable-next-line react/no-danger -- safeHtml прошёл render-time sanitizer прямо выше. */}
-      <div className="legal-doc-body" dangerouslySetInnerHTML={{ __html: safeHtml }} />
+      {/* eslint-disable-next-line react/no-danger -- API отдаёт body после shared DOMPurify sanitizer. */}
+      <div className="legal-doc-body" dangerouslySetInnerHTML={{ __html: detail.body }} />
     </section>
   );
 }

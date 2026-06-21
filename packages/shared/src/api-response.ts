@@ -496,8 +496,7 @@ export type AuthMeCompany = {
 // ── Legal documents & consents ────────────────────────────────────────────
 // Публичная карточка юр-документа: id текущей активной версии, заголовок,
 // summary краткого описания изменений, рендеримый HTML и флаг обязательности.
-// `body` отдаётся уже после серверной санитизации (DOMPurify в shared),
-// фронт ещё раз прогоняет через тот же sanitize-html — двойная защита.
+// `body` отдаётся уже после серверной санитизации (DOMPurify в shared).
 export type LegalDocumentSummary = {
   id: string;
   type: LegalDocumentType;

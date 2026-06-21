@@ -5,6 +5,7 @@ import type {
   DocumentationFileMeta,
   DocumentationNode,
 } from "@ecoplatform/shared";
+import { sanitizeContentBlocksForResponse } from "./content-block-response.helpers";
 
 // Узел документации в том виде, как он приходит из Prisma с подгруженными
 // связями (file/blocks/children/parent). Поля опциональны — каждый запрос
@@ -62,12 +63,14 @@ function fileMeta(file?: FileAsset | null): DocumentationFileMeta | null {
 }
 
 function mapBlocks(blocks?: DocumentationBlock[]) {
-  return (blocks ?? []).map((block) => ({
-    id: block.id,
-    position: block.position,
-    type: block.type,
-    payload: block.payload as Record<string, unknown>,
-  }));
+  return sanitizeContentBlocksForResponse(
+    (blocks ?? []).map((block) => ({
+      id: block.id,
+      position: block.position,
+      type: block.type,
+      payload: block.payload as Record<string, unknown>,
+    })),
+  );
 }
 
 export function mapDocumentationNode(

@@ -217,7 +217,7 @@ function toSummary(doc: LegalDocument): LegalDocumentSummary {
 function toDetail(doc: LegalDocument): LegalDocumentDetail {
   return {
     ...toSummary(doc),
-    body: doc.body,
+    body: sanitizeParagraphHtml(doc.body),
     isActive: doc.isActive,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),

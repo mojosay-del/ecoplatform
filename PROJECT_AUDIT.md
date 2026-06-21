@@ -295,7 +295,7 @@ CORS-allowlist с валидацией origin, многоуровневый thro
   - **Остаток (опц.):** A-3 (ISR detail-страниц) — ЗАКРЫТО отдельным коммитом `efc08709`.
   - **Исполнитель/заметка:** Claude.
 
-- [ ] **M-8. Самостоятельная активация подписки/триала выдаёт доступ БЕЗ оплаты (launch-blocker).**
+- [x] **M-8. Самостоятельная активация подписки/триала выдаёт доступ БЕЗ оплаты (launch-blocker).**
   `POST /api/billing/subscriptions` (`createSelfSubscriptionActivation`) и `POST /api/billing/trial` ставят компании
   `status=active` + `subscriptionEndsAt = now + 30 дней` без какой-либо оплаты (платёжный шлюз ещё не подключён —
   в коде прямой намёк: «Продление через оплату появится следующим шагом»). Владелец компании может активировать
@@ -313,20 +313,30 @@ CORS-allowlist с валидацией origin, многоуровневый thro
     НЕ баг, НЕ re-flag. Вернуться перед публичным/платным запуском: подключить оплату (Tinkoff webhook) ИЛИ
     закрыть self-activation фиче-флагом. До конца альфы — не трогать.
 
-- [ ] **M-9. Смена email подтверждается СТАРЫМ адресом, новый адрес не верифицируется.**
-  Поток `startContactChange → verifyContactChange → applyContactChange` (`account.service.ts`): код отправляется на
-  **текущий** email пользователя, а **новый** email приходит только на шаге `apply` и применяется без отправки кода
-  на него. Проверяется лишь занятость (`assertContactValueAvailable`).
-  - **Что хорошо:** это закрывает захват через угон сессии (код уходит на старую почту, которой у атакующего нет) —
-    хорошее свойство, его терять нельзя.
-  - **Риск (Medium):** пользователь/сессия может выставить email, которым НЕ владеет (опечатка или чужой адрес):
-    письма биллинга/уведомлений уходят не туда; если позже появится публичный forgot-password — непроверенный
-    email становится вектором захвата; лёгкая возможность «припарковать» чужой адрес.
-  - **Файлы:** `apps/api/src/account/account.service.ts:70-226`.
-  - **Проверка:** сменить email на адрес, к которому нет доступа → смена проходит без подтверждения нового адреса.
-  - **Фикс:** двухсторонняя верификация — код на **новый** адрес (подтверждение владения) + уведомление на **старый**
-    (алерт о смене). Телефон — аналогично, когда подключат SMS.
-  - **Исполнитель/заметка:**
+- [x] **M-9. Смена email подтверждается СТАРЫМ адресом, новый адрес не верифицируется.** ЗАКРЫТО (2026-06-21):
+  внедрена ДВУСТОРОННЯЯ верификация смены email, при этом старая защита (код на текущий адрес = защита от угона
+  сессии) СОХРАНЕНА.
+  - **Стало:** `start` (код на текущий email) → `verify` (подтверждение владения старым адресом, защита от угона
+    сессии — НЕ потеряна) → `apply` теперь НЕ применяет адрес сразу: валидирует занятость, запоминает новое значение
+    в challenge (`pendingValue`/`pendingCodeHash`) и шлёт код на **новый** адрес (`sendNewEmailVerificationCode`),
+    возвращая `{ requiresNewCode: true, email, expiresAt }` → новый шаг `POST /contact-change/confirm`
+    (`confirmContactChange`) проверяет код с нового адреса, применяет email и шлёт алерт на **старый** адрес
+    (`sendContactChangeAlert`). Итог: подтверждено владение обоими адресами + старый адрес уведомлён о смене.
+  - **Телефон:** SMS-верификации нового номера ещё нет → применяется сразу после подтверждения старой почтой, но
+    теперь тоже шлёт алерт на текущий email (готово к симметрии, когда подключат SMS — см. задел в коде/схеме).
+  - **Схема:** аддитивная миграция `20260621120000_account_contact_change_pending` (nullable `pendingValue`/
+    `pendingCodeHash` + `pendingAttempts Int @default(0)`). Анти-brute: отдельный счётчик попыток нового кода
+    (`EMAIL_VERIFICATION_MAX_ATTEMPTS`), TTL нового кода, SMTP-сбой нового кода откатывает pending-поля.
+  - **Файлы:** `account.service.ts` (apply/confirm), `account.controller.ts` (+`contact-change/confirm`),
+    `email.service.ts` (+`sendNewEmailVerificationCode`/`sendContactChangeAlert`),
+    `views/account/PersonalProfileContactDialog.tsx` (+шаг ввода кода с нового адреса), `user-endpoints.ts`.
+  - **Проверка:** typecheck ✓, web build ✓ (ISR-маршруты A-3 не съехали), api unit **199 ✓** (+3 новых:
+    apply email не применяет адрес/шлёт код на новый; confirm применяет + алерт на старый; неверный новый код →
+    попытка++ без применения); integration-тест переписан (apply→requiresNewCode, /me ещё старый, неверный новый
+    код не меняет, confirm применяет; занятый адрес → 409 на apply). Integration ЛОКАЛЬНО не прогнан — нет
+    тест-Postgres :5433 (docker недоступен в песочнице, на :5432 нет роли проекта); прогон в CI. Живьём в preview
+    не проверено — поток за авторизацией (ввод пароля запрещён) и требует SMTP для кода на новый адрес.
+  - **Исполнитель/заметка:** Claude.
 
 - [x] **M-10. Видеотранскодер: pending-видео из бэклога могут не перекодироваться никогда (starvation).**
   `video-transcode.service.ts:findNextPending` берёт только **50 самых свежих** видео
@@ -488,7 +498,9 @@ CORS-allowlist с валидацией origin, многоуровневый thro
     `pnpm format:check` ✓, `pnpm test` ✓ (shared 32 + web 238 + api 199), `pnpm build` ✓, `git diff --check` ✓.
   - **Исполнитель/заметка:** Codex.
 
-- [ ] **Q-2. Два независимых HTML-санитайзера (костыль jsdom-в-Next-SSR).**
+- [x] **Q-2. Два независимых HTML-санитайзера (костыль jsdom-в-Next-SSR).** ЗАКРЫТО (2026-06-21):
+  web regex-санитайзер удалён; финальная render-time очистка HTML теперь выполняется на серверной API-границе единым
+  shared DOMPurify sanitizer перед отдачей content-block paragraph и legal body во фронт.
   `packages/shared/sanitize-html.ts` (DOMPurify, 127 строк) + `apps/web/src/lib/sanitize-html.ts`
   (ручной regex, 164 строки). Web НЕ импортирует shared (jsdom ломал упаковку в Next SSR), whitelist'ы
   держатся в синхроне **вручную**, parity-теста нет → при расхождении web отрендерит то, что сервер бы вырезал.
@@ -496,7 +508,16 @@ CORS-allowlist с валидацией origin, многоуровневый thro
   - **Фикс (упрощение):** вынести рендер paragraph-HTML в маленький **server-компонент** (использует shared DOMPurify,
     клиенту санитайзер вообще не нужен) и отделить его от интерактивных блоков (quiz/matching = client). Если оставлять
     клиентский — добавить **parity-тест** whitelist'ов (как у `materials.ts` с `--material-*`), чтобы не разъехались.
-  - **Исполнитель/заметка:**
+  - **Стало:** добавлен `content-block-response.helpers.ts`; read-ответы news / documentation / knowledge-base /
+    learning прогоняют legacy paragraph HTML через shared sanitizer без изменения DTO. `LegalDocumentDetail.body`
+    также повторно санитизируется на API. `ContentBlocks.tsx` и `LegalDocumentPage.tsx` больше не импортируют
+    web-local sanitizer, `apps/web/src/lib/sanitize-html.ts` и его тест удалены, `serverExternalPackages` для
+    `isomorphic-dompurify/jsdom` убран из Next config.
+  - **Проверка:** `pnpm typecheck` ✓, `pnpm lint` ✓ (0 errors; текущие a11y/next-image warnings остаются),
+    api unit 202 ✓, shared unit 32 ✓, web unit 236 ✓, targeted integration
+    `content-news.integration.test.ts` + `legal-company-discussion.integration.test.ts` 30 ✓, `pnpm build` ✓,
+    `git diff --check` ✓.
+  - **Исполнитель/заметка:** Codex.
 
 - [ ] **Q-3. Блоки контента рендерятся через `as unknown as` без рантайм-валидации.**
   `ContentBlocks.tsx:160-163`: `block.payload as unknown as QuizPayload`/`MatchingPayload`. При этом в shared

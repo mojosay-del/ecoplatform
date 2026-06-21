@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Prisma } from "@prisma/client";
 import { setupIntegrationContext } from "./test/integration-context";
 
 const ctx = setupIntegrationContext();
@@ -17,6 +18,29 @@ describe("Content lifecycle: news", () => {
     const ids = response.body.items.map((item: { id: string }) => item.id);
     expect(ids).toContain(marketNews.id);
     expect(ids).not.toContain(otherNews.id);
+  });
+
+  it("публичная detail-выдача повторно санитизирует legacy paragraph HTML из БД", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800103");
+    const news = await ctx.createPublishedNews(adminToken, "legacy-unsafe-html", ["security"]);
+    const block = await ctx.prisma.newsContentBlock.findFirstOrThrow({
+      where: { newsPostId: news.id, type: "paragraph" },
+    });
+    await ctx.prisma.newsContentBlock.update({
+      where: { id: block.id },
+      data: {
+        payload: {
+          html: '<p onclick="alert(1)">Текст</p><script>alert(1)</script><a href="javascript:alert(1)" target="_blank">bad</a>',
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    const response = await ctx.http.get(`/api/news/${news.slug}`).set("Authorization", `Bearer ${reader.token}`);
+
+    expect(response.status).toBe(200);
+    const paragraph = response.body.blocks.find((item: { type: string }) => item.type === "paragraph");
+    expect(paragraph.payload.html).toBe('<p>Текст</p><a target="_blank" rel="noopener noreferrer">bad</a>');
   });
 
   it("delete новости полностью удаляет её и связанные данные", async () => {
