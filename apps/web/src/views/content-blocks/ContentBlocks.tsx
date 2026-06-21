@@ -49,13 +49,9 @@ export function ContentBlocks({
         }
         if (block.type === "paragraph") {
           const html = (block.payload as { html: string }).html;
-          return (
-            <div
-              className="rendered-html"
-              key={index}
-              dangerouslySetInnerHTML={{ __html: sanitizeParagraphHtml(html) }}
-            />
-          );
+          const safeHtml = sanitizeParagraphHtml(html);
+          // eslint-disable-next-line react/no-danger -- safeHtml прошёл render-time sanitizer перед вставкой CMS HTML.
+          return <div className="rendered-html" key={index} dangerouslySetInnerHTML={{ __html: safeHtml }} />;
         }
         if (block.type === "image") {
           const payload = block.payload as { fileId: string; caption?: string; altText?: string };

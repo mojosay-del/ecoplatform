@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, UserStatus } from "@prisma/client";
 import { AdminActionLogService } from "../../common/admin-action-log.service";
 import { paginatedResponse } from "../../common/pagination";

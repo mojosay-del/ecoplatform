@@ -89,16 +89,16 @@ export function normalizeLessonDraft(draft: LessonDraft) {
 }
 
 export function findChapter(modules: LearningModule[], chapterId: string): Chapter | null {
-  for (const module of modules) {
-    const chapter = module.chapters.find((candidate) => candidate.id === chapterId);
+  for (const learningModule of modules) {
+    const chapter = learningModule.chapters.find((candidate) => candidate.id === chapterId);
     if (chapter) return chapter;
   }
   return null;
 }
 
 export function findLesson(modules: LearningModule[], lessonId: string): Lesson | null {
-  for (const module of modules) {
-    for (const chapter of module.chapters) {
+  for (const learningModule of modules) {
+    for (const chapter of learningModule.chapters) {
       const lesson = chapter.lessons.find((candidate) => candidate.id === lessonId);
       if (lesson) return lesson;
     }

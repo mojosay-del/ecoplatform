@@ -277,7 +277,6 @@ export function ListingMap({
       mapRef.current?.destroy();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (failed || !DGIS_MAPS_KEY) {

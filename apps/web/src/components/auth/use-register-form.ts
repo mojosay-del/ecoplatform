@@ -122,7 +122,7 @@ export function useRegisterForm() {
     if (step !== "verification" || verificationPhase !== "typing") return;
     const firstEmptyIndex = verificationDigits.findIndex((digit) => digit === "");
     focusVerificationInput(firstEmptyIndex === -1 ? VERIFICATION_CODE_LENGTH - 1 : firstEmptyIndex);
-  }, [step, verification?.verificationId]);
+  }, [step, verification?.verificationId, verificationDigits, verificationPhase]);
 
   useEffect(() => {
     if (step !== "verification" || verificationPhase !== "typing" || !verification || !verificationIsComplete) return;
@@ -131,6 +131,8 @@ export function useRegisterForm() {
     }, VERIFICATION_AUTO_SUBMIT_DELAY_MS);
 
     return () => window.clearTimeout(timerId);
+    // confirmVerificationCode читает актуальные refs/timers; перезапускать таймер нужно только при смене кода или challenge.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, verification?.verificationId, verificationPhase, verificationCode, verificationIsComplete]);
 
   const setField: SetRegisterField = (field, value) => {

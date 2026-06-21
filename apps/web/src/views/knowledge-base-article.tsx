@@ -22,7 +22,7 @@ export function KnowledgeArticlePanel({ active, tree }: { active: KnowledgeArtic
   const activeCover = active.coverImageId ? covers.get(active.coverImageId) : null;
   const activeCoverUrl = preferredFileAssetImageUrl(activeCover);
   const shouldReserveActiveCover = Boolean(active.coverImageId || activeCoverUrl);
-  const blocks = active.blocks ?? [];
+  const blocks = useMemo(() => active.blocks ?? [], [active.blocks]);
   const articleImageIds = useMemo(() => {
     return Array.from(
       new Set([...(active.coverImageId ? [active.coverImageId] : []), ...collectContentBlockImageFileIds(blocks)]),

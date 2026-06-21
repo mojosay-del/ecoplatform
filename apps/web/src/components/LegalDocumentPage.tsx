@@ -75,6 +75,7 @@ export async function LegalDocumentPage({ type }: { type: LegalDocumentType }) {
         </div>
         {detail.summary ? <p className="legal-doc-summary">{detail.summary}</p> : null}
       </header>
+      {/* eslint-disable-next-line react/no-danger -- safeHtml прошёл render-time sanitizer прямо выше. */}
       <div className="legal-doc-body" dangerouslySetInnerHTML={{ __html: safeHtml }} />
     </section>
   );

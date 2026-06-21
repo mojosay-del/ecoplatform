@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { GraduationCap } from "lucide-react";
 import type { LearningChapterDetail, LearningModuleDetail, LessonDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
@@ -335,7 +335,7 @@ export function LessonView({
               <div className="lesson-side-card">
                 <div className="lesson-side-card-header">Прогресс модуля</div>
                 <div className="lesson-progress">
-                  <div className="lesson-progress-ring" style={{ ["--progress" as any]: progressPercent }}>
+                  <div className="lesson-progress-ring" style={{ "--progress": progressPercent } as CSSProperties}>
                     <span>{progressPercent}%</span>
                   </div>
                   <div className="lesson-progress-meta">

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { AuthMeUser, RegistrationResendDto, RegistrationVerifyDto } from "@ecoplatform/shared";
 import {
   apiFetch,
@@ -83,44 +83,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  async function loadMe(nextToken: string) {
+  const loadMe = useCallback(async (nextToken: string) => {
     const me = await apiFetch<User>("/auth/me", { token: nextToken });
     setUser(me);
-  }
+  }, []);
 
-  async function login(email: string, password: string, rememberMe = true) {
-    const result = await apiFetch<{ accessToken: string }>("/auth/login", {
-      method: "POST",
-      body: { email, password, rememberMe },
-    });
-    setAccessToken(result.accessToken);
-    await loadMe(result.accessToken);
-  }
+  const login = useCallback(
+    async (email: string, password: string, rememberMe = true) => {
+      const result = await apiFetch<{ accessToken: string }>("/auth/login", {
+        method: "POST",
+        body: { email, password, rememberMe },
+      });
+      setAccessToken(result.accessToken);
+      await loadMe(result.accessToken);
+    },
+    [loadMe],
+  );
 
-  async function register(input: Record<string, string | string[]>): Promise<RegistrationStartResult> {
+  const register = useCallback(async (input: Record<string, string | string[]>): Promise<RegistrationStartResult> => {
     return apiFetch<RegistrationStartResult>("/auth/register", {
       method: "POST",
       body: input,
     });
-  }
+  }, []);
 
-  async function resendRegistrationCode(input: RegistrationResendDto): Promise<RegistrationStartResult> {
+  const resendRegistrationCode = useCallback(async (input: RegistrationResendDto): Promise<RegistrationStartResult> => {
     return apiFetch<RegistrationStartResult>("/auth/register/resend", {
       method: "POST",
       body: input,
     });
-  }
+  }, []);
 
-  async function verifyRegistration(input: RegistrationVerifyDto) {
-    const result = await apiFetch<{ accessToken: string }>("/auth/register/verify", {
-      method: "POST",
-      body: input,
-    });
-    setAccessToken(result.accessToken);
-    await loadMe(result.accessToken);
-  }
+  const verifyRegistration = useCallback(
+    async (input: RegistrationVerifyDto) => {
+      const result = await apiFetch<{ accessToken: string }>("/auth/register/verify", {
+        method: "POST",
+        body: input,
+      });
+      setAccessToken(result.accessToken);
+      await loadMe(result.accessToken);
+    },
+    [loadMe],
+  );
 
-  async function logout() {
+  const logout = useCallback(async () => {
     if (token) {
       await apiFetch("/auth/logout", { method: "POST", token }).catch(() => undefined);
     }
@@ -128,19 +134,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Полный переход на /login: гарантированно сбрасывает любой кешированный
     // состояния React-страницы и не даёт пользователю остаться на защищённом url.
     window.location.assign("/login");
-  }
+  }, [token]);
 
-  async function refreshMe() {
+  const refreshMe = useCallback(async () => {
     if (token) {
       await loadMe(token).catch(() => {
         clearAccessToken();
       });
     }
-  }
+  }, [loadMe, token]);
 
   const value = useMemo(
     () => ({ token, user, ready, login, register, resendRegistrationCode, verifyRegistration, logout, refreshMe }),
-    [token, user, ready],
+    [login, logout, ready, refreshMe, register, resendRegistrationCode, token, user, verifyRegistration],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

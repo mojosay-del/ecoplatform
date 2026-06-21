@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { CompanyRole, CompanyStatus, NotificationCategory } from "@prisma/client";
+import { CompanyRole, CompanyStatus } from "@prisma/client";
 import { hash } from "bcryptjs";
 import { randomUUID } from "crypto";
 import {
@@ -66,7 +66,7 @@ export class AuthService {
 
   async register(
     input: RegisterDto,
-    meta: { userAgent?: string; ipAddress?: string },
+    _meta: { userAgent?: string; ipAddress?: string },
   ): Promise<RegistrationVerificationStart> {
     const prepared = await this.prepareRegistration(input);
     const now = new Date();

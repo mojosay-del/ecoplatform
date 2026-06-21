@@ -21,16 +21,16 @@ export function DetailPanel({
     return <p className="page-subtitle">Выберите модуль, главу или урок слева.</p>;
   }
   if (selection.kind === "module") {
-    const module = modules.find((candidate) => candidate.id === selection.id);
-    if (!module) return <p className="page-subtitle">Модуль не найден.</p>;
-    return <ModuleForm module={module} onMutate={onMutate} onSelect={onSelect} />;
+    const learningModule = modules.find((candidate) => candidate.id === selection.id);
+    if (!learningModule) return <p className="page-subtitle">Модуль не найден.</p>;
+    return <ModuleForm module={learningModule} onMutate={onMutate} onSelect={onSelect} />;
   }
   if (selection.kind === "chapter") {
     const chapter = findChapter(modules, selection.id);
     if (!chapter) return <p className="page-subtitle">Глава не найдена.</p>;
-    const module = modules.find((candidate) => candidate.id === chapter.moduleId);
-    if (!module) return <p className="page-subtitle">Модуль главы не найден.</p>;
-    return <ChapterForm chapter={chapter} module={module} onMutate={onMutate} onSelect={onSelect} />;
+    const learningModule = modules.find((candidate) => candidate.id === chapter.moduleId);
+    if (!learningModule) return <p className="page-subtitle">Модуль главы не найден.</p>;
+    return <ChapterForm chapter={chapter} module={learningModule} onMutate={onMutate} onSelect={onSelect} />;
   }
   const lesson = findLesson(modules, selection.id);
   if (!lesson) return <p className="page-subtitle">Урок не найден.</p>;

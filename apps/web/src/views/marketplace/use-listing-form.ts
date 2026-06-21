@@ -93,10 +93,11 @@ export function useListingForm(listingId?: string) {
   }
 
   useEffect(() => {
+    const draftUploadFileIds = draftUploadFileIdsRef.current;
     return () => {
       if (!cleanupDraftUploadsRef.current) return;
-      const fileIds = Array.from(draftUploadFileIdsRef.current);
-      draftUploadFileIdsRef.current.clear();
+      const fileIds = Array.from(draftUploadFileIds);
+      draftUploadFileIds.clear();
       fileIds.forEach((fileId) => {
         void apiDeleteFile(fileId).catch(() => undefined);
       });

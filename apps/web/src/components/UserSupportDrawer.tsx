@@ -53,6 +53,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
       api.support.listMyTickets({ limit, offset }) as Promise<{ items: Ticket[]; total: number; hasMore: boolean }>,
   );
   const tickets = ticketsQuery.items;
+  const reloadTickets = ticketsQuery.reload;
 
   useDialogA11y(drawerRef, { bodyLock: true, enabled: open, onEscape: onClose, restoreFocus: true });
 
@@ -61,10 +62,10 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
   // список обновится.
   useEffect(() => {
     if (!open) return;
-    const handler = () => ticketsQuery.reload();
+    const handler = () => reloadTickets();
     window.addEventListener("support:changed", handler);
     return () => window.removeEventListener("support:changed", handler);
-  }, [open, ticketsQuery.reload]);
+  }, [open, reloadTickets]);
 
   const createTicket = useMutation({
     mutationFn: (input: { category: string; subject: string; text: string }) => api.support.createTicket(input),

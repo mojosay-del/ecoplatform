@@ -61,7 +61,8 @@ personal-data — обязательные, cookies / offer — опционал
 ## Проверки
 
 ```bash
-pnpm lint              # tsc --noEmit во всех пакетах
+pnpm typecheck         # tsc --noEmit во всех пакетах
+pnpm lint              # ESLint: TS, React Hooks, a11y и XSS/security-барьеры
 pnpm test              # unit-тесты (shared / web / api)
 pnpm test:integration  # integration-тесты api против реальной PostgreSQL
 pnpm build             # tsc + next build

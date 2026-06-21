@@ -26,7 +26,7 @@ type MatchingLine = {
 };
 
 export function MatchingPlayer({ payload }: { payload: MatchingPayload }) {
-  const pairs = payload.pairs ?? [];
+  const pairs = useMemo(() => payload.pairs ?? [], [payload.pairs]);
   const pairsKey = useMemo(() => pairs.map((pair) => `${pair.left}${pair.right}`).join(""), [pairs]);
   const [rightOptions, setRightOptions] = useState<MatchingRightOption[]>(() => createMatchingOptions(pairs));
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -46,7 +46,7 @@ export function MatchingPlayer({ payload }: { payload: MatchingPayload }) {
     setDragFrom(null);
     setPreviewLine(null);
     setChecked(false);
-  }, [pairsKey]);
+  }, [pairs, pairsKey]);
 
   const rightOptionById = useMemo(() => new Map(rightOptions.map((option) => [option.id, option])), [rightOptions]);
   const rightToLeft = useMemo(() => {

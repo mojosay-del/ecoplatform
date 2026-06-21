@@ -119,7 +119,7 @@ export function NewsModal({
       settled = true;
       cleanups.forEach((cleanup) => cleanup());
     };
-  }, [state, post?.id, slug]);
+  }, [post, state, slug]);
 
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

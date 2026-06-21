@@ -32,7 +32,8 @@
 | Действие | Команда |
 |---|---|
 | Установка | `pnpm install --frozen-lockfile` |
-| Типы всего репо | `pnpm lint` (= `tsc --noEmit`) / `pnpm typecheck` |
+| Типы всего репо | `pnpm typecheck` (`tsc --noEmit`) |
+| ESLint | `pnpm lint` |
 | Unit (все пакеты) | `pnpm test` |
 | Integration (нужен Postgres) | `pnpm --filter @ecoplatform/api test:integration` |
 | Сборка | `pnpm build` |
@@ -464,7 +465,8 @@ CORS-allowlist с валидацией origin, многоуровневый thro
 > практически нет TODO/FIXME, зависимости свежайшие (Next 16, React 19, Nest 11, Prisma 6, zod 4, TS 5.9).
 > Ниже — точечные упрощения «костылей» и пробелы по современным стандартам, без потери качества/безопасности.
 
-- [ ] **Q-1. ESLint не подключён вообще (главный пробел стандартов).**
+- [x] **Q-1. ESLint не подключён вообще (главный пробел стандартов).** ЗАКРЫТО (2026-06-21):
+  подключён настоящий ESLint flat-config вместо `lint = tsc`.
   `lint` во всех пакетах = `tsc --noEmit` (это typecheck, не линт). Нет `eslint.config.*`/`.eslintrc`, нет
   зависимости eslint. Следствия: 12 комментариев `// eslint-disable-next-line react-hooks/exhaustive-deps`
   **мёртвые** (никто их не проверяет); нет автопроверок класса, который TS+Prettier не ловят — `react-hooks`
@@ -474,7 +476,17 @@ CORS-allowlist с валидацией origin, многоуровневый thro
   - **Фикс:** flat-config ESLint (`eslint.config.mjs`) с `@typescript-eslint`, `eslint-plugin-react-hooks`,
     `eslint-plugin-jsx-a11y`, опц. `eslint-plugin-security`; `lint` = `eslint .` (typecheck оставить отдельным
     `typecheck`); включить в CI. Затем пройти живые предупреждения exhaustive-deps (часть уйдёт вместе с H-1).
-  - **Исполнитель/заметка:**
+  - **Стало:** root `eslint.config.mjs`; `lint` в пакетах = `eslint .`, `typecheck` оставлен отдельным `tsc`;
+    CI разделён на `pnpm typecheck` и `pnpm lint`; README/web README обновлены. Подключены
+    `@typescript-eslint/no-floating-promises`, `react-hooks/rules-of-hooks` + `exhaustive-deps` как hard-error,
+    `jsx-a11y` в warning-режиме (карта для M-6), `@next/next`, `react/no-danger`, `no-eval`/`no-implied-eval`/
+    `no-new-func`, `no-unsanitized`.
+  - **Живые фиксы:** убраны/уточнены текущие `exhaustive-deps` срабатывания, добавлены точечные разрешения
+    `react/no-danger` только рядом с render-time sanitizer, убран один `as any`, исправлены `module`-переменные
+    под Next lint.
+  - **Проверка:** `pnpm lint` ✓ (0 errors; текущие a11y/next-image замечания остаются warnings), `pnpm typecheck` ✓,
+    `pnpm format:check` ✓, `pnpm test` ✓ (shared 32 + web 238 + api 199), `pnpm build` ✓, `git diff --check` ✓.
+  - **Исполнитель/заметка:** Codex.
 
 - [ ] **Q-2. Два независимых HTML-санитайзера (костыль jsdom-в-Next-SSR).**
   `packages/shared/sanitize-html.ts` (DOMPurify, 127 строк) + `apps/web/src/lib/sanitize-html.ts`

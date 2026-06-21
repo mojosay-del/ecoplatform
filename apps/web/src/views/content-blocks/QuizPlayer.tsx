@@ -12,7 +12,7 @@ export type QuizPayload = {
 };
 
 export function QuizPlayer({ payload }: { payload: QuizPayload }) {
-  const options = payload.options ?? [];
+  const options = useMemo(() => payload.options ?? [], [payload.options]);
   const multiple = Boolean(payload.multiple);
   const [selected, setSelected] = useState<number[]>([]);
   const [checked, setChecked] = useState(false);

@@ -7,7 +7,7 @@
 // и заданным aspect-ratio (.education-card-cover, .news-tile-cover и т.п.).
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./cover.css";
 
 export function CoverImage({
@@ -35,12 +35,12 @@ export function CoverImage({
     onLoadSettledRef.current = onLoadSettled;
   }, [onLoadSettled]);
 
-  function settleImage() {
+  const settleImage = useCallback(() => {
     setLoadedSrc(src);
     if (settledSrcRef.current === src) return;
     settledSrcRef.current = src;
     onLoadSettledRef.current?.();
-  }
+  }, [src]);
 
   // Картинка из кеша могла догрузиться ещё до навешивания onLoad (особенно при
   // гидрации) — тогда событие не сработает и обложка осталась бы скрытой.
@@ -49,7 +49,7 @@ export function CoverImage({
     if (ref.current?.complete) {
       settleImage();
     }
-  }, [src]);
+  }, [settleImage]);
 
   return (
     <>

@@ -83,7 +83,8 @@ export { AdminUsersView } from "./AdminUsersView";
 ## Проверки перед коммитом
 
 ```bash
-pnpm --filter @ecoplatform/web lint   # tsc --noEmit (типы)
+pnpm --filter @ecoplatform/web typecheck # tsc --noEmit (типы)
+pnpm --filter @ecoplatform/web lint      # ESLint (React Hooks, a11y, security)
 pnpm --filter @ecoplatform/web test   # vitest
 pnpm exec prettier --write <изменённые файлы>
 ```

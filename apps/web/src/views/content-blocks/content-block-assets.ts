@@ -39,7 +39,7 @@ export function useFileAssets(blocks: RenderableBlock[]) {
     return () => {
       isActive = false;
     };
-  }, [ids.length, idsKey, token]);
+  }, [ids, ids.length, idsKey, token]);
 
   return { assets, isLoading };
 }

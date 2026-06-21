@@ -11,7 +11,7 @@ import { TrendArrow } from "./TrendChip";
 import type { IndexPeriod } from "./types";
 
 export function IndexCard({ item }: { item: NomenclatureListItem }) {
-  const chart = item.chart ?? {};
+  const chart = useMemo(() => item.chart ?? {}, [item.chart]);
 
   // Стартовый период подбираем под данные: индексы обновляются редко, и в коротком
   // окне (3 мес.) у номенклатуры бывает всего 1 точка — тогда график вырождался в

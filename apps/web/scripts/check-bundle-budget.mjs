@@ -14,7 +14,7 @@
 // Детальный per-chunk разбор — в .next/analyze/*.html (`pnpm analyze`).
 
 import { gzipSync } from "node:zlib";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 

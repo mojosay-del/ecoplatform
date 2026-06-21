@@ -1,4 +1,4 @@
-# CI для PR/push в main. Запускает lint + prettier-check + unit-тесты + сборку.
+# CI для PR/push в main. Запускает typecheck + ESLint + prettier-check + unit-тесты + сборку.
 # Integration-тесты выполняются отдельным job с поднятым Postgres.
 # Security-audit (pnpm audit) — отдельный job, падает только на high/critical.
 name: CI
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   static-checks:
-    name: lint + format-check + unit-tests + build
+    name: typecheck + eslint + format-check + unit-tests + build
     runs-on: ubuntu-latest
     if: github.event_name != 'deployment_status'
     steps:
@@ -42,7 +42,10 @@ jobs:
       - name: Prettier check
         run: pnpm format:check
 
-      - name: TypeScript (tsc --noEmit) lint
+      - name: TypeScript typecheck (tsc --noEmit)
+        run: pnpm typecheck
+
+      - name: ESLint
         run: pnpm lint
 
       - name: Unit tests (vitest)
