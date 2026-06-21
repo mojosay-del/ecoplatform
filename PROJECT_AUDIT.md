@@ -218,7 +218,11 @@ CORS-allowlist с валидацией origin, многоуровневый thro
         self-subscription / trial разнесены в три соседних helper-файла одного домена. Codex 2026-06-21;
         проверки: api typecheck ✓, root lint ✓, api unit 199 ✓, targeted integration 14 ✓, format ✓,
         diff-check ✓.
-  - [ ] `auth/auth-data-export.service.ts` (423) — GDPR-экспорт: сбор по доменам вынести в `*.helpers`, сервис — оркестратор.
+  - [x] `auth/auth-data-export.service.ts` (423 → 87) — GDPR-экспорт оставлен тонким оркестратором,
+        сбор profile/company/session/communication/content/governance и сборка ZIP вынесены в соседние
+        `auth-data-export-*.helpers.ts` без смены endpoint/архива. Codex 2026-06-21; проверки:
+        api typecheck ✓, root lint ✓, api unit 199 ✓, targeted integration export-data 11 ✓,
+        format ✓, diff-check ✓.
   - [ ] `marketplace/services/marketplace-listings.service.ts` (422) — `mapToDetail`/фильтры/гео-логику в helpers.
   - [ ] `moderation/moderation-case.helpers.ts` (421) — *borderline (уже helpers)*: дробить по типам кейсов только если
         реально облегчает чтение.
