@@ -214,8 +214,10 @@ CORS-allowlist с валидацией origin, многоуровневый thro
         пропущен: локальный `.env` содержит активные S3/SMTP ключи (значения не выводились).
 
   **Backend (`apps/api/src/`):**
-  - [ ] `billing/billing-activation.helpers.ts` (448) — разнести по под-операциям (trial / self-subscription / manual)
-        в отдельные helper-файлы одного домена.
+  - [x] `billing/billing-activation.helpers.ts` (448 → 3) — старый путь оставлен фасадом, manual /
+        self-subscription / trial разнесены в три соседних helper-файла одного домена. Codex 2026-06-21;
+        проверки: api typecheck ✓, root lint ✓, api unit 199 ✓, targeted integration 14 ✓, format ✓,
+        diff-check ✓.
   - [ ] `auth/auth-data-export.service.ts` (423) — GDPR-экспорт: сбор по доменам вынести в `*.helpers`, сервис — оркестратор.
   - [ ] `marketplace/services/marketplace-listings.service.ts` (422) — `mapToDetail`/фильтры/гео-логику в helpers.
   - [ ] `moderation/moderation-case.helpers.ts` (421) — *borderline (уже helpers)*: дробить по типам кейсов только если
