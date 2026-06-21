@@ -178,8 +178,10 @@ CORS-allowlist с валидацией origin, многоуровневый thro
         состояние/OTP/submit → `use-register-form`, чистая логика → `register-form.helpers` (+unit), кнопки и
         закрытая регистрация → малые presentational-компоненты. Codex 2026-06-21; проверки:
         web tsc ✓, web unit 222 ✓, root lint ✓, live `/register` desktop/375/OTP ✓.
-  - [ ] `views/admin/companies/AdminCompaniesView.tsx` (471) — таблица+фильтры+модалка: строку/модалку в под-компоненты,
-        данные+мутации в `use-admin-companies` (react-query уже заведён в проекте).
+  - [x] `views/admin/companies/AdminCompaniesView.tsx` (471 → 112) — таблица/строка/фильтры/detail-panel/form статуса
+        вынесены в малые соседние компоненты, данные+мутация статуса — в `use-admin-companies` на react-query.
+        Codex 2026-06-21; проверки: web tsc ✓, root lint ✓, web unit 222 ✓, format ✓, diff-check ✓.
+        Live `/admin/companies` пропущен: локальный `.env` содержит prod-like S3/storage и SMTP/mail признаки.
   - [ ] `views/account/AccountView.tsx` (460) — секции профиля в под-компоненты, состояние секций в хуки.
   - [ ] `views/admin/staff/AdminStaffView.tsx` (457) — как companies: под-компоненты строки/инвайта + хук данных.
   - [ ] `views/marketplace/ListingModal.tsx` (424) — крупная модалка: подсекции (галерея/инфо/форма ставки) в под-компоненты.
