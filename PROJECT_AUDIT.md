@@ -182,7 +182,11 @@ CORS-allowlist с валидацией origin, многоуровневый thro
         вынесены в малые соседние компоненты, данные+мутация статуса — в `use-admin-companies` на react-query.
         Codex 2026-06-21; проверки: web tsc ✓, root lint ✓, web unit 222 ✓, format ✓, diff-check ✓.
         Live `/admin/companies` пропущен: локальный `.env` содержит prod-like S3/storage и SMTP/mail признаки.
-  - [ ] `views/account/AccountView.tsx` (460) — секции профиля в под-компоненты, состояние секций в хуки.
+  - [x] `views/account/AccountView.tsx` (460 → 157) — секции профиля оставлены в тонком контейнере,
+        состояние/URL-модалки/scroll-spy/security/data-privacy/notification-preferences вынесены в соседние
+        `use-account-*` хуки без смены поведения. Codex 2026-06-21; проверки: web tsc ✓, root lint ✓,
+        web unit 222 ✓, format ✓, diff-check ✓. Live `/account/*` пропущен: локальный `.env` содержит
+        prod-like S3/storage и SMTP/mail признаки.
   - [ ] `views/admin/staff/AdminStaffView.tsx` (457) — как companies: под-компоненты строки/инвайта + хук данных.
   - [ ] `views/marketplace/ListingModal.tsx` (424) — крупная модалка: подсекции (галерея/инфо/форма ставки) в под-компоненты.
   - [ ] `components/AudioMessagePlayer.tsx` (420) — логику воспроизведения в `use-audio-player`, презентацию отдельно.
