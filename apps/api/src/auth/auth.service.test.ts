@@ -227,6 +227,51 @@ describe("AuthService registration email", () => {
     );
   });
 
+  it("при занятом контакте отвечает тем же шагом и шлёт уведомление вместо кода (L-6)", async () => {
+    const prisma = {
+      user: {
+        findFirst: vi.fn().mockResolvedValue({ email: "taken@example.test" }),
+      },
+      legalDocument: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      emailVerificationChallenge: {
+        updateMany: vi.fn(),
+        create: vi.fn(),
+      },
+    };
+    const email = {
+      sendRegistrationCode: vi.fn(),
+      sendExistingAccountNotice: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = createService(prisma, email);
+
+    const result = await service.register(
+      {
+        organizationName: "ООО Дубль",
+        companyType: "collector",
+        firstName: "Иван",
+        lastName: "Петров",
+        phone: "+79990000002",
+        email: "Taken@Example.Test",
+        password: "Password12345",
+        acceptedDocumentIds: [],
+      },
+      { userAgent: "test" },
+    );
+
+    // Ответ неотличим от обычной заявки: тот же шаг ввода кода.
+    expect(result).toEqual({
+      verificationId: expect.any(String),
+      email: "taken@example.test",
+      expiresAt: expect.any(String),
+    });
+    // Кода нет — уходит уведомление на занятый адрес, заявка не сохраняется.
+    expect(email.sendExistingAccountNotice).toHaveBeenCalledWith({ to: "taken@example.test" });
+    expect(email.sendRegistrationCode).not.toHaveBeenCalled();
+    expect(prisma.emailVerificationChallenge.create).not.toHaveBeenCalled();
+  });
+
   it("не возвращает verificationId, если SMTP не принял письмо", async () => {
     const prisma = {
       user: {

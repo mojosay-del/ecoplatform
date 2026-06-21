@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { CompanyRole, CompanyStatus, NotificationCategory } from "@prisma/client";
 import { hash } from "bcryptjs";
@@ -69,10 +69,28 @@ export class AuthService {
     meta: { userAgent?: string; ipAddress?: string },
   ): Promise<RegistrationVerificationStart> {
     const prepared = await this.prepareRegistration(input);
-    const verificationId = randomUUID();
-    const code = generateEmailVerificationCode();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS);
+
+    // L-6: ответ на заявку ОДИНАКОВ вне зависимости от занятости email/телефона
+    // (анти-enumeration). Невалидный пароль/документы по-прежнему отдают 400 —
+    // это не утечка существования аккаунта, а валидация ввода.
+    const existing = await this.prisma.user.findFirst({
+      where: { OR: [{ email: prepared.email }, { phone: input.phone }] },
+      select: { email: true },
+    });
+
+    if (existing) {
+      // Контакт занят: кода НЕ шлём и заявку не сохраняем — вместо этого
+      // уведомляем владельца занятого адреса письмом. Клиент получает тот же
+      // шаг «введите код», но verificationId никуда не ведёт (verify → «код
+      // устарел»), поэтому со стороны заявителя поведение неотличимо.
+      await this.email.sendExistingAccountNotice({ to: existing.email });
+      return { verificationId: randomUUID(), email: prepared.email, expiresAt: expiresAt.toISOString() };
+    }
+
+    const verificationId = randomUUID();
+    const code = generateEmailVerificationCode();
 
     await this.prisma.emailVerificationChallenge.updateMany({
       where: {
@@ -182,7 +200,10 @@ export class AuthService {
     });
 
     if (existing) {
-      throw new ConflictException("Пользователь с такой почтой или телефоном уже зарегистрирован.");
+      // Контакт занят (редкая гонка: заняли между заявкой и подтверждением).
+      // Не раскрываем занятость — отвечаем generic-сообщением, как при
+      // протухшем коде (L-6).
+      throw new BadRequestException("Код устарел. Отправьте новый код подтверждения.");
     }
 
     const consentDocumentIds = await this.resolveRegistrationConsentDocumentIds(challenge.acceptedDocumentIds);
@@ -260,16 +281,8 @@ export class AuthService {
       throw new ForbiddenException("Регистрация новых пользователей временно отключена.");
     }
 
-    const existing = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ email: input.email.toLowerCase() }, { phone: input.phone }],
-      },
-    });
-
-    if (existing) {
-      throw new ConflictException("Пользователь с такой почтой или телефоном уже зарегистрирован.");
-    }
-
+    // Занятость email/телефона здесь НЕ проверяем — это делает register() через
+    // единообразную ветку (L-6, анти-enumeration). Тут только валидация ввода.
     await this.passwordPolicy.assertAcceptablePassword(input.password);
     const passwordHash = await hash(input.password, 12);
 

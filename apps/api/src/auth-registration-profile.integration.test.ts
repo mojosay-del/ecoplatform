@@ -276,7 +276,7 @@ describe("Auth — регистрация и профиль", () => {
     expect(conflict.status).toBe(409);
   });
 
-  it("повторная регистрация с тем же email отбивается 409", async () => {
+  it("повторная регистрация с тем же email не раскрывает занятость (L-6)", async () => {
     await registerCompany("0000002");
     const dup = await ctx.http.post("/api/auth/register").send({
       organizationName: "ООО Дубль",
@@ -288,7 +288,19 @@ describe("Auth — регистрация и профиль", () => {
       password: "User12345678",
       acceptedDocumentIds: REQUIRED_DOC_IDS_FOR_TESTS,
     });
-    expect(dup.status).toBe(409);
+    // Анти-enumeration: ответ как при обычной заявке (201), а не 409.
+    expect(dup.status).toBe(201);
+    expect(dup.body.verificationId).toEqual(expect.any(String));
+    expect(dup.body.email).toBe("user0000002@test.local");
+
+    // Но кода нет — попытка подтвердить «фантомную» заявку проваливается,
+    // второй аккаунт на этот email не создаётся.
+    const verify = await ctx.http
+      .post("/api/auth/register/verify")
+      .send({ verificationId: dup.body.verificationId, code: TEST_EMAIL_VERIFICATION_CODE });
+    expect(verify.status).toBe(400);
+    const users = await ctx.prisma.user.findMany({ where: { email: "user0000002@test.local" } });
+    expect(users).toHaveLength(1);
   });
 
   it("регистрация не принимает ИНН: реквизиты заполняются в профиле компании", async () => {

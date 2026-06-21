@@ -66,6 +66,38 @@ export class EmailService {
     });
   }
 
+  // L-6: уведомление на ЗАНЯТЫЙ адрес, когда кто-то пытается зарегистрироваться
+  // с уже существующим email/телефоном. Сама заявка отвечает одинаково (анти-
+  // enumeration), поэтому занятость контакта раскрывается только владельцу
+  // адреса — письмом, а не HTTP-ответом. SMTP-сбой бросает ту же ошибку, что и
+  // код подтверждения, чтобы ответ на заявку не отличался по поведению.
+  async sendExistingAccountNotice(input: { to: string }): Promise<void> {
+    if (this.deliveryDisabled()) {
+      return;
+    }
+
+    const config = this.smtpConfig();
+    const transporter = this.getTransporter(config);
+    const lines = [
+      "Кто-то попытался зарегистрироваться на ЭкоПлатформе, указав ваш email или телефон.",
+      "Если это были вы — у вас уже есть аккаунт. Войдите или восстановите пароль.",
+      "Если это были не вы — никаких действий не требуется, ваш аккаунт в безопасности.",
+    ];
+
+    try {
+      await this.sendMailWithTimeout(transporter, config.sendTimeoutMs, {
+        from: config.from,
+        to: input.to,
+        subject: "Попытка регистрации с вашими данными",
+        text: lines.join("\n"),
+        html: lines.map((line) => `<p>${line}</p>`).join(""),
+      });
+    } catch (error) {
+      this.logger.warn(`SMTP existing-account notice failed: ${smtpErrorCode(error)}`);
+      throw new ServiceUnavailableException("Не удалось отправить код подтверждения. Попробуйте ещё раз через минуту.");
+    }
+  }
+
   private async sendVerificationCode(
     input: RegistrationCodeEmail & {
       subject: string;
