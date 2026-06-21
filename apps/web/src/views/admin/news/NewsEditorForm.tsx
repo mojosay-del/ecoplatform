@@ -119,7 +119,7 @@ export function NewsEditorForm({
         onTagDraftChange={onTagDraftChange}
       />
 
-      <label className="form-field news-content-field" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+      <label className="form-field news-content-field news-content-field--inline">
         <input
           type="checkbox"
           checked={draft.pinnedInForum}

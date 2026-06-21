@@ -25,7 +25,7 @@ export function NewsSection() {
                       alt=""
                       fill
                       sizes="(max-width: 980px) 90vw, 18vw"
-                      style={{ objectFit: "cover" }}
+                      className="u-object-cover"
                     />
                   </div>
                   <div className="lp-news-tile__body">

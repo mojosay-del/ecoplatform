@@ -70,7 +70,7 @@ export function ForumAskView() {
             <Search size={20} />
             <span>
               Сначала поищите — возможно, на ваш вопрос уже есть решённый ответ.{" "}
-              <Link href="/forum" style={{ textDecoration: "underline" }}>
+              <Link href="/forum" className="u-underline">
                 Открыть поиск
               </Link>
             </span>

@@ -253,6 +253,10 @@
   border-radius: 12px;
   background: var(--surface, #fff);
 }
+/* Строка «мои предложения» — без колонки обложки (ранее inline). */
+.mp-row--offer {
+  grid-template-columns: 1fr auto;
+}
 
 .mp-row-cover {
   width: 64px;
@@ -283,6 +287,10 @@
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+/* Действия строки, выровненные по левому краю (ранее inline). */
+.mp-row-actions--start {
+  justify-content: flex-start;
 }
 
 .mp-row-status {

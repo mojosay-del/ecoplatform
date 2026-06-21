@@ -44,7 +44,7 @@ export function KnowledgeSection() {
                     alt=""
                     fill
                     sizes="(max-width: 980px) 90vw, 30vw"
-                    style={{ objectFit: "cover" }}
+                    className="u-object-cover"
                   />
                 </div>
                 <p className="lp-kb__lead">Виды, требования к приёму, влажность и подготовка к переработке.</p>

@@ -57,7 +57,7 @@ export function KnowledgeCategoryNode({
                   onSelect={onSelect}
                 />
               ))}
-              <li className="tree-add-row" style={{ paddingLeft: 44 }}>
+              <li className="tree-add-row is-indent">
                 <button type="button" className="tree-add-button" onClick={onAddMaterial}>
                   <Plus size={14} /> Материал
                 </button>

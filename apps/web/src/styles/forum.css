@@ -1015,6 +1015,10 @@ section.forum-page .forum-expert-rank {
   gap: 18px;
   max-width: 680px;
 }
+/* Форма засева вопроса (admin) — без ограничения ширины (ранее inline). */
+.forum-form--seed {
+  max-width: none;
+}
 .forum-fgroup {
   display: flex;
   flex-direction: column;

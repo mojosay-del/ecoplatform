@@ -181,7 +181,7 @@ export function NewsView() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
+          <p className="page-subtitle u-text-center u-py-60">
             {isNewsSearching
               ? `По запросу «${activeNewsSearchQuery}» ничего не найдено.`
               : selectedTags.length > 0
@@ -208,16 +208,8 @@ export function NewsView() {
           </div>
         )}
         <div ref={sentinelRef} aria-hidden="true" />
-        {isLoadingMore ? (
-          <p className="page-subtitle" style={{ textAlign: "center" }}>
-            Загружаем ещё…
-          </p>
-        ) : null}
-        {!hasMore && items.length > 0 ? (
-          <p className="page-subtitle" style={{ textAlign: "center" }}>
-            Это все записи.
-          </p>
-        ) : null}
+        {isLoadingMore ? <p className="page-subtitle u-text-center">Загружаем ещё…</p> : null}
+        {!hasMore && items.length > 0 ? <p className="page-subtitle u-text-center">Это все записи.</p> : null}
       </section>
       {openedSlug ? <NewsModal slug={openedSlug} onClose={closePost} onPostUpdate={updatePostInFeed} /> : null}
     </AppShell>

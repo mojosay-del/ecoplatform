@@ -150,7 +150,7 @@ export function LessonView({
         <section className="page">
           <PageHeader title="Урок" />
           <div className="page-skeleton-body page-skeleton-article" aria-busy="true">
-            <div className="page-skeleton-card" style={{ minHeight: 260 }} />
+            <div className="page-skeleton-card u-minh-260" />
             <div className="page-skeleton-bar w-3-4" />
             <div className="page-skeleton-bar w-full" />
             <div className="page-skeleton-bar w-full" />
@@ -276,7 +276,7 @@ export function LessonView({
               <ContentBlocks blocks={lessonContentBlocks} />
             </div>
             {!preview ? (
-              <div className="form-actions lesson-actions" style={{ marginTop: 24 }}>
+              <div className="form-actions lesson-actions u-mt-24">
                 <div className="lesson-actions-left">
                   <Link className="button secondary" href={moduleHref}>
                     ← К модулю
@@ -314,7 +314,7 @@ export function LessonView({
                 </div>
               </div>
             ) : (
-              <div className="form-actions lesson-actions" style={{ marginTop: 24 }}>
+              <div className="form-actions lesson-actions u-mt-24">
                 <div className="lesson-actions-left">
                   <Link className="button secondary" href={moduleHref}>
                     ← К модулю

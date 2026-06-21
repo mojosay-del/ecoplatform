@@ -78,19 +78,11 @@ export function MarketplaceFeedList({
         ))}
       </div>
       <div ref={sentinelRef} aria-hidden="true" />
-      <p className="page-subtitle" style={{ textAlign: "center", marginTop: 18 }}>
+      <p className="page-subtitle u-text-center u-mt-18">
         Показано {loadedCount} из {total}
       </p>
-      {isLoadingMore ? (
-        <p className="page-subtitle" style={{ textAlign: "center" }}>
-          Загружаем ещё…
-        </p>
-      ) : null}
-      {!hasMore ? (
-        <p className="page-subtitle" style={{ textAlign: "center" }}>
-          Это все объявления.
-        </p>
-      ) : null}
+      {isLoadingMore ? <p className="page-subtitle u-text-center">Загружаем ещё…</p> : null}
+      {!hasMore ? <p className="page-subtitle u-text-center">Это все объявления.</p> : null}
     </>
   );
 }

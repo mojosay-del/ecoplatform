@@ -31,11 +31,10 @@ function ItemsEditor({ items, onChange }: { items: string[]; onChange: (next: st
       {items.map((item, index) => (
         <div className="list-row" key={index}>
           <input
-            className="input"
+            className="input u-flex-1"
             placeholder={`Пункт ${index + 1}`}
             value={item}
             onChange={(event) => onChange(items.map((value, idx) => (idx === index ? event.target.value : value)))}
-            style={{ flex: 1 }}
           />
           <button
             className="icon-button"
@@ -58,7 +57,7 @@ function ItemsEditor({ items, onChange }: { items: string[]; onChange: (next: st
 export function ChecklistEditor({ payload, onChange }: { payload: Record<string, unknown>; onChange: PatchFn }) {
   const items = (payload.items as string[]) ?? [""];
   return (
-    <div className="form" style={{ gap: 6 }}>
+    <div className="form u-gap-6">
       <input
         className="input"
         placeholder="Заголовок чек-листа"
@@ -75,7 +74,7 @@ export function ImageChecklistEditor({ payload, onChange }: { payload: Record<st
   const items = (payload.items as string[]) ?? [""];
   const image = (payload.image as Img) ?? {};
   return (
-    <div className="form" style={{ gap: 8 }}>
+    <div className="form u-gap-8">
       <input
         className="input"
         placeholder="Заголовок чек-листа"
@@ -109,11 +108,11 @@ export function LessonTasksEditor({ tasks, onChange }: { tasks: Img[]; onChange:
     onChange(list.map((task, idx) => (idx === index ? { ...task, ...patch } : task)));
   }
   return (
-    <div className="form" style={{ gap: 8 }}>
+    <div className="form u-gap-8">
       {list.map((task, index) => (
         <div className={styles.taskRow} key={index}>
           <span className={styles.taskIndex}>{index + 1}</span>
-          <div className="form" style={{ gap: 4, flex: 1 }}>
+          <div className="form u-gap-4 u-flex-1">
             <input
               className="input"
               placeholder={`Задача ${index + 1}`}

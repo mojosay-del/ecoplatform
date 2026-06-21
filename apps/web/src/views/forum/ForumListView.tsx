@@ -335,7 +335,7 @@ export function ForumListView() {
                     ? `По запросу «${searchTerm}» ничего не найдено. Попробуйте другие слова или задайте вопрос.`
                     : "Вопросов пока нет. Будьте первым — задайте вопрос."}
                 </p>
-                <Link href="/forum/ask" className="button" style={{ marginTop: 12 }}>
+                <Link href="/forum/ask" className="button u-mt-12">
                   Задать вопрос
                 </Link>
               </div>

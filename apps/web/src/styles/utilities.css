@@ -1,0 +1,89 @@
+/*
+ * Утилитарные классы для СТАТИЧНЫХ раскладочных значений. Заведены в рамках
+ * гигиены L-1: убираем inline `style=` атрибуты с фиксированными значениями из
+ * JSX, чтобы сократить поверхность inline-стилей. ДИНАМИЧЕСКИЕ стили (прогресс,
+ * цвета материалов, размеры графиков/спарклайнов, CSS-переменные, dnd-kit
+ * transform) осознанно остаются inline — их нельзя выразить статикой, а CSS-
+ * переменная через `style` всё равно считается inline-атрибутом (поэтому сама
+ * CSP-директива `style-src-attr 'unsafe-inline'` пока остаётся, см. L-1).
+ *
+ * Импортируется в layout ПОСЛЕ globals.css — чтобы при равной специфичности
+ * (один класс) перекрывать дефолты вроде `.form { gap }`.
+ */
+
+.u-text-center {
+  text-align: center;
+}
+.u-object-cover {
+  object-fit: cover;
+}
+.u-flex-1 {
+  flex: 1;
+}
+.u-nowrap {
+  white-space: nowrap;
+}
+.u-underline {
+  text-decoration: underline;
+}
+
+/* Иконка в потоке текста: лёгкий подъём по базовой линии + отступ справа. */
+.u-inline-icon {
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+/* Вертикальные отступы. */
+.u-mt-0 {
+  margin-top: 0;
+}
+.u-mt-8 {
+  margin-top: 8px;
+}
+.u-mt-12 {
+  margin-top: 12px;
+}
+.u-mt-18 {
+  margin-top: 18px;
+}
+.u-mt-24 {
+  margin-top: 24px;
+}
+.u-mb-14 {
+  margin-bottom: 14px;
+}
+
+/* Вертикальный padding для «пустых» состояний списков. */
+.u-py-60 {
+  padding-top: 60px;
+  padding-bottom: 60px;
+}
+.u-py-80 {
+  padding-top: 80px;
+  padding-bottom: 80px;
+}
+
+/* Ширины/высоты с фиксированными значениями (скелетоны, ограничители форм). */
+.u-maxw-720 {
+  max-width: 720px;
+}
+.u-minh-260 {
+  min-height: 260px;
+}
+.u-w-52 {
+  width: 52%;
+}
+.u-w-78 {
+  width: 78%;
+}
+
+/* Зазоры flex/grid (перекрывают дефолтный `.form { gap: 14px }`). */
+.u-gap-4 {
+  gap: 4px;
+}
+.u-gap-6 {
+  gap: 6px;
+}
+.u-gap-8 {
+  gap: 8px;
+}

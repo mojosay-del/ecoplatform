@@ -176,8 +176,8 @@ export function ListingCardSkeleton() {
     <div aria-hidden="true" className="mp-card mp-card-skeleton">
       <div className="mp-card-cover" />
       <div className="mp-card-body">
-        <span className="mp-skeleton-line" style={{ width: "78%" }} />
-        <span className="mp-skeleton-line" style={{ width: "52%" }} />
+        <span className="mp-skeleton-line u-w-78" />
+        <span className="mp-skeleton-line u-w-52" />
       </div>
     </div>
   );

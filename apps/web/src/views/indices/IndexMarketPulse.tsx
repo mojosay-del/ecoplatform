@@ -40,7 +40,7 @@ export function IndexMarketPulse({ items }: { items: NomenclatureListItem[] }) {
           aria-label={`${pulse.risingCount} растут, ${pulse.fallingCount} падают, ${pulse.flatCount} без изменений`}
         >
           {total === 0 ? (
-            <span className="flat" style={{ flex: 1 }} />
+            <span className="flat u-flex-1" />
           ) : (
             <>
               {pulse.risingCount > 0 ? <span className="up" style={{ flex: pulse.risingCount }} /> : null}

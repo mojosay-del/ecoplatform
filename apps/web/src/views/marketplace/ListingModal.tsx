@@ -127,7 +127,7 @@ export function ListingModal({
         </button>
 
         {!data ? (
-          <p className="page-subtitle" style={{ padding: "80px 0", textAlign: "center" }}>
+          <p className="page-subtitle u-text-center u-py-80">
             {state === "error" ? (errorMessage ?? "Объявление не найдено.") : "Загрузка…"}
           </p>
         ) : (

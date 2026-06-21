@@ -154,7 +154,7 @@ export function PinnedNewsCard({ item }: { item: ForumPinnedNews }) {
           <Pin size={14} /> Закреплено
         </span>
         <span className="forum-chip">
-          <Newspaper size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} />
+          <Newspaper size={13} className="u-inline-icon" />
           Из новостей
         </span>
         {item.hasPodcast ? (

@@ -64,8 +64,7 @@ export function CoverImage({
         {...(priority ? { priority: true } : { loading: eager ? "eager" : "lazy" })}
         onLoad={settleImage}
         onError={settleImage}
-        className={`cover-image${loaded ? " is-loaded" : ""}`}
-        style={{ objectFit: "cover" }}
+        className={`cover-image u-object-cover${loaded ? " is-loaded" : ""}`}
       />
     </>
   );

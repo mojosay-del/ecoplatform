@@ -62,7 +62,7 @@ export function NewsArticleContent({
             src={coverUrl}
             fill
             sizes="(max-width: 1024px) 100vw, 1024px"
-            style={{ objectFit: "cover" }}
+            className="u-object-cover"
             priority
           />
         </div>

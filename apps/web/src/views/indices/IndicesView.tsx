@@ -71,9 +71,7 @@ export function IndicesView() {
         {state === "loading" ? (
           <IndicesLoadingShell />
         ) : data.length === 0 ? (
-          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            Пока нет опубликованных индексов.
-          </p>
+          <p className="page-subtitle u-text-center u-py-60">Пока нет опубликованных индексов.</p>
         ) : (
           <>
             <IndexMarketPulse items={data} />

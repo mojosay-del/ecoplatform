@@ -19,7 +19,7 @@ export function MatchingEditor({ payload, onChange }: { payload: Record<string, 
   }
 
   return (
-    <div className="form" style={{ gap: 8 }}>
+    <div className="form u-gap-8">
       <input
         className="input"
         placeholder="Инструкция (необязательно)"

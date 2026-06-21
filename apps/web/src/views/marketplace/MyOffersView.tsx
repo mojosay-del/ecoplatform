@@ -67,18 +67,16 @@ export function MyOffersView() {
         {error ? <p className="mp-error">{error}</p> : null}
 
         {state === "loading" ? (
-          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            Загрузка…
-          </p>
+          <p className="page-subtitle u-text-center u-py-60">Загрузка…</p>
         ) : offers.length === 0 ? (
-          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
+          <p className="page-subtitle u-text-center u-py-60">
             У вас пока нет предложений. Найдите объявление в <Link href="/marketplace">ленте</Link>.
           </p>
         ) : (
           <div className="mp-mylist">
             {offers.map((offer) => (
               <div key={offer.id}>
-                <div className="mp-row" style={{ gridTemplateColumns: "1fr auto" }}>
+                <div className="mp-row mp-row--offer">
                   <div className="mp-row-main">
                     <Link className="mp-row-title" href={`/marketplace/${offer.listingId}`}>
                       {offer.listingSummary || "Объявление"}
@@ -120,7 +118,7 @@ export function MyOffersView() {
                   </div>
                 </div>
                 {reviewingId === offer.id ? (
-                  <div style={{ marginTop: 8 }}>
+                  <div className="u-mt-8">
                     <ReviewForm
                       offerId={offer.id}
                       direction="buyer_to_seller"

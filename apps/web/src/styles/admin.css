@@ -2010,6 +2010,14 @@
 .news-content-field {
   padding-top: 4px;
 }
+/* Поле-строка (например, чекбокс «закрепить в форуме»): горизонтально, по
+   центру (ранее inline flexDirection/alignItems/gap). Идёт после базового
+   .news-content-field, поэтому gap:10 перекрывает его gap:8. */
+.news-content-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
 
 .news-content-field,
 .tag-field {
@@ -2909,6 +2917,13 @@
 
 li.tree-add-row + li.tree-add-row,
 .tree-children > li.tree-add-row {
+  padding-left: 44px;
+}
+
+/* L-1: add-row под категорией (документы/БЗ) — 44px вместо 24px из globals-
+   правила .tree>li>ul.tree-children>li.tree-add-row. Ранее форсилось inline
+   paddingLeft:44; специфичность здесь (0,4,3) перебивает globals (0,3,3). */
+.tree > li > ul.tree-children > li.tree-add-row.is-indent {
   padding-left: 44px;
 }
 

@@ -79,11 +79,9 @@ export function MyListingsView() {
         {error ? <p className="mp-error">{error}</p> : null}
 
         {state === "loading" ? (
-          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
-            Загрузка…
-          </p>
+          <p className="page-subtitle u-text-center u-py-60">Загрузка…</p>
         ) : listings.length === 0 ? (
-          <p className="page-subtitle" style={{ textAlign: "center", padding: "60px 0" }}>
+          <p className="page-subtitle u-text-center u-py-60">
             У вас пока нет объявлений. <Link href="/marketplace/new">Разместить первое</Link>.
           </p>
         ) : (

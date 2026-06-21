@@ -196,7 +196,7 @@ export function AdminBillingView() {
           </button>
         </form>
 
-        <section className="stack-list" style={{ marginTop: 24 }}>
+        <section className="stack-list u-mt-24">
           <h2>Компании на платформе</h2>
           {companies.length === 0 ? <p className="page-subtitle">Компаний пока нет.</p> : null}
           {companies.map((company) => (

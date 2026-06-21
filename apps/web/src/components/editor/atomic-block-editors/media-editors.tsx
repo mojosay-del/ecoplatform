@@ -8,7 +8,7 @@ import { str } from "./utils";
 
 export function ImagePayloadEditor({ payload, onChange }: { payload: Record<string, unknown>; onChange: PatchFn }) {
   return (
-    <div className="form" style={{ gap: 6 }}>
+    <div className="form u-gap-6">
       <FileUploadField
         accept="image/*"
         buttonLabel="Загрузить картинку"
@@ -34,7 +34,7 @@ export function ImagePayloadEditor({ payload, onChange }: { payload: Record<stri
 
 export function VideoPayloadEditor({ payload, onChange }: { payload: Record<string, unknown>; onChange: PatchFn }) {
   return (
-    <div className="form" style={{ gap: 6 }}>
+    <div className="form u-gap-6">
       <FileUploadField
         accept="video/*"
         buttonLabel="Загрузить видео"
@@ -54,7 +54,7 @@ export function VideoPayloadEditor({ payload, onChange }: { payload: Record<stri
 
 export function AudioPayloadEditor({ payload, onChange }: { payload: Record<string, unknown>; onChange: PatchFn }) {
   return (
-    <div className="form" style={{ gap: 6 }}>
+    <div className="form u-gap-6">
       <FileUploadField
         accept="audio/*"
         buttonLabel="Загрузить аудио"
@@ -82,7 +82,7 @@ export function AudioPayloadEditor({ payload, onChange }: { payload: Record<stri
 
 export function FilePayloadEditor({ payload, onChange }: { payload: Record<string, unknown>; onChange: PatchFn }) {
   return (
-    <div className="form" style={{ gap: 6 }}>
+    <div className="form u-gap-6">
       <FileUploadField
         buttonLabel="Загрузить файл"
         label="Файл"
@@ -119,7 +119,7 @@ export function GalleryEditor({ images, onChange }: { images: Img[]; onChange: (
   }
 
   return (
-    <div className="form" style={{ gap: 8 }}>
+    <div className="form u-gap-8">
       <div className={styles.galleryGrid}>
         {images.map((image, index) => (
           <div className={styles.galleryTile} key={index}>

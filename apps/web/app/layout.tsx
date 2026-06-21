@@ -6,6 +6,7 @@ import { AppQueryProvider } from "../src/lib/query";
 import { createPageMetadata, getSiteUrl, SITE_NAME } from "../src/lib/seo";
 import "../src/styles/tokens.css";
 import "../src/styles/globals.css";
+import "../src/styles/utilities.css";
 
 // Шрифт лежит в репозитории, чтобы production build не зависел от Google Fonts.
 const inter = localFont({

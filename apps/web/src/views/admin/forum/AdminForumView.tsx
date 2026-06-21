@@ -88,8 +88,8 @@ export function AdminForumView() {
         ) : null}
 
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Вопросы</h3>
-          <div className="forum-seg" role="group" aria-label="Фильтр по статусу" style={{ marginBottom: 14 }}>
+          <h3 className="u-mt-0">Вопросы</h3>
+          <div className="forum-seg u-mb-14" role="group" aria-label="Фильтр по статусу">
             {STATUS_FILTERS.map((option) => (
               <button
                 key={option.value || "all"}
@@ -185,7 +185,7 @@ function TaxonomyEditor({
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
+      <h3 className="u-mt-0">{title}</h3>
       <div className="forum-admin-tax-list">
         {values.length === 0 ? (
           <p className="page-subtitle">Значений пока нет.</p>
@@ -200,7 +200,7 @@ function TaxonomyEditor({
           ))
         )}
       </div>
-      <div className="forum-report__row" style={{ marginTop: 12 }}>
+      <div className="forum-report__row u-mt-12">
         <input
           className="input"
           value={newLabel}
@@ -298,11 +298,11 @@ function SeedForm({
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>Засеять вопрос от лица команды</h3>
+      <h3 className="u-mt-0">Засеять вопрос от лица команды</h3>
       {disabled ? (
         <p className="page-subtitle">Сначала добавьте хотя бы один вид сырья и один тип вопроса.</p>
       ) : (
-        <div className="forum-form" style={{ maxWidth: "none" }}>
+        <div className="forum-form forum-form--seed">
           <input
             className="input"
             value={title}

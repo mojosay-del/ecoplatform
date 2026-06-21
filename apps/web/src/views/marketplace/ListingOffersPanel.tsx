@@ -92,7 +92,7 @@ export function ListingOffersPanel({ listingId, onChanged }: { listingId: string
             ) : (
               <p className="mp-offer-hidden">Покупатель и контакты откроются после принятия предложения.</p>
             )}
-            <div className="mp-row-actions" style={{ justifyContent: "flex-start" }}>
+            <div className="mp-row-actions mp-row-actions--start">
               {offer.status === "active" ? (
                 <button
                   className="button"

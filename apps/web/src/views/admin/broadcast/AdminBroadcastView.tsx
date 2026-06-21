@@ -115,7 +115,7 @@ export function AdminBroadcastView() {
         {flash ? <p className="cms-flash">{flash}</p> : null}
         {error ? <p className="form-error">{error}</p> : null}
 
-        <form className="form news-form" onSubmit={submit} style={{ maxWidth: 720 }}>
+        <form className="form news-form u-maxw-720" onSubmit={submit}>
           <label className="indices-title-field">
             <span>Заголовок</span>
             <input
@@ -217,7 +217,7 @@ export function AdminBroadcastView() {
               </label>
             </div>
 
-            <label className="consent-row" style={{ marginTop: 12 }}>
+            <label className="consent-row u-mt-12">
               <input
                 type="checkbox"
                 checked={audience.includeBlocked ?? false}

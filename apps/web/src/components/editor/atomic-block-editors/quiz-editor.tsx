@@ -43,7 +43,7 @@ export function QuizEditor({ payload, onChange }: { payload: Record<string, unkn
   }
 
   return (
-    <div className="form" style={{ gap: 8 }}>
+    <div className="form u-gap-8">
       <input
         className="input"
         placeholder="Текст вопроса"
@@ -68,11 +68,10 @@ export function QuizEditor({ payload, onChange }: { payload: Record<string, unkn
               aria-label="Правильный вариант"
             />
             <input
-              className="input"
+              className="input u-flex-1"
               placeholder={`Вариант ${index + 1}`}
               value={option.text}
               onChange={(event) => setOption(index, { text: event.target.value })}
-              style={{ flex: 1 }}
             />
             <button
               className="icon-button"

@@ -66,7 +66,7 @@ export function DocCategoryNode({
                   onSelect={onSelect}
                 />
               ))}
-              <li className="tree-add-row" style={{ paddingLeft: 44 }}>
+              <li className="tree-add-row is-indent">
                 <button type="button" className="tree-add-button" onClick={onAddDocument}>
                   <Plus size={14} /> Документ
                 </button>

@@ -10,7 +10,7 @@ export function PriceIndicesSection() {
           <h3 className="lp-show__t">Цены живут здесь</h3>
           <p className="lp-show__d">
             Ежедневные котировки по ключевым видам вторсырья: динамика, тренды и история. Вы видите справедливую{" "}
-            <span style={{ whiteSpace: "nowrap" }}>цену — и торгуетесь</span> на данных, а не на слухах.
+            <span className="u-nowrap">цену — и торгуетесь</span> на данных, а не на слухах.
           </p>
         </div>
         <div className="lp-show__mock" data-reveal style={reveal(120)}>
