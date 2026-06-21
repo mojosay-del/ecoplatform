@@ -1,396 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { FormEvent, KeyboardEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Lock } from "lucide-react";
-import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
-import { SendActionIcon } from "../app-shell/nav-icons";
-import { api, ApiError } from "../../lib/api";
-import { useAuth } from "../../lib/auth";
 import { AuthShell } from "./auth-shell";
-import {
-  INITIAL_REGISTER_VALUES,
-  VERIFICATION_AUTO_SUBMIT_DELAY_MS,
-  VERIFICATION_CODE_LENGTH,
-  VERIFICATION_ERROR_RESET_DELAY_MS,
-  VERIFICATION_SUCCESS_REDIRECT_DELAY_MS,
-} from "./constants";
+import { RegisterClosedCard } from "./register-closed-card";
+import { CompanyStepActions, PersonStepActions, VerificationStepActions } from "./register-form-actions";
 import { RegisterStepper } from "./register-stepper";
 import { CompanyStepFields, PersonStepFields, VerificationStepFields } from "./register-sections";
-import type { RegisterFormValues, RegisterStep, VerificationPhase } from "./types";
-import {
-  emptyVerificationDigits,
-  formatPhoneFull,
-  getPhoneCountry,
-  isPasswordStrong,
-  normalizeEmailValue,
-} from "./utils";
-
-const REGISTRATION_TRUST_ITEMS = ["Соответствие 152-ФЗ", "Защищённое соединение", "Регистрация за пару минут"] as const;
+import { useRegisterForm } from "./use-register-form";
 
 export function RegisterForm() {
-  const router = useRouter();
-  const { register, resendRegistrationCode, verifyRegistration } = useAuth();
-  const formRef = useRef<HTMLFormElement>(null);
-  const verificationInputRefs = useRef<Array<HTMLInputElement | null>>([]);
-  const verificationAttemptRef = useRef(0);
-  const verificationResetTimerRef = useRef<number | null>(null);
-  const verificationRedirectTimerRef = useRef<number | null>(null);
-  const [step, setStep] = useState<RegisterStep>("company");
-  const [values, setValues] = useState<RegisterFormValues>(INITIAL_REGISTER_VALUES);
-  const [verification, setVerification] = useState<{ verificationId: string; email: string; expiresAt: string } | null>(
-    null,
-  );
-  const [verificationDigits, setVerificationDigits] = useState<string[]>(emptyVerificationDigits);
-  const [verificationPhase, setVerificationPhase] = useState<VerificationPhase>("typing");
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [resendingCode, setResendingCode] = useState(false);
-  const [resendStatus, setResendStatus] = useState("");
-  const [registrationOpen, setRegistrationOpen] = useState<boolean | null>(null);
-  const [legalDocs, setLegalDocs] = useState<LegalDocumentSummary[]>([]);
-  const [legalLoadError, setLegalLoadError] = useState(false);
-  const [acceptedIds, setAcceptedIds] = useState<Set<string>>(new Set());
+  const form = useRegisterForm();
 
-  useEffect(() => {
-    let cancelled = false;
-    api.legal
-      .list()
-      .then((docs) => {
-        if (cancelled) return;
-        setLegalDocs(docs);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLegalLoadError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.auth
-      .registrationStatus()
-      .then((status) => {
-        if (!cancelled) setRegistrationOpen(status.enabled);
-      })
-      .catch(() => {
-        if (!cancelled) setRegistrationOpen(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const requiredDocs = useMemo(() => legalDocs.filter((d) => d.isRequired), [legalDocs]);
-  const requiredAccepted = requiredDocs.every((d) => acceptedIds.has(d.id));
-  const selectedPhoneCountry = getPhoneCountry(values.phoneCountryId);
-  const passwordReady = isPasswordStrong(values.password);
-  const canSubmit = legalDocs.length > 0 && requiredAccepted && passwordReady;
-  const submitHint =
-    legalDocs.length === 0
-      ? null
-      : !requiredAccepted && !passwordReady
-        ? `Отметьте обязательные согласия и доведите пароль до зелёного (минимум ${MIN_PASSWORD_LENGTH} символов, буква и цифра).`
-        : !requiredAccepted
-          ? "Отметьте все обязательные согласия, чтобы продолжить."
-          : !passwordReady
-            ? `Пароль должен стать зелёным: минимум ${MIN_PASSWORD_LENGTH} символов, буква и цифра.`
-            : null;
-  const currentStepNumber = step === "company" ? 1 : step === "person" ? 2 : 3;
-  const verificationExpiresAt = verification
-    ? new Date(verification.expiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
-    : "";
-  const verificationCode = verificationDigits.join("");
-  const verificationIsComplete = verificationCode.length === VERIFICATION_CODE_LENGTH;
-  const verificationIsAnimating = verificationPhase !== "typing";
-  const verificationInputLocked = verificationIsAnimating || resendingCode || (step === "verification" && submitting);
-  const verificationStatusText =
-    verificationPhase === "checking"
-      ? "Проверяем код"
-      : verificationPhase === "success"
-        ? "Почта подтверждена"
-        : verificationPhase === "error"
-          ? "Код не подошёл"
-          : "";
-
-  function clearVerificationTimers() {
-    if (verificationResetTimerRef.current) {
-      window.clearTimeout(verificationResetTimerRef.current);
-      verificationResetTimerRef.current = null;
-    }
-    if (verificationRedirectTimerRef.current) {
-      window.clearTimeout(verificationRedirectTimerRef.current);
-      verificationRedirectTimerRef.current = null;
-    }
-  }
-
-  function focusVerificationInput(index: number) {
-    window.setTimeout(() => verificationInputRefs.current[index]?.focus(), 0);
-  }
-
-  useEffect(() => {
-    return () => clearVerificationTimers();
-  }, []);
-
-  useEffect(() => {
-    if (step !== "verification" || verificationPhase !== "typing") return;
-    const firstEmptyIndex = verificationDigits.findIndex((digit) => digit === "");
-    focusVerificationInput(firstEmptyIndex === -1 ? VERIFICATION_CODE_LENGTH - 1 : firstEmptyIndex);
-  }, [step, verification?.verificationId]);
-
-  useEffect(() => {
-    if (step !== "verification" || verificationPhase !== "typing" || !verification || !verificationIsComplete) return;
-    const timerId = window.setTimeout(() => {
-      void confirmVerificationCode(verificationCode);
-    }, VERIFICATION_AUTO_SUBMIT_DELAY_MS);
-
-    return () => window.clearTimeout(timerId);
-  }, [step, verification?.verificationId, verificationPhase, verificationCode, verificationIsComplete]);
-
-  function setField<K extends keyof RegisterFormValues>(field: K, value: RegisterFormValues[K]) {
-    setValues((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function toggleAccepted(id: string) {
-    setAcceptedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function goToPersonStep() {
-    setError("");
-    if (formRef.current?.reportValidity()) {
-      setStep("person");
-    }
-  }
-
-  function goBackToCompanyStep() {
-    setError("");
-    setResendStatus("");
-    setStep("company");
-  }
-
-  function registrationPayload() {
-    return {
-      organizationName: values.organizationName.trim(),
-      companyType: values.companyType,
-      lastName: values.lastName.trim(),
-      firstName: values.firstName.trim(),
-      phone: formatPhoneFull(selectedPhoneCountry, values.phoneDigits),
-      email: normalizeEmailValue(values.email),
-      password: values.password,
-      acceptedDocumentIds: Array.from(acceptedIds),
-    };
-  }
-
-  async function requestVerificationCode() {
-    if (!passwordReady) {
-      setError("Пароль должен стать зелёным: минимум 12 символов, буква и цифра.");
-      return;
-    }
-
-    if (!requiredAccepted) {
-      setError("Отметьте все обязательные согласия.");
-      return;
-    }
-
-    setSubmitting(true);
-    setError("");
-    setResendStatus("");
-    try {
-      const result = await register(registrationPayload());
-      clearVerificationTimers();
-      setVerification(result);
-      setVerificationDigits(emptyVerificationDigits());
-      setVerificationPhase("typing");
-      setStep("verification");
-    } catch (err) {
-      setError(
-        err instanceof ApiError && err.message
-          ? err.message
-          : "Не удалось отправить код. Возможно, email или телефон уже используются.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (step === "company") {
-      goToPersonStep();
-      return;
-    }
-
-    if (step === "person") {
-      await requestVerificationCode();
-      return;
-    }
-
-    if (!verification) {
-      setStep("person");
-      return;
-    }
-
-    if (verificationPhase !== "typing") {
-      return;
-    }
-
-    if (!verificationIsComplete) {
-      setError("Введите 4 цифры из письма.");
-      return;
-    }
-
-    await confirmVerificationCode(verificationCode);
-  }
-
-  async function confirmVerificationCode(code: string) {
-    if (!verification || verificationPhase !== "typing" || !/^\d{4}$/.test(code)) return;
-
-    const attempt = verificationAttemptRef.current + 1;
-    verificationAttemptRef.current = attempt;
-    clearVerificationTimers();
-    setSubmitting(true);
-    setError("");
-    setResendStatus("");
-    setVerificationPhase("checking");
-
-    try {
-      await verifyRegistration({ verificationId: verification.verificationId, code });
-      if (verificationAttemptRef.current !== attempt) return;
-      setVerificationPhase("success");
-      verificationRedirectTimerRef.current = window.setTimeout(() => {
-        router.push("/news");
-      }, VERIFICATION_SUCCESS_REDIRECT_DELAY_MS);
-    } catch (err) {
-      if (verificationAttemptRef.current !== attempt) return;
-      setVerificationPhase("error");
-      setError(err instanceof ApiError && err.message ? err.message : "Не удалось подтвердить почту.");
-      verificationResetTimerRef.current = window.setTimeout(() => {
-        if (verificationAttemptRef.current !== attempt) return;
-        setVerificationDigits(emptyVerificationDigits());
-        setVerificationPhase("typing");
-        setSubmitting(false);
-        focusVerificationInput(0);
-      }, VERIFICATION_ERROR_RESET_DELAY_MS);
-    }
-  }
-
-  async function resendVerificationCode() {
-    if (!verification || resendingCode) return;
-
-    clearVerificationTimers();
-    setError("");
-    setResendStatus("");
-    setVerificationPhase("typing");
-    setResendingCode(true);
-
-    try {
-      const result = await resendRegistrationCode({ verificationId: verification.verificationId });
-      setVerification(result);
-      setVerificationDigits(emptyVerificationDigits());
-      setResendStatus("Новый код отправлен.");
-      focusVerificationInput(0);
-    } catch (err) {
-      setError(
-        err instanceof ApiError && err.message
-          ? err.message
-          : "Не удалось отправить код повторно. Попробуйте через минуту.",
-      );
-    } finally {
-      setResendingCode(false);
-    }
-  }
-
-  function setVerificationDigit(index: number, rawValue: string) {
-    if (verificationInputLocked) return;
-
-    const digits = rawValue
-      .replace(/\D/g, "")
-      .slice(0, VERIFICATION_CODE_LENGTH - index)
-      .split("");
-    setError("");
-    setResendStatus("");
-    setVerificationDigits((current) => {
-      const next = [...current];
-      if (digits.length === 0) {
-        next[index] = "";
-        return next;
-      }
-
-      digits.forEach((digit, offset) => {
-        next[index + offset] = digit;
-      });
-
-      const nextEmptyIndex = next.findIndex((digit, digitIndex) => digitIndex > index && digit === "");
-      if (nextEmptyIndex !== -1) {
-        focusVerificationInput(nextEmptyIndex);
-      } else {
-        focusVerificationInput(Math.min(index + digits.length, VERIFICATION_CODE_LENGTH - 1));
-      }
-
-      return next;
-    });
-  }
-
-  function onVerificationKeyDown(index: number, event: KeyboardEvent<HTMLInputElement>) {
-    if (verificationInputLocked) return;
-
-    if (event.key === "Backspace" && verificationDigits[index] === "" && index > 0) {
-      event.preventDefault();
-      setVerificationDigits((current) => {
-        const next = [...current];
-        next[index - 1] = "";
-        return next;
-      });
-      focusVerificationInput(index - 1);
-      return;
-    }
-
-    if (event.key === "ArrowLeft" && index > 0) {
-      event.preventDefault();
-      focusVerificationInput(index - 1);
-      return;
-    }
-
-    if (event.key === "ArrowRight" && index < VERIFICATION_CODE_LENGTH - 1) {
-      event.preventDefault();
-      focusVerificationInput(index + 1);
-    }
-  }
-
-  if (registrationOpen === false) {
+  if (form.registrationOpen === false) {
     return (
       <AuthShell mode="register">
-        <div className="ui-card ui-card-wide auth-closed">
-          <span className="auth-closed-badge" aria-hidden="true">
-            <Lock size={28} strokeWidth={1.75} />
-          </span>
-          <span className="auth-closed-pill">
-            <span className="auth-closed-pill-dot" aria-hidden="true" />
-            Скоро откроется
-          </span>
-          <header className="ui-card-head">
-            <h1 className="ui-card-title">Регистрация закрыта</h1>
-            <p className="ui-card-sub">
-              Регистрация новых пользователей временно отключена. Загляните чуть позже — мы готовим место для новых
-              компаний.
-            </p>
-          </header>
-          <Link className="button form-submit auth-closed-cta" href="/login">
-            Войти в аккаунт
-          </Link>
-          <p className="ui-card-sub auth-closed-foot">Уже есть аккаунт? Войдите по кнопке выше.</p>
-        </div>
+        <RegisterClosedCard />
       </AuthShell>
     );
   }
@@ -398,11 +22,11 @@ export function RegisterForm() {
   return (
     <AuthShell mode="register">
       <form
-        ref={formRef}
-        className={`ui-card form ui-card-wide${step === "verification" ? " ui-card-verification" : ""}`}
-        onSubmit={onSubmit}
+        ref={form.formRef}
+        className={`ui-card form ui-card-wide${form.step === "verification" ? " ui-card-verification" : ""}`}
+        onSubmit={form.onSubmit}
       >
-        {step !== "verification" ? (
+        {form.step !== "verification" ? (
           <header className="ui-card-head">
             <h1 className="ui-card-title">Создать аккаунт</h1>
             <p className="ui-card-sub">
@@ -411,114 +35,64 @@ export function RegisterForm() {
           </header>
         ) : null}
 
-        <RegisterStepper current={currentStepNumber} />
+        <RegisterStepper current={form.currentStepNumber} />
 
-        {step === "company" ? (
-          <CompanyStepFields values={values} setField={setField} />
-        ) : step === "person" ? (
+        {form.step === "company" ? (
+          <CompanyStepFields values={form.values} setField={form.setField} />
+        ) : form.step === "person" ? (
           <PersonStepFields
-            acceptedIds={acceptedIds}
-            legalDocs={legalDocs}
-            legalLoadError={legalLoadError}
-            requiredDocs={requiredDocs}
-            setField={setField}
-            toggleAccepted={toggleAccepted}
-            values={values}
+            acceptedIds={form.acceptedIds}
+            legalDocs={form.legalDocs}
+            legalLoadError={form.legalLoadError}
+            requiredDocs={form.requiredDocs}
+            setField={form.setField}
+            toggleAccepted={form.toggleAccepted}
+            values={form.values}
           />
         ) : (
           <VerificationStepFields
-            onVerificationKeyDown={onVerificationKeyDown}
-            setVerificationDigit={setVerificationDigit}
-            valuesEmail={values.email}
-            verificationCode={verificationCode}
-            verificationDigits={verificationDigits}
-            verificationEmail={verification?.email}
-            verificationExpiresAt={verificationExpiresAt}
-            verificationInputLocked={verificationInputLocked}
-            verificationInputRefs={verificationInputRefs}
-            verificationIsAnimating={verificationIsAnimating}
-            verificationPhase={verificationPhase}
-            verificationStatusText={verificationStatusText}
+            onVerificationKeyDown={form.onVerificationKeyDown}
+            setVerificationDigit={form.setVerificationDigit}
+            valuesEmail={form.values.email}
+            verificationCode={form.verificationCode}
+            verificationDigits={form.verificationDigits}
+            verificationEmail={form.verification?.email}
+            verificationExpiresAt={form.verificationExpiresAt}
+            verificationInputLocked={form.verificationInputLocked}
+            verificationInputRefs={form.verificationInputRefs}
+            verificationIsAnimating={form.verificationIsAnimating}
+            verificationPhase={form.verificationPhase}
+            verificationStatusText={form.verificationStatusText}
           />
         )}
 
-        {step === "verification" && resendStatus ? (
+        {form.step === "verification" && form.resendStatus ? (
           <p className="auth-verification-resend-status" role="status">
-            {resendStatus}
+            {form.resendStatus}
           </p>
         ) : null}
 
-        {error ? <p className="form-error">{error}</p> : null}
+        {form.error ? <p className="form-error">{form.error}</p> : null}
 
-        {step === "company" ? (
-          <button className="button form-submit" type="button" onClick={goToPersonStep}>
-            Далее
-          </button>
-        ) : step === "person" ? (
-          <>
-            <div className="auth-step-actions">
-              <button className="button secondary" type="button" onClick={goBackToCompanyStep} disabled={submitting}>
-                Назад
-              </button>
-              <button className="button form-submit" type="submit" disabled={submitting || !canSubmit}>
-                {submitting ? (
-                  <>
-                    <span className="form-btn-spinner" aria-hidden="true" />
-                    Отправляем код…
-                  </>
-                ) : (
-                  "Создать аккаунт"
-                )}
-              </button>
-            </div>
-            {!canSubmit && submitHint ? <p className="form-submit-hint">{submitHint}</p> : null}
-            <ul className="form-inline-trust" aria-label="Гарантии регистрации">
-              {REGISTRATION_TRUST_ITEMS.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </>
+        {form.step === "company" ? (
+          <CompanyStepActions onNext={form.goToPersonStep} />
+        ) : form.step === "person" ? (
+          <PersonStepActions
+            canSubmit={form.canSubmit}
+            onBack={form.goBackToCompanyStep}
+            submitHint={form.submitHint}
+            submitting={form.submitting}
+          />
         ) : (
-          <div className="auth-verification-actions">
-            <button
-              className="button form-submit auth-verification-submit"
-              type="submit"
-              disabled={verificationInputLocked || !verificationIsComplete}
-            >
-              {verificationPhase === "checking"
-                ? "Проверяем код..."
-                : verificationPhase === "success"
-                  ? "Готово"
-                  : verificationPhase === "error"
-                    ? "Код не подошёл"
-                    : "Подтвердить"}
-            </button>
-            <div className="auth-verification-secondary">
-              <button
-                className="form-text-button"
-                type="button"
-                onClick={() => {
-                  clearVerificationTimers();
-                  setError("");
-                  setResendStatus("");
-                  setVerificationPhase("typing");
-                  setStep("person");
-                }}
-                disabled={submitting}
-              >
-                Назад
-              </button>
-              <button
-                className="form-text-button"
-                type="button"
-                onClick={resendVerificationCode}
-                disabled={submitting || resendingCode}
-              >
-                <SendActionIcon size={16} />
-                {resendingCode ? "Отправляем..." : "Отправить код ещё раз"}
-              </button>
-            </div>
-          </div>
+          <VerificationStepActions
+            onBack={form.goBackToPersonStep}
+            onResend={form.resendVerificationCode}
+            resendingCode={form.resendingCode}
+            submitting={form.submitting}
+            verificationInputLocked={form.verificationInputLocked}
+            verificationIsComplete={form.verificationIsComplete}
+            verificationPhase={form.verificationPhase}
+          />
         )}
       </form>
     </AuthShell>

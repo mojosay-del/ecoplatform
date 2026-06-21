@@ -15,10 +15,8 @@ import {
   PasswordStrengthMeter,
 } from "./fields";
 import { PhoneInput } from "./phone-input";
-import type { PhoneCountryId, RegisterFormValues, VerificationPhase } from "./types";
+import type { PhoneCountryId, RegisterFormValues, SetRegisterField, VerificationPhase } from "./types";
 import { normalizeEmailValue } from "./utils";
-
-type SetRegisterField = <K extends keyof RegisterFormValues>(field: K, value: RegisterFormValues[K]) => void;
 
 export function CompanyStepFields({ values, setField }: { values: RegisterFormValues; setField: SetRegisterField }) {
   const companyTypeLabelId = useId();

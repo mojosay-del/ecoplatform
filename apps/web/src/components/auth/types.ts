@@ -22,6 +22,8 @@ export type RegisterFormValues = {
   password: string;
 };
 
+export type SetRegisterField = <K extends keyof RegisterFormValues>(field: K, value: RegisterFormValues[K]) => void;
+
 export type PhoneCountry = {
   id: string;
   name: string;
