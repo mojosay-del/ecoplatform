@@ -48,6 +48,14 @@ export class AccountController {
     return this.account.applyContactChange(user.id, input);
   }
 
+  // M-9: подтверждение владения НОВЫМ email кодом, отправленным на новый адрес.
+  @Throttle(CONTACT_CHANGE_THROTTLE)
+  @Post("contact-change/confirm")
+  async confirmContactChange(@CurrentUser() user: RequestUser, @Body() body: unknown) {
+    const input = parseBody(accountContactChangeVerifyDtoSchema, body);
+    return this.account.confirmContactChange(user.id, input);
+  }
+
   // Привязать загруженное (через /files/upload) фото к профилю как аватар.
   @Post("avatar")
   async setAvatar(@CurrentUser() user: RequestUser, @Body() body: unknown) {

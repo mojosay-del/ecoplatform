@@ -82,8 +82,16 @@ export const accountApi = {
     }),
   verifyContactChange: (input: AccountContactChangeVerifyDto) =>
     apiFetch<{ ok: true }>("/account/contact-change/verify", { method: "POST", body: input }),
+  // M-9: для email apply не применяет адрес сразу, а отправляет код на НОВЫЙ
+  // адрес и просит подтвердить владение (requiresNewCode). Телефон применяется
+  // сразу (requiresNewCode: false).
   applyContactChange: (input: AccountContactChangeApplyDto) =>
-    apiFetch<AuthMeUser>("/account/contact-change/apply", { method: "POST", body: input }),
+    apiFetch<
+      | { requiresNewCode: true; verificationId: string; email: string; expiresAt: string }
+      | { requiresNewCode: false; user: AuthMeUser }
+    >("/account/contact-change/apply", { method: "POST", body: input }),
+  confirmContactChange: (input: AccountContactChangeVerifyDto) =>
+    apiFetch<AuthMeUser>("/account/contact-change/confirm", { method: "POST", body: input }),
   // fileId — id уже загруженного через api.files.upload публичного изображения.
   setAvatar: (fileId: string) => apiFetch<AuthMeUser>("/account/avatar", { method: "POST", body: { fileId } }),
   removeAvatar: () => apiFetch<AuthMeUser>("/account/avatar", { method: "DELETE" }),

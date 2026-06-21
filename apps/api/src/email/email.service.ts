@@ -66,6 +66,49 @@ export class EmailService {
     });
   }
 
+  // M-9: код на НОВЫЙ email — подтверждение владения новым адресом (вторая
+  // сторона двусторонней верификации). Уходит на новый адрес, а не на текущий.
+  async sendNewEmailVerificationCode(input: RegistrationCodeEmail): Promise<void> {
+    await this.sendVerificationCode({
+      ...input,
+      subject: "Подтвердите новый email на ЭкоПлатформе",
+      actionText: "Код для подтверждения нового адреса:",
+      ignoreText:
+        "Если вы не указывали этот адрес для своего аккаунта на ЭкоПлатформе, просто проигнорируйте это письмо.",
+      warnContext: "account new-email verification",
+    });
+  }
+
+  // M-9: алерт на СТАРЫЙ адрес о том, что контакт изменён. Информирует владельца
+  // прежнего адреса о смене (раннее обнаружение несанкционированного изменения).
+  async sendContactChangeAlert(input: { to: string; field: "email" | "phone" }): Promise<void> {
+    if (this.deliveryDisabled()) {
+      return;
+    }
+
+    const fieldLabel = input.field === "email" ? "email" : "телефон";
+    const config = this.smtpConfig();
+    const transporter = this.getTransporter(config);
+    const lines = [
+      `На вашем аккаунте ЭкоПлатформы изменён ${fieldLabel}.`,
+      "Если это были вы — никаких действий не требуется.",
+      "Если это были не вы — срочно восстановите доступ и смените пароль.",
+    ];
+
+    try {
+      await this.sendMailWithTimeout(transporter, config.sendTimeoutMs, {
+        from: config.from,
+        to: input.to,
+        subject: "Контактные данные аккаунта изменены",
+        text: lines.join("\n"),
+        html: lines.map((line) => `<p>${line}</p>`).join(""),
+      });
+    } catch (error) {
+      // Алерт — best-effort: смена контакта уже применена, падать на письме нельзя.
+      this.logger.warn(`SMTP contact-change alert failed: ${smtpErrorCode(error)}`);
+    }
+  }
+
   // L-6: уведомление на ЗАНЯТЫЙ адрес, когда кто-то пытается зарегистрироваться
   // с уже существующим email/телефоном. Сама заявка отвечает одинаково (анти-
   // enumeration), поэтому занятость контакта раскрывается только владельцу

@@ -33,7 +33,10 @@ export function ContactChangeDialog({
   const [verification, setVerification] = useState<{ verificationId: string; email: string; expiresAt: string } | null>(
     null,
   );
-  const [step, setStep] = useState<"code" | "edit">("code");
+  // M-9: для email после ввода нового адреса появляется второй код — на новый
+  // адрес. newVerification хранит адрес/срок нового кода (verificationId — общий).
+  const [newVerification, setNewVerification] = useState<{ email: string; expiresAt: string } | null>(null);
+  const [step, setStep] = useState<"code" | "edit" | "newCode">("code");
   const [codeDigits, setCodeDigits] = useState<string[]>(emptyVerificationDigits);
   const [phase, setPhase] = useState<VerificationPhase>("typing");
   const [message, setMessage] = useState<string | null>(null);
@@ -51,8 +54,11 @@ export function ContactChangeDialog({
   const busy = requesting || saving || phase === "checking";
   const code = codeDigits.join("");
   const codeComplete = code.length === VERIFICATION_CODE_LENGTH;
-  const expiresAt = verification
-    ? new Date(verification.expiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+  const isCodeStep = step === "code" || step === "newCode";
+  // На шаге newCode код и срок относятся к новому адресу, иначе — к текущему.
+  const activeCodeTarget = step === "newCode" ? newVerification : verification;
+  const expiresAt = activeCodeTarget
+    ? new Date(activeCodeTarget.expiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
     : "";
   const contactTitle = field === "email" ? "email" : "телефона";
 
@@ -97,7 +103,7 @@ export function ContactChangeDialog({
   }, [clearTimers]);
 
   useEffect(() => {
-    if (step !== "code" || !verification || phase !== "typing" || !codeComplete) return;
+    if (!isCodeStep || !verification || phase !== "typing" || !codeComplete) return;
     const timer = window.setTimeout(() => void confirmCode(code), VERIFICATION_AUTO_SUBMIT_DELAY_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,6 +117,17 @@ export function ContactChangeDialog({
     setPhase("checking");
     setMessage(null);
     try {
+      if (step === "newCode") {
+        // M-9: подтверждаем владение новым email — после успеха адрес применён.
+        await api.account.confirmContactChange({ verificationId: verification.verificationId, code: nextCode });
+        if (attemptRef.current !== attempt) return;
+        setPhase("success");
+        successTimerRef.current = window.setTimeout(() => {
+          if (attemptRef.current !== attempt) return;
+          void onSaved().finally(onClose);
+        }, VERIFICATION_SUCCESS_REDIRECT_DELAY_MS);
+        return;
+      }
       await api.account.verifyContactChange({ verificationId: verification.verificationId, code: nextCode });
       if (attemptRef.current !== attempt) return;
       setPhase("success");
@@ -166,6 +183,17 @@ export function ContactChangeDialog({
     }
   }
 
+  function enterNewCodeStep(newEmail: string, newExpiresAt: string) {
+    clearTimers();
+    attemptRef.current += 1; // обнуляем любые незавершённые проверки старого кода
+    setNewVerification({ email: newEmail, expiresAt: newExpiresAt });
+    setCodeDigits(emptyVerificationDigits());
+    setPhase("typing");
+    setMessage(null);
+    setStep("newCode");
+    window.setTimeout(() => inputRefs.current[0]?.focus(), 0);
+  }
+
   async function onSubmitNewValue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!verification) return;
@@ -174,25 +202,59 @@ export function ContactChangeDialog({
     setMessage(null);
     try {
       if (field === "email") {
-        await api.account.applyContactChange({
+        // M-9: apply не применяет адрес — отправляет код на новый email и просит
+        // подтвердить владение им (шаг newCode).
+        const result = await api.account.applyContactChange({
           field,
           verificationId: verification.verificationId,
           email: normalizeEmailValue(emailValue),
         });
-      } else {
-        const phone = formatPhoneFull(getPhoneCountry(phoneCountryId), phoneDigits);
-        if (!phone) {
-          setMessage("Введите полный номер телефона.");
+        if (result.requiresNewCode) {
+          enterNewCodeStep(result.email, result.expiresAt);
           return;
         }
-        await api.account.applyContactChange({ field, verificationId: verification.verificationId, phone });
+        await onSaved();
+        onClose();
+        return;
       }
+      const phone = formatPhoneFull(getPhoneCountry(phoneCountryId), phoneDigits);
+      if (!phone) {
+        setMessage("Введите полный номер телефона.");
+        return;
+      }
+      await api.account.applyContactChange({ field, verificationId: verification.verificationId, phone });
       await onSaved();
       onClose();
     } catch (error) {
       setMessage(errorText(error, "Не удалось сохранить новое значение."));
     } finally {
       setSaving(false);
+    }
+  }
+
+  // M-9: переотправка кода на новый email (повторный apply тем же значением).
+  async function resendNewCode() {
+    if (!verification || field !== "email") return;
+    setRequesting(true);
+    setMessage(null);
+    try {
+      const result = await api.account.applyContactChange({
+        field: "email",
+        verificationId: verification.verificationId,
+        email: normalizeEmailValue(emailValue),
+      });
+      if (result.requiresNewCode) {
+        clearTimers();
+        attemptRef.current += 1;
+        setNewVerification({ email: result.email, expiresAt: result.expiresAt });
+        setCodeDigits(emptyVerificationDigits());
+        setPhase("typing");
+        window.setTimeout(() => inputRefs.current[0]?.focus(), 0);
+      }
+    } catch (error) {
+      setMessage(errorText(error, "Не удалось отправить код."));
+    } finally {
+      setRequesting(false);
     }
   }
 
@@ -211,7 +273,11 @@ export function ContactChangeDialog({
           <div>
             <span className="account-password-modal-kicker">Подтверждение</span>
             <h2 id="account-contact-dialog-title">Смена {contactTitle}</h2>
-            <p>Код будет отправлен на текущий email аккаунта.</p>
+            <p>
+              {step === "newCode"
+                ? "Подтвердите, что новый email принадлежит вам."
+                : "Код будет отправлен на текущий email аккаунта."}
+            </p>
           </div>
           <button
             aria-label={`Закрыть смену ${contactTitle}`}
@@ -223,7 +289,7 @@ export function ContactChangeDialog({
             <X aria-hidden="true" size={18} />
           </button>
         </header>
-        {step === "code" ? (
+        {isCodeStep ? (
           <div className="account-contact-modal-body">
             <div className="account-contact-code-head">
               <span className="account-contact-code-icon" aria-hidden="true">
@@ -231,14 +297,22 @@ export function ContactChangeDialog({
               </span>
               <div>
                 <strong>
-                  {requesting ? "Отправляем код..." : verification ? "Введите код из письма" : "Отправьте код"}
+                  {requesting
+                    ? "Отправляем код..."
+                    : step === "newCode"
+                      ? "Введите код с нового адреса"
+                      : verification
+                        ? "Введите код из письма"
+                        : "Отправьте код"}
                 </strong>
                 <p>
-                  {verification
-                    ? `Письмо отправлено на ${verification.email}, код действует до ${expiresAt}.`
-                    : requesting
-                      ? "Подготавливаем письмо с кодом подтверждения."
-                      : "Код придёт на текущий email аккаунта после нажатия на кнопку."}
+                  {step === "newCode" && newVerification
+                    ? `Письмо с кодом отправлено на ${newVerification.email}, код действует до ${expiresAt}.`
+                    : verification
+                      ? `Письмо отправлено на ${verification.email}, код действует до ${expiresAt}.`
+                      : requesting
+                        ? "Подготавливаем письмо с кодом подтверждения."
+                        : "Код придёт на текущий email аккаунта после нажатия на кнопку."}
                 </p>
               </div>
             </div>
@@ -287,7 +361,7 @@ export function ContactChangeDialog({
                   <button
                     className="button secondary"
                     disabled={requesting || phase === "checking"}
-                    onClick={() => void requestCode()}
+                    onClick={() => void (step === "newCode" ? resendNewCode() : requestCode())}
                     type="button"
                   >
                     Отправить код ещё раз

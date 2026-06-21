@@ -335,14 +335,22 @@ model AccountContactChangeChallenge {
   userId     String
   user       User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   field      AccountContactChangeField
-  // Текущая почта, на которую отправлен код. Новое значение хранится только в
-  // запросе apply, чтобы не держать лишние персональные данные в ожидании кода.
+  // Текущая почта, на которую отправлен код первой стороны (подтверждение
+  // владения текущим адресом — защита от угона сессии). email/codeHash/attempts/
+  // verifiedAt относятся к ЭТОЙ, старой стороне.
   email      String
   codeHash   String
   attempts   Int                       @default(0)
   expiresAt  DateTime
   verifiedAt DateTime?
   consumedAt DateTime?
+  // M-9: вторая сторона — подтверждение владения НОВЫМ адресом. После того как
+  // старая сторона подтверждена (verifiedAt) и пользователь ввёл новый email,
+  // сюда кладётся новое значение + хэш кода, отправленного на новый адрес.
+  // Применяется только когда обе стороны подтверждены (двусторонняя верификация).
+  pendingValue    String?
+  pendingCodeHash String?
+  pendingAttempts Int      @default(0)
   createdAt  DateTime                  @default(now())
   updatedAt  DateTime                  @updatedAt
 

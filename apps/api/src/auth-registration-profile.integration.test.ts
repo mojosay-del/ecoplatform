@@ -203,12 +203,14 @@ describe("Auth — регистрация и профиль", () => {
     expect(verified.status).toBe(201);
     expect(verified.body).toEqual({ ok: true });
 
+    // Телефон применяется сразу (SMS-верификации нового номера пока нет, M-9).
     const applied = await ctx.http
       .post("/api/account/contact-change/apply")
       .set("Authorization", `Bearer ${token}`)
       .send({ field: "phone", verificationId: start.body.verificationId, phone: "+79000009999" });
     expect(applied.status).toBe(201);
-    expect(applied.body.phone).toBe("+79000009999");
+    expect(applied.body.requiresNewCode).toBe(false);
+    expect(applied.body.user.phone).toBe("+79000009999");
 
     const repeat = await ctx.http
       .post("/api/account/contact-change/apply")
@@ -217,7 +219,7 @@ describe("Auth — регистрация и профиль", () => {
     expect(repeat.status).toBe(400);
   });
 
-  it("смена email подтверждается текущей почтой, нормализует новый адрес и проверяет уникальность", async () => {
+  it("смена email двусторонняя: код на старый адрес + подтверждение нового, нормализует и проверяет уникальность (M-9)", async () => {
     const token = await registerWithBody({
       organizationName: "ООО Email",
       companyType: "collector",
@@ -250,13 +252,40 @@ describe("Auth — регистрация и профиль", () => {
       .send({ verificationId: start.body.verificationId, code: TEST_EMAIL_VERIFICATION_CODE });
     expect(verified.status).toBe(201);
 
+    // apply НЕ применяет адрес — требует подтверждения владения новым адресом.
     const applied = await ctx.http
       .post("/api/account/contact-change/apply")
       .set("Authorization", `Bearer ${token}`)
       .send({ field: "email", verificationId: start.body.verificationId, email: "New.Email@TEST.Local" });
     expect(applied.status).toBe(201);
+    expect(applied.body.requiresNewCode).toBe(true);
     expect(applied.body.email).toBe("new.email@test.local");
 
+    // До подтверждения нового кода email остаётся прежним.
+    const stillOld = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(stillOld.body.email).toBe("email-change@test.local");
+
+    // Неверный код на новый адрес не применяет смену.
+    const wrongNew = await ctx.http
+      .post("/api/account/contact-change/confirm")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ verificationId: start.body.verificationId, code: "0000" });
+    expect(wrongNew.status).toBe(400);
+    const afterWrong = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(afterWrong.body.email).toBe("email-change@test.local");
+
+    // Подтверждение нового адреса применяет нормализованный email.
+    const confirmed = await ctx.http
+      .post("/api/account/contact-change/confirm")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ verificationId: start.body.verificationId, code: TEST_EMAIL_VERIFICATION_CODE });
+    expect(confirmed.status).toBe(201);
+    expect(confirmed.body.email).toBe("new.email@test.local");
+
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(me.body.email).toBe("new.email@test.local");
+
+    // Занятый адрес отклоняется уже на apply (до отправки кода на новый адрес).
     const conflictStart = await ctx.http
       .post("/api/account/contact-change/start")
       .set("Authorization", `Bearer ${token}`)

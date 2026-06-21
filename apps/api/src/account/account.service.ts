@@ -34,6 +34,13 @@ type ContactChangeStartResponse = {
   expiresAt: string;
 };
 
+// M-9: смена email требует второй код — на НОВЫЙ адрес. apply отдаёт «нужен ещё
+// один код» (на новый адрес уже отправлен) вместо немедленного применения.
+// Смена телефона применяется сразу (SMS-верификации нового номера пока нет).
+type ContactChangeApplyResponse =
+  | { requiresNewCode: true; verificationId: string; email: string; expiresAt: string }
+  | { requiresNewCode: false; user: AuthMeUser };
+
 const CONTACT_CHANGE_EXPIRED_MESSAGE = "Код устарел. Отправьте новый код подтверждения.";
 const CONTACT_CHANGE_TOO_MANY_ATTEMPTS_MESSAGE = "Слишком много попыток. Отправьте новый код подтверждения.";
 const CONTACT_CHANGE_WRONG_CODE_MESSAGE = "Неверный код подтверждения.";
@@ -163,7 +170,7 @@ export class AccountService {
     return { ok: true };
   }
 
-  async applyContactChange(userId: string, input: AccountContactChangeApplyDto): Promise<AuthMeUser> {
+  async applyContactChange(userId: string, input: AccountContactChangeApplyDto): Promise<ContactChangeApplyResponse> {
     const now = new Date();
     const challenge = await this.prisma.accountContactChangeChallenge.findUnique({
       where: { id: input.verificationId },
@@ -171,6 +178,7 @@ export class AccountService {
         id: true,
         userId: true,
         field: true,
+        email: true,
         verifiedAt: true,
         consumedAt: true,
         expiresAt: true,
@@ -191,13 +199,61 @@ export class AccountService {
     const nextValue = input.field === "email" ? input.email.trim().toLowerCase() : input.phone.trim();
     await this.assertContactValueAvailable(userId, input.field, nextValue);
 
+    // Email: новый адрес НЕ применяется здесь — сперва нужно подтвердить владение
+    // им кодом (вторая сторона). apply лишь запоминает новое значение и шлёт код
+    // на новый адрес; применение — в confirmContactChange.
+    if (input.field === "email") {
+      const code = generateEmailVerificationCode();
+      const pendingExpiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS);
+      const armed = await this.prisma.accountContactChangeChallenge.updateMany({
+        where: {
+          id: challenge.id,
+          userId,
+          field: "email",
+          verifiedAt: { not: null },
+          consumedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: {
+          pendingValue: nextValue,
+          pendingCodeHash: hashEmailVerificationCode(challenge.id, nextValue, code),
+          pendingAttempts: 0,
+          expiresAt: pendingExpiresAt,
+        },
+      });
+      if (armed.count !== 1) {
+        throw new BadRequestException(CONTACT_CHANGE_EXPIRED_MESSAGE);
+      }
+
+      try {
+        await this.email.sendNewEmailVerificationCode({ to: nextValue, code, expiresAt: pendingExpiresAt });
+      } catch (error) {
+        await this.prisma.accountContactChangeChallenge
+          .updateMany({
+            where: { id: challenge.id, consumedAt: null },
+            data: { pendingValue: null, pendingCodeHash: null },
+          })
+          .catch(() => undefined);
+        throw error;
+      }
+
+      return {
+        requiresNewCode: true,
+        verificationId: challenge.id,
+        email: nextValue,
+        expiresAt: pendingExpiresAt.toISOString(),
+      };
+    }
+
+    // Телефон: SMS-верификации нового номера пока нет — применяем сразу после
+    // подтверждения старой почтой, но шлём алерт на текущий email (M-9).
     try {
       await this.prisma.$transaction(async (tx) => {
         const claimed = await tx.accountContactChangeChallenge.updateMany({
           where: {
             id: challenge.id,
             userId,
-            field: input.field,
+            field: "phone",
             verifiedAt: { not: null },
             consumedAt: null,
             expiresAt: { gt: now },
@@ -209,18 +265,96 @@ export class AccountService {
           throw new BadRequestException(CONTACT_CHANGE_EXPIRED_MESSAGE);
         }
 
-        await tx.user.update({
-          where: { id: userId },
-          data: input.field === "email" ? { email: nextValue } : { phone: nextValue },
-        });
+        await tx.user.update({ where: { id: userId }, data: { phone: nextValue } });
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ConflictException(this.contactConflictMessage(input.field));
+        throw new ConflictException(this.contactConflictMessage("phone"));
       }
       throw error;
     }
 
+    await this.email.sendContactChangeAlert({ to: challenge.email, field: "phone" });
+    await this.sessionCache.invalidateUser(userId);
+    return {
+      requiresNewCode: false,
+      user: await getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId),
+    };
+  }
+
+  // M-9: вторая сторона — подтверждение владения новым email кодом, отправленным
+  // на новый адрес. Только после этого email применяется + алерт на старый адрес.
+  async confirmContactChange(userId: string, input: AccountContactChangeVerifyDto): Promise<AuthMeUser> {
+    const now = new Date();
+    const challenge = await this.prisma.accountContactChangeChallenge.findUnique({
+      where: { id: input.verificationId },
+    });
+
+    if (
+      !challenge ||
+      challenge.userId !== userId ||
+      challenge.field !== "email" ||
+      !challenge.verifiedAt ||
+      challenge.consumedAt ||
+      challenge.expiresAt <= now ||
+      !challenge.pendingValue ||
+      !challenge.pendingCodeHash
+    ) {
+      throw new BadRequestException(CONTACT_CHANGE_EXPIRED_MESSAGE);
+    }
+
+    if (challenge.pendingAttempts >= EMAIL_VERIFICATION_MAX_ATTEMPTS) {
+      throw new BadRequestException(CONTACT_CHANGE_TOO_MANY_ATTEMPTS_MESSAGE);
+    }
+
+    if (!emailVerificationCodeMatches(challenge.id, challenge.pendingValue, input.code, challenge.pendingCodeHash)) {
+      const nextAttempts = challenge.pendingAttempts + 1;
+      const tooManyAttempts = nextAttempts >= EMAIL_VERIFICATION_MAX_ATTEMPTS;
+      await this.prisma.accountContactChangeChallenge.update({
+        where: { id: challenge.id },
+        data: {
+          pendingAttempts: nextAttempts,
+          ...(tooManyAttempts ? { expiresAt: now } : {}),
+        },
+      });
+      throw new BadRequestException(
+        tooManyAttempts ? CONTACT_CHANGE_TOO_MANY_ATTEMPTS_MESSAGE : CONTACT_CHANGE_WRONG_CODE_MESSAGE,
+      );
+    }
+
+    const nextEmail = challenge.pendingValue;
+    await this.assertContactValueAvailable(userId, "email", nextEmail);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const claimed = await tx.accountContactChangeChallenge.updateMany({
+          where: {
+            id: challenge.id,
+            userId,
+            field: "email",
+            verifiedAt: { not: null },
+            consumedAt: null,
+            expiresAt: { gt: now },
+            pendingValue: { not: null },
+          },
+          data: { consumedAt: now },
+        });
+
+        if (claimed.count !== 1) {
+          throw new BadRequestException(CONTACT_CHANGE_EXPIRED_MESSAGE);
+        }
+
+        await tx.user.update({ where: { id: userId }, data: { email: nextEmail } });
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException(this.contactConflictMessage("email"));
+      }
+      throw error;
+    }
+
+    // Алерт на СТАРЫЙ адрес (challenge.email хранит исходную почту).
+    await this.email.sendContactChangeAlert({ to: challenge.email, field: "email" });
     await this.sessionCache.invalidateUser(userId);
     return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
   }
