@@ -3,6 +3,7 @@ import { defaultDocumentationDisplayIconName } from "../../documentation-icons";
 import type { DocDraftState } from "./types";
 
 export const DOC_CATEGORY_ICON_TYPE = "category";
+export const DOC_LIST_PATH = "/admin/content/documentation";
 export const UNCATEGORIZED_GROUP_ID = "__documentation_uncategorized__";
 
 export const EMPTY_DOCUMENT_DRAFT: DocDraftState = {

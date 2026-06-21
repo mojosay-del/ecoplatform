@@ -207,8 +207,11 @@ CORS-allowlist с валидацией origin, многоуровневый thro
         `document-editor-toolbar`, extensions/slash-команды/metadata/link-команды — в `lib/editor/*`.
         Codex 2026-06-21; проверки: web tsc ✓, editor unit 26 ✓, root lint ✓, format ✓, diff-check ✓.
         Live UI пропущен: локальный `.env` содержит prod-like S3/storage и SMTP/mail признаки.
-  - [ ] `views/admin/documentation/use-admin-documentation.ts` (407) — *borderline (хук данных)*: разнести на под-хуки
-        (список/реордер/мутации) или helpers, если читается как god-хук; иначе пропустить.
+  - [x] `views/admin/documentation/use-admin-documentation.ts` (407 → 81) — хук оставлен тонким фасадом,
+        список/группировка, состояние draft, мутации/autosave и reorder вынесены в соседние `use-admin-documentation-*`
+        хуки, чистая логика draft/save-body — в `documentation-draft.helpers` (+unit). Codex 2026-06-21; проверки:
+        web tsc ✓, documentation helper unit 7 ✓, root lint ✓, format ✓, diff-check ✓. Live `/admin/content/documentation`
+        пропущен: локальный `.env` содержит активные S3/SMTP ключи (значения не выводились).
 
   **Backend (`apps/api/src/`):**
   - [ ] `billing/billing-activation.helpers.ts` (448) — разнести по под-операциям (trial / self-subscription / manual)
