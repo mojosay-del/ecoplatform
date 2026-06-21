@@ -197,7 +197,11 @@ CORS-allowlist с валидацией origin, многоуровневый thro
         в `listing-modal.helpers` без смены поведения. Codex 2026-06-21; проверки: web tsc ✓, root lint ✓,
         web unit 222 ✓, format ✓, diff-check ✓. Live `/marketplace` пропущен: локальный `.env` содержит
         prod-like S3/storage и SMTP/mail признаки.
-  - [ ] `components/AudioMessagePlayer.tsx` (420) — логику воспроизведения в `use-audio-player`, презентацию отдельно.
+  - [x] `components/AudioMessagePlayer.tsx` (420 → 49) — публичный компонент оставлен тонким фасадом,
+        логика воспроизведения/seek/speed/waveform вынесена в `use-audio-player`, JSX — в `audio-player-view`,
+        чистые расчёты — в `audio-player.helpers` (+unit). Codex 2026-06-21; проверки: web tsc ✓,
+        web unit 228 ✓, root lint ✓, format ✓, diff-check ✓. Live UI пропущен: локальный `.env` содержит
+        prod-like S3/storage и SMTP/mail признаки.
   - [ ] `components/editor/DocumentEditor.tsx` (400) — конфиг расширений/тулбар/slash-команды в модули `lib/editor/*`
         (сериализатор уже там); сам компонент — тонкая оболочка.
   - [ ] `views/admin/documentation/use-admin-documentation.ts` (407) — *borderline (хук данных)*: разнести на под-хуки
