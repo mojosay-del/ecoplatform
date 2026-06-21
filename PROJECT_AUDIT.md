@@ -223,7 +223,11 @@ CORS-allowlist с валидацией origin, многоуровневый thro
         `auth-data-export-*.helpers.ts` без смены endpoint/архива. Codex 2026-06-21; проверки:
         api typecheck ✓, root lint ✓, api unit 199 ✓, targeted integration export-data 11 ✓,
         format ✓, diff-check ✓.
-  - [ ] `marketplace/services/marketplace-listings.service.ts` (422) — `mapToDetail`/фильтры/гео-логику в helpers.
+  - [x] `marketplace/services/marketplace-listings.service.ts` (422 → 212) — сервис оставлен тонким фасадом,
+        транзакционные сценарии create/update/publish/archive/republish + owner lookup вынесены в
+        `marketplace-listings-workflow.helpers.ts` без смены API/DTO/прав доступа. Codex 2026-06-21; проверки:
+        api typecheck ✓, root lint ✓, api unit 199 ✓, targeted integration listings 12 ✓, format ✓,
+        diff-check ✓.
   - [ ] `moderation/moderation-case.helpers.ts` (421) — *borderline (уже helpers)*: дробить по типам кейсов только если
         реально облегчает чтение.
   - [ ] `auth/auth.service.ts` (414) — *borderline (тонкий оркестратор, логика уже в `auth-*.helpers`)*: при желании
