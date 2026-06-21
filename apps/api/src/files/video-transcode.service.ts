@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process";
-import { createWriteStream } from "node:fs";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { Injectable, Logger } from "@nestjs/common";
-import { GetObjectCommand, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import { FileAccessLevel, Prisma, VideoTranscodeStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { bucketForAccessLevel, getS3Config } from "./files-storage.helpers";
@@ -115,24 +116,27 @@ export class VideoTranscodeService {
       const renditions: StoredVideoRendition[] = [];
       for (const height of heights) {
         const outPath = join(workDir, `${height}.mp4`);
-        await this.runFfmpeg(sourcePath, outPath, height);
-        const buffer = await readFile(outPath);
+        // L-7: готовый ренишен (до 100 МБ × до 3 шт) НЕ грузим целиком в Buffer,
+        // а стримим с диска в S3 через lib-storage Upload (multipart): буферизует
+        // по одной ~5-МБ части за раз и ретраит по частям — низкий пик памяти и
+        // безопасные ретраи (сырой поток в PutObject при ретрае не перечитать).
+        const sizeBytes = await this.runFfmpeg(sourcePath, outPath, height);
         const renditionKey = storageKeyWithExtension(asset.storageKey, `.${height}p.mp4`);
-        await client.send(
-          new PutObjectCommand({
+        await new Upload({
+          client,
+          params: {
             Bucket: sourceBucket,
             Key: renditionKey,
-            Body: buffer,
+            Body: createReadStream(outPath),
             ContentType: "video/mp4",
-            ContentLength: buffer.length,
             // Без attachment — чтобы плеер мог воспроизводить inline.
-          }),
-        );
+          },
+        }).done();
         renditions.push({
           height,
           width: scaledWidth(probe.width, probe.height, height),
           storageKey: renditionKey,
-          sizeBytes: buffer.length,
+          sizeBytes,
         });
       }
 
@@ -196,7 +200,9 @@ export class VideoTranscodeService {
     }
   }
 
-  private async runFfmpeg(input: string, output: string, height: number): Promise<void> {
+  // Возвращает размер готового файла в байтах (для ContentLength потокового
+  // PutObject и метаданных ренишена).
+  private async runFfmpeg(input: string, output: string, height: number): Promise<number> {
     await this.run(FFMPEG_BIN, [
       "-i",
       input,
@@ -220,7 +226,8 @@ export class VideoTranscodeService {
       "-y",
       output,
     ]);
-    await stat(output); // убедимся, что файл создан
+    const { size } = await stat(output); // убедимся, что файл создан, и вернём размер
+    return size;
   }
 
   // Тонкая обёртка над spawn: собирает stdout, отклоняется при ненулевом коде.
