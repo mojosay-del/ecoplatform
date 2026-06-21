@@ -3,95 +3,18 @@
 import { useCallback, useRef, useState } from "react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from "@tiptap/react";
-import {
-  CheckSquare,
-  ClipboardList,
-  FileAudio,
-  GripVertical,
-  Image as ImageIcon,
-  Images,
-  ListChecks,
-  ListOrdered,
-  Paperclip,
-  Shuffle,
-  Trash2,
-  Video as VideoIcon,
-} from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
 import {
   ATOMIC_BLOCK_KINDS,
   ATOMIC_BLOCK_NODE_NAME,
   NODE_NAME_TO_ATOMIC_KIND,
   type AtomicBlockKind,
 } from "../../lib/editor/block-mapping";
+import { ATOMIC_BLOCK_ICONS, ATOMIC_BLOCK_LABELS } from "../../lib/editor/atomic-block-metadata";
 import { AtomicBlockEditor } from "./atomic-block-editors";
 import styles from "./document-editor.module.css";
 
-// Человекочитаемые подписи и иконки атомарных блоков (для шапки карточки и меню).
-export const ATOMIC_BLOCK_LABELS: Record<AtomicBlockKind, string> = {
-  image: "Картинка",
-  gallery: "Галерея",
-  video: "Видео",
-  audio: "Аудио",
-  file: "Файл",
-  checklist: "Чек-лист",
-  image_checklist: "Чек-лист с картинкой",
-  lesson_tasks: "Задания урока",
-  quiz: "Тест",
-  matching: "Сопоставление",
-};
-
-export const ATOMIC_BLOCK_ICONS: Record<AtomicBlockKind, React.ReactNode> = {
-  image: <ImageIcon size={15} />,
-  gallery: <Images size={15} />,
-  video: <VideoIcon size={15} />,
-  audio: <FileAudio size={15} />,
-  file: <Paperclip size={15} />,
-  checklist: <CheckSquare size={15} />,
-  image_checklist: <ListChecks size={15} />,
-  lesson_tasks: <ClipboardList size={15} />,
-  quiz: <ListOrdered size={15} />,
-  matching: <Shuffle size={15} />,
-};
-
-// Значения по умолчанию при вставке нового блока (совпадают с zod-схемами).
-export function atomicDefaultPayload(kind: AtomicBlockKind): Record<string, unknown> {
-  switch (kind) {
-    case "image":
-      return { fileId: "", caption: "", altText: "" };
-    case "gallery":
-      return { images: [] };
-    case "video":
-      return { fileId: "", caption: "" };
-    case "audio":
-      return { fileId: "", episodeTitle: "", caption: "" };
-    case "file":
-      return { fileId: "", displayName: "", description: "" };
-    case "checklist":
-      return { title: "", style: "positive", items: [""] };
-    case "image_checklist":
-      return { title: "", style: "positive", image: { fileId: "", caption: "", altText: "" }, items: [""] };
-    case "lesson_tasks":
-      return { tasks: [{ title: "", description: "" }] };
-    case "quiz":
-      return {
-        question: "",
-        multiple: false,
-        options: [
-          { text: "", correct: false },
-          { text: "", correct: false },
-        ],
-        explanation: "",
-      };
-    case "matching":
-      return {
-        instruction: "",
-        pairs: [
-          { left: "", right: "" },
-          { left: "", right: "" },
-        ],
-      };
-  }
-}
+export { ATOMIC_BLOCK_ICONS, ATOMIC_BLOCK_LABELS, atomicDefaultPayload } from "../../lib/editor/atomic-block-metadata";
 
 // Локальное состояние payload + коммит в атрибуты узла. Локальный стейт даёт
 // плавный ввод (без скачков курсора), коммит держит документ в синхроне.

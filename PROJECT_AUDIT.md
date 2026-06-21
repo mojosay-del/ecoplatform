@@ -202,8 +202,11 @@ CORS-allowlist с валидацией origin, многоуровневый thro
         чистые расчёты — в `audio-player.helpers` (+unit). Codex 2026-06-21; проверки: web tsc ✓,
         web unit 228 ✓, root lint ✓, format ✓, diff-check ✓. Live UI пропущен: локальный `.env` содержит
         prod-like S3/storage и SMTP/mail признаки.
-  - [ ] `components/editor/DocumentEditor.tsx` (400) — конфиг расширений/тулбар/slash-команды в модули `lib/editor/*`
-        (сериализатор уже там); сам компонент — тонкая оболочка.
+  - [x] `components/editor/DocumentEditor.tsx` (400 → 34) — публичный компонент оставлен тонким фасадом,
+        состояние/синхронизация TipTap вынесены в `use-document-editor`, toolbar/insert-menu — в
+        `document-editor-toolbar`, extensions/slash-команды/metadata/link-команды — в `lib/editor/*`.
+        Codex 2026-06-21; проверки: web tsc ✓, editor unit 26 ✓, root lint ✓, format ✓, diff-check ✓.
+        Live UI пропущен: локальный `.env` содержит prod-like S3/storage и SMTP/mail признаки.
   - [ ] `views/admin/documentation/use-admin-documentation.ts` (407) — *borderline (хук данных)*: разнести на под-хуки
         (список/реордер/мутации) или helpers, если читается как god-хук; иначе пропустить.
 

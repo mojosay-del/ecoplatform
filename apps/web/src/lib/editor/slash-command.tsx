@@ -7,9 +7,18 @@ import { PluginKey } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import { Heading2, Heading3, IndentIncrease, List, ListOrdered, Quote, Type } from "lucide-react";
-import { ATOMIC_BLOCK_NODE_NAME, type AtomicBlockKind } from "../../lib/editor/block-mapping";
-import { ATOMIC_BLOCK_ICONS, ATOMIC_BLOCK_LABELS, atomicDefaultPayload } from "./atomic-nodes";
-import styles from "./document-editor.module.css";
+import { ATOMIC_BLOCK_ICONS, ATOMIC_BLOCK_LABELS, atomicDefaultPayload } from "./atomic-block-metadata";
+import { ATOMIC_BLOCK_NODE_NAME, type AtomicBlockKind } from "./block-mapping";
+
+export type SlashCommandStyles = {
+  slashMenu: string;
+  slashEmpty: string;
+  slashItem: string;
+  slashItemActive: string;
+  slashItemIcon: string;
+  slashItemTitle: string;
+  slashPopup: string;
+};
 
 export type SlashItem = {
   title: string;
@@ -18,7 +27,6 @@ export type SlashItem = {
   run: (editor: Editor, range: Range) => void;
 };
 
-// Базовые текстовые команды доступны всегда.
 const TEXT_ITEMS: SlashItem[] = [
   {
     title: "Текст",
@@ -100,12 +108,14 @@ function filterItems(items: SlashItem[], query: string): SlashItem[] {
   );
 }
 
-// --- Всплывающее меню (React) ----------------------------------------------
-
-type SlashMenuProps = { items: SlashItem[]; command: (item: SlashItem) => void };
+type SlashMenuProps = {
+  items: SlashItem[];
+  command: (item: SlashItem) => void;
+  styles: SlashCommandStyles;
+};
 type SlashMenuHandle = { onKeyDown: (props: { event: KeyboardEvent }) => boolean };
 
-const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function SlashMenu({ items, command }, ref) {
+const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function SlashMenu({ items, command, styles }, ref) {
   const [selected, setSelected] = useState(0);
   const selectedRef = useRef(0);
   selectedRef.current = selected;
@@ -176,11 +186,9 @@ function positionMenu(element: HTMLElement, clientRect: () => DOMRect | null) {
   });
 }
 
-// --- Расширение --------------------------------------------------------------
-
 const slashPluginKey = new PluginKey("slashCommand");
 
-export function createSlashCommand(allowedAtomicKinds: AtomicBlockKind[]) {
+export function createSlashCommand(allowedAtomicKinds: AtomicBlockKind[], styles: SlashCommandStyles) {
   const items = buildItems(allowedAtomicKinds);
 
   const suggestion: Omit<SuggestionOptions<SlashItem>, "editor"> = {
@@ -196,16 +204,20 @@ export function createSlashCommand(allowedAtomicKinds: AtomicBlockKind[]) {
       return {
         onStart: (props) => {
           component = new ReactRenderer(SlashMenu, {
-            props: { items: props.items, command: (item: SlashItem) => props.command(item) },
+            props: { items: props.items, command: (item: SlashItem) => props.command(item), styles },
             editor: props.editor,
           });
           const element = component.element as HTMLElement;
-          element.classList.add(styles.slashPopup!);
+          element.classList.add(styles.slashPopup);
           document.body.appendChild(element);
           positionMenu(element, props.clientRect ?? (() => null));
         },
         onUpdate: (props) => {
-          component?.updateProps({ items: props.items, command: (item: SlashItem) => props.command(item) });
+          component?.updateProps({
+            items: props.items,
+            command: (item: SlashItem) => props.command(item),
+            styles,
+          });
           if (component) positionMenu(component.element as HTMLElement, props.clientRect ?? (() => null));
         },
         onKeyDown: (props) => {
