@@ -1,12 +1,13 @@
 import { ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
-import { CompanyStatus, Prisma } from "@prisma/client";
+import { CompanyStatus } from "@prisma/client";
 import { computeDiff } from "../common/admin-action-log.service";
+import { toPrismaJson } from "../common/prisma-json";
 import type { PrismaService } from "../prisma/prisma.service";
 import {
   addHours,
   isCompanySubscriptionCurrentlyActive,
   isUniqueConstraintError,
-  replayStoredResponse,
+  replayTrialActivation,
   serializeCompany,
   type TrialActivationResponse,
 } from "./billing-subscription.helpers";
@@ -26,7 +27,7 @@ export async function createSelfTrialActivation(
     where: { key_endpoint_actorId: { key, endpoint: SELF_TRIAL_ENDPOINT, actorId } },
   });
   if (existing) {
-    return replayStoredResponse<TrialActivationResponse>(existing, requestHash);
+    return replayTrialActivation(existing, requestHash);
   }
 
   try {
@@ -96,7 +97,7 @@ export async function createSelfTrialActivation(
           entityType: "Company",
           entityId: companyId,
           comment: "Пользователь включил пробный доступ на странице выбора тарифа.",
-          payload: auditPayload as Prisma.InputJsonValue,
+          payload: toPrismaJson(auditPayload),
         },
       });
 
@@ -108,7 +109,7 @@ export async function createSelfTrialActivation(
       await tx.idempotencyKey.update({
         where: { key_endpoint_actorId: { key, endpoint: SELF_TRIAL_ENDPOINT, actorId } },
         data: {
-          response: response as unknown as Prisma.InputJsonValue,
+          response: toPrismaJson(response),
           referenceType: "Company",
           referenceId: companyId,
         },
@@ -122,7 +123,7 @@ export async function createSelfTrialActivation(
         where: { key_endpoint_actorId: { key, endpoint: SELF_TRIAL_ENDPOINT, actorId } },
       });
       if (existing) {
-        return replayStoredResponse<TrialActivationResponse>(existing, requestHash);
+        return replayTrialActivation(existing, requestHash);
       }
     }
 

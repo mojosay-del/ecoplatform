@@ -3,11 +3,53 @@ import { createHash } from "crypto";
 import { CompanyStatus, Prisma } from "@prisma/client";
 import type { Company, Subscription } from "@prisma/client";
 import type { BillingTrialActivationResponse, ManualSubscriptionDto, SelfSubscriptionDto } from "@ecoplatform/shared";
+import { z } from "zod";
 
-export type ManualSubscriptionResponse = {
-  company: ReturnType<typeof serializeCompany>;
-  subscription: ReturnType<typeof serializeSubscription>;
-};
+const isoDateStringSchema = z.string().datetime();
+const nullableStringSchema = z.string().nullable();
+
+const billingCompanySummarySchema = z.object({
+  id: z.string(),
+  organizationName: z.string(),
+  type: z.string(),
+  status: z.string(),
+  demoEndsAt: isoDateStringSchema.nullable(),
+  subscriptionPlan: nullableStringSchema,
+  subscriptionEndsAt: isoDateStringSchema.nullable(),
+  billingInn: nullableStringSchema,
+  billingKpp: nullableStringSchema,
+  legalAddress: nullableStringSchema,
+  bankName: nullableStringSchema,
+  bankBik: nullableStringSchema,
+  bankAccount: nullableStringSchema,
+  correspondentAccount: nullableStringSchema,
+  createdAt: isoDateStringSchema,
+  updatedAt: isoDateStringSchema,
+});
+
+const billingSubscriptionSchema = z.object({
+  id: z.string(),
+  companyId: z.string(),
+  plan: z.string(),
+  status: z.string(),
+  startsAt: isoDateStringSchema,
+  endsAt: isoDateStringSchema,
+  reason: nullableStringSchema,
+  createdAt: isoDateStringSchema,
+  updatedAt: isoDateStringSchema,
+});
+
+const manualSubscriptionResponseSchema = z.object({
+  company: billingCompanySummarySchema,
+  subscription: billingSubscriptionSchema,
+});
+
+const trialActivationResponseSchema = z.object({
+  company: billingCompanySummarySchema,
+  trialEndsAt: isoDateStringSchema,
+});
+
+export type ManualSubscriptionResponse = z.infer<typeof manualSubscriptionResponseSchema>;
 
 export type TrialActivationResponse = BillingTrialActivationResponse;
 
@@ -68,12 +110,20 @@ export function replayManualSubscription(
   existing: { requestHash: string; response: Prisma.JsonValue | null },
   requestHash: string,
 ): ManualSubscriptionResponse {
-  return replayStoredResponse<ManualSubscriptionResponse>(existing, requestHash);
+  return replayStoredResponse(existing, requestHash, manualSubscriptionResponseSchema);
 }
 
-export function replayStoredResponse<T>(
+export function replayTrialActivation(
   existing: { requestHash: string; response: Prisma.JsonValue | null },
   requestHash: string,
+): TrialActivationResponse {
+  return replayStoredResponse(existing, requestHash, trialActivationResponseSchema);
+}
+
+function replayStoredResponse<T>(
+  existing: { requestHash: string; response: Prisma.JsonValue | null },
+  requestHash: string,
+  schema: z.ZodType<T>,
 ): T {
   if (existing.requestHash !== requestHash) {
     throw new ConflictException("Idempotency-Key уже использован с другим payload.");
@@ -83,7 +133,12 @@ export function replayStoredResponse<T>(
     throw new ConflictException("Запрос с этим Idempotency-Key ещё обрабатывается. Повторите позже.");
   }
 
-  return existing.response as unknown as T;
+  const parsed = schema.safeParse(existing.response);
+  if (!parsed.success) {
+    throw new ConflictException("Сохранённый ответ для этого Idempotency-Key повреждён. Повторите запрос позже.");
+  }
+
+  return parsed.data;
 }
 
 export function isUniqueConstraintError(error: unknown): boolean {

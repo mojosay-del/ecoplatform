@@ -533,11 +533,17 @@ CORS-allowlist с валидацией origin, многоуровневый thro
     Browser/dev не запускался: локальная `.env` указывает на prod-like S3/SMTP.
   - **Исполнитель/заметка:** Codex.
 
-- [ ] **Q-4. Повторяющийся каст `as unknown as Prisma.InputJsonValue` (биллинг/трип-калькулятор).**
+- [x] **Q-4. Повторяющийся каст `as unknown as Prisma.InputJsonValue` (биллинг/трип-калькулятор).** ЗАКРЫТО
+  (2026-06-22):
+  JSON-запись в billing/trip-calculator переведена на общий backend-хелпер `toPrismaJson`, а idempotency replay
+  валидирует сохранённый `response` Zod-схемами manual subscription / trial перед возвратом клиенту.
   6+ мест льют типизированный объект в Prisma-JSON через двойной каст. Это известная фрикция Prisma, но шумит.
   - **Фикс:** один хелпер `toPrismaJson<T>(value: T): Prisma.InputJsonValue` + при чтении idempotency-replay
     валидировать `existing.response` zod-схемой вместо `as unknown as T` (сейчас доверяем форме JSON из БД вслепую).
-  - **Исполнитель/заметка:**
+  - **Проверка:** api unit 207 ✓ (включая `billing-subscription.helpers.test.ts`), targeted integration
+    `auth-demo-billing.integration.test.ts` + `trip-calculator.integration.test.ts` 19 ✓, `pnpm typecheck` ✓,
+    `pnpm lint` ✓ (0 errors; текущие web warnings остаются), `git diff --check` ✓.
+  - **Исполнитель/заметка:** Codex.
 
 - [ ] **Q-5. Мелкие dev-experience / стандарты (опционально).**
   Нет pre-commit хука (prettier/tsc гоняются только в CI — `lint-staged`+`simple-git-hooks` ловили бы до push);

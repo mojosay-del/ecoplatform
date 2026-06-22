@@ -1,7 +1,8 @@
 import { ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
-import { CompanyStatus, NotificationCategory, Prisma, SubscriptionStatus } from "@prisma/client";
+import { CompanyStatus, NotificationCategory, SubscriptionStatus } from "@prisma/client";
 import type { SelfSubscriptionDto } from "@ecoplatform/shared";
 import { computeDiff } from "../common/admin-action-log.service";
+import { toPrismaJson } from "../common/prisma-json";
 import { swallowAndLog } from "../common/silent-catch";
 import type { NotificationsService } from "../notifications/notifications.service";
 import type { PrismaService } from "../prisma/prisma.service";
@@ -113,7 +114,7 @@ export async function createSelfSubscriptionActivation(
           entityType: "Company",
           entityId: companyId,
           comment: "Пользователь выбрал подписку на странице выбора тарифа.",
-          payload: auditPayload as Prisma.InputJsonValue,
+          payload: toPrismaJson(auditPayload),
         },
       });
 
@@ -125,7 +126,7 @@ export async function createSelfSubscriptionActivation(
       await tx.idempotencyKey.update({
         where: { key_endpoint_actorId: { key, endpoint: SELF_SUBSCRIPTION_ENDPOINT, actorId } },
         data: {
-          response: response as unknown as Prisma.InputJsonValue,
+          response: toPrismaJson(response),
           referenceType: "Subscription",
           referenceId: subscription.id,
         },

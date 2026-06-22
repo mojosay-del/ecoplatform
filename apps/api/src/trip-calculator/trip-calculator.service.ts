@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
 import {
   tripCalculatorSettingsSchema,
   type TripCalculatorSettings,
   type TripCalculatorSettingsGetResponse,
 } from "@ecoplatform/shared";
 import { assertCompanyTypeIn } from "../common/access-policy";
+import { toPrismaJson } from "../common/prisma-json";
 import { PrismaService } from "../prisma/prisma.service";
 import type { RequestUser } from "../common/request-user";
 
@@ -34,7 +34,7 @@ export class TripCalculatorService {
 
   async saveSettings(user: RequestUser, input: TripCalculatorSettings): Promise<TripCalculatorSettings> {
     const companyId = this.assertCollector(user);
-    const data = input as unknown as Prisma.InputJsonValue;
+    const data = toPrismaJson(input);
     const row = await this.prisma.companyTripCalculatorSettings.upsert({
       where: { companyId },
       create: { companyId, data },
