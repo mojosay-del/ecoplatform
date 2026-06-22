@@ -1,3 +1,4 @@
+import "../../styles/account.css";
 import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { BillingStatus, SubscriptionPlan } from "@ecoplatform/shared";
