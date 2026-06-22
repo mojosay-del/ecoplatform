@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bodyParagraphs,
   companyRoleLabel,
+  forumProfileRoleLabel,
   forumStatusLabel,
   forumStatusVariant,
   initialsFromName,
@@ -26,6 +27,29 @@ describe("forum helpers", () => {
     expect(companyRoleLabel("trader")).toBe("Трейдер");
     expect(companyRoleLabel("processor")).toBe("Переработчик");
     expect(companyRoleLabel(null)).toBeNull();
+  });
+
+  it("shows platform badge for staff before company or verified labels", () => {
+    expect(
+      forumProfileRoleLabel({
+        companyType: "collector",
+        isPlatformStaff: true,
+        verified: true,
+      }),
+    ).toBe("ЭкоПлатформа");
+    expect(
+      forumProfileRoleLabel({
+        companyType: "trader",
+        platformRoles: ["moderator"],
+        verified: true,
+      }),
+    ).toBe("ЭкоПлатформа");
+  });
+
+  it("keeps company and verified labels for regular users", () => {
+    expect(forumProfileRoleLabel({ companyType: "collector", verified: false })).toBe("Заготовитель");
+    expect(forumProfileRoleLabel({ companyType: null, verified: true })).toBe("Проверенный профиль");
+    expect(forumProfileRoleLabel({ companyType: null, verified: false })).toBeNull();
   });
 
   it("builds avatar initials from display name", () => {

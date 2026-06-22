@@ -13,6 +13,7 @@ export function fallbackReputation(userId: string): ForumAuthorReputation {
     avatarUrl: null,
     companyType: null,
     companyName: null,
+    isPlatformStaff: false,
     verified: false,
     rating: null,
     dealsCompleted: 0,
@@ -40,6 +41,7 @@ export async function buildForumReputationMap(prisma: PrismaService, authorIds: 
       companyId: true,
       avatarFile: { select: { storageKey: true, accessLevel: true } },
       company: { select: { type: true, organizationName: true, status: true } },
+      platformStaff: { select: { isActive: true, roles: true } },
     },
   });
 
@@ -73,6 +75,7 @@ export async function buildForumReputationMap(prisma: PrismaService, authorIds: 
       avatarUrl: user.avatarFile ? publicUrl(user.avatarFile.storageKey, user.avatarFile.accessLevel) : null,
       companyType: user.company?.type ?? null,
       companyName: user.company?.organizationName ?? null,
+      isPlatformStaff: Boolean(user.platformStaff?.isActive && user.platformStaff.roles.length > 0),
       // «Проверенный» — компания с активной (оплаченной) подпиской.
       verified: user.company?.status === "active",
       rating: user.companyId ? (ratingByCompany.get(user.companyId) ?? null) : null,

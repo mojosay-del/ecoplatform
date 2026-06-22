@@ -418,6 +418,48 @@ describe("FilesService upload validation", () => {
     expect(result.mimeType).toBe("application/pdf");
   });
 
+  it("нормализует кириллическое имя файла, если multipart прислал UTF-8 mojibake", async () => {
+    const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
+    const mojibakeName = Buffer.from("Акт об уничтожении.pdf", "utf8").toString("latin1");
+    const prisma = referencePrisma({
+      fileAsset: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
+        create: vi.fn().mockImplementation(({ data }) =>
+          Promise.resolve({
+            id: "file-pdf",
+            createdAt: new Date("2026-05-25T00:00:00.000Z"),
+            ...data,
+          }),
+        ),
+      },
+    });
+    const service = serviceWithPrisma(prisma);
+
+    const result = await withEnvAsync(CONFIGURED_S3_ENV, () =>
+      service.upload(
+        {
+          originalname: mojibakeName,
+          mimetype: "application/pdf",
+          size: pdf.length,
+          buffer: pdf,
+        },
+        {},
+        "user-1",
+      ),
+    );
+
+    const command = s3Send.mock.calls[0]?.[0] as { input?: Record<string, unknown> } | undefined;
+    expect(command?.input?.ContentDisposition).toContain(encodeURIComponent("Акт об уничтожении.pdf"));
+    expect(prisma.fileAsset.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        originalName: "Акт об уничтожении.pdf",
+      }),
+    });
+    expect(result.originalName).toBe("Акт об уничтожении.pdf");
+  });
+
   it("возвращает понятную ошибку и не создаёт metadata, если S3 upload недоступен", async () => {
     const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n%test\n"), Buffer.alloc(5000)]);
     const prisma = referencePrisma({
@@ -807,6 +849,7 @@ describe("FilesService приватный бакет + signed URL", () => {
 
   it("signDownloadUrls: приватный файл при настроенном приватном бакете → presigned GET", async () => {
     const service = serviceWithPrisma(referencePrisma());
+    const mojibakeName = Buffer.from("Акт об уничтожении.xlsx", "utf8").toString("latin1");
 
     const urls = await withEnvAsync({ ...CONFIGURED_S3_ENV, S3_PRIVATE_BUCKET: "private-bucket" }, () =>
       service.signDownloadUrls([
@@ -814,12 +857,15 @@ describe("FilesService приватный бакет + signed URL", () => {
           id: "priv",
           storageKey: "uploads/x/doc.pdf",
           accessLevel: FileAccessLevel.authenticated,
-          originalName: "doc.pdf",
+          originalName: mojibakeName,
         },
       ]),
     );
 
     expect(urls.get("priv")).toBe("https://signed.example/private-bucket/uploads/x/doc.pdf");
+    const disposition = (vi.mocked(getSignedUrl).mock.calls[0]?.[1] as { input?: Record<string, unknown> } | undefined)
+      ?.input?.ResponseContentDisposition;
+    expect(disposition).toBe(`attachment; filename*=UTF-8''${encodeURIComponent("Акт об уничтожении.xlsx")}`);
   });
 
   it("signDownloadUrls: ошибка presign даёт null для файла, а не роняет весь ответ", async () => {

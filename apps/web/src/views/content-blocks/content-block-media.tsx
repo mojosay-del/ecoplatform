@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect } from "react";
-import { preferredFileAssetMediaUrl, type FileAsset } from "../../lib/api";
+import { useEffect, useRef } from "react";
+import type { FileAsset } from "../../lib/api";
 import type { VideoPlayerProps, VideoPlayerSource } from "./VideoPlayer";
 import "./media-block.css";
 
@@ -33,11 +33,19 @@ export function ImageBlock({
   fileId: string;
   onImageLoadSettled?: (fileId: string) => void;
 }) {
+  const imageRef = useRef<HTMLImageElement | null>(null);
+
   useEffect(() => {
     if (!assetsLoading && !asset?.publicUrl) {
       onImageLoadSettled?.(fileId);
     }
   }, [asset?.publicUrl, assetsLoading, fileId, onImageLoadSettled]);
+
+  useEffect(() => {
+    if (asset?.publicUrl && imageRef.current?.complete) {
+      onImageLoadSettled?.(fileId);
+    }
+  }, [asset?.publicUrl, fileId, onImageLoadSettled]);
 
   return (
     <figure className="media-block">
@@ -46,6 +54,7 @@ export function ImageBlock({
           alt={altText ?? asset.originalName}
           onError={() => onImageLoadSettled?.(fileId)}
           onLoad={() => onImageLoadSettled?.(fileId)}
+          ref={imageRef}
           src={asset.publicUrl}
         />
       ) : (

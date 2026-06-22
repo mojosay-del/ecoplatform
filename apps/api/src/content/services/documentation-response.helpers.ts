@@ -5,6 +5,7 @@ import type {
   DocumentationFileMeta,
   DocumentationNode,
 } from "@ecoplatform/shared";
+import { normalizeFileNameEncoding } from "../../files/file-name.helpers";
 import { sanitizeContentBlocksForResponse } from "./content-block-response.helpers";
 
 // Узел документации в том виде, как он приходит из Prisma с подгруженными
@@ -54,10 +55,11 @@ function fileMeta(file?: FileAsset | null): DocumentationFileMeta | null {
   if (!file) {
     return null;
   }
+  const fileName = normalizeFileNameEncoding(file.originalName);
   return {
     id: file.id,
-    fileName: file.originalName,
-    format: documentationFileFormat(file.originalName, file.mimeType),
+    fileName,
+    format: documentationFileFormat(fileName, file.mimeType),
     sizeBytes: file.sizeBytes,
   };
 }

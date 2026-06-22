@@ -353,6 +353,8 @@ export function ForumListView() {
               name={userName}
               avatarUrl={user?.avatarUrl ?? null}
               companyType={user?.company?.type ?? null}
+              isPlatformStaff={(user?.platformRoles?.length ?? 0) > 0}
+              platformRoles={user?.platformRoles ?? []}
               verified={user?.company?.status === "active"}
               summary={summary.data.currentUser}
               weeklyExperts={summary.data.weeklyExperts}

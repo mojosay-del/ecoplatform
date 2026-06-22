@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import "./content-blocks/content-article.css";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
 import { CoverImage } from "../components/CoverImage";
@@ -14,6 +14,11 @@ import { buildKnowledgeBreadcrumbs } from "./knowledge-base-utils";
 import { PageHeader } from "./shared";
 
 type KnowledgeArticleLike = KnowledgeNode | KnowledgeArticleDetail;
+
+type ArticleImageReadiness = {
+  key: string;
+  settledIds: Set<string>;
+};
 
 export function KnowledgeArticlePanel({ active, tree }: { active: KnowledgeArticleLike; tree: KnowledgeNode[] }) {
   const breadcrumbs = buildKnowledgeBreadcrumbs(tree, active);
@@ -29,21 +34,29 @@ export function KnowledgeArticlePanel({ active, tree }: { active: KnowledgeArtic
     ).sort();
   }, [active.coverImageId, blocks]);
   const articleImageIdsKey = articleImageIds.join(",");
-  const [settledArticleImageIds, setSettledArticleImageIds] = useState<Set<string>>(new Set());
+  const articleReadinessKey = `${active.slug}:${articleImageIdsKey}`;
+  const [articleReadiness, setArticleReadiness] = useState<ArticleImageReadiness>({
+    key: articleReadinessKey,
+    settledIds: new Set(),
+  });
+  const settledArticleImageIds =
+    articleReadiness.key === articleReadinessKey ? articleReadiness.settledIds : new Set<string>();
   const isArticleReady =
     articleImageIds.length === 0 || articleImageIds.every((imageId) => settledArticleImageIds.has(imageId));
-  const markArticleImageSettled = useCallback((fileId: string) => {
-    setSettledArticleImageIds((current) => {
-      if (current.has(fileId)) return current;
-      const next = new Set(current);
-      next.add(fileId);
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    setSettledArticleImageIds(new Set());
-  }, [active.slug, articleImageIdsKey]);
+  const markArticleImageSettled = useCallback(
+    (fileId: string) => {
+      setArticleReadiness((current) => {
+        const currentSet = current.key === articleReadinessKey ? current.settledIds : new Set<string>();
+        if (currentSet.has(fileId)) {
+          return current.key === articleReadinessKey ? current : { key: articleReadinessKey, settledIds: currentSet };
+        }
+        const next = new Set(currentSet);
+        next.add(fileId);
+        return { key: articleReadinessKey, settledIds: next };
+      });
+    },
+    [articleReadinessKey],
+  );
 
   return (
     <>

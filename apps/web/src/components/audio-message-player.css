@@ -167,8 +167,8 @@
 }
 
 .audio-message-player.is-compact .audio-player-round-button {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   margin-top: 0;
 }
 
@@ -193,11 +193,11 @@
 }
 
 .audio-message-player.is-compact .audio-player-speed {
-  min-width: 48px;
-  height: 36px;
+  min-width: 44px;
+  height: 34px;
   margin-top: 8px;
-  padding: 0 10px;
-  font-size: 13px;
+  padding: 0 9px;
+  font-size: 12px;
 }
 
 .audio-message-player.is-unavailable .audio-player-waveform {

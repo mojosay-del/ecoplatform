@@ -1,4 +1,4 @@
-import type { CompanyType, ForumQuestionStatus } from "@ecoplatform/shared";
+import type { CompanyType, ForumQuestionStatus, PlatformRole } from "@ecoplatform/shared";
 
 // Статус-бейдж: «Решено» (есть принятый ответ) vs «Нужен ответ». hidden — только
 // в админ-контексте; в публичной ленте скрытые вопросы не показываются.
@@ -20,6 +20,21 @@ export function companyRoleLabel(type: CompanyType | null): string | null {
   if (type === "trader") return "Трейдер";
   if (type === "processor") return "Переработчик";
   return null;
+}
+
+export function forumProfileRoleLabel({
+  companyType,
+  isPlatformStaff,
+  platformRoles = [],
+  verified,
+}: {
+  companyType: CompanyType | null;
+  isPlatformStaff?: boolean;
+  platformRoles?: readonly PlatformRole[];
+  verified: boolean;
+}): string | null {
+  if (isPlatformStaff || platformRoles.length > 0) return "ЭкоПлатформа";
+  return companyRoleLabel(companyType) ?? (verified ? "Проверенный профиль" : null);
 }
 
 // Инициалы для аватара-заглушки из отображаемого имени («Игорь П.» → «ИП»).

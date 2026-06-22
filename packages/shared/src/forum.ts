@@ -35,6 +35,8 @@ export type ForumAuthorReputation = {
   // Роль автора = тип его компании (заготовитель/трейдер/переработчик); null у стаффа.
   companyType: CompanyType | null;
   companyName: string | null;
+  // Staff-пользователь платформы: admin / moderator / content_manager.
+  isPlatformStaff: boolean;
   // «Проверенный» — компания с активной подпиской/верифицирована.
   verified: boolean;
   // Общий рейтинг компании на площадке (null = ещё нет отзывов).

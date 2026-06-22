@@ -22,10 +22,11 @@ import type {
   ForumQuestionStatus,
   ForumSummary,
   ForumTaxonomyValue,
+  PlatformRole,
 } from "@ecoplatform/shared";
 import { ArrowUpActionIcon } from "../../components/app-shell/nav-icons";
 import {
-  companyRoleLabel,
+  forumProfileRoleLabel,
   forumStatusLabel,
   forumStatusVariant,
   initialsFromName,
@@ -68,9 +69,12 @@ export function Avatar({ author, className }: { author: ForumAuthorReputation; c
 
 // Репутация автора: имя + роль + «проверенный» + рейтинг + сделки + решено на форуме.
 export function Reputation({ author }: { author: ForumAuthorReputation }) {
-  const role = companyRoleLabel(author.companyType);
   const displayName = author.companyName ?? author.name;
-  const profileRoleLabel = role ?? (author.verified ? "Проверенный профиль" : null);
+  const profileRoleLabel = forumProfileRoleLabel({
+    companyType: author.companyType,
+    isPlatformStaff: author.isPlatformStaff,
+    verified: author.verified,
+  });
   return (
     <span className="forum-who">
       <Avatar author={author} />
@@ -78,7 +82,7 @@ export function Reputation({ author }: { author: ForumAuthorReputation }) {
       {profileRoleLabel ? (
         <span
           className="forum-profile-role forum-profile-role--inline"
-          title={author.verified ? "Проверенная компания" : undefined}
+          title={author.isPlatformStaff ? "Команда ЭкоПлатформы" : author.verified ? "Проверенная компания" : undefined}
         >
           <BadgeCheck size={15} />
           {profileRoleLabel}
@@ -174,6 +178,8 @@ export function AsideProfile({
   name,
   avatarUrl,
   companyType,
+  isPlatformStaff,
+  platformRoles,
   verified,
   summary,
   weeklyExperts,
@@ -181,12 +187,13 @@ export function AsideProfile({
   name: string;
   avatarUrl: string | null;
   companyType: ForumAuthorReputation["companyType"];
+  isPlatformStaff?: boolean;
+  platformRoles?: readonly PlatformRole[];
   verified: boolean;
   summary: ForumSummary["currentUser"];
   weeklyExperts: ForumSummary["weeklyExperts"];
 }) {
-  const role = companyRoleLabel(companyType);
-  const profileRoleLabel = role ?? (verified ? "Проверенный профиль" : null);
+  const profileRoleLabel = forumProfileRoleLabel({ companyType, isPlatformStaff, platformRoles, verified });
   return (
     <>
       <div className="card forum-profile-card">

@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { extname } from "path";
+import { normalizeFileNameEncoding } from "./file-name.helpers";
 
 const SAFE_NAME_PATTERN = /[^a-zA-Z0-9._-]+/g;
 export const GENERIC_DECLARED_MIME_TYPES = new Set(["application/octet-stream", "binary/octet-stream"]);
@@ -81,12 +82,13 @@ export function isDeclaredMimeCompatible(declaredMime: string, detectedMime: str
 }
 
 export function hasBlockedExtension(originalName: string): boolean {
-  return BLOCKED_UPLOAD_EXTENSIONS.has(extname(originalName).toLowerCase());
+  return BLOCKED_UPLOAD_EXTENSIONS.has(extname(normalizeFileNameEncoding(originalName)).toLowerCase());
 }
 
 function attachmentDisposition(originalName: string): string {
-  const fallback = (originalName.replace(/[^\x20-\x7E]+/g, "_").replace(/["\\]/g, "_") || "file").slice(0, 120);
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(originalName)}`;
+  const normalizedName = normalizeFileNameEncoding(originalName);
+  const fallback = (normalizedName.replace(/[^\x20-\x7E]+/g, "_").replace(/["\\]/g, "_") || "file").slice(0, 120);
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(normalizedName)}`;
 }
 
 export function contentDisposition(mimeType: string, originalName: string): string | undefined {
@@ -98,15 +100,17 @@ export function contentDisposition(mimeType: string, originalName: string): stri
 }
 
 export function downloadContentDisposition(originalName: string): string {
+  const normalizedName = normalizeFileNameEncoding(originalName);
   // filename* (RFC 5987) корректно отдаёт кириллические имена при скачивании.
-  return `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`;
+  return `attachment; filename*=UTF-8''${encodeURIComponent(normalizedName)}`;
 }
 
 export function buildStorageKey(originalName: string, extensionOverride?: string): string {
-  const originalExtension = extname(originalName).toLowerCase();
+  const normalizedName = normalizeFileNameEncoding(originalName);
+  const originalExtension = extname(normalizedName).toLowerCase();
   const extension = extensionOverride ?? originalExtension;
-  const baseName = originalName
-    .slice(0, Math.max(0, originalName.length - originalExtension.length))
+  const baseName = normalizedName
+    .slice(0, Math.max(0, normalizedName.length - originalExtension.length))
     .trim()
     .replace(SAFE_NAME_PATTERN, "-")
     .replace(/^-+|-+$/g, "")

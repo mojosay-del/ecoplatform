@@ -1,5 +1,6 @@
 import { ContentStatus, Prisma } from "@prisma/client";
 import type { DocumentationSearchSnippet } from "@ecoplatform/shared";
+import { normalizeFileNameEncoding } from "../../files/file-name.helpers";
 import type { PrismaService } from "../../prisma/prisma.service";
 
 type DocumentationSearchInput = {
@@ -170,7 +171,7 @@ function buildDocumentationSearchSnippet(
   query: string,
   source: DocumentationSearchSnippet["source"],
 ): DocumentationSearchSnippet {
-  const cleanSource = stripSearchSource(sourceText);
+  const cleanSource = stripSearchSource(source === "file" ? normalizeFileNameEncoding(sourceText) : sourceText);
   const highlights = findHighlights(cleanSource, query);
 
   if (highlights.length === 0) {

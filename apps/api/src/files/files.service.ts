@@ -17,6 +17,7 @@ import { PlatformSettingsService } from "../admin/settings/platform-settings.ser
 import { fileTypeFromBuffer } from "file-type";
 import type { RequestUser } from "../common/request-user";
 import { PrismaService } from "../prisma/prisma.service";
+import { normalizeFileNameEncoding } from "./file-name.helpers";
 import { processCoverImage, type ProcessedImageVariant } from "./image-presets";
 import {
   BLOCKED_UPLOAD_MIME_TYPES,
@@ -318,7 +319,7 @@ export class FilesService {
 
     const asset = await this.prisma.fileAsset.create({
       data: {
-        originalName: file.originalname,
+        originalName: normalizeFileNameEncoding(file.originalname),
         mimeType: upload.mimeType,
         sizeBytes: upload.buffer.length,
         accessLevel,

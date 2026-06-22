@@ -47,6 +47,8 @@ export function AudioPlayerView({
   onStartSeek,
   onSeekByKeyboard,
 }: AudioPlayerViewProps) {
+  const pauseIconSize = compact ? 24 : 30;
+  const playIconSize = compact ? 28 : 34;
   const rootClassName = [
     "audio-message-player",
     compact ? "is-compact" : "",
@@ -72,9 +74,9 @@ export function AudioPlayerView({
           aria-pressed={isPlaying}
         >
           {isPlaying ? (
-            <Pause size={30} strokeWidth={3} aria-hidden="true" />
+            <Pause size={pauseIconSize} strokeWidth={3} aria-hidden="true" />
           ) : (
-            <Play size={34} fill="currentColor" strokeWidth={0} aria-hidden="true" />
+            <Play size={playIconSize} fill="currentColor" strokeWidth={0} aria-hidden="true" />
           )}
         </button>
 

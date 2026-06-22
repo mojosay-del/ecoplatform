@@ -1,4 +1,5 @@
 import { Prisma, type FileAsset } from "@prisma/client";
+import { normalizeFileNameEncoding } from "./file-name.helpers";
 import { publicUrl } from "./files-storage.helpers";
 import { parseVideoRenditions, type VideoRenditionStatus } from "./video-renditions";
 
@@ -88,6 +89,7 @@ export function toFileAssetResponse(asset: FileAsset): FileAssetResponse {
   const resolvedPublicUrl = publicUrl(asset.storageKey, asset.accessLevel);
   return {
     ...asset,
+    originalName: normalizeFileNameEncoding(asset.originalName),
     publicUrl: resolvedPublicUrl,
     // Базовое значение: для public — публичная ссылка, для приватных — null.
     // Вызовы, которым нужна presigned-ссылка для приватного файла, перезаписывают
