@@ -13,7 +13,7 @@ import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
 import { AccountService } from "./account.service";
 
-const setAvatarSchema = z.object({ fileId: z.string().trim().min(1) });
+export const setAvatarSchema = z.object({ fileId: z.string().trim().min(1) });
 const CONTACT_CHANGE_THROTTLE = { short: { limit: 5, ttl: 60_000 } };
 
 @UseGuards(JwtAuthGuard)

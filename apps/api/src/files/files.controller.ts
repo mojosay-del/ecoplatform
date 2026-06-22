@@ -25,7 +25,7 @@ const FILE_UPLOAD_THROTTLE = {
   short: { limit: 20, ttl: 60_000 },
   long: { limit: 20, ttl: 60_000 },
 };
-const fileUploadSchema = z.object({
+export const fileUploadSchema = z.object({
   accessLevel: z.nativeEnum(FileAccessLevel).optional(),
   imagePreset: z.literal("cover").optional(),
 });

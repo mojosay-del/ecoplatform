@@ -21,6 +21,7 @@ import { createCorsOrigin } from "./common/cors-origin";
 import { csrfCookieMiddleware, CsrfGuard } from "./common/csrf.guard";
 import { GlobalExceptionFilter, registerProcessErrorHandlers } from "./common/global-exception.filter";
 import { FilesService } from "./files/files.service";
+import { setupOpenApi } from "./openapi/openapi";
 
 function assertSecret(name: string) {
   const value = process.env[name];
@@ -56,6 +57,7 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   app.setGlobalPrefix("api");
+  setupOpenApi(app);
   app.use(cookieParser());
   app.use(csrfCookieMiddleware);
   app.useGlobalGuards(new CsrfGuard());

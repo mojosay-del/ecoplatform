@@ -545,13 +545,19 @@ CORS-allowlist с валидацией origin, многоуровневый thro
     `pnpm lint` ✓ (0 errors; текущие web warnings остаются), `git diff --check` ✓.
   - **Исполнитель/заметка:** Codex.
 
-- [ ] **Q-5. Мелкие dev-experience / стандарты (опционально).**
+- [x] **Q-5. Мелкие dev-experience / стандарты (опционально).** ЗАКРЫТО (2026-06-22):
   Нет pre-commit хука (prettier/tsc гоняются только в CI — `lint-staged`+`simple-git-hooks` ловили бы до push);
   нет OpenAPI/Swagger для API (контракт частично закрыт shared-типами, но машиночитаемой спеки нет);
   `auth-shell.tsx` использует `<img>` вместо `next/image` (1 место, билборд).
   - **Фикс:** по желанию владельца — `simple-git-hooks` + `lint-staged`; `@nestjs/swagger` (+ zod-to-openapi) если нужен
     внешний контракт; `next/image` для билборда.
-  - **Исполнитель/заметка:**
+  - **Стало:** root pre-commit через `simple-git-hooks` (`pnpm lint-staged && pnpm typecheck`) + `lint-staged`;
+    OpenAPI включён в dev/test на `/api/docs` и `/api/openapi.json`, в production только при `OPENAPI_ENABLED=1`;
+    request body/query схемы берутся из текущих Zod-схем, общие error/CSRF/bearer компоненты добавлены; мобильный
+    логотип auth-shell переведён на `next/image`.
+  - **Проверка:** api unit 210 ✓ (включая `openapi.test.ts`), `pnpm typecheck` ✓, `pnpm lint` ✓ (0 errors; текущие
+    web warnings остаются), `pnpm format:check` ✓, `git diff --check` ✓.
+  - **Исполнитель/заметка:** Codex.
 
 ---
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -86,8 +87,7 @@ export function AuthShell({ children, mode }: { children: ReactNode; mode: AuthM
         <AuthVisual mode={mode} />
         <div className="auth-form-panel">
           <div className="auth-mobile-brand" aria-hidden="true">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="auth-mobile-brand-logo" src="/icons/icon-192.png" alt="" width={36} height={36} />
+            <Image className="auth-mobile-brand-logo" src="/icons/icon-192.png" alt="" width={36} height={36} />
             <span>ЭкоПлатформа</span>
           </div>
           {children}

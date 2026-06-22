@@ -19,7 +19,7 @@ import { MarketplaceEnabledGuard } from "./marketplace-enabled.guard";
 import { MarketplaceOffersService } from "./services/marketplace-offers.service";
 import { MarketplaceReviewsService } from "./services/marketplace-reviews.service";
 
-const addressSuggestQuerySchema = z.object({
+export const addressSuggestQuerySchema = z.object({
   q: z.string().trim().min(3).max(200),
 });
 

@@ -10,9 +10,9 @@ import type { RequestUser } from "../common/request-user";
 import { parseBody } from "../common/zod";
 import { SupportService } from "./support.service";
 
-const replySchema = z.object({ text: z.string().trim().min(1).max(SUPPORT_TICKET_MESSAGE_MAX_LENGTH) });
+export const supportReplySchema = z.object({ text: z.string().trim().min(1).max(SUPPORT_TICKET_MESSAGE_MAX_LENGTH) });
 
-const supportListQuerySchema = z
+export const supportListQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(200).optional(),
     offset: z.coerce.number().int().min(0).optional(),
@@ -48,7 +48,7 @@ export class SupportController {
 
   @Post("support/tickets/:id/replies")
   async ownReply(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
-    const input = parseBody(replySchema, body);
+    const input = parseBody(supportReplySchema, body);
     return this.support.replyAsCompanyUser(id, user.id, requireCompany(user), input.text);
   }
 
@@ -63,7 +63,7 @@ export class SupportController {
   @Roles("admin")
   @Post("admin/support/tickets/:id/replies")
   async adminReply(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
-    const input = parseBody(replySchema, body);
+    const input = parseBody(supportReplySchema, body);
     return this.support.replyAsAdmin(id, user.id, input.text);
   }
 }

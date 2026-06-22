@@ -7,12 +7,12 @@ import { parseBody } from "../common/zod";
 import type { RequestUser } from "../common/request-user";
 import { NotificationsService } from "./notifications.service";
 
-const preferencesSchema = z.object({
+export const notificationPreferencesSchema = z.object({
   inAppMutedCategories: z.array(z.nativeEnum(NotificationCategory)).default([]),
   emailMutedCategories: z.array(z.nativeEnum(NotificationCategory)).default([]),
 });
 
-const listQuerySchema = z.object({
+export const notificationListQuerySchema = z.object({
   archived: z
     .enum(["true", "false"])
     .optional()
@@ -29,7 +29,7 @@ export class NotificationsController {
 
   @Get()
   async list(@CurrentUser() user: RequestUser, @Query() query: unknown) {
-    const input = parseBody(listQuerySchema, query);
+    const input = parseBody(notificationListQuerySchema, query);
     return this.notifications.list(user, {
       includeArchived: input.archived,
       limit: input.limit,
@@ -64,7 +64,7 @@ export class NotificationsController {
 
   @Patch("preferences")
   async updatePreferences(@CurrentUser() user: RequestUser, @Body() body: unknown) {
-    const input = parseBody(preferencesSchema, body);
+    const input = parseBody(notificationPreferencesSchema, body);
     return this.notifications.updatePreferences(user, input);
   }
 }
