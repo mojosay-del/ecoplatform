@@ -91,6 +91,8 @@ const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
   support: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/support.json")) },
 };
 
+const LOTTIE_REST_FRAME_CACHE = new Map<LottieNavIconKey, number>();
+
 export function IconsaxLottieIcon({ name, onComplete, playing, reducedMotion }: IconsaxLottieIconProps) {
   const config = LOTTIE_NAV_ICONS[name];
   const containerRef = useRef<HTMLSpanElement | null>(null);
@@ -159,7 +161,10 @@ export function IconsaxLottieIcon({ name, onComplete, playing, reducedMotion }: 
       removeCompleteListener = animation.addEventListener("complete", () => onCompleteRef.current());
       animation.setSubframe(false);
       animation.setSpeed(playbackSpeed);
-      resetLottieAnimation(animation, getRestFrame(animation, startFrame, configuredRestFrame));
+      resetLottieAnimation(
+        animation,
+        getRestFrame(animation, containerRef.current, name, startFrame, configuredRestFrame),
+      );
       animationRef.current = animation;
 
       if (playingRef.current && !reducedMotionRef.current) {
@@ -174,19 +179,22 @@ export function IconsaxLottieIcon({ name, onComplete, playing, reducedMotion }: 
       animationRef.current = null;
       container.textContent = "";
     };
-  }, [animationData, configuredRestFrame, playbackSpeed, startFrame]);
+  }, [animationData, configuredRestFrame, name, playbackSpeed, startFrame]);
 
   useEffect(() => {
     const animation = animationRef.current;
     if (!animation) return;
 
     if (reducedMotion || !playing) {
-      resetLottieAnimation(animation, getRestFrame(animation, startFrame, configuredRestFrame));
+      resetLottieAnimation(
+        animation,
+        getRestFrame(animation, containerRef.current, name, startFrame, configuredRestFrame),
+      );
       return;
     }
 
     playLottieAnimation(animation, startFrame);
-  }, [configuredRestFrame, playing, reducedMotion, startFrame]);
+  }, [configuredRestFrame, name, playing, reducedMotion, startFrame]);
 
   return <span aria-hidden="true" className="eco-nav-icon-lottie" ref={containerRef} />;
 }
@@ -199,17 +207,47 @@ function resetLottieAnimation(animation: AnimationItem, startFrame: number) {
   animation.goToAndStop(startFrame, true);
 }
 
-function getRestFrame(animation: AnimationItem, startFrame: number, configuredRestFrame: number | undefined) {
+function getRestFrame(
+  animation: AnimationItem,
+  container: HTMLSpanElement | null,
+  name: LottieNavIconKey,
+  startFrame: number,
+  configuredRestFrame: number | undefined,
+) {
   if (configuredRestFrame !== undefined) {
     return Math.max(startFrame, configuredRestFrame);
   }
 
+  const cachedRestFrame = LOTTIE_REST_FRAME_CACHE.get(name);
+  if (cachedRestFrame !== undefined) {
+    return cachedRestFrame;
+  }
+
   const durationInFrames = animation.getDuration(true);
   if (!Number.isFinite(durationInFrames) || durationInFrames <= startFrame) {
+    LOTTIE_REST_FRAME_CACHE.set(name, startFrame);
     return startFrame;
   }
 
-  return Math.max(startFrame, Math.floor(durationInFrames) - 1);
+  const lastFrame = Math.max(startFrame, Math.floor(durationInFrames) - 1);
+  for (let frame = lastFrame; frame >= startFrame; frame -= 1) {
+    animation.goToAndStop(frame, true);
+    if (hasRenderedLottieContent(container)) {
+      LOTTIE_REST_FRAME_CACHE.set(name, frame);
+      return frame;
+    }
+  }
+
+  LOTTIE_REST_FRAME_CACHE.set(name, startFrame);
+  return startFrame;
+}
+
+function hasRenderedLottieContent(container: HTMLSpanElement | null): boolean {
+  return Boolean(
+    container?.querySelector(
+      ".eco-nav-icon-lottie-svg path, .eco-nav-icon-lottie-svg rect, .eco-nav-icon-lottie-svg circle, .eco-nav-icon-lottie-svg ellipse, .eco-nav-icon-lottie-svg line, .eco-nav-icon-lottie-svg polyline, .eco-nav-icon-lottie-svg polygon",
+    ),
+  );
 }
 
 function cloneLottieAnimationData(animationData: LottieAnimationData): LottieAnimationData {
