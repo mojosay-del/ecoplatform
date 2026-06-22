@@ -98,6 +98,7 @@ section.forum-page .forum-hero .forum-title {
   align-items: center;
   justify-content: center;
   gap: 10px;
+  padding-inline-start: clamp(18px, 21%, 136px);
   min-width: 0;
   color: var(--text-muted);
   font-size: 17px;
