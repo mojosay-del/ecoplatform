@@ -141,6 +141,8 @@ export function IconsaxLottieIcon({ name, onComplete, playing, reducedMotion }: 
 
     let disposed = false;
     let removeCompleteListener: (() => void) | null = null;
+    let removeDomLoadedListener: (() => void) | null = null;
+    let readyFrameHandle: number | null = null;
 
     void import("lottie-web").then(({ default: lottie }) => {
       if (disposed || !containerRef.current) return;
@@ -158,23 +160,43 @@ export function IconsaxLottieIcon({ name, onComplete, playing, reducedMotion }: 
         },
       });
 
+      const applyReadyState = () => {
+        if (disposed || animationRef.current !== animation) return;
+
+        const restFrame = getRestFrame(animation, containerRef.current, name, startFrame, configuredRestFrame);
+        resetLottieAnimation(animation, restFrame);
+
+        if (playingRef.current && !reducedMotionRef.current) {
+          playLottieAnimation(animation, startFrame);
+        }
+      };
+
+      const scheduleReadyState = () => {
+        if (readyFrameHandle !== null) {
+          window.cancelAnimationFrame(readyFrameHandle);
+        }
+
+        readyFrameHandle = window.requestAnimationFrame(() => {
+          readyFrameHandle = null;
+          applyReadyState();
+        });
+      };
+
       removeCompleteListener = animation.addEventListener("complete", () => onCompleteRef.current());
+      removeDomLoadedListener = animation.addEventListener("DOMLoaded", scheduleReadyState);
       animation.setSubframe(false);
       animation.setSpeed(playbackSpeed);
-      resetLottieAnimation(
-        animation,
-        getRestFrame(animation, containerRef.current, name, startFrame, configuredRestFrame),
-      );
       animationRef.current = animation;
-
-      if (playingRef.current && !reducedMotionRef.current) {
-        playLottieAnimation(animation, startFrame);
-      }
+      scheduleReadyState();
     });
 
     return () => {
       disposed = true;
+      if (readyFrameHandle !== null) {
+        window.cancelAnimationFrame(readyFrameHandle);
+      }
       removeCompleteListener?.();
+      removeDomLoadedListener?.();
       animationRef.current?.destroy();
       animationRef.current = null;
       container.textContent = "";
@@ -225,7 +247,6 @@ function getRestFrame(
 
   const durationInFrames = animation.getDuration(true);
   if (!Number.isFinite(durationInFrames) || durationInFrames <= startFrame) {
-    LOTTIE_REST_FRAME_CACHE.set(name, startFrame);
     return startFrame;
   }
 
@@ -238,16 +259,55 @@ function getRestFrame(
     }
   }
 
-  LOTTIE_REST_FRAME_CACHE.set(name, startFrame);
   return startFrame;
 }
 
 function hasRenderedLottieContent(container: HTMLSpanElement | null): boolean {
-  return Boolean(
-    container?.querySelector(
-      ".eco-nav-icon-lottie-svg path, .eco-nav-icon-lottie-svg rect, .eco-nav-icon-lottie-svg circle, .eco-nav-icon-lottie-svg ellipse, .eco-nav-icon-lottie-svg line, .eco-nav-icon-lottie-svg polyline, .eco-nav-icon-lottie-svg polygon",
-    ),
+  const shapes = container?.querySelectorAll(
+    ".eco-nav-icon-lottie-svg path, .eco-nav-icon-lottie-svg rect, .eco-nav-icon-lottie-svg circle, .eco-nav-icon-lottie-svg ellipse, .eco-nav-icon-lottie-svg line, .eco-nav-icon-lottie-svg polyline, .eco-nav-icon-lottie-svg polygon",
   );
+
+  return Array.from(shapes ?? []).some(isVisibleLottieShape);
+}
+
+function isVisibleLottieShape(shape: Element): boolean {
+  if (isTechnicalSvgShape(shape)) return false;
+
+  const styles = window.getComputedStyle(shape);
+  if (styles.display === "none" || styles.visibility === "hidden" || Number(styles.opacity) === 0) {
+    return false;
+  }
+
+  const box = shape.getBoundingClientRect();
+  return box.width > 0 && box.height > 0;
+}
+
+function isTechnicalSvgShape(shape: Element): boolean {
+  let parent = shape.parentElement;
+
+  while (parent) {
+    const tagName = parent.tagName.toLowerCase();
+    if (
+      tagName === "defs" ||
+      tagName === "clippath" ||
+      tagName === "mask" ||
+      tagName === "symbol" ||
+      tagName === "pattern" ||
+      tagName === "lineargradient" ||
+      tagName === "radialgradient" ||
+      tagName === "filter"
+    ) {
+      return true;
+    }
+
+    if (parent.classList.contains("eco-nav-icon-lottie-svg")) {
+      return false;
+    }
+
+    parent = parent.parentElement;
+  }
+
+  return false;
 }
 
 function cloneLottieAnimationData(animationData: LottieAnimationData): LottieAnimationData {
