@@ -6,12 +6,13 @@
 
 import { AudioMessagePlayer } from "../../components/AudioMessagePlayer";
 import { preferredFileAssetMediaUrl } from "../../lib/api";
-import { MatchingPlayer, type MatchingPayload } from "./MatchingPlayer";
-import { QuizPlayer, type QuizPayload } from "./QuizPlayer";
+import { MatchingPlayer } from "./MatchingPlayer";
+import { QuizPlayer } from "./QuizPlayer";
 import { useFileAssets } from "./content-block-assets";
 import { ChecklistBlock, HeadingIcon } from "./content-block-checklist";
 import { ImageBlock, MissingAsset, VideoBlock } from "./content-block-media";
 import type { ChecklistPayload, ContentBlocksVariant, RenderableBlock } from "./content-block-types";
+import { parseMatchingPayload, parseQuizPayload } from "./content-block-validation";
 import "./gallery.css";
 
 export { collectContentBlockImageFileIds } from "./content-block-assets";
@@ -151,13 +152,31 @@ export function ContentBlocks({
           );
         }
         if (block.type === "quiz") {
-          return <QuizPlayer key={index} payload={block.payload as unknown as QuizPayload} />;
+          const parsed = parseQuizPayload(block.payload);
+          return parsed.ok ? (
+            <QuizPlayer key={index} payload={parsed.payload} />
+          ) : (
+            <InvalidInteractiveBlock key={index} />
+          );
         }
         if (block.type === "matching") {
-          return <MatchingPlayer key={index} payload={block.payload as unknown as MatchingPayload} />;
+          const parsed = parseMatchingPayload(block.payload);
+          return parsed.ok ? (
+            <MatchingPlayer key={index} payload={parsed.payload} />
+          ) : (
+            <InvalidInteractiveBlock key={index} />
+          );
         }
         return null;
       })}
     </div>
+  );
+}
+
+function InvalidInteractiveBlock() {
+  return (
+    <p className="page-subtitle" role="status">
+      Интерактивный блок временно недоступен.
+    </p>
   );
 }

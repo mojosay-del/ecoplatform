@@ -519,13 +519,19 @@ CORS-allowlist с валидацией origin, многоуровневый thro
     `git diff --check` ✓.
   - **Исполнитель/заметка:** Codex.
 
-- [ ] **Q-3. Блоки контента рендерятся через `as unknown as` без рантайм-валидации.**
+- [x] **Q-3. Блоки контента рендерятся через `as unknown as` без рантайм-валидации.** ЗАКРЫТО (2026-06-22):
+  quiz/matching payload теперь валидируется через shared `quizBlockSchema`/`matchingBlockSchema` на границе
+  `ContentBlocks`; плееры получают только parsed payload, а невалидный интерактивный блок показывает спокойный
+  fallback без падения страницы.
   `ContentBlocks.tsx:160-163`: `block.payload as unknown as QuizPayload`/`MatchingPayload`. При этом в shared
   **уже есть** `quizBlockSchema`/`matchingBlockSchema` (zod) — каст вместо валидации.
   - **Риск:** битый/легаси payload из БД роняет плеер в рантайме; теряется type-safety.
   - **Фикс:** `quizBlockSchema.safeParse(block.payload)` на границе рендера (или один разбор всего блока через
     `lessonContentBlockSchema`), с graceful-фолбэком на невалидный блок. Убирает двойной каст.
-  - **Исполнитель/заметка:**
+  - **Проверка:** web unit 240 ✓ (включая `content-block-validation.test.ts`), `pnpm typecheck` ✓,
+    `pnpm lint` ✓ (0 errors; текущие a11y/next-image warnings остаются), `git diff --check` ✓.
+    Browser/dev не запускался: локальная `.env` указывает на prod-like S3/SMTP.
+  - **Исполнитель/заметка:** Codex.
 
 - [ ] **Q-4. Повторяющийся каст `as unknown as Prisma.InputJsonValue` (биллинг/трип-калькулятор).**
   6+ мест льют типизированный объект в Prisma-JSON через двойной каст. Это известная фрикция Prisma, но шумит.
