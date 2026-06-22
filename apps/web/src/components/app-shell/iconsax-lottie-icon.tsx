@@ -147,17 +147,22 @@ export function IconsaxLottieIcon({ name, onComplete, playing, reducedMotion }: 
     void import("lottie-web").then(({ default: lottie }) => {
       if (disposed || !containerRef.current) return;
 
+      const rendererSettings = {
+        className: "eco-nav-icon-lottie-svg",
+        focusable: false,
+        preserveAspectRatio: "xMidYMid meet",
+        // Iconsax exports contain After Effects expressions. Production CSP
+        // intentionally forbids eval, so we render the exported base keyframes.
+        runExpressions: false,
+      };
+
       const animation = lottie.loadAnimation({
         animationData: cloneLottieAnimationData(animationData),
         autoplay: false,
         container: containerRef.current,
         loop: false,
         renderer: "svg",
-        rendererSettings: {
-          className: "eco-nav-icon-lottie-svg",
-          focusable: false,
-          preserveAspectRatio: "xMidYMid meet",
-        },
+        rendererSettings,
       });
 
       const applyReadyState = () => {
