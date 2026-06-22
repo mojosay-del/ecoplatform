@@ -41,10 +41,6 @@ export function useAccountDataPrivacyActions({
 
   async function requestDeletion() {
     if (!token) return;
-    const ok = window.confirm(
-      "Запланировать удаление аккаунта через 30 дней? Функциональные разделы будут закрыты до отмены запроса.",
-    );
-    if (!ok) return;
     setDeletionBusy(true);
     setDeletionMessage(null);
     try {

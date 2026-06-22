@@ -19,6 +19,7 @@ export function AccountProfileSection({
   greeting,
   isPlatformStaff,
   onBillingSaved,
+  onOpenDataPrivacy,
   onOpenNotifications,
   onOpenPassword,
   onOpenPayment,
@@ -32,6 +33,7 @@ export function AccountProfileSection({
   greeting: string;
   isPlatformStaff: boolean;
   onBillingSaved: (updated: BillingStatus) => void;
+  onOpenDataPrivacy: () => void;
   onOpenNotifications: () => void;
   onOpenPassword: () => void;
   onOpenPayment: () => void;
@@ -164,6 +166,13 @@ export function AccountProfileSection({
             label="Уведомления"
             onClick={onOpenNotifications}
           />
+          <AccountStatButton
+            ariaLabel="Открыть данные и приватность"
+            iconClassName="account-stat-privacy"
+            iconName="data-privacy"
+            label="Приватность"
+            onClick={onOpenDataPrivacy}
+          />
         </div>
       ) : null}
 
@@ -208,11 +217,13 @@ export function AccountProfileSection({
 }
 
 function AccountStatButton({
+  ariaLabel,
   iconClassName,
   iconName,
   label,
   onClick,
 }: {
+  ariaLabel?: string;
   iconClassName: string;
   iconName: NavIconKey;
   label: string;
@@ -222,7 +233,7 @@ function AccountStatButton({
   const iconPlayback = useAnimatedNavIconPlayback(iconRef);
 
   return (
-    <button className="account-stat" type="button" onClick={onClick} {...iconPlayback}>
+    <button aria-label={ariaLabel} className="account-stat" type="button" onClick={onClick} {...iconPlayback}>
       <span className={`account-stat-icon ${iconClassName}`}>
         <AnimatedNavIcon name={iconName} ref={iconRef} size={24} />
       </span>

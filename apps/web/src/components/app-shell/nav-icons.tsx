@@ -1,7 +1,6 @@
 "use client";
 
 import BackIcon from "@animated-color-icons/lucide-react/ArrowLeftCircle";
-import DataPrivacyIcon from "@animated-color-icons/lucide-react/ShieldCheck";
 import dynamic from "next/dynamic";
 import {
   forwardRef,
@@ -45,7 +44,6 @@ type AnimatedIconKey =
 
 const NAV_ICON_COMPONENTS: Record<Exclude<AnimatedIconKey, LottieNavIconKey>, AnimatedLucideIconComponent> = {
   back: BackIcon,
-  "data-privacy": DataPrivacyIcon,
 };
 
 const LOTTIE_NAV_ICON_KEYS: ReadonlySet<string> = new Set<LottieNavIconKey>([
@@ -53,6 +51,7 @@ const LOTTIE_NAV_ICON_KEYS: ReadonlySet<string> = new Set<LottieNavIconKey>([
   "analytics-map",
   "arrow-up",
   "calculator",
+  "data-privacy",
   "docs",
   "education",
   "forum",

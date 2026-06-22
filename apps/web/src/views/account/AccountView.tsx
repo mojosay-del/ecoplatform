@@ -5,7 +5,7 @@ import type { AccountSectionId } from "../../components/app-shell-nav";
 import { useAuth } from "../../lib/auth";
 import { accountNotificationRowsForRoles } from "../account-notification-rows";
 import { AccountProfileSection } from "./AccountProfileSection";
-import { DataPrivacySection } from "./DataPrivacySection";
+import { DataPrivacyDialog } from "./DataPrivacyDialog";
 import { NotificationsDialog } from "./NotificationsDialog";
 import { PasswordDialog } from "./PasswordDialog";
 import { PaymentDialog, SubscriptionDialog } from "./SubscriptionDialog";
@@ -35,9 +35,12 @@ export function AccountView({ section }: { section: AccountSectionId }) {
   const {
     closeNotificationsDialog,
     closePaymentDialog,
+    closeDataPrivacyDialog,
     closeSessionsDialog,
     closeSubscriptionDialog,
+    dataPrivacyDialogOpen,
     notificationsDialogOpen,
+    openDataPrivacyDialog,
     openNotificationsDialog,
     openPaymentDialog,
     openSessionsDialog,
@@ -81,6 +84,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           greeting={greeting}
           isPlatformStaff={isPlatformStaff}
           onBillingSaved={(updated) => setBilling(updated)}
+          onOpenDataPrivacy={openDataPrivacyDialog}
           onOpenNotifications={openNotificationsDialog}
           onOpenPassword={openPasswordDialog}
           onOpenPayment={openPaymentDialog}
@@ -88,17 +92,6 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           onOpenSubscription={openSubscriptionDialog}
           onProfileSaved={refreshMe}
           sessionsCount={sessions.length}
-          user={user}
-        />
-
-        <DataPrivacySection
-          deletionBusy={deletionBusy}
-          deletionMessage={deletionMessage}
-          exportBusy={exportBusy}
-          exportMessage={exportMessage}
-          onCancelDeletion={() => void cancelDeletion()}
-          onExportData={() => void exportData()}
-          onRequestDeletion={() => void requestDeletion()}
           user={user}
         />
       </section>
@@ -134,6 +127,19 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           notificationRows={notificationRows}
           onClose={closeNotificationsDialog}
           updateNotificationPreference={updateNotificationPreference}
+        />
+      ) : null}
+      {dataPrivacyDialogOpen ? (
+        <DataPrivacyDialog
+          deletionBusy={deletionBusy}
+          deletionMessage={deletionMessage}
+          exportBusy={exportBusy}
+          exportMessage={exportMessage}
+          onCancelDeletion={() => void cancelDeletion()}
+          onClose={closeDataPrivacyDialog}
+          onExportData={() => void exportData()}
+          onRequestDeletion={() => void requestDeletion()}
+          user={user}
         />
       ) : null}
       {passwordDialogOpen ? (

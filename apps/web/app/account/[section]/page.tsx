@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import {
+  accountProfileModalHref,
   getLegacyAccountTabHref,
   normalizeAccountSection,
   type AccountSectionId,
@@ -31,6 +32,9 @@ export default async function AccountSectionPage({ params }: { params: Promise<{
     const legacyHref = getLegacyAccountTabHref(section);
     if (legacyHref) redirect(legacyHref);
     notFound();
+  }
+  if (normalized === "data-privacy") {
+    redirect(accountProfileModalHref("data-privacy"));
   }
 
   return <AccountView section={normalized} />;

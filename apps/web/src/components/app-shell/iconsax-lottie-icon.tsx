@@ -8,6 +8,7 @@ export type LottieNavIconKey =
   | "analytics-map"
   | "arrow-up"
   | "calculator"
+  | "data-privacy"
   | "docs"
   | "education"
   | "forum"
@@ -61,6 +62,7 @@ const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
   "analytics-map": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/analytics-map.json")) },
   "arrow-up": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/arrow-up.json")) },
   calculator: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/calculator.json")) },
+  "data-privacy": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/data-privacy.json")) },
   docs: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/docs.json")) },
   education: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/education.json")) },
   forum: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/forum.json")) },

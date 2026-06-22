@@ -19,6 +19,14 @@ import { useAccountDialogBodyLock } from "./hooks";
 import type { ContactField } from "./personal-profile-options";
 import { phoneStateFromValue } from "./personal-profile-utils";
 
+type EmailChangeStepId = "currentCode" | "newEmail" | "newCode";
+
+const EMAIL_CHANGE_STEPS: Array<{ id: EmailChangeStepId; label: string }> = [
+  { id: "currentCode", label: "Текущий email" },
+  { id: "newEmail", label: "Новый email" },
+  { id: "newCode", label: "Подтверждение" },
+];
+
 export function ContactChangeDialog({
   currentValue,
   field,
@@ -61,6 +69,7 @@ export function ContactChangeDialog({
     ? new Date(activeCodeTarget.expiresAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
     : "";
   const contactTitle = field === "email" ? "email" : "телефона";
+  const emailStep: EmailChangeStepId = step === "code" ? "currentCode" : step === "edit" ? "newEmail" : "newCode";
 
   useAccountDialogBodyLock(true, onClose, busy);
 
@@ -274,8 +283,12 @@ export function ContactChangeDialog({
             <span className="account-password-modal-kicker">Подтверждение</span>
             <h2 id="account-contact-dialog-title">Смена {contactTitle}</h2>
             <p>
-              {step === "newCode"
-                ? "Подтвердите, что новый email принадлежит вам."
+              {field === "email"
+                ? step === "newCode"
+                  ? "Финальный код подтвердит, что новый email принадлежит вам."
+                  : step === "edit"
+                    ? "Укажите новый адрес, и мы отправим на него второй код."
+                    : "Сначала подтвердите доступ к текущему email аккаунта."
                 : "Код будет отправлен на текущий email аккаунта."}
             </p>
           </div>
@@ -291,7 +304,8 @@ export function ContactChangeDialog({
         </header>
         {isCodeStep ? (
           <div className="account-contact-modal-body">
-            <div className="account-contact-code-head">
+            {field === "email" ? <EmailChangeSteps activeStep={emailStep} /> : null}
+            <div className="account-contact-panel account-contact-code-head">
               <span className="account-contact-code-icon" aria-hidden="true">
                 <Mail size={22} />
               </span>
@@ -314,6 +328,7 @@ export function ContactChangeDialog({
                         ? "Подготавливаем письмо с кодом подтверждения."
                         : "Код придёт на текущий email аккаунта после нажатия на кнопку."}
                 </p>
+                {activeCodeTarget ? <span className="account-contact-target">Код действует до {expiresAt}</span> : null}
               </div>
             </div>
             {verification ? (
@@ -346,7 +361,11 @@ export function ContactChangeDialog({
                 </div>
               </div>
             ) : null}
-            {message ? <p className="account-form-message account-form-message-error">{message}</p> : null}
+            {message ? (
+              <p className="account-form-message account-form-message-error" role="status">
+                {message}
+              </p>
+            ) : null}
             <div className="account-contact-actions">
               {verification ? (
                 <>
@@ -375,7 +394,24 @@ export function ContactChangeDialog({
             </div>
           </div>
         ) : (
-          <form className="account-form account-password-modal-form" onSubmit={onSubmitNewValue}>
+          <form
+            className="account-form account-password-modal-form account-contact-edit-form"
+            onSubmit={onSubmitNewValue}
+          >
+            {field === "email" ? (
+              <>
+                <EmailChangeSteps activeStep={emailStep} />
+                <div className="account-contact-panel account-contact-edit-note">
+                  <span className="account-contact-code-icon" aria-hidden="true">
+                    <Mail size={22} />
+                  </span>
+                  <div>
+                    <strong>Новый адрес для входа</strong>
+                    <p>После сохранения отправим код на новый email. Адрес изменится только после подтверждения.</p>
+                  </div>
+                </div>
+              </>
+            ) : null}
             {field === "email" ? (
               <label>
                 <span>Новый email</span>
@@ -401,13 +437,35 @@ export function ContactChangeDialog({
                 />
               </label>
             )}
-            {message ? <p className="account-form-message account-form-message-error">{message}</p> : null}
+            {message ? (
+              <p className="account-form-message account-form-message-error" role="status">
+                {message}
+              </p>
+            ) : null}
             <button className="button" disabled={saving} type="submit">
               {saving ? "Сохраняем..." : "Сохранить"}
             </button>
           </form>
         )}
       </section>
+    </div>
+  );
+}
+
+function EmailChangeSteps({ activeStep }: { activeStep: EmailChangeStepId }) {
+  const activeIndex = EMAIL_CHANGE_STEPS.findIndex((item) => item.id === activeStep);
+
+  return (
+    <div className="account-contact-steps" aria-label="Шаги смены email">
+      {EMAIL_CHANGE_STEPS.map((item, index) => (
+        <span
+          className={`account-contact-step${index < activeIndex ? " is-done" : ""}${item.id === activeStep ? " is-active" : ""}`}
+          key={item.id}
+        >
+          <span className="account-contact-step-index">{index + 1}</span>
+          <span>{item.label}</span>
+        </span>
+      ))}
     </div>
   );
 }

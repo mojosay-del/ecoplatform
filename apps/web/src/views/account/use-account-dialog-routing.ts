@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  accountProfileModalHref,
   accountSectionHref,
   normalizeAccountProfileModal,
   type AccountProfileModalId,
@@ -18,18 +19,20 @@ export function useAccountDialogRouting({ isPlatformStaff, user }: { isPlatformS
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false);
   const [notificationsDialogOpen, setNotificationsDialogOpen] = useState(false);
+  const [dataPrivacyDialogOpen, setDataPrivacyDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!rawProfileModal) {
       setSubscriptionDialogOpen(false);
       setSessionsDialogOpen(false);
       setNotificationsDialogOpen(false);
+      setDataPrivacyDialogOpen(false);
       return;
     }
 
     if (!user) return;
 
-    if (!profileModal || isPlatformStaff) {
+    if (!profileModal || (isPlatformStaff && profileModal !== "data-privacy")) {
       router.replace(accountSectionHref("profile"), { scroll: false });
       return;
     }
@@ -37,6 +40,7 @@ export function useAccountDialogRouting({ isPlatformStaff, user }: { isPlatformS
     setSubscriptionDialogOpen(profileModal === "subscription");
     setSessionsDialogOpen(profileModal === "sessions");
     setNotificationsDialogOpen(profileModal === "notifications");
+    setDataPrivacyDialogOpen(profileModal === "data-privacy");
   }, [isPlatformStaff, profileModal, rawProfileModal, router, user]);
 
   function clearProfileModalParam(modal: AccountProfileModalId) {
@@ -49,9 +53,22 @@ export function useAccountDialogRouting({ isPlatformStaff, user }: { isPlatformS
     window.dispatchEvent(new Event("support:open"));
   }
 
+  function openProfileModal(modal: AccountProfileModalId) {
+    setSubscriptionDialogOpen(modal === "subscription");
+    setSessionsDialogOpen(modal === "sessions");
+    setNotificationsDialogOpen(modal === "notifications");
+    setDataPrivacyDialogOpen(modal === "data-privacy");
+    router.push(accountProfileModalHref(modal), { scroll: false });
+  }
+
   function closeSubscriptionDialog() {
     setSubscriptionDialogOpen(false);
     clearProfileModalParam("subscription");
+  }
+
+  function closeDataPrivacyDialog() {
+    setDataPrivacyDialogOpen(false);
+    clearProfileModalParam("data-privacy");
   }
 
   function closeSessionsDialog() {
@@ -65,15 +82,18 @@ export function useAccountDialogRouting({ isPlatformStaff, user }: { isPlatformS
   }
 
   return {
+    closeDataPrivacyDialog,
     closeNotificationsDialog,
     closePaymentDialog: () => setPaymentDialogOpen(false),
     closeSessionsDialog,
     closeSubscriptionDialog,
+    dataPrivacyDialogOpen,
     notificationsDialogOpen,
-    openNotificationsDialog: () => setNotificationsDialogOpen(true),
+    openDataPrivacyDialog: () => openProfileModal("data-privacy"),
+    openNotificationsDialog: () => openProfileModal("notifications"),
     openPaymentDialog: () => setPaymentDialogOpen(true),
-    openSessionsDialog: () => setSessionsDialogOpen(true),
-    openSubscriptionDialog: () => setSubscriptionDialogOpen(true),
+    openSessionsDialog: () => openProfileModal("sessions"),
+    openSubscriptionDialog: () => openProfileModal("subscription"),
     openSupport,
     paymentDialogOpen,
     sessionsDialogOpen,

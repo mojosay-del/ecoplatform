@@ -50,7 +50,7 @@ export type BreadcrumbItem = {
 };
 
 export type AccountSectionId = "profile" | "data-privacy";
-export type AccountProfileModalId = "subscription" | "sessions" | "notifications";
+export type AccountProfileModalId = "subscription" | "sessions" | "notifications" | "data-privacy";
 
 export const ACCOUNT_SECTION_CHANGE_EVENT = "account:section-change";
 export const ACCOUNT_SECTION_NAVIGATE_EVENT = "account:section-navigate";
@@ -140,7 +140,7 @@ export const appNavSections: NavSection[] = [
 
 const accountSettingsItems: NavItem[] = [
   { href: "/account/profile", label: "Профиль", icon: "profile" },
-  { href: "/account/data-privacy", label: "Данные и приватность", icon: "data-privacy" },
+  { href: accountProfileModalHref("data-privacy"), label: "Данные и приватность", icon: "data-privacy" },
 ];
 
 const accountProfileMenuItems: NavItem[] = [
@@ -148,9 +148,13 @@ const accountProfileMenuItems: NavItem[] = [
   { href: accountProfileModalHref("subscription"), label: "Подписка", icon: "subscription" },
   { href: accountProfileModalHref("sessions"), label: "Сессии", icon: "sessions" },
   { href: accountProfileModalHref("notifications"), label: "Уведомления", icon: "notifications" },
+  { href: accountProfileModalHref("data-privacy"), label: "Данные и приватность", icon: "data-privacy" },
 ];
 
-const accountStaffMenuItems: NavItem[] = [{ href: "/account/profile", label: "Профиль", icon: "profile" }];
+const accountStaffMenuItems: NavItem[] = [
+  { href: "/account/profile", label: "Профиль", icon: "profile" },
+  { href: accountProfileModalHref("data-privacy"), label: "Данные и приватность", icon: "data-privacy" },
+];
 
 export function getAccountNavSections(): NavSection[] {
   return [
@@ -315,7 +319,12 @@ const accountBreadcrumbs: { prefix: string; section: AccountSectionId; label: st
 ];
 
 const accountSectionIds = new Set<AccountSectionId>(accountBreadcrumbs.map((item) => item.section));
-const accountProfileModalIds = new Set<AccountProfileModalId>(["subscription", "sessions", "notifications"]);
+const accountProfileModalIds = new Set<AccountProfileModalId>([
+  "subscription",
+  "sessions",
+  "notifications",
+  "data-privacy",
+]);
 
 const legacyAccountTabToHref = new Map<string, string>([
   ["profile", accountSectionHref("profile")],

@@ -113,12 +113,19 @@ describe("AppShell future navigation teasers", () => {
     const sections = getAccountMenuSections(true);
 
     expect(sections.map((section) => section.title)).toEqual(["Настройки"]);
-    expect(sections[0]?.items.map((item) => item.label)).toEqual(["Профиль", "Подписка", "Сессии", "Уведомления"]);
+    expect(sections[0]?.items.map((item) => item.label)).toEqual([
+      "Профиль",
+      "Подписка",
+      "Сессии",
+      "Уведомления",
+      "Данные и приватность",
+    ]);
     expect(sections[0]?.items.map((item) => item.href)).toEqual([
       "/account/profile",
       "/account/profile?modal=subscription",
       "/account/profile?modal=sessions",
       "/account/profile?modal=notifications",
+      "/account/profile?modal=data-privacy",
     ]);
   });
 
@@ -133,8 +140,11 @@ describe("AppShell future navigation teasers", () => {
     const sections = getAccountMenuSections(false);
 
     expect(sections.map((section) => section.title)).toEqual(["Настройки"]);
-    expect(sections[0]?.items.map((item) => item.label)).toEqual(["Профиль"]);
-    expect(sections[0]?.items.map((item) => item.href)).toEqual(["/account/profile"]);
+    expect(sections[0]?.items.map((item) => item.label)).toEqual(["Профиль", "Данные и приватность"]);
+    expect(sections[0]?.items.map((item) => item.href)).toEqual([
+      "/account/profile",
+      "/account/profile?modal=data-privacy",
+    ]);
   });
 
   it("builds regular breadcrumbs from the visible sidebar section", () => {
@@ -188,6 +198,7 @@ describe("AppShell future navigation teasers", () => {
     expect(accountProfileModalFromHref("/account/profile?modal=subscription")).toBe("subscription");
     expect(accountProfileModalFromHref("/account/profile?modal=sessions")).toBe("sessions");
     expect(accountProfileModalFromHref("/account/profile?modal=notifications")).toBe("notifications");
+    expect(accountProfileModalFromHref("/account/profile?modal=data-privacy")).toBe("data-privacy");
     expect(accountProfileModalFromHref("/account/profile?modal=unknown")).toBeNull();
   });
 
