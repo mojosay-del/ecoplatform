@@ -21,13 +21,15 @@ const immutablePublicAssetHeaders = [
 const isProduction = process.env.NODE_ENV === "production";
 
 function buildContentSecurityPolicy(): string {
-  const scriptSrc = [
-    "'self'",
-    ...(isProduction ? [] : ["'unsafe-inline'"]),
-    "https://mapgl.2gis.com",
-    "https://*.2gis.com",
-  ];
-  const styleSrc = ["'self'", ...(isProduction ? [] : ["'unsafe-inline'"]), "blob:"];
+  // Next App Router рендерит динамические страницы (auth, кабинет, данные) и
+  // эмитит inline-скрипты гидрации (`self.__next_f.push(...)`) в рантайме.
+  // hash-based CSP через experimental.sri покрывает только статически
+  // сгенерированные страницы — для динамических inline-скрипты остаются без
+  // хэша и блокируются `script-src 'self'`, из-за чего гидрация падает и формы
+  // уходят в нативный submit. Поэтому inline разрешён и в проде; перевод на
+  // per-request nonce (proxy/middleware) — отдельная задача по hardening.
+  const scriptSrc = ["'self'", "'unsafe-inline'", "https://mapgl.2gis.com", "https://*.2gis.com"];
+  const styleSrc = ["'self'", "'unsafe-inline'", "blob:"];
   const connectSrc = [
     "'self'",
     "https://s3.twcstorage.ru",
@@ -54,10 +56,6 @@ function buildContentSecurityPolicy(): string {
     "media-src 'self' https://s3.twcstorage.ru https://*.s3.twcstorage.ru",
     `script-src ${scriptSrc.join(" ")}`,
     `style-src ${styleSrc.join(" ")}`,
-    // В коде ещё есть управляемые React style-атрибуты (прогресс-бары, цвета
-    // материалов, размеры графиков). Разрешаем только style-атрибуты, но не
-    // общий inline <style>; убрать и это можно отдельной UI-волной.
-    ...(isProduction ? ["style-src-attr 'unsafe-inline'"] : []),
     `connect-src ${connectSrc.join(" ")}`,
     "font-src 'self' https://*.2gis.com",
     // MapGL поднимает web-workers из blob: — без worker-src карта молча не стартует
@@ -119,11 +117,6 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     clientTraceMetadata: ["baggage", "sentry-trace"],
-    // SRI даёт hash-based CSP для скриптов App Router без перевода всех страниц
-    // в dynamic rendering через per-request nonce.
-    sri: {
-      algorithm: "sha256",
-    },
   },
   turbopack: {
     root: projectRoot,
