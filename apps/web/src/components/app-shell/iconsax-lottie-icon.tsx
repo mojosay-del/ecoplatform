@@ -45,6 +45,7 @@ type LottieAnimationModule = { default: LottieAnimationData };
 type LottieNavIconConfig = {
   loadAnimationData: () => Promise<LottieAnimationData>;
   playbackSpeed?: number;
+  restFrame?: number;
   startFrame?: number;
 };
 
@@ -100,6 +101,7 @@ export function IconsaxLottieIcon({ name, onComplete, playing, reducedMotion }: 
   const reducedMotionRef = useRef(reducedMotion);
   const playbackSpeed = config.playbackSpeed ?? 1;
   const startFrame = config.startFrame ?? 0;
+  const configuredRestFrame = config.restFrame;
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -157,7 +159,7 @@ export function IconsaxLottieIcon({ name, onComplete, playing, reducedMotion }: 
       removeCompleteListener = animation.addEventListener("complete", () => onCompleteRef.current());
       animation.setSubframe(false);
       animation.setSpeed(playbackSpeed);
-      resetLottieAnimation(animation, startFrame);
+      resetLottieAnimation(animation, getRestFrame(animation, startFrame, configuredRestFrame));
       animationRef.current = animation;
 
       if (playingRef.current && !reducedMotionRef.current) {
@@ -172,19 +174,19 @@ export function IconsaxLottieIcon({ name, onComplete, playing, reducedMotion }: 
       animationRef.current = null;
       container.textContent = "";
     };
-  }, [animationData, playbackSpeed, startFrame]);
+  }, [animationData, configuredRestFrame, playbackSpeed, startFrame]);
 
   useEffect(() => {
     const animation = animationRef.current;
     if (!animation) return;
 
     if (reducedMotion || !playing) {
-      resetLottieAnimation(animation, startFrame);
+      resetLottieAnimation(animation, getRestFrame(animation, startFrame, configuredRestFrame));
       return;
     }
 
     playLottieAnimation(animation, startFrame);
-  }, [playing, reducedMotion, startFrame]);
+  }, [configuredRestFrame, playing, reducedMotion, startFrame]);
 
   return <span aria-hidden="true" className="eco-nav-icon-lottie" ref={containerRef} />;
 }
@@ -195,6 +197,19 @@ function playLottieAnimation(animation: AnimationItem, startFrame: number) {
 
 function resetLottieAnimation(animation: AnimationItem, startFrame: number) {
   animation.goToAndStop(startFrame, true);
+}
+
+function getRestFrame(animation: AnimationItem, startFrame: number, configuredRestFrame: number | undefined) {
+  if (configuredRestFrame !== undefined) {
+    return Math.max(startFrame, configuredRestFrame);
+  }
+
+  const durationInFrames = animation.getDuration(true);
+  if (!Number.isFinite(durationInFrames) || durationInFrames <= startFrame) {
+    return startFrame;
+  }
+
+  return Math.max(startFrame, Math.floor(durationInFrames) - 1);
 }
 
 function cloneLottieAnimationData(animationData: LottieAnimationData): LottieAnimationData {
