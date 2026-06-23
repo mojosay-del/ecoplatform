@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useRef, useState, type SetStateAction } from "react";
+import { FormEvent, useMemo, useRef, useState, type SetStateAction } from "react";
+import { CreditCard } from "lucide-react";
 import { subscriptionPlans } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "../../../components/StatusPill";
+import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import { errorText, apiFetch } from "../../../lib/api";
 import { queryKeys } from "../../../lib/query/keys";
 import {
@@ -12,7 +14,6 @@ import {
   SUBSCRIPTION_STATUS_LABELS,
 } from "../../../lib/display-labels";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
-import "../../content-blocks/checklist.css";
 
 type CompanyItem = {
   id: string;
@@ -43,6 +44,23 @@ export function AdminBillingView() {
     },
   );
   const companies = companiesQuery.items;
+
+  // Сводка по загруженному списку компаний (быстрый взгляд «сколько активно /
+  // скоро истекает»). Считается по подтянутым записям.
+  const summary = useMemo(() => {
+    const now = Date.now();
+    const soon = now + 7 * 24 * 60 * 60 * 1000;
+    let active = 0;
+    let expiring = 0;
+    for (const company of companies) {
+      if (!company.subscriptionPlan || !company.subscriptionEndsAt) continue;
+      const ends = new Date(company.subscriptionEndsAt).getTime();
+      if (ends <= now) continue;
+      active += 1;
+      if (ends <= soon) expiring += 1;
+    }
+    return { active, expiring };
+  }, [companies]);
 
   const [form, setForm] = useState({
     companyId: "",
@@ -94,7 +112,7 @@ export function AdminBillingView() {
     return (
       <AppShell>
         <section className="page">
-          <h1 className="page-title">Ручная активация подписки</h1>
+          <h1 className="page-title">Подписки</h1>
           <p className="page-subtitle">Войдите как администратор.</p>
         </section>
       </AppShell>
@@ -105,7 +123,7 @@ export function AdminBillingView() {
     return (
       <AppShell>
         <section className="page">
-          <h1 className="page-title">Ручная активация подписки</h1>
+          <h1 className="page-title">Подписки</h1>
           <p className="page-subtitle">Раздел доступен только администратору.</p>
         </section>
       </AppShell>
@@ -115,12 +133,12 @@ export function AdminBillingView() {
   return (
     <AppShell>
       <section className="page">
-        <header className="page-header">
-          <h1 className="page-title">Ручная активация подписки</h1>
-          <p className="page-subtitle">
-            Используется, пока нет автоматического платёжного шлюза. Действие фиксируется в журнале админов.
-          </p>
-        </header>
+        <AdminPageHeader
+          count={companiesQuery.state === "ready" || companies.length > 0 ? companiesQuery.total : undefined}
+          subtitle="Тарифы компаний и ручная активация подписки. Действие фиксируется в журнале админов."
+          title="Подписки"
+        />
+
         {successMessage ? (
           <StatusPill as="p" variant="success">
             {successMessage}
@@ -133,103 +151,174 @@ export function AdminBillingView() {
         ) : null}
         {companiesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
-        <form className="form" onSubmit={submit}>
-          <label className="form-field">
-            <span>Компания</span>
-            <select
-              className="select"
-              value={form.companyId}
-              onChange={(event) => updateForm((prev) => ({ ...prev, companyId: event.target.value }))}
-              required
-            >
-              <option value="">Выберите компанию…</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.organizationName} · {COMPANY_STATUS_LABELS[company.status] ?? company.status}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="admin-billing-layout">
+          <form className="admin-billing-form" onSubmit={submit}>
+            <header className="admin-billing-form-head">
+              <span className="admin-billing-form-icon" aria-hidden>
+                <CreditCard size={18} />
+              </span>
+              <div>
+                <strong>Ручная активация</strong>
+                <p>Пока нет автоматического платёжного шлюза.</p>
+              </div>
+            </header>
 
-          <label className="form-field">
-            <span>Тариф</span>
-            <select
-              className="select"
-              value={form.plan}
-              onChange={(event) =>
-                updateForm((prev) => ({ ...prev, plan: event.target.value as "basic" | "extended" }))
-              }
-            >
-              {subscriptionPlans.map((plan) => (
-                <option key={plan} value={plan}>
-                  {SUBSCRIPTION_PLAN_LABELS[plan]}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="form-field">
+              <span>Компания</span>
+              <select
+                className="select"
+                value={form.companyId}
+                onChange={(event) => updateForm((prev) => ({ ...prev, companyId: event.target.value }))}
+                required
+              >
+                <option value="">Выберите компанию…</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.organizationName} · {COMPANY_STATUS_LABELS[company.status] ?? company.status}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="form-field">
-            <span>Дата окончания</span>
-            <input
-              className="input"
-              type="date"
-              value={form.endsAt}
-              onChange={(event) => updateForm((prev) => ({ ...prev, endsAt: event.target.value }))}
-              required
-            />
-          </label>
+            <label className="form-field">
+              <span>Тариф</span>
+              <select
+                className="select"
+                value={form.plan}
+                onChange={(event) =>
+                  updateForm((prev) => ({ ...prev, plan: event.target.value as "basic" | "extended" }))
+                }
+              >
+                {subscriptionPlans.map((plan) => (
+                  <option key={plan} value={plan}>
+                    {SUBSCRIPTION_PLAN_LABELS[plan]}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="form-field">
-            <span>Причина / комментарий</span>
-            <textarea
-              className="textarea small"
-              placeholder="Например: оплачено по счёту № 123 от 2026-05-19."
-              value={form.reason}
-              onChange={(event) => updateForm((prev) => ({ ...prev, reason: event.target.value }))}
-              minLength={3}
-              required
-            />
-          </label>
+            <label className="form-field">
+              <span>Дата окончания</span>
+              <input
+                className="input"
+                type="date"
+                value={form.endsAt}
+                onChange={(event) => updateForm((prev) => ({ ...prev, endsAt: event.target.value }))}
+                required
+              />
+            </label>
 
-          <button className="button" type="submit" disabled={submitting || !form.companyId}>
-            {submitting ? "Активирую…" : "Активировать подписку"}
-          </button>
-        </form>
+            <label className="form-field">
+              <span>Причина / комментарий</span>
+              <textarea
+                className="textarea small"
+                placeholder="Например: оплачено по счёту № 123 от 2026-05-19."
+                value={form.reason}
+                onChange={(event) => updateForm((prev) => ({ ...prev, reason: event.target.value }))}
+                minLength={3}
+                required
+              />
+            </label>
 
-        <section className="stack-list u-mt-24">
-          <h2>Компании на платформе</h2>
-          {companies.length === 0 ? <p className="page-subtitle">Компаний пока нет.</p> : null}
-          {companies.map((company) => (
-            <article className="checklist-block" key={company.id}>
-              <strong>{company.organizationName}</strong>
-              <p>
-                <StatusPill variant={companyStatusPillVariant(company.status)}>
-                  {COMPANY_STATUS_LABELS[company.status] ?? company.status}
-                </StatusPill>{" "}
-                · Тариф:{" "}
-                {company.subscriptionPlan
-                  ? (SUBSCRIPTION_PLAN_LABELS[company.subscriptionPlan] ?? company.subscriptionPlan)
-                  : "—"}
-                {company.subscriptionEndsAt
-                  ? ` (до ${new Date(company.subscriptionEndsAt).toLocaleDateString("ru-RU")})`
-                  : ""}
-              </p>
-              {company.subscriptions[0] ? (
-                <p className="page-subtitle">
-                  Последняя подписка:{" "}
-                  {SUBSCRIPTION_PLAN_LABELS[company.subscriptions[0].plan] ?? company.subscriptions[0].plan} ·{" "}
-                  <StatusPill variant={subscriptionStatusPillVariant(company.subscriptions[0].status)}>
-                    {SUBSCRIPTION_STATUS_LABELS[company.subscriptions[0].status] ?? company.subscriptions[0].status}
-                  </StatusPill>{" "}
-                  · до {new Date(company.subscriptions[0].endsAt).toLocaleDateString("ru-RU")}
-                </p>
+            <button className="button" type="submit" disabled={submitting || !form.companyId}>
+              {submitting ? "Активирую…" : "Активировать подписку"}
+            </button>
+          </form>
+
+          <div className="admin-billing-companies">
+            {companies.length > 0 ? (
+              <div className="admin-billing-summary">
+                <div className="admin-billing-summary-chip">
+                  <span className="admin-billing-summary-value">{summary.active}</span>
+                  <span className="admin-billing-summary-label">Активных подписок</span>
+                </div>
+                <div className="admin-billing-summary-chip admin-billing-summary-chip-warning">
+                  <span className="admin-billing-summary-value">{summary.expiring}</span>
+                  <span className="admin-billing-summary-label">Истекают ≤ 7 дней</span>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="admin-table-shell">
+              <div className="admin-table-meta">
+                <p className="page-subtitle">Компании на платформе</p>
+              </div>
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Компания</th>
+                      <th scope="col">Статус</th>
+                      <th scope="col">Тариф</th>
+                      <th scope="col">Действует до</th>
+                      <th scope="col">Последняя подписка</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {companies.map((company) => {
+                      const last = company.subscriptions[0];
+                      return (
+                        <tr key={company.id}>
+                          <td>
+                            <div className="admin-table-cell-main">
+                              <strong>{company.organizationName}</strong>
+                            </div>
+                          </td>
+                          <td>
+                            <StatusPill variant={companyStatusPillVariant(company.status)}>
+                              {COMPANY_STATUS_LABELS[company.status] ?? company.status}
+                            </StatusPill>
+                          </td>
+                          <td>
+                            {company.subscriptionPlan
+                              ? (SUBSCRIPTION_PLAN_LABELS[company.subscriptionPlan] ?? company.subscriptionPlan)
+                              : "—"}
+                          </td>
+                          <td>
+                            {company.subscriptionEndsAt
+                              ? new Date(company.subscriptionEndsAt).toLocaleDateString("ru-RU")
+                              : "—"}
+                          </td>
+                          <td>
+                            {last ? (
+                              <div className="admin-table-cell-main">
+                                <StatusPill variant={subscriptionStatusPillVariant(last.status)}>
+                                  {SUBSCRIPTION_STATUS_LABELS[last.status] ?? last.status}
+                                </StatusPill>
+                                <span className="admin-table-muted">
+                                  {SUBSCRIPTION_PLAN_LABELS[last.plan] ?? last.plan} · до{" "}
+                                  {new Date(last.endsAt).toLocaleDateString("ru-RU")}
+                                </span>
+                              </div>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {companies.length === 0 && !companiesQuery.isInitialLoading ? (
+                <AdminEmptyState
+                  description="Здесь появятся компании после регистрации на платформе."
+                  icon={CreditCard}
+                  title="Компаний пока нет"
+                />
               ) : null}
-            </article>
-          ))}
-          <div ref={companiesQuery.sentinelRef} aria-hidden="true" />
-          {companiesQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
-          {!companiesQuery.hasMore && companies.length > 0 ? <p className="page-subtitle">Это все компании.</p> : null}
-        </section>
+
+              <AdminInfiniteFooter
+                endLabel="Это все компании."
+                hasItems={companies.length > 0}
+                hasMore={companiesQuery.hasMore}
+                isLoadingMore={companiesQuery.isLoadingMore}
+                sentinelRef={companiesQuery.sentinelRef}
+              />
+            </div>
+          </div>
+        </div>
       </section>
     </AppShell>
   );

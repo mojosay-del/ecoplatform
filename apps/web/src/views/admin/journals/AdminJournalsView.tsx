@@ -1,11 +1,12 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, ScrollText } from "lucide-react";
 import type { AdminJournalEntry, AdminJournalPayload, PaginatedResponse } from "@ecoplatform/shared";
 import { AdminSortButton } from "../../../components/AdminSortButton";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
+import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import { getJournalEntityDisplay } from "../../../components/admin-entity-display";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
 import { apiFetch } from "../../../lib/api";
@@ -116,10 +117,11 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
 
   const content = (
     <>
-      <header className="page-header">
-        <h1 className="page-title">Журнал действий администраторов</h1>
-        <p className="page-subtitle">Все изменения в админке фиксируются и доступны для аудита.</p>
-      </header>
+      <AdminPageHeader
+        count={journalsQuery.state === "ready" || journalsQuery.items.length > 0 ? journalsQuery.total : undefined}
+        subtitle="Все изменения в админке фиксируются и доступны для аудита."
+        title="Журнал действий"
+      />
 
       <form className="admin-filter-bar" onSubmit={submit}>
         <input
@@ -235,21 +237,30 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
           </div>
 
           {sortedEntries.length === 0 && !journalsQuery.isInitialLoading ? (
-            <div className="admin-empty-state">
-              <p>{hasActiveFilters ? "По текущим фильтрам записей нет." : "Записей журнала пока нет."}</p>
-              {hasActiveFilters ? (
-                <button className="button secondary" onClick={resetFilters} type="button">
-                  Очистить фильтры
-                </button>
-              ) : null}
-            </div>
+            <AdminEmptyState
+              action={
+                hasActiveFilters ? (
+                  <button className="button secondary" onClick={resetFilters} type="button">
+                    Очистить фильтры
+                  </button>
+                ) : undefined
+              }
+              description={
+                hasActiveFilters
+                  ? "Под текущие фильтры записей не нашлось — измените условия."
+                  : "Здесь появятся записи о действиях администраторов."
+              }
+              icon={ScrollText}
+              title={hasActiveFilters ? "Записей не найдено" : "Журнал пуст"}
+            />
           ) : null}
 
-          <div ref={journalsQuery.sentinelRef} aria-hidden="true" />
-          {journalsQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
-          {!journalsQuery.hasMore && journalsQuery.items.length > 0 ? (
-            <p className="page-subtitle">Это все записи.</p>
-          ) : null}
+          <AdminInfiniteFooter
+            hasItems={journalsQuery.items.length > 0}
+            hasMore={journalsQuery.hasMore}
+            isLoadingMore={journalsQuery.isLoadingMore}
+            sentinelRef={journalsQuery.sentinelRef}
+          />
         </div>
       ) : null}
     </>

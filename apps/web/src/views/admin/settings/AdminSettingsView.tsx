@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
+import { AdminPageHeader } from "../../../components/admin";
 import { errorText, apiFetch } from "../../../lib/api";
 import { queryKeys } from "../../../lib/query/keys";
 import { useApiQuery } from "../../shared";
@@ -219,12 +220,10 @@ export function AdminSettingsView() {
   return (
     <AppShell>
       <section className="page">
-        <header className="page-header">
-          <h1 className="page-title">Настройки платформы</h1>
-          <p className="page-subtitle">
-            Параметры, которые раньше были жёстко прописаны в коде. Сохранение действует моментально.
-          </p>
-        </header>
+        <AdminPageHeader
+          subtitle="Параметры, которые раньше были жёстко прописаны в коде. Сохранение действует моментально."
+          title="Настройки платформы"
+        />
 
         {(errorMessage ?? readError) ? (
           <StatusPill as="p" variant="danger">
