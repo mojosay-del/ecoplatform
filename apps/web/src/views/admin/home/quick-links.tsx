@@ -3,6 +3,7 @@
 // Блоки для не-админ-персонала: быстрые переходы по доступным разделам и
 // сводка задач (черновики контента, очередь модерации).
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { ArrowRight, BookOpen, GraduationCap, Newspaper, ShieldAlert, type LucideIcon } from "lucide-react";
 import type { AdminStaffSummary } from "@ecoplatform/shared";
@@ -13,19 +14,28 @@ export function AdminQuickLinks({ groups }: { groups: ReturnType<typeof visibleA
   return (
     <section className="admin-home-shortcuts" aria-labelledby="admin-home-shortcuts-title">
       <header className="admin-home-shortcuts-head">
-        <h2 id="admin-home-shortcuts-title">Быстрые переходы</h2>
+        <h2 id="admin-home-shortcuts-title">Разделы панели</h2>
       </header>
       <div className="admin-home-groups">
         {groups.map((group) => (
-          <section className="admin-home-section" key={group.title}>
+          <section className={`admin-home-section admin-home-section-${group.accent}`} key={group.title}>
             <header className="admin-home-section-head">
-              <h3>{group.title}</h3>
+              <div className="admin-home-section-heading">
+                <h3>{group.title}</h3>
+                {group.caption ? <p className="admin-home-section-caption">{group.caption}</p> : null}
+              </div>
+              <span className="admin-home-section-count">{group.items.length}</span>
             </header>
             <div className="admin-home-links">
-              {group.items.map((item) => {
+              {group.items.map((item, index) => {
                 const Icon = item.icon;
                 return (
-                  <Link className="admin-home-link" href={item.href} key={item.href}>
+                  <Link
+                    className="admin-home-link"
+                    href={item.href}
+                    key={item.href}
+                    style={{ "--link-delay": `${index * 40}ms` } as CSSProperties}
+                  >
                     <span className="admin-home-link-icon" aria-hidden>
                       <Icon size={18} />
                     </span>

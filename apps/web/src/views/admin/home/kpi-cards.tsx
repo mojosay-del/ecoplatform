@@ -8,10 +8,16 @@ import { KPI_CARDS } from "./dashboard-config";
 import { deltaTone, formatNumber } from "./format";
 import type { KpiPolarity } from "./types";
 
-export function AdminKpiGrid({ dashboard }: { dashboard: AdminDashboardSummary }) {
+export function AdminKpiGrid({
+  dashboard,
+  cards = KPI_CARDS,
+}: {
+  dashboard: AdminDashboardSummary;
+  cards?: typeof KPI_CARDS;
+}) {
   return (
     <div className="admin-kpi-grid">
-      {KPI_CARDS.map((item, index) => {
+      {cards.map((item, index) => {
         const Icon = item.icon;
         const previous = item.trendKey ? dashboard.kpiTrends[item.trendKey] : null;
         const delta = previous === null ? null : dashboard.kpis[item.key] - previous;

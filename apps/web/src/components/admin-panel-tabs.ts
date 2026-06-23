@@ -31,8 +31,14 @@ export type AdminHomeItem = AdminPanelTab & {
   icon: LucideIcon;
 };
 
+export type AdminHomeAccent = "brand" | "info" | "warning" | "neutral";
+
 export type AdminHomeGroup = {
   title: string;
+  /** Подпись-описание группы под заголовком в лаунчпаде. */
+  caption?: string;
+  /** Акцентный цвет иконок-плашек раздела. */
+  accent: AdminHomeAccent;
   items: AdminHomeItem[];
 };
 
@@ -87,13 +93,10 @@ const forumTab: AdminPanelTab = {
 
 const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
   {
-    title: "CMS",
+    title: "Контент",
+    caption: "Публикации, база знаний и сообщество",
+    accent: "brand",
     items: [
-      {
-        ...analyticsTab,
-        description: "Состояние платформы, метрики и операционные сигналы.",
-        icon: Gauge,
-      },
       {
         ...newsTab,
         description: "Новостные публикации и редактор материалов.",
@@ -127,7 +130,9 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
     ],
   },
   {
-    title: "Операции",
+    title: "Аудитория",
+    caption: "Пользователи, компании и подписки",
+    accent: "info",
     items: [
       {
         href: "/admin/users",
@@ -154,6 +159,21 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         icon: UserCog,
       },
       {
+        href: "/admin/billing",
+        label: "Подписки",
+        pathname: "/admin/billing",
+        roles: ["admin"],
+        description: "Тарифы, ручная активация и продления.",
+        icon: CreditCard,
+      },
+    ],
+  },
+  {
+    title: "Обращения и модерация",
+    caption: "Поддержка, жалобы и рассылки",
+    accent: "warning",
+    items: [
+      {
         href: "/admin/support",
         label: "Поддержка",
         pathname: "/admin/support",
@@ -161,27 +181,6 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         description: "Обращения клиентов и ответы поддержки.",
         icon: Headphones,
       },
-      {
-        href: "/admin/broadcast",
-        label: "Рассылка",
-        pathname: "/admin/broadcast",
-        roles: ["admin"],
-        description: "Уведомления пользователям от платформы с фильтрами по аудитории.",
-        icon: Megaphone,
-      },
-      {
-        href: "/admin/billing",
-        label: "Подписки",
-        pathname: "/admin/billing",
-        roles: ["admin"],
-        description: "Ручная активация и контроль тарифов.",
-        icon: CreditCard,
-      },
-    ],
-  },
-  {
-    title: "Контроль",
-    items: [
       {
         href: "/admin/moderation",
         label: "Очередь модерации",
@@ -191,6 +190,26 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         icon: ShieldAlert,
       },
       {
+        href: "/admin/broadcast",
+        label: "Рассылка",
+        pathname: "/admin/broadcast",
+        roles: ["admin"],
+        description: "Уведомления пользователям с фильтрами по аудитории.",
+        icon: Megaphone,
+      },
+    ],
+  },
+  {
+    title: "Система",
+    caption: "Аналитика, журнал и параметры платформы",
+    accent: "neutral",
+    items: [
+      {
+        ...analyticsTab,
+        description: "Полный дашборд: метрики, графики и операционные сигналы.",
+        icon: Gauge,
+      },
+      {
         href: "/admin/journals",
         label: "Журнал",
         pathname: "/admin/journals",
@@ -198,11 +217,6 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         description: "История админ-действий и изменений.",
         icon: ScrollText,
       },
-    ],
-  },
-  {
-    title: "Настройки",
-    items: [
       {
         href: "/admin/settings",
         label: "Настройки платформы",
