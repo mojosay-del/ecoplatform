@@ -7,6 +7,7 @@ import "../../../components/support-drawer.css";
 import { AdminSortButton } from "../../../components/AdminSortButton";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, supportStatusPillVariant } from "../../../components/StatusPill";
+import { AdminPageHeader } from "../../../components/admin";
 import { SendActionIcon } from "../../../components/app-shell/nav-icons";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
 import { errorText, apiFetch } from "../../../lib/api";
@@ -156,10 +157,11 @@ export function AdminSupportView() {
   return (
     <AppShell>
       <section className="page">
-        <header className="page-header">
-          <h1 className="page-title">Поддержка администратора</h1>
-          <p className="page-subtitle">Очередь обращений компаний. Слева — список, справа — переписка.</p>
-        </header>
+        <AdminPageHeader
+          count={ticketsQuery.state === "ready" || tickets.length > 0 ? ticketsQuery.total : undefined}
+          subtitle="Очередь обращений компаний. Слева — список, справа — переписка."
+          title="Поддержка"
+        />
 
         {result ? (
           <StatusPill as="p" variant="danger">

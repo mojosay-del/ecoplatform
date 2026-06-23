@@ -7,8 +7,10 @@ import type {
   ModerationDecisionType,
   PaginatedResponse,
 } from "@ecoplatform/shared";
+import { ShieldCheck } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, moderationStatusPillVariant } from "../../../components/StatusPill";
+import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
 import { formatModerationCaseTitle, formatModerationEntityPreview } from "../../../components/admin-entity-display";
 import { apiFetch } from "../../../lib/api";
 import { queryKeys } from "../../../lib/query/keys";
@@ -112,10 +114,11 @@ export function AdminModerationView() {
   return (
     <AppShell>
       <section className="page">
-        <header className="page-header">
-          <h1 className="page-title">Модерация</h1>
-          <p className="page-subtitle">Очередь жалоб на пользовательский контент.</p>
-        </header>
+        <AdminPageHeader
+          count={state === "ready" ? cases.length : undefined}
+          subtitle="Очередь жалоб на пользовательский контент."
+          title="Модерация"
+        />
         {state === "error" ? (
           <StatusPill as="p" variant="danger">
             {errorMessage}
@@ -125,7 +128,13 @@ export function AdminModerationView() {
         {state === "ready" ? (
           <div className="moderation-layout">
             <div className="stack-list">
-              {cases.length === 0 ? <p className="page-subtitle">Кейсов нет.</p> : null}
+              {cases.length === 0 ? (
+                <AdminEmptyState
+                  description="Новых жалоб на пользовательский контент сейчас нет."
+                  icon={ShieldCheck}
+                  title="Очередь пуста"
+                />
+              ) : null}
               {cases.map((item) => (
                 <button
                   className={`moderation-case-row ${selectedCase?.id === item.id ? "active" : ""}`}
