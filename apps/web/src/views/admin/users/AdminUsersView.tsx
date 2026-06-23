@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { Users } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
+import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
 import { errorText, apiFetch } from "../../../lib/api";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
@@ -165,10 +167,11 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
 
   const content = (
     <>
-      <header className="page-header">
-        <h1 className="page-title">Пользователи</h1>
-        <p className="page-subtitle">Управление учётными записями платформы.</p>
-      </header>
+      <AdminPageHeader
+        count={usersQuery.state === "ready" || usersQuery.items.length > 0 ? usersQuery.total : undefined}
+        subtitle="Управление учётными записями платформы."
+        title="Пользователи"
+      />
 
       <AdminUsersFilterBar
         search={search}
@@ -205,21 +208,31 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
             />
 
             {sortedUsers.length === 0 && !usersQuery.isInitialLoading ? (
-              <div className="admin-empty-state">
-                <p>{hasActiveFilters ? "По текущим фильтрам пользователей нет." : "Пользователей пока нет."}</p>
-                {hasActiveFilters ? (
-                  <button className="button secondary" onClick={resetFilters} type="button">
-                    Очистить фильтры
-                  </button>
-                ) : null}
-              </div>
+              <AdminEmptyState
+                action={
+                  hasActiveFilters ? (
+                    <button className="button secondary" onClick={resetFilters} type="button">
+                      Очистить фильтры
+                    </button>
+                  ) : undefined
+                }
+                description={
+                  hasActiveFilters
+                    ? "Под текущие фильтры ничего не подошло — измените условия поиска."
+                    : "Здесь появятся учётные записи пользователей платформы."
+                }
+                icon={Users}
+                title={hasActiveFilters ? "Пользователей не найдено" : "Пользователей пока нет"}
+              />
             ) : null}
 
-            <div ref={usersQuery.sentinelRef} aria-hidden="true" />
-            {usersQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
-            {!usersQuery.hasMore && usersQuery.items.length > 0 ? (
-              <p className="page-subtitle">Это все пользователи.</p>
-            ) : null}
+            <AdminInfiniteFooter
+              endLabel="Это все пользователи."
+              hasItems={usersQuery.items.length > 0}
+              hasMore={usersQuery.hasMore}
+              isLoadingMore={usersQuery.isLoadingMore}
+              sentinelRef={usersQuery.sentinelRef}
+            />
           </div>
 
           <AdminUserDetailPanel

@@ -1,7 +1,9 @@
 "use client";
 
+import { Building2 } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
+import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import "../../content-blocks/checklist.css";
 import { AdminCompanyDetailPanel } from "./company-detail-panel";
 import { AdminCompaniesTable } from "./companies-table";
@@ -37,10 +39,11 @@ export function AdminCompaniesView() {
   return (
     <AppShell>
       <section className="page">
-        <header className="page-header">
-          <h1 className="page-title">Компании</h1>
-          <p className="page-subtitle">Управление компаниями и их подписками.</p>
-        </header>
+        <AdminPageHeader
+          count={companiesQuery.state === "ready" || companiesQuery.items.length > 0 ? companiesQuery.total : undefined}
+          subtitle="Управление компаниями и их подписками."
+          title="Компании"
+        />
 
         <AdminCompaniesFilterBar
           search={view.search}
@@ -77,21 +80,31 @@ export function AdminCompaniesView() {
               />
 
               {view.sortedCompanies.length === 0 && !companiesQuery.isInitialLoading ? (
-                <div className="admin-empty-state">
-                  <p>{view.hasActiveFilters ? "По текущим фильтрам компаний нет." : "Компаний пока нет."}</p>
-                  {view.hasActiveFilters ? (
-                    <button className="button secondary" onClick={view.resetFilters} type="button">
-                      Очистить фильтры
-                    </button>
-                  ) : null}
-                </div>
+                <AdminEmptyState
+                  action={
+                    view.hasActiveFilters ? (
+                      <button className="button secondary" onClick={view.resetFilters} type="button">
+                        Очистить фильтры
+                      </button>
+                    ) : undefined
+                  }
+                  description={
+                    view.hasActiveFilters
+                      ? "Под текущие фильтры ничего не подошло — измените условия поиска."
+                      : "Здесь появятся компании после регистрации на платформе."
+                  }
+                  icon={Building2}
+                  title={view.hasActiveFilters ? "Компаний не найдено" : "Компаний пока нет"}
+                />
               ) : null}
 
-              <div ref={companiesQuery.sentinelRef} aria-hidden="true" />
-              {companiesQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
-              {!companiesQuery.hasMore && companiesQuery.items.length > 0 ? (
-                <p className="page-subtitle">Это все компании.</p>
-              ) : null}
+              <AdminInfiniteFooter
+                endLabel="Это все компании."
+                hasItems={companiesQuery.items.length > 0}
+                hasMore={companiesQuery.hasMore}
+                isLoadingMore={companiesQuery.isLoadingMore}
+                sentinelRef={companiesQuery.sentinelRef}
+              />
             </div>
 
             <AdminCompanyDetailPanel

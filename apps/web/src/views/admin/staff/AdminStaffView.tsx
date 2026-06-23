@@ -1,7 +1,9 @@
 "use client";
 
+import { UserCog } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
+import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import { CreateStaffForm } from "./create-staff-form";
 import { AdminStaffFilterBar } from "./filter-bar";
 import { StaffTable } from "./staff-table";
@@ -36,10 +38,16 @@ export function AdminStaffView() {
   return (
     <AppShell>
       <section className="page">
-        <header className="page-header">
-          <h1 className="page-title">Сотрудники</h1>
-          <p className="page-subtitle">Платформенные роли: админ, модератор, контент-менеджер.</p>
-        </header>
+        <AdminPageHeader
+          actions={
+            <button className="button" onClick={() => view.setCreateOpen((value) => !value)} type="button">
+              {view.createOpen ? "Скрыть форму" : "Добавить сотрудника"}
+            </button>
+          }
+          count={staffQuery.state === "ready" || staffQuery.items.length > 0 ? staffQuery.total : undefined}
+          subtitle="Платформенные роли: админ, модератор, контент-менеджер."
+          title="Сотрудники"
+        />
 
         {view.errorMessage || staffQuery.errorMessage ? (
           <StatusPill as="p" variant="danger">
@@ -47,12 +55,6 @@ export function AdminStaffView() {
           </StatusPill>
         ) : null}
         {staffQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
-
-        <div className="form-actions">
-          <button className="button" onClick={() => view.setCreateOpen((value) => !value)} type="button">
-            {view.createOpen ? "Скрыть форму" : "Добавить сотрудника"}
-          </button>
-        </div>
 
         {view.createOpen ? (
           <CreateStaffForm form={view.createForm} onChange={view.setCreateForm} onSubmit={view.createStaff} />
@@ -83,21 +85,31 @@ export function AdminStaffView() {
           />
 
           {view.sortedItems.length === 0 && !staffQuery.isInitialLoading ? (
-            <div className="admin-empty-state">
-              <p>{view.hasActiveFilters ? "По текущим фильтрам сотрудников нет." : "Сотрудников пока нет."}</p>
-              {view.hasActiveFilters ? (
-                <button className="button secondary" onClick={view.resetFilters} type="button">
-                  Очистить фильтры
-                </button>
-              ) : null}
-            </div>
+            <AdminEmptyState
+              action={
+                view.hasActiveFilters ? (
+                  <button className="button secondary" onClick={view.resetFilters} type="button">
+                    Очистить фильтры
+                  </button>
+                ) : undefined
+              }
+              description={
+                view.hasActiveFilters
+                  ? "Под текущие фильтры ничего не подошло — измените условия поиска."
+                  : "Добавьте сотрудника платформы кнопкой выше."
+              }
+              icon={UserCog}
+              title={view.hasActiveFilters ? "Сотрудников не найдено" : "Сотрудников пока нет"}
+            />
           ) : null}
 
-          <div ref={staffQuery.sentinelRef} aria-hidden="true" />
-          {staffQuery.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
-          {!staffQuery.hasMore && staffQuery.items.length > 0 ? (
-            <p className="page-subtitle">Это все сотрудники.</p>
-          ) : null}
+          <AdminInfiniteFooter
+            endLabel="Это все сотрудники."
+            hasItems={staffQuery.items.length > 0}
+            hasMore={staffQuery.hasMore}
+            isLoadingMore={staffQuery.isLoadingMore}
+            sentinelRef={staffQuery.sentinelRef}
+          />
         </div>
       </section>
     </AppShell>
