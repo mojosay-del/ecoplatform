@@ -2119,7 +2119,7 @@
 .mp-split-list {
   position: absolute;
   top: 16px;
-  bottom: 16px;
+  bottom: 40px;
   left: 16px;
   z-index: 8;
   display: flex;
@@ -2142,17 +2142,24 @@
 }
 
 .mp-split-list .page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
   margin-bottom: 0;
   text-align: center;
 }
 
 .mp-split-list .page-title {
+  width: 100%;
   font-size: clamp(21px, 1.8vw, 26px);
+  text-align: center;
 }
 
 .mp-split-list .page-subtitle {
+  width: 100%;
   font-size: 13px;
+  text-align: center;
 }
 
 .mp-split-list .mp-toolbar-actions {
@@ -2255,8 +2262,10 @@
 }
 
 .mp-page-map .mp-map-search-area {
-  left: calc(16px + min(560px, calc(100% - 32px)) + 24px);
-  transform: none;
+  top: auto;
+  bottom: 38px;
+  left: calc(16px + min(560px, calc(100% - 32px)) + (100% - 16px - min(560px, calc(100% - 32px))) / 2);
+  transform: translateX(-50%);
 }
 
 /* Переключатель Список/Карта — виден только когда сплит свёрнут. */
@@ -2349,6 +2358,8 @@
   }
 
   .mp-page-map .mp-map-search-area {
+    top: 56px;
+    bottom: auto;
     left: 50%;
     transform: translateX(-50%);
   }
