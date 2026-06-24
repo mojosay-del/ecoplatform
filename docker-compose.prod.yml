@@ -37,7 +37,9 @@ services:
         # ВАЖНО: NEXT_PUBLIC_* «зашиваются» в сайт на ЭТАПЕ СБОРКИ, не в рантайме.
         # Значение берётся из deploy/.env.prod (через --env-file при запуске).
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_DGIS_MAPS_API_KEY: ${NEXT_PUBLIC_DGIS_MAPS_API_KEY}
+        # Карта MapLibre: self-host стиль на нашем домене + origin тайлов для CSP.
+        NEXT_PUBLIC_MAP_STYLE_URL: ${NEXT_PUBLIC_MAP_STYLE_URL}
+        NEXT_PUBLIC_MAP_TILES_ORIGIN: ${NEXT_PUBLIC_MAP_TILES_ORIGIN}
     restart: unless-stopped
     env_file: deploy/.env.prod
     expose:
@@ -52,7 +54,10 @@ services:
       - "443:443"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data      # здесь caddy хранит выпущенные TLS-сертификаты
+      # Самостоятельные векторные тайлы карты (eco.pmtiles + шрифты/спрайты/стиль).
+      # Лежат ВНЕ репозитория (~7.7ГБ); caddy раздаёт их по пути /maptiles.
+      - ../eco-tiles/maptiles:/srv/maptiles:ro
+      - caddy_data:/data # здесь caddy хранит выпущенные TLS-сертификаты
       - caddy_config:/config
     depends_on:
       - api

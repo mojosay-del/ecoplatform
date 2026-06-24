@@ -33,9 +33,13 @@ COPY . .
 
 # NEXT_PUBLIC_* читаются на build-time — пробрасываем как build-arg.
 ARG NEXT_PUBLIC_API_URL="http://localhost:4000/api"
-ARG NEXT_PUBLIC_DGIS_MAPS_API_KEY=""
+# Карта MapLibre: стиль (self-host на проде) и origin тайлов для CSP. Пусто →
+# фронт берёт dev-fallback OpenFreeMap positron.
+ARG NEXT_PUBLIC_MAP_STYLE_URL=""
+ARG NEXT_PUBLIC_MAP_TILES_ORIGIN=""
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NEXT_PUBLIC_DGIS_MAPS_API_KEY=${NEXT_PUBLIC_DGIS_MAPS_API_KEY}
+ENV NEXT_PUBLIC_MAP_STYLE_URL=${NEXT_PUBLIC_MAP_STYLE_URL}
+ENV NEXT_PUBLIC_MAP_TILES_ORIGIN=${NEXT_PUBLIC_MAP_TILES_ORIGIN}
 
 # Сначала shared (через turbo dependsOn), потом сам next build.
 RUN pnpm --filter @ecoplatform/web... build

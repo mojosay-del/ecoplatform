@@ -32,6 +32,17 @@ ecoplatform.pro {
 		reverse_proxy api:4000
 	}
 
+	# Самостоятельные векторные тайлы карты (MapLibre): eco.pmtiles + шрифты/
+	# спрайты/стиль. Раздаются как статика из тома /srv/maptiles (см.
+	# docker-compose.prod.yml). file_server сам поддерживает Range-запросы (206),
+	# что нужно для чтения pmtiles по диапазонам. Тот же origin, что и сайт —
+	# CSP 'self' покрывает, поддомен/CORS не нужны.
+	handle_path /maptiles/* {
+		root * /srv/maptiles
+		header Cache-Control "public, max-age=86400"
+		file_server
+	}
+
 	# Всё остальное — на сайт (Next.js, контейнер web).
 	handle {
 		reverse_proxy web:3000
