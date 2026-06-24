@@ -11,7 +11,7 @@
 // [lon, lat] — в БД храним circleLat/circleLon, разворачиваем при сборке.
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import maplibregl, { type GeoJSONSource, type Map as MlMap } from "maplibre-gl";
+import maplibregl, { type GeoJSONSource, type Map as MlMap, type PropertyValueSpecification } from "maplibre-gl";
 import { Protocol as PmtilesProtocol } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Point, Polygon } from "geojson";
@@ -35,6 +35,9 @@ const LYR_DOT_PULSE = "listing-dot-pulse";
 const LYR_CIRCLE_FILL = "listing-circle-fill";
 const LYR_CIRCLE_LINE = "listing-circle-line";
 const HOVER_LAYERS = [LYR_DOT, LYR_CIRCLE_FILL];
+const LAYER_FADE_ZOOM_RANGE = 0.45;
+const CIRCLE_FADE_START_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD - LAYER_FADE_ZOOM_RANGE;
+const CIRCLE_FADE_END_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD + LAYER_FADE_ZOOM_RANGE;
 
 // Тайлы подложки обрезаны по зоне Экоплатформы (РФ+новые территории+РБ) ещё на
 // этапе генерации, поэтому вне зоны данных нет вовсе — и НЕ рисуем ни линий
@@ -71,19 +74,60 @@ const RU_NAME_OVERRIDES: Record<string, string> = {
   Червоногригорівка: "Червоногригоровка",
 };
 
-// Подписи: name:ru → точечный РФ-словарь по name → латинский фолбэк. name:nonlatin
-// исключён намеренно (для новых территорий/Крыма это украинская кириллица —
-// нельзя по закону РФ); если русского нет, показываем латиницу, не украинский.
+// Подписи: name:ru → точечный РФ-словарь по name → исходное name. Для РФ-зоны
+// нельзя уходить в name_int/name:en: эти поля часто дают латиницу или
+// транслитерацию даже там, где основное name уже русское.
 const LABEL_TEXT_FIELD = [
   "coalesce",
   ["get", "name:ru"],
-  [
-    "match",
-    ["get", "name"],
-    ...Object.entries(RU_NAME_OVERRIDES).flat(),
-    ["coalesce", ["get", "name_int"], ["get", "name:en"], ["get", "name"]],
-  ],
+  ["match", ["get", "name"], ...Object.entries(RU_NAME_OVERRIDES).flat(), ["get", "name"]],
 ];
+
+const DOT_ZOOM_OPACITY: PropertyValueSpecification<number> = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  CIRCLE_FADE_START_ZOOM,
+  1,
+  CIRCLE_FADE_END_ZOOM,
+  0,
+];
+
+const PULSE_ZOOM_OPACITY: PropertyValueSpecification<number> = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  CIRCLE_FADE_START_ZOOM,
+  0.3,
+  CIRCLE_FADE_END_ZOOM,
+  0,
+];
+
+const CIRCLE_LINE_ZOOM_OPACITY: PropertyValueSpecification<number> = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  CIRCLE_FADE_START_ZOOM,
+  0,
+  CIRCLE_FADE_END_ZOOM,
+  1,
+];
+
+const CIRCLE_FILL_ZOOM_OPACITY: PropertyValueSpecification<number> = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  CIRCLE_FADE_START_ZOOM,
+  0,
+  CIRCLE_FADE_END_ZOOM,
+  ["case", ["boolean", ["feature-state", "hover"], false], 0.34, 0.18],
+];
+
+function dotFadeForZoom(zoom: number) {
+  if (zoom <= CIRCLE_FADE_START_ZOOM) return 1;
+  if (zoom >= CIRCLE_FADE_END_ZOOM) return 0;
+  return (CIRCLE_FADE_END_ZOOM - zoom) / (CIRCLE_FADE_END_ZOOM - CIRCLE_FADE_START_ZOOM);
+}
 
 // Приводим подложку к требованиям РФ: подписи — на русском, пограничные линии
 // подложки скрываем (рисуем собственную зону). Работает для любого
@@ -298,20 +342,21 @@ export function ListingMap({
         id: LYR_CIRCLE_FILL,
         type: "fill",
         source: SRC_CIRCLES,
-        minzoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+        minzoom: CIRCLE_FADE_START_ZOOM,
         paint: {
           "fill-color": ["get", "color"],
-          "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.34, 0.18],
+          "fill-opacity": CIRCLE_FILL_ZOOM_OPACITY,
         },
       });
       map.addLayer({
         id: LYR_CIRCLE_LINE,
         type: "line",
         source: SRC_CIRCLES,
-        minzoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+        minzoom: CIRCLE_FADE_START_ZOOM,
         paint: {
           "line-color": ["get", "color"],
           "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 3, 2],
+          "line-opacity": CIRCLE_LINE_ZOOM_OPACITY,
         },
       });
 
@@ -320,21 +365,23 @@ export function ListingMap({
         id: LYR_DOT_PULSE,
         type: "circle",
         source: SRC_POINTS,
-        maxzoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+        maxzoom: CIRCLE_FADE_END_ZOOM,
         filter: ["==", ["get", "fresh"], true],
-        paint: { "circle-color": ["get", "color"], "circle-opacity": 0.3, "circle-radius": 6 },
+        paint: { "circle-color": ["get", "color"], "circle-opacity": PULSE_ZOOM_OPACITY, "circle-radius": 6 },
       });
       // Точка дальнего масштаба.
       map.addLayer({
         id: LYR_DOT,
         type: "circle",
         source: SRC_POINTS,
-        maxzoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+        maxzoom: CIRCLE_FADE_END_ZOOM,
         paint: {
           "circle-color": ["get", "color"],
           "circle-radius": ["case", ["boolean", ["feature-state", "hover"], false], 8, 6],
+          "circle-opacity": DOT_ZOOM_OPACITY,
           "circle-stroke-width": 2,
           "circle-stroke-color": "#ffffff",
+          "circle-stroke-opacity": DOT_ZOOM_OPACITY,
         },
       });
 
@@ -375,7 +422,7 @@ export function ListingMap({
           const phase = (Math.sin(Date.now() / 500) + 1) / 2; // 0..1
           if (map.getLayer(LYR_DOT_PULSE)) {
             map.setPaintProperty(LYR_DOT_PULSE, "circle-radius", 6 + phase * 12);
-            map.setPaintProperty(LYR_DOT_PULSE, "circle-opacity", 0.35 * (1 - phase));
+            map.setPaintProperty(LYR_DOT_PULSE, "circle-opacity", 0.35 * (1 - phase) * dotFadeForZoom(map.getZoom()));
           }
           pulseFrame = requestAnimationFrame(animate);
         };
