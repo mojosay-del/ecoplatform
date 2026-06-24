@@ -2043,6 +2043,10 @@
   max-width: none;
 }
 
+.mp-page-map {
+  margin: -24px -32px -32px;
+}
+
 .mp-map {
   width: 100%;
   height: 460px;
@@ -2063,34 +2067,75 @@
 /* Точки/круги/пульс свежих объявлений рисует MapLibre data-driven слоями (см.
    ListingMap.tsx) — отдельный CSS для маркеров больше не нужен. */
 
-/* ── Сплит лента+карта (как у гео-маркетплейсов) ─────────────────────────────
-   Список скроллится слева, карта закреплена справа на всю высоту вьюпорта.
-   Topbar оболочки не sticky, поэтому карта может занять почти весь экран. */
+/* ── Карта как рабочая область, лента поверх ────────────────────────────────
+   На desktop карта занимает всю ширину, а фильтры и объявления лежат поверх
+   неё в левой панели. На узких экранах панель/карта переключаются кнопками. */
 .mp-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(380px, 40vw, 600px);
-  gap: 18px;
-  align-items: start;
+  position: relative;
+  min-height: calc(100dvh - 64px);
 }
 
-/* В сплите колонка списка уже, чем была лента во всю ширину — чуть меньший
-   минимум карточки, чтобы на ноутбуках оставались две колонки. */
 .mp-split-list .mp-grid {
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 /* Список выше карты по z-оси: фильтр-попапы не ныряют под контролы карты. */
 .mp-split-list {
-  position: relative;
-  z-index: 2;
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 16px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  width: min(600px, calc(100% - 32px));
+  min-width: 0;
+  padding: 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.mp-split-list .mp-toolbar {
+  margin-bottom: 16px;
+}
+
+.mp-split-list .page-header {
+  margin-bottom: 0;
+}
+
+.mp-split-list .page-title {
+  font-size: clamp(22px, 2vw, 28px);
+}
+
+.mp-split-list .page-subtitle {
+  font-size: 14px;
+}
+
+.mp-split-list .mp-toolbar-actions {
+  width: 100%;
+}
+
+.mp-split-list .mp-toolbar-actions .button {
+  flex: 1 1 180px;
   min-width: 0;
 }
 
+.mp-split-list .mp-filterbar {
+  margin-bottom: 12px;
+}
+
 .mp-split-map {
-  position: sticky;
-  top: 16px;
+  position: relative;
   z-index: 1;
-  height: calc(100vh - 32px);
+  height: calc(100dvh - 64px);
+  min-height: 620px;
 }
 
 /* Relative-обёртка — якорь для оверлеев карты (легенда, «Искать в области»). */
@@ -2101,6 +2146,8 @@
 
 .mp-map-shell .mp-map {
   height: 100%;
+  border: 0;
+  border-radius: 24px 0 0 24px;
 }
 
 /* Легенда цветов сырья: верхний левый угол (зум-контрол 2ГИС — справа по
@@ -2128,6 +2175,11 @@
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+.mp-page-map .mp-map-legend {
+  right: 58px;
+  left: auto;
 }
 
 /* «Искать в этой области» — плашка по центру, строкой ниже легенды (первая
@@ -2163,6 +2215,11 @@
 .mp-map-search-area:hover {
   border-color: var(--accent, #1f8a4c);
   color: var(--accent, #1f8a4c);
+}
+
+.mp-page-map .mp-map-search-area {
+  left: calc(16px + min(600px, calc(100% - 32px)) + 24px);
+  transform: none;
 }
 
 /* Переключатель Список/Карта — виден только когда сплит свёрнут. */
@@ -2203,12 +2260,33 @@
 }
 
 @media (max-width: 1024px) {
+  .mp-page-map {
+    margin: 0;
+  }
+
   .mp-split {
-    grid-template-columns: 1fr;
+    min-height: auto;
   }
 
   .mp-view-toggle {
     display: inline-flex;
+  }
+
+  .mp-split-list {
+    position: relative;
+    top: auto;
+    bottom: auto;
+    left: auto;
+    width: 100%;
+    max-height: none;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .mp-split-list.is-mobile-hidden {
@@ -2221,6 +2299,7 @@
     position: static;
     display: none;
     height: auto;
+    min-height: 0;
   }
 
   .mp-split-map.is-mobile-visible {
@@ -2232,14 +2311,30 @@
     min-height: 320px;
   }
 
+  .mp-page-map .mp-map-search-area {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .mp-map-shell .mp-map {
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 14px;
+  }
+
   /* Компактная легенда на узкой карте. */
   .mp-map-legend {
+    right: auto;
+    left: 10px;
     gap: 4px 10px;
     padding: 6px 10px;
   }
 }
 
 @media (max-width: 680px) {
+  .mp-split-list .mp-grid {
+    grid-template-columns: 1fr;
+  }
+
   .mp-filterbar,
   .mp-filterbar-group {
     align-items: stretch;

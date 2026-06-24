@@ -132,50 +132,50 @@ export function MarketplaceView() {
 
   return (
     <AppShell>
-      <section className="page mp-page-wide">
-        <div className="mp-toolbar">
-          <PageHeader title="Торговая площадка" subtitle="Объявления о продаже вторсырья от заготовителей." />
-          {isCollector ? (
-            <div className="mp-toolbar-actions">
-              <Link className="button secondary" href="/marketplace/my">
-                Мои объявления
-              </Link>
-              <Link className="button" href="/marketplace/new">
-                Разместить объявление
-              </Link>
-            </div>
-          ) : isBuyer ? (
-            <div className="mp-toolbar-actions">
-              <Link className="button secondary" href="/marketplace/offers">
-                Мои предложения
-              </Link>
-            </div>
-          ) : null}
-        </div>
-
-        {/* На узких экранах сплит сворачивается в один столбец — переключатель
-            Список/Карта (карта при этом не размонтируется, только скрывается). */}
-        <div className="mp-view-toggle" role="group" aria-label="Вид ленты">
-          <button
-            aria-pressed={mobileView === "list"}
-            className={mobileView === "list" ? "is-active" : ""}
-            type="button"
-            onClick={() => setMobileView("list")}
-          >
-            Список
-          </button>
-          <button
-            aria-pressed={mobileView === "map"}
-            className={mobileView === "map" ? "is-active" : ""}
-            type="button"
-            onClick={() => setMobileView("map")}
-          >
-            Карта
-          </button>
-        </div>
-
+      <section className="page mp-page-wide mp-page-map">
         <div className="mp-split">
           <div className={`mp-split-list${mobileView === "map" ? " is-mobile-hidden" : ""}`}>
+            <div className="mp-toolbar">
+              <PageHeader title="Торговая площадка" subtitle="Объявления о продаже вторсырья от заготовителей." />
+              {isCollector ? (
+                <div className="mp-toolbar-actions">
+                  <Link className="button secondary" href="/marketplace/my">
+                    Мои объявления
+                  </Link>
+                  <Link className="button" href="/marketplace/new">
+                    Разместить объявление
+                  </Link>
+                </div>
+              ) : isBuyer ? (
+                <div className="mp-toolbar-actions">
+                  <Link className="button secondary" href="/marketplace/offers">
+                    Мои предложения
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+
+            {/* На узких экранах карта и список живут в одной рабочей области,
+                но показывается только выбранный слой. */}
+            <div className="mp-view-toggle" role="group" aria-label="Вид ленты">
+              <button
+                aria-pressed={mobileView === "list"}
+                className={mobileView === "list" ? "is-active" : ""}
+                type="button"
+                onClick={() => setMobileView("list")}
+              >
+                Список
+              </button>
+              <button
+                aria-pressed={mobileView === "map"}
+                className={mobileView === "map" ? "is-active" : ""}
+                type="button"
+                onClick={() => setMobileView("map")}
+              >
+                Карта
+              </button>
+            </div>
+
             <MarketplaceFilterBar
               containerRef={filtersRef}
               nomenclatureGroups={nomenclatureGroups}
