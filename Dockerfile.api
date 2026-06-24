@@ -25,7 +25,14 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 
 # `--frozen-lockfile` гарантирует, что версии не «разъедутся» против lock.
-RUN pnpm install --frozen-lockfile
+# Сеть до npm-реестра с этого сервера бывает нестабильной (таймауты тарболлов):
+# повышаем ретраи/таймаут, снижаем параллелизм и до 5 раз повторяем всю установку.
+RUN pnpm config set fetch-retries 8 && \
+    pnpm config set fetch-retry-maxtimeout 120000 && \
+    pnpm config set network-concurrency 4 && \
+    for i in 1 2 3 4 5; do pnpm install --frozen-lockfile && break; \
+      if [ "$i" = 5 ]; then echo "pnpm install: все попытки исчерпаны"; exit 1; fi; \
+      echo "pnpm install: повтор $i после сетевого сбоя"; sleep 15; done
 
 # ────────────────── Stage 2: build ──────────────────
 FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS build
