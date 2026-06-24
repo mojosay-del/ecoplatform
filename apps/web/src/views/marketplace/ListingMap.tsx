@@ -80,9 +80,11 @@ const BASEMAP_REVEAL_WINDOWS: Record<string, { start: number; end: number }> = {
   label_other: { start: 11.2, end: 13.2 },
   label_town: { start: 4.2, end: 6.2 },
   label_village: { start: 9.1, end: 10.8 },
-  landcover_wood: { start: 4.8, end: 9.4 },
-  landuse_residential: { start: 7.6, end: 9.8 },
-  park: { start: 3.8, end: 7.4 },
+  landcover_glacier: { start: 3.2, end: 6.8 },
+  landcover_ice_shelf: { start: 3.2, end: 6.8 },
+  landcover_wood: { start: 3.4, end: 7.1 },
+  landuse_residential: { start: 6.1, end: 8.8 },
+  park: { start: 3.2, end: 6.4 },
   railway: { start: 12.2, end: 14.2 },
   railway_dashline: { start: 12.2, end: 14.2 },
   road_shield_us: { start: 8.2, end: 10.2 },
@@ -166,14 +168,25 @@ const BASEMAP_PAINT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
     "icon-opacity": ["interpolate", ["linear"], ["zoom"], 9.1, 0, 10.8, 0.45],
     "text-opacity": ["interpolate", ["linear"], ["zoom"], 9.1, 0, 10.8, 0.78],
   },
+  landcover_glacier: {
+    "fill-color": "hsl(200, 20%, 87%)",
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 3.2, 0, 4.8, 0.16, 7.4, 0.28, 10, 0.34],
+  },
+  landcover_ice_shelf: {
+    "fill-color": "hsl(200, 18%, 88%)",
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 3.2, 0, 4.8, 0.12, 7.4, 0.22, 10, 0.28],
+  },
   landcover_wood: {
-    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 4.8, 0, 6.4, 0.08, 8, 0.18, 12, 0.48, 15, 0.62],
+    "fill-color": "hsl(112, 18%, 82%)",
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 3.4, 0, 4.4, 0.06, 6.6, 0.16, 9, 0.28, 12, 0.5, 15, 0.62],
   },
   landuse_residential: {
-    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 7.6, 0, 9.8, 0.18, 12, 0.34],
+    "fill-color": "hsl(52, 17%, 88%)",
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 6.1, 0, 8, 0.1, 10.5, 0.22, 12.5, 0.34],
   },
   park: {
-    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 3.8, 0, 5.4, 0.08, 7.4, 0.18, 10, 0.3],
+    "fill-color": "hsl(104, 22%, 84%)",
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 3.2, 0, 4.6, 0.07, 6.4, 0.16, 8.4, 0.24, 10, 0.32],
   },
   railway: {
     "line-opacity": ["interpolate", ["linear"], ["zoom"], 12.2, 0, 14.2, 0.45, 17, 0.7],
@@ -193,9 +206,14 @@ const BASEMAP_PAINT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
   water_name_point_label: {
     "text-opacity": ["interpolate", ["linear"], ["zoom"], 5.2, 0, 8.2, 0.58],
   },
+  water: {
+    "fill-color": "hsl(198, 22%, 82%)",
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 0, 0.78, 6, 0.82, 12, 0.88],
+  },
   waterway: {
-    "line-opacity": ["interpolate", ["linear"], ["zoom"], 3.1, 0, 4.4, 0.22, 6.4, 0.44, 8.4, 0.64, 12, 0.78],
-    "line-width": ["interpolate", ["exponential", 1.2], ["zoom"], 3.1, 0.1, 5.5, 0.28, 8, 0.62, 14, 1.7],
+    "line-color": "hsl(198, 28%, 72%)",
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 3.1, 0, 4.2, 0.24, 6.4, 0.5, 8.4, 0.68, 12, 0.8],
+    "line-width": ["interpolate", ["exponential", 1.2], ["zoom"], 3.1, 0.1, 5.5, 0.3, 8, 0.66, 14, 1.72],
   },
   waterway_line_label: {
     "text-opacity": ["interpolate", ["linear"], ["zoom"], 9.8, 0, 11.6, 0.52],
