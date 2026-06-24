@@ -11,10 +11,15 @@
 // [lon, lat] — в БД храним circleLat/circleLon, разворачиваем при сборке.
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import maplibregl, { type GeoJSONSource, type Map as MlMap, type PropertyValueSpecification } from "maplibre-gl";
+import maplibregl, {
+  type FilterSpecification,
+  type GeoJSONSource,
+  type Map as MlMap,
+  type PropertyValueSpecification,
+} from "maplibre-gl";
 import { Protocol as PmtilesProtocol } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
-import type { Feature, FeatureCollection, Point, Polygon } from "geojson";
+import type { Feature, FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
 import { isFreshListing } from "./listing-card-meta";
@@ -37,7 +42,6 @@ const LYR_CIRCLE_LINE = "listing-circle-line";
 const HOVER_LAYERS = [LYR_DOT, LYR_CIRCLE_FILL];
 const LAYER_FADE_ZOOM_RANGE = 0.45;
 const BASEMAP_LAYER_FADE_ZOOM_RANGE = 0.9;
-const BASEMAP_LAYER_FADE_MIN_ZOOM = 4;
 const MAX_MAP_ZOOM = 24;
 const CIRCLE_FADE_START_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD - LAYER_FADE_ZOOM_RANGE;
 const CIRCLE_FADE_END_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD + LAYER_FADE_ZOOM_RANGE;
@@ -52,10 +56,173 @@ const BASEMAP_OPACITY_PROPERTIES_BY_TYPE: Record<string, readonly string[]> = {
   symbol: ["text-opacity", "icon-opacity"],
 };
 
+const BASEMAP_SYMBOL_REVEAL_WINDOWS: Record<string, { start: number; end: number }> = {
+  airport: { start: 10.2, end: 11.8 },
+  "highway-name-major": { start: 11.2, end: 13.2 },
+  "highway-name-minor": { start: 14, end: 16 },
+  "highway-name-path": { start: 14.4, end: 16.4 },
+  label_city: { start: 4.4, end: 6.9 },
+  label_city_capital: { start: 2.7, end: 4.7 },
+  label_country_1: { start: 0, end: 2.2 },
+  label_country_2: { start: 0, end: 3 },
+  label_country_3: { start: 1.3, end: 3.5 },
+  label_other: { start: 7.1, end: 9.2 },
+  label_state: { start: 4.1, end: 6.4 },
+  label_town: { start: 5.1, end: 7.3 },
+  label_village: { start: 8.1, end: 9.8 },
+  road_shield_us: { start: 11.2, end: 12.8 },
+  water_name_line_label: { start: 3.8, end: 6.6 },
+  water_name_point_label: { start: 3.8, end: 6.6 },
+  waterway_line_label: { start: 9.1, end: 10.9 },
+};
+
 // Тайлы подложки обрезаны по зоне Экоплатформы (РФ+новые территории+РБ) ещё на
 // этапе генерации, поэтому вне зоны данных нет вовсе — и НЕ рисуем ни линий
 // госграниц, ни заливки-маски (чище и без территориальных акцентов).
 const FIT_PADDING = { top: 48, right: 48, bottom: 48, left: 48 };
+
+// Маска только для фильтра подписей. Она НЕ рисуется на карте: геометрия нужна,
+// чтобы не показывать названия за пределами РФ-зоны по выбранной правовой логике
+// и Беларуси. Контур упрощён для клиентской маски: он не заменяет геоданные
+// тайлов, а закрывает видимый слой подписей без отрисовки государственных границ.
+const RF_AND_BELARUS_LABEL_ZONE: MultiPolygon = {
+  type: "MultiPolygon",
+  coordinates: [
+    [
+      [
+        [30.8, 69.8],
+        [40, 70.8],
+        [60, 70.2],
+        [82, 72.8],
+        [105, 77.4],
+        [135, 76.5],
+        [160, 72.5],
+        [180, 71.5],
+        [180, 60],
+        [168, 60],
+        [158, 58.5],
+        [151, 54.5],
+        [142, 52],
+        [135, 47.7],
+        [132, 43],
+        [124, 42],
+        [119, 49.5],
+        [112, 49.5],
+        [106, 51.1],
+        [98, 50.2],
+        [92, 50.5],
+        [87, 49],
+        [82, 50.2],
+        [76, 53.3],
+        [68, 54.8],
+        [61, 53.7],
+        [56, 51],
+        [51, 50.5],
+        [47.2, 47],
+        [44, 43.2],
+        [41, 43.2],
+        [38.8, 45.2],
+        [40.2, 47.8],
+        [39.8, 50.2],
+        [37.2, 51.1],
+        [34.5, 51.5],
+        [32, 53.7],
+        [31, 56],
+        [28.5, 58],
+        [29, 60.2],
+        [31.2, 62.5],
+        [30, 65.5],
+        [30.8, 69.8],
+      ],
+    ],
+    [
+      [
+        [19.4, 54.2],
+        [22.9, 54.2],
+        [22.9, 55.4],
+        [19.4, 55.4],
+        [19.4, 54.2],
+      ],
+    ],
+    [
+      [
+        [23.1, 51.1],
+        [24, 52.1],
+        [23.4, 53.6],
+        [24.7, 55],
+        [27.4, 56.2],
+        [30.9, 55.4],
+        [32.8, 53.6],
+        [31.6, 51.3],
+        [28.2, 51.2],
+        [25.2, 51],
+        [23.1, 51.1],
+      ],
+    ],
+    [
+      [
+        [36.8, 50.4],
+        [40.3, 50.3],
+        [40.4, 47.8],
+        [38.2, 47],
+        [36.8, 47.3],
+        [36.8, 50.4],
+      ],
+    ],
+    [
+      [
+        [31.4, 46],
+        [32.7, 47.5],
+        [35.2, 48.1],
+        [37, 47.2],
+        [38.1, 46.4],
+        [36.2, 45.3],
+        [33, 45.2],
+        [31.4, 46],
+      ],
+    ],
+    [
+      [
+        [31.8, 44.3],
+        [33.1, 45.6],
+        [36.7, 45.5],
+        [36.9, 44.8],
+        [34.8, 44.2],
+        [32.8, 44.1],
+        [31.8, 44.3],
+      ],
+    ],
+    [
+      [
+        [140.5, 45],
+        [146.5, 45],
+        [146.5, 55.5],
+        [140.5, 55.5],
+        [140.5, 45],
+      ],
+    ],
+    [
+      [
+        [154, 50],
+        [166, 50],
+        [166, 63],
+        [154, 63],
+        [154, 50],
+      ],
+    ],
+    [
+      [
+        [-180, 60],
+        [-168, 60],
+        [-168, 72],
+        [-180, 72],
+        [-180, 60],
+      ],
+    ],
+  ],
+};
+
+const HIDDEN_LABEL_NAMES = ["Автономная Республика Крым"];
 
 // Базовый стиль карты: ВЕКТОРНЫЙ (OpenMapTiles-схема) — обязателен, чтобы (1)
 // принудительно ставить русские подписи и (2) скрывать пограничные линии
@@ -141,6 +308,7 @@ type BasemapLayerSpec = {
   type: string;
   layout?: Record<string, unknown>;
   paint?: Record<string, unknown>;
+  filter?: FilterSpecification;
   minzoom?: number;
   maxzoom?: number;
   "source-layer"?: string;
@@ -160,36 +328,49 @@ function clampOpacity(value: number) {
   return Math.min(1, Math.max(0, value));
 }
 
+function expressionHasZoom(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.some((item) => item === "zoom" || expressionHasZoom(item));
+}
+
+function symbolRevealWindow(layer: BasemapLayerSpec) {
+  return BASEMAP_SYMBOL_REVEAL_WINDOWS[layer.id] ?? null;
+}
+
 function opacityFadeExpression(
   layer: BasemapLayerSpec,
-  targetOpacity: number,
+  targetOpacity: unknown,
 ): PropertyValueSpecification<number> | null {
   const minZoom = finiteNumber(layer.minzoom);
   const maxZoom = finiteNumber(layer.maxzoom);
-  const shouldFadeIn = minZoom != null && minZoom >= BASEMAP_LAYER_FADE_MIN_ZOOM;
+  const revealWindow = symbolRevealWindow(layer);
+  const fadeInStart = revealWindow?.start ?? (minZoom != null ? minZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE : null);
+  const fadeInEnd = revealWindow?.end ?? (minZoom != null ? minZoom + BASEMAP_LAYER_FADE_ZOOM_RANGE : null);
+  const shouldFadeIn = fadeInStart != null && fadeInEnd != null && fadeInEnd > fadeInStart;
   const shouldFadeOut = maxZoom != null && maxZoom < MAX_MAP_ZOOM - BASEMAP_LAYER_FADE_ZOOM_RANGE;
 
   if (!shouldFadeIn && !shouldFadeOut) return null;
 
-  const stops: number[] = [];
-  const pushStop = (zoom: number, opacity: number) => {
+  const stops: unknown[] = [];
+  const pushStop = (zoom: number, opacity: unknown) => {
     const nextZoom = Math.min(MAX_MAP_ZOOM, Math.max(0, Number(zoom.toFixed(2))));
     const previousZoom = stops.length >= 2 ? stops[stops.length - 2] : null;
-    if (previousZoom != null && nextZoom <= previousZoom) return false;
-    stops.push(nextZoom, clampOpacity(opacity));
+    if (typeof previousZoom === "number" && nextZoom <= previousZoom) return false;
+    stops.push(nextZoom, typeof opacity === "number" ? clampOpacity(opacity) : opacity);
     return true;
   };
 
-  if (shouldFadeIn && minZoom != null) {
-    pushStop(minZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE, 0);
-    pushStop(minZoom + BASEMAP_LAYER_FADE_ZOOM_RANGE, targetOpacity);
+  if (shouldFadeIn && fadeInStart != null && fadeInEnd != null) {
+    pushStop(fadeInStart, 0);
+    pushStop(fadeInEnd, targetOpacity);
   } else {
     pushStop(0, targetOpacity);
   }
 
   if (shouldFadeOut && maxZoom != null) {
     const fadeOutStart = maxZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE;
-    const previousZoom = stops.length >= 2 ? (stops[stops.length - 2] ?? 0) : 0;
+    const previousZoomValue = stops.length >= 2 ? stops[stops.length - 2] : 0;
+    const previousZoom = typeof previousZoomValue === "number" ? previousZoomValue : 0;
     const visibleUntilZoom = fadeOutStart > previousZoom ? fadeOutStart : Math.min(maxZoom, previousZoom + 0.01);
     pushStop(visibleUntilZoom, targetOpacity);
     pushStop(maxZoom + BASEMAP_LAYER_FADE_ZOOM_RANGE, 0);
@@ -205,9 +386,9 @@ function applySmoothBasemapZoom(map: MlMap, layer: BasemapLayerSpec) {
   let didSetOpacity = false;
   for (const property of opacityProperties) {
     const currentValue = map.getPaintProperty(layer.id, property) ?? layer.paint?.[property];
-    if (currentValue != null && finiteNumber(currentValue) == null) continue;
+    if (currentValue != null && finiteNumber(currentValue) == null && expressionHasZoom(currentValue)) continue;
 
-    const targetOpacity = finiteNumber(currentValue) ?? 1;
+    const targetOpacity = finiteNumber(currentValue) ?? currentValue ?? 1;
     const expression = opacityFadeExpression(layer, targetOpacity);
     if (!expression) continue;
 
@@ -219,16 +400,47 @@ function applySmoothBasemapZoom(map: MlMap, layer: BasemapLayerSpec) {
 
   const minZoom = finiteNumber(layer.minzoom);
   const maxZoom = finiteNumber(layer.maxzoom);
-  const nextMinZoom =
-    minZoom != null && minZoom >= BASEMAP_LAYER_FADE_MIN_ZOOM
-      ? Math.max(0, minZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE)
-      : (minZoom ?? 0);
+  const fadeStartZoom =
+    symbolRevealWindow(layer)?.start ?? (minZoom != null ? minZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE : 0);
+  const nextMinZoom = minZoom != null ? Math.max(0, Math.min(minZoom, fadeStartZoom)) : Math.max(0, fadeStartZoom);
   const nextMaxZoom =
     maxZoom != null && maxZoom < MAX_MAP_ZOOM - BASEMAP_LAYER_FADE_ZOOM_RANGE
       ? Math.min(MAX_MAP_ZOOM, maxZoom + BASEMAP_LAYER_FADE_ZOOM_RANGE)
       : (maxZoom ?? MAX_MAP_ZOOM);
 
   map.setLayerZoomRange(layer.id, nextMinZoom, nextMaxZoom);
+}
+
+function hasTextLabel(map: MlMap, layer: BasemapLayerSpec) {
+  return (
+    layer.type === "symbol" && Boolean(map.getLayoutProperty(layer.id, "text-field") ?? layer.layout?.["text-field"])
+  );
+}
+
+function labelZoneFilterFor(layer: BasemapLayerSpec, currentFilter: FilterSpecification | null): FilterSpecification {
+  const filters: FilterSpecification[] = [];
+  if (currentFilter) filters.push(currentFilter);
+  if (layer["source-layer"]) filters.push(["within", RF_AND_BELARUS_LABEL_ZONE] as FilterSpecification);
+  if (layer["source-layer"] === "place") {
+    filters.push([
+      "!",
+      [
+        "match",
+        ["coalesce", ["get", "name:ru"], ["get", "name"], ["get", "name_en"], ""],
+        HIDDEN_LABEL_NAMES,
+        true,
+        false,
+      ],
+    ] as FilterSpecification);
+  }
+  if (filters.length === 1 && filters[0]) return filters[0];
+  return ["all", ...filters] as FilterSpecification;
+}
+
+function applyLabelZoneFilter(map: MlMap, layer: BasemapLayerSpec) {
+  if (!hasTextLabel(map, layer)) return;
+  const currentFilter = (map.getFilter(layer.id) ?? layer.filter ?? null) as FilterSpecification | null;
+  map.setFilter(layer.id, labelZoneFilterFor(layer, currentFilter));
 }
 
 // Приводим подложку к требованиям РФ: подписи — на русском, пограничные линии
@@ -249,6 +461,7 @@ function applyRussianRfBasemap(map: MlMap) {
       if (spec.type === "symbol" && textField && JSON.stringify(textField).includes("name")) {
         map.setLayoutProperty(spec.id, "text-field", LABEL_TEXT_FIELD);
       }
+      applyLabelZoneFilter(map, spec);
     } catch {
       // отдельный проблемный слой не должен прерывать локализацию остальных
     }
