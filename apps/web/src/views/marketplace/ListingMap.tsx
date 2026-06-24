@@ -36,8 +36,21 @@ const LYR_CIRCLE_FILL = "listing-circle-fill";
 const LYR_CIRCLE_LINE = "listing-circle-line";
 const HOVER_LAYERS = [LYR_DOT, LYR_CIRCLE_FILL];
 const LAYER_FADE_ZOOM_RANGE = 0.45;
+const BASEMAP_LAYER_FADE_ZOOM_RANGE = 0.9;
+const BASEMAP_LAYER_FADE_MIN_ZOOM = 4;
+const MAX_MAP_ZOOM = 24;
 const CIRCLE_FADE_START_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD - LAYER_FADE_ZOOM_RANGE;
 const CIRCLE_FADE_END_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD + LAYER_FADE_ZOOM_RANGE;
+
+const BASEMAP_OPACITY_PROPERTIES_BY_TYPE: Record<string, readonly string[]> = {
+  circle: ["circle-opacity", "circle-stroke-opacity"],
+  fill: ["fill-opacity"],
+  "fill-extrusion": ["fill-extrusion-opacity"],
+  heatmap: ["heatmap-opacity"],
+  line: ["line-opacity"],
+  raster: ["raster-opacity"],
+  symbol: ["text-opacity", "icon-opacity"],
+};
 
 // Тайлы подложки обрезаны по зоне Экоплатформы (РФ+новые территории+РБ) ещё на
 // этапе генерации, поэтому вне зоны данных нет вовсе — и НЕ рисуем ни линий
@@ -123,10 +136,99 @@ const CIRCLE_FILL_ZOOM_OPACITY: PropertyValueSpecification<number> = [
   ["case", ["boolean", ["feature-state", "hover"], false], 0.34, 0.18],
 ];
 
+type BasemapLayerSpec = {
+  id: string;
+  type: string;
+  layout?: Record<string, unknown>;
+  paint?: Record<string, unknown>;
+  minzoom?: number;
+  maxzoom?: number;
+  "source-layer"?: string;
+};
+
 function dotFadeForZoom(zoom: number) {
   if (zoom <= CIRCLE_FADE_START_ZOOM) return 1;
   if (zoom >= CIRCLE_FADE_END_ZOOM) return 0;
   return (CIRCLE_FADE_END_ZOOM - zoom) / (CIRCLE_FADE_END_ZOOM - CIRCLE_FADE_START_ZOOM);
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function clampOpacity(value: number) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function opacityFadeExpression(
+  layer: BasemapLayerSpec,
+  targetOpacity: number,
+): PropertyValueSpecification<number> | null {
+  const minZoom = finiteNumber(layer.minzoom);
+  const maxZoom = finiteNumber(layer.maxzoom);
+  const shouldFadeIn = minZoom != null && minZoom >= BASEMAP_LAYER_FADE_MIN_ZOOM;
+  const shouldFadeOut = maxZoom != null && maxZoom < MAX_MAP_ZOOM - BASEMAP_LAYER_FADE_ZOOM_RANGE;
+
+  if (!shouldFadeIn && !shouldFadeOut) return null;
+
+  const stops: number[] = [];
+  const pushStop = (zoom: number, opacity: number) => {
+    const nextZoom = Math.min(MAX_MAP_ZOOM, Math.max(0, Number(zoom.toFixed(2))));
+    const previousZoom = stops.length >= 2 ? stops[stops.length - 2] : null;
+    if (previousZoom != null && nextZoom <= previousZoom) return false;
+    stops.push(nextZoom, clampOpacity(opacity));
+    return true;
+  };
+
+  if (shouldFadeIn && minZoom != null) {
+    pushStop(minZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE, 0);
+    pushStop(minZoom + BASEMAP_LAYER_FADE_ZOOM_RANGE, targetOpacity);
+  } else {
+    pushStop(0, targetOpacity);
+  }
+
+  if (shouldFadeOut && maxZoom != null) {
+    const fadeOutStart = maxZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE;
+    const previousZoom = stops.length >= 2 ? (stops[stops.length - 2] ?? 0) : 0;
+    const visibleUntilZoom = fadeOutStart > previousZoom ? fadeOutStart : Math.min(maxZoom, previousZoom + 0.01);
+    pushStop(visibleUntilZoom, targetOpacity);
+    pushStop(maxZoom + BASEMAP_LAYER_FADE_ZOOM_RANGE, 0);
+  }
+
+  return ["interpolate", ["linear"], ["zoom"], ...stops] as PropertyValueSpecification<number>;
+}
+
+function applySmoothBasemapZoom(map: MlMap, layer: BasemapLayerSpec) {
+  const opacityProperties = BASEMAP_OPACITY_PROPERTIES_BY_TYPE[layer.type];
+  if (!opacityProperties) return;
+
+  let didSetOpacity = false;
+  for (const property of opacityProperties) {
+    const currentValue = map.getPaintProperty(layer.id, property) ?? layer.paint?.[property];
+    if (currentValue != null && finiteNumber(currentValue) == null) continue;
+
+    const targetOpacity = finiteNumber(currentValue) ?? 1;
+    const expression = opacityFadeExpression(layer, targetOpacity);
+    if (!expression) continue;
+
+    map.setPaintProperty(layer.id, property, expression);
+    didSetOpacity = true;
+  }
+
+  if (!didSetOpacity) return;
+
+  const minZoom = finiteNumber(layer.minzoom);
+  const maxZoom = finiteNumber(layer.maxzoom);
+  const nextMinZoom =
+    minZoom != null && minZoom >= BASEMAP_LAYER_FADE_MIN_ZOOM
+      ? Math.max(0, minZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE)
+      : (minZoom ?? 0);
+  const nextMaxZoom =
+    maxZoom != null && maxZoom < MAX_MAP_ZOOM - BASEMAP_LAYER_FADE_ZOOM_RANGE
+      ? Math.min(MAX_MAP_ZOOM, maxZoom + BASEMAP_LAYER_FADE_ZOOM_RANGE)
+      : (maxZoom ?? MAX_MAP_ZOOM);
+
+  map.setLayerZoomRange(layer.id, nextMinZoom, nextMaxZoom);
 }
 
 // Приводим подложку к требованиям РФ: подписи — на русском, пограничные линии
@@ -134,12 +236,13 @@ function dotFadeForZoom(zoom: number) {
 // OpenMapTiles-совместимого стиля.
 function applyRussianRfBasemap(map: MlMap) {
   for (const layer of map.getStyle().layers ?? []) {
-    const spec = layer as { id: string; type: string; layout?: Record<string, unknown> } & Record<string, unknown>;
+    const spec = layer as BasemapLayerSpec;
     try {
       if (spec["source-layer"] === "boundary") {
         map.setLayoutProperty(spec.id, "visibility", "none");
         continue;
       }
+      applySmoothBasemapZoom(map, spec);
       // text-field может лежать в layout слоя ИЛИ быть применён через стиль —
       // надёжнее спросить у карты текущее значение.
       const textField = map.getLayoutProperty(spec.id, "text-field") ?? spec.layout?.["text-field"];
