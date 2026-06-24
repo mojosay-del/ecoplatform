@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
-  circleStyleOptions,
+  circlePolygon,
   getSinglePointFocusView,
   modeForZoom,
 } from "./listing-map-view";
 
 describe("marketplace listing map view", () => {
-  it("focuses a single listing at the circle zoom in MapGL [lon, lat] order", () => {
+  it("focuses a single listing at the circle zoom in MapLibre [lon, lat] order", () => {
     expect(getSinglePointFocusView([{ circleLat: 56.12, circleLon: 37.45 }])).toEqual({
       center: [37.45, 56.12],
       zoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
@@ -33,16 +33,23 @@ describe("marketplace listing map view", () => {
     expect(modeForZoom(LISTING_MAP_CIRCLE_ZOOM_THRESHOLD - 1)).toBe("dot");
   });
 
-  it("подсветка круга — плотнее заливка и толще обводка, цвет сохраняется", () => {
-    expect(circleStyleOptions("#1f6fb8", false)).toEqual({
-      color: "#1f6fb82e",
-      strokeColor: "#1f6fb8",
-      strokeWidth: 2,
-    });
-    expect(circleStyleOptions("#1f6fb8", true)).toEqual({
-      color: "#1f6fb855",
-      strokeColor: "#1f6fb8",
-      strokeWidth: 3,
-    });
+  it("circlePolygon — замкнутое кольцо нужного радиуса вокруг центра", () => {
+    const center: [number, number] = [37.6, 55.75];
+    const ring = circlePolygon(center, 4, 32)[0] as number[][];
+
+    // steps + 1 точек, кольцо замкнуто (первая === последняя).
+    expect(ring).toHaveLength(33);
+    expect(ring[0]).toEqual(ring[ring.length - 1]);
+
+    // Каждая точка примерно в 4 км от центра (грубая проверка по равноугольной
+    // метрике: ~111 км на градус широты).
+    for (const point of ring) {
+      const [lon, lat] = point as [number, number];
+      const dLatKm = (lat - center[1]) * 111;
+      const dLonKm = (lon - center[0]) * 111 * Math.cos((center[1] * Math.PI) / 180);
+      const distance = Math.hypot(dLatKm, dLonKm);
+      expect(distance).toBeGreaterThan(3.8);
+      expect(distance).toBeLessThan(4.2);
+    }
   });
 });

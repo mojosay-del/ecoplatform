@@ -65,25 +65,24 @@ describe("Marketplace — предложения и аукцион (фаза 3)"
       ok: true,
       status: 200,
       json: async () => ({
-        result: {
-          items: [
-            {
-              full_name: "Россия, Московская область, Мытищи",
-              point: { lat: 55.910483, lon: 37.73633 },
-              adm_div: [
-                { type: "country", name: "Россия" },
-                { type: "region", name: "Московская область" },
-                { type: "city", name: "Мытищи" },
-              ],
+        suggestions: [
+          {
+            value: "Россия, Московская обл, г Мытищи",
+            data: {
+              country: "Россия",
+              region_with_type: "Московская область",
+              city_with_type: "г Мытищи",
+              geo_lat: "55.910483",
+              geo_lon: "37.73633",
             },
-          ],
-        },
+          },
+        ],
       }),
     });
 
     try {
       vi.stubGlobal("fetch", fetchMock);
-      await withEnv({ DGIS_GEOCODER_API_KEY: "test-key" }, async () => {
+      await withEnv({ DADATA_API_KEY: "test-key" }, async () => {
         const offer = await ctx.http
           .post(`/api/marketplace/listings/${listingId}/offers`)
           .set(bearer(buyerToken))

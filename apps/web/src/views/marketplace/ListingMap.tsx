@@ -1,50 +1,116 @@
 "use client";
 
-// Карта ленты площадки на 2ГИС MapGL. Цвет элемента — по сырью (макулатура/
-// плёнки/полимеры). Два масштаба для читаемости: близко — круг 4 км (реальная
-// точка скрыта), дальше — маленькая DOM-точка (HtmlMarker; CSS-пульс у свежих
-// объявлений, hover — класс). Загрузчик/типы — в ./mapgl-loader; без ключа
-// показываем заглушку, список остаётся доступен. MapGL ждёт координаты в порядке
-// [lon, lat] — переворачиваем при передаче (в БД храним circleLat/circleLon).
+// Карта ленты площадки на MapLibre GL (OSM). Цвет элемента — по сырью
+// (макулатура/плёнки/полимеры). Два масштаба для читаемости: близко — круг 4 км
+// (GeoJSON-полигон через fill/line, реальная точка скрыта), дальше — маленькая
+// точка (circle-слой; пульс у свежих объявлений через rAF, hover — feature-state).
+// Подложка — векторные тайлы, ОБРЕЗАННЫЕ по зоне Экоплатформы (РФ+новые
+// территории+РБ) ещё при генерации, поэтому вне зоны данных нет и госграницы не
+// рисуются вовсе. Базовый стиль векторный из NEXT_PUBLIC_MAP_STYLE_URL (self-host
+// в проде); dev-fallback — OpenFreeMap positron. MapLibre ждёт координаты
+// [lon, lat] — в БД храним circleLat/circleLon, разворачиваем при сборке.
 
+import "maplibre-gl/dist/maplibre-gl.css";
+import maplibregl, { type GeoJSONSource, type Map as MlMap } from "maplibre-gl";
+import { Protocol as PmtilesProtocol } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
+import type { Feature, FeatureCollection, Point, Polygon } from "geojson";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
 import { isFreshListing } from "./listing-card-meta";
 import { materialColor } from "./materials";
 import {
-  DGIS_MAPS_KEY,
-  loadMapgl,
-  type MapglCircle,
-  type MapglHtmlMarker,
-  type MapglLngLat,
-  type MapglMap,
-} from "./mapgl-loader";
-import {
-  type ListingMapMode,
+  LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
   LISTING_MAP_DEFAULT_CENTER,
   LISTING_MAP_DEFAULT_ZOOM,
-  circleStyleOptions,
+  circlePolygon,
   getSinglePointFocusView,
-  modeForZoom,
 } from "./listing-map-view";
 
-// Точка-маркер: фикс-бокс 14px, заякорена в свой центр (пульс-кольцо свежего
-// объявления рисуется ::after и выходит за бокс, не сдвигая якорь).
-const DOT_SIZE = 14;
-const DOT_ANCHOR: [number, number] = [DOT_SIZE / 2, DOT_SIZE / 2];
+// Идентификаторы источников/слоёв MapLibre.
+const SRC_POINTS = "listing-points";
+const SRC_CIRCLES = "listing-circles";
+const LYR_DOT = "listing-dot";
+const LYR_DOT_PULSE = "listing-dot-pulse";
+const LYR_CIRCLE_FILL = "listing-circle-fill";
+const LYR_CIRCLE_LINE = "listing-circle-line";
+const HOVER_LAYERS = [LYR_DOT, LYR_CIRCLE_FILL];
+
+// Тайлы подложки обрезаны по зоне Экоплатформы (РФ+новые территории+РБ) ещё на
+// этапе генерации, поэтому вне зоны данных нет вовсе — и НЕ рисуем ни линий
+// госграниц, ни заливки-маски (чище и без территориальных акцентов).
 const FIT_PADDING = { top: 48, right: 48, bottom: 48, left: 48 };
+
+// Базовый стиль карты: ВЕКТОРНЫЙ (OpenMapTiles-схема) — обязателен, чтобы (1)
+// принудительно ставить русские подписи и (2) скрывать пограничные линии
+// подложки (международный вид). positron — светлый минималистичный стиль (как
+// просил владелец: светло-серый, выделены дороги, видны названия). В проде —
+// self-host через NEXT_PUBLIC_MAP_STYLE_URL; dev-fallback — OpenFreeMap
+// (бесплатный, без ключа, самохостится позже).
+const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
+const MAP_STYLE_URL = process.env.NEXT_PUBLIC_MAP_STYLE_URL || OPENFREEMAP_STYLE;
+
+// pmtiles-протокол нужен для self-host тайлов в проде (стиль ссылается на
+// pmtiles://). Регистрируем один раз; в dev (OpenFreeMap http) не используется.
+let pmtilesRegistered = false;
+function ensurePmtilesProtocol() {
+  if (pmtilesRegistered) return;
+  maplibregl.addProtocol("pmtiles", new PmtilesProtocol().tile);
+  pmtilesRegistered = true;
+}
+
+// Точечные русские названия для мест новых территорий, где в тайлах OpenFreeMap
+// нет name:ru (пробел данных провайдера; у большинства — Донецк/Луганск/Мариуполь/
+// Симферополь/Ялта и т.д. — name:ru есть). Полное покрытие придёт с self-host
+// тайлов (Фаза 5: name:ru гарантируется при сборке/дополняется из РФ-справочника).
+const RU_NAME_OVERRIDES: Record<string, string> = {
+  Запоріжжя: "Запорожье",
+  Оріхів: "Орехов",
+  Комишуваха: "Камышеваха",
+  Надіївка: "Надеевка",
+  Червоногригорівка: "Червоногригоровка",
+};
+
+// Подписи: name:ru → точечный РФ-словарь по name → латинский фолбэк. name:nonlatin
+// исключён намеренно (для новых территорий/Крыма это украинская кириллица —
+// нельзя по закону РФ); если русского нет, показываем латиницу, не украинский.
+const LABEL_TEXT_FIELD = [
+  "coalesce",
+  ["get", "name:ru"],
+  [
+    "match",
+    ["get", "name"],
+    ...Object.entries(RU_NAME_OVERRIDES).flat(),
+    ["coalesce", ["get", "name_int"], ["get", "name:en"], ["get", "name"]],
+  ],
+];
+
+// Приводим подложку к требованиям РФ: подписи — на русском, пограничные линии
+// подложки скрываем (рисуем собственную зону). Работает для любого
+// OpenMapTiles-совместимого стиля.
+function applyRussianRfBasemap(map: MlMap) {
+  for (const layer of map.getStyle().layers ?? []) {
+    const spec = layer as { id: string; type: string; layout?: Record<string, unknown> } & Record<string, unknown>;
+    try {
+      if (spec["source-layer"] === "boundary") {
+        map.setLayoutProperty(spec.id, "visibility", "none");
+        continue;
+      }
+      // text-field может лежать в layout слоя ИЛИ быть применён через стиль —
+      // надёжнее спросить у карты текущее значение.
+      const textField = map.getLayoutProperty(spec.id, "text-field") ?? spec.layout?.["text-field"];
+      if (spec.type === "symbol" && textField && JSON.stringify(textField).includes("name")) {
+        map.setLayoutProperty(spec.id, "text-field", LABEL_TEXT_FIELD);
+      }
+    } catch {
+      // отдельный проблемный слой не должен прерывать локализацию остальных
+    }
+  }
+}
 
 // Видимая область карты в географических координатах (контракт «Искать в области»
 // и серверного bbox-фильтра не зависит от провайдера).
 export type MapViewBounds = { south: number; west: number; north: number; east: number };
-
-// Запись реестра объектов карты — для hover-синхро ленты↔карты без полной
-// перерисовки. У точки держим DOM-узел (toggle класса), у круга — параметры для
-// пересоздания в подсвеченном стиле.
-type MapObjectEntry =
-  | { mode: "dot"; marker: MapglHtmlMarker; element: HTMLElement }
-  | { mode: "circle"; circle: MapglCircle; color: string; coordinates: MapglLngLat };
 
 export type ListingMapProps = {
   listings: MarketplaceListingListItem[];
@@ -61,6 +127,52 @@ export type ListingMapProps = {
   fitOnDataChange?: boolean;
 };
 
+type PointProps = { id: string; color: string; fresh: boolean };
+
+function listingPoints(listings: MarketplaceListingListItem[]): MarketplaceListingListItem[] {
+  return listings.filter((listing) => listing.circleLat != null && listing.circleLon != null);
+}
+
+function pointsCollection(points: MarketplaceListingListItem[]): FeatureCollection<Point, PointProps> {
+  return {
+    type: "FeatureCollection",
+    features: points.map(
+      (listing): Feature<Point, PointProps> => ({
+        type: "Feature",
+        id: listing.id,
+        geometry: { type: "Point", coordinates: [listing.circleLon as number, listing.circleLat as number] },
+        properties: {
+          id: listing.id,
+          color: materialColor(listing.positions[0]?.categorySlug),
+          fresh: isFreshListing(listing.publishedAt),
+        },
+      }),
+    ),
+  };
+}
+
+function circlesCollection(
+  points: MarketplaceListingListItem[],
+): FeatureCollection<Polygon, { id: string; color: string }> {
+  return {
+    type: "FeatureCollection",
+    features: points.map(
+      (listing): Feature<Polygon, { id: string; color: string }> => ({
+        type: "Feature",
+        id: listing.id,
+        geometry: {
+          type: "Polygon",
+          coordinates: circlePolygon(
+            [listing.circleLon as number, listing.circleLat as number],
+            MARKETPLACE_CIRCLE_RADIUS_KM,
+          ),
+        },
+        properties: { id: listing.id, color: materialColor(listing.positions[0]?.categorySlug) },
+      }),
+    ),
+  };
+}
+
 export function ListingMap({
   listings,
   onSelect,
@@ -70,10 +182,8 @@ export function ListingMap({
   fitOnDataChange = true,
 }: ListingMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<MapglMap | null>(null);
-  const modeRef = useRef<ListingMapMode | null>(null);
-  const drawRef = useRef<(fit: boolean) => void>(() => undefined);
-  const objectsRef = useRef<Map<string, MapObjectEntry>>(new Map());
+  const mapRef = useRef<MlMap | null>(null);
+  const readyRef = useRef(false);
   const hoveredIdRef = useRef<string | null>(null);
   // Через ref, чтобы колбэки родителя не пересоздавали эффект карты.
   const onSelectRef = useRef(onSelect);
@@ -88,175 +198,211 @@ export function ListingMap({
   const suppressMovedUntilRef = useRef(0);
   const [failed, setFailed] = useState(false);
 
-  const points = listings.filter((listing) => listing.circleLat != null && listing.circleLon != null);
+  const points = listingPoints(listings);
   const pointsKey = points.map((listing) => `${listing.id}:${listing.circleLat},${listing.circleLon}`).join("|");
 
-  // Создание круга 4 км с навешенными событиями. Используется и при отрисовке, и
-  // при hover-подсветке (пересоздаём один задетый круг в плотном стиле).
-  function createCircle(id: string, coordinates: MapglLngLat, color: string, highlighted: boolean): MapglCircle {
-    const mapgl = window.mapgl;
+  // Подсветка объекта — через feature-state hover на обоих источниках (точка и
+  // круг живут в разных source, активен лишь один по зуму, но состояние держим в
+  // обоих, чтобы переживать свап масштаба).
+  function setHover(id: string | null, on: boolean) {
     const map = mapRef.current;
-    const circle = new mapgl!.Circle(map!, {
-      coordinates,
-      radius: MARKETPLACE_CIRCLE_RADIUS_KM * 1000,
-      ...circleStyleOptions(color, highlighted),
-    });
-    circle.on("click", () => onSelectRef.current?.(id));
-    circle.on("mouseover", () => onHoverRef.current?.(id));
-    circle.on("mouseout", () => onHoverRef.current?.(null));
-    return circle;
-  }
-
-  // Создание DOM-точки дальнего масштаба. Цвет — inline-переменной, пульс свежего
-  // объявления и hover-подсветка — классами (стили в marketplace.css).
-  function createDot(id: string, coordinates: MapglLngLat, color: string, fresh: boolean): MapObjectEntry {
-    const mapgl = window.mapgl;
-    const map = mapRef.current;
-    const element = document.createElement("div");
-    element.className = `mp-map-dot${fresh ? " is-fresh" : ""}`;
-    element.style.setProperty("--dot", color);
-    element.addEventListener("click", () => onSelectRef.current?.(id));
-    element.addEventListener("mouseenter", () => onHoverRef.current?.(id));
-    element.addEventListener("mouseleave", () => onHoverRef.current?.(null));
-    const marker = new mapgl!.HtmlMarker(map!, {
-      coordinates,
-      html: element,
-      anchor: DOT_ANCHOR,
-      interactive: true,
-    });
-    return { mode: "dot", marker, element };
-  }
-
-  function clearObjects() {
-    for (const entry of objectsRef.current.values()) {
-      if (entry.mode === "circle") entry.circle.destroy();
-      else entry.marker.destroy();
+    if (!map || !id || !readyRef.current) return;
+    for (const source of [SRC_POINTS, SRC_CIRCLES]) {
+      if (map.getSource(source)) map.setFeatureState({ source, id }, { hover: on });
     }
-    objectsRef.current = new Map();
   }
 
-  // Пересоздаётся каждый рендер — замыкает актуальные points; слушатель moveend
-  // (добавлен один раз) дёргает свежую версию через drawRef.
-  drawRef.current = (fit: boolean) => {
+  function emitBoundsIfUserMoved() {
     const map = mapRef.current;
-    if (!window.mapgl || !map) return;
+    if (!map) return;
+    if (Date.now() < suppressMovedUntilRef.current || !onUserMovedRef.current) return;
+    const b = map.getBounds();
+    onUserMovedRef.current({ south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() });
+  }
 
-    const focusView = fit ? getSinglePointFocusView(points) : null;
-    if (focusView) {
-      suppressMovedUntilRef.current = Date.now() + 600;
-      map.setCenter(focusView.center);
-      map.setZoom(focusView.zoom);
+  // Установка/обновление данных и подгонка вида. Вызывается на load и при смене
+  // набора точек.
+  function applyData(fit: boolean) {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+
+    (map.getSource(SRC_POINTS) as GeoJSONSource | undefined)?.setData(pointsCollection(points));
+    (map.getSource(SRC_CIRCLES) as GeoJSONSource | undefined)?.setData(circlesCollection(points));
+
+    if (!fit || points.length === 0) return;
+
+    const focus = getSinglePointFocusView(points);
+    suppressMovedUntilRef.current = Date.now() + 700;
+    if (focus) {
+      map.jumpTo({ center: focus.center, zoom: focus.zoom });
+      return;
     }
-
-    const mode = modeForZoom(focusView?.zoom ?? map.getZoom());
-    modeRef.current = mode;
-    clearObjects();
-
-    const lons: number[] = [];
-    const lats: number[] = [];
+    let west = Infinity;
+    let south = Infinity;
+    let east = -Infinity;
+    let north = -Infinity;
     for (const listing of points) {
       const lon = listing.circleLon as number;
       const lat = listing.circleLat as number;
-      lons.push(lon);
-      lats.push(lat);
-      const coordinates: MapglLngLat = [lon, lat];
-      const color = materialColor(listing.positions[0]?.categorySlug);
-
-      if (mode === "circle") {
-        objectsRef.current.set(listing.id, {
-          mode: "circle",
-          circle: createCircle(listing.id, coordinates, color, false),
-          color,
-          coordinates,
-        });
-      } else {
-        objectsRef.current.set(
-          listing.id,
-          createDot(listing.id, coordinates, color, isFreshListing(listing.publishedAt)),
-        );
-      }
+      west = Math.min(west, lon);
+      east = Math.max(east, lon);
+      south = Math.min(south, lat);
+      north = Math.max(north, lat);
     }
-
-    // После перерисовки (свап режима по зуму) переприменяем активную подсветку.
-    const hovered = hoveredIdRef.current;
-    if (hovered) setObjectHover(hovered, true);
-
-    if (fit && points.length > 1) {
-      suppressMovedUntilRef.current = Date.now() + 600;
-      map.fitBounds(
-        {
-          southWest: [Math.min(...lons), Math.min(...lats)],
-          northEast: [Math.max(...lons), Math.max(...lats)],
-        },
-        { padding: FIT_PADDING },
-      );
-    }
-  };
-
-  // Подсветка/снятие подсветки одного объекта: точка — класс на DOM-узле, круг —
-  // пересоздание в плотном стиле (обновляем запись реестра).
-  function setObjectHover(id: string, highlighted: boolean) {
-    const entry = objectsRef.current.get(id);
-    if (!entry) return;
-    if (entry.mode === "dot") {
-      entry.element.classList.toggle("is-hovered", highlighted);
-      return;
-    }
-    entry.circle.destroy();
-    objectsRef.current.set(id, {
-      ...entry,
-      circle: createCircle(id, entry.coordinates, entry.color, highlighted),
-    });
+    map.fitBounds(
+      [
+        [west, south],
+        [east, north],
+      ],
+      { padding: FIT_PADDING, animate: false },
+    );
   }
 
   useEffect(() => {
-    if (!DGIS_MAPS_KEY) {
+    if (!containerRef.current || mapRef.current) return;
+    ensurePmtilesProtocol();
+    let map: MlMap;
+    try {
+      map = new maplibregl.Map({
+        container: containerRef.current,
+        style: MAP_STYLE_URL,
+        center: LISTING_MAP_DEFAULT_CENTER,
+        zoom: LISTING_MAP_DEFAULT_ZOOM,
+        attributionControl: { compact: true },
+      });
+    } catch {
       setFailed(true);
       return;
     }
-    let cancelled = false;
+    mapRef.current = map;
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
-    loadMapgl()
-      .then(() => {
-        const mapgl = window.mapgl;
-        if (cancelled || !mapgl || !containerRef.current) return;
-        if (!mapRef.current) {
-          const focusView = getSinglePointFocusView(points);
-          mapRef.current = new mapgl.Map(containerRef.current, {
-            key: DGIS_MAPS_KEY,
-            center: focusView?.center ?? LISTING_MAP_DEFAULT_CENTER,
-            zoom: focusView?.zoom ?? LISTING_MAP_DEFAULT_ZOOM,
-            // Сам следит за размером контейнера: при сворачивании сайдбара
-            // грид-колонка расширяется — карта пересчитывается без ResizeObserver.
-            enableTrackResize: true,
-            zoomControl: "centerRight",
-          });
-          // moveend терминален (срабатывает в конце жеста) — отдельный дебаунс не
-          // нужен. Свап точка↔круг при пересечении порога зума + детект ручного
-          // перемещения для «Искать в этой области» (вне окна подавления fit).
-          mapRef.current.on("moveend", () => {
-            const map = mapRef.current;
-            if (!map) return;
-            if (modeForZoom(map.getZoom()) !== modeRef.current) drawRef.current(false);
-            if (Date.now() < suppressMovedUntilRef.current || !onUserMovedRef.current) return;
-            const { southWest, northEast } = map.getBounds();
-            onUserMovedRef.current({
-              south: southWest[1],
-              west: southWest[0],
-              north: northEast[1],
-              east: northEast[0],
-            });
-          });
-        }
-        drawRef.current(fitOnDataChangeRef.current);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+    let pulseFrame = 0;
+    map.on("error", () => undefined); // тайловые ошибки не должны валить компонент
+
+    // Настройку вешаем на styledata, а НЕ на load: с обрезанными по зоне тайлами
+    // часть вьюпорта пустая, из-за чего map.loaded() навсегда false и событие
+    // load не наступает. styledata срабатывает после парса стиля (слои уже можно
+    // добавлять). readyRef гарантирует однократный прогон.
+    const setupMap = () => {
+      if (readyRef.current || !mapRef.current) return;
+      if (map.getSource(SRC_POINTS)) return;
+      // Подложку — к виду РФ: русские подписи + скрытые пограничные линии.
+      applyRussianRfBasemap(map);
+
+      map.addSource(SRC_POINTS, { type: "geojson", data: pointsCollection(points) });
+      map.addSource(SRC_CIRCLES, { type: "geojson", data: circlesCollection(points) });
+
+      // Круг 4 км — на городском масштабе и ближе.
+      map.addLayer({
+        id: LYR_CIRCLE_FILL,
+        type: "fill",
+        source: SRC_CIRCLES,
+        minzoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+        paint: {
+          "fill-color": ["get", "color"],
+          "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.34, 0.18],
+        },
+      });
+      map.addLayer({
+        id: LYR_CIRCLE_LINE,
+        type: "line",
+        source: SRC_CIRCLES,
+        minzoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+        paint: {
+          "line-color": ["get", "color"],
+          "line-width": ["case", ["boolean", ["feature-state", "hover"], false], 3, 2],
+        },
       });
 
-    return () => {
-      cancelled = true;
+      // Пульс свежих объявлений (под точкой) — анимируется rAF ниже.
+      map.addLayer({
+        id: LYR_DOT_PULSE,
+        type: "circle",
+        source: SRC_POINTS,
+        maxzoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+        filter: ["==", ["get", "fresh"], true],
+        paint: { "circle-color": ["get", "color"], "circle-opacity": 0.3, "circle-radius": 6 },
+      });
+      // Точка дальнего масштаба.
+      map.addLayer({
+        id: LYR_DOT,
+        type: "circle",
+        source: SRC_POINTS,
+        maxzoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+        paint: {
+          "circle-color": ["get", "color"],
+          "circle-radius": ["case", ["boolean", ["feature-state", "hover"], false], 8, 6],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
+
+      readyRef.current = true;
+      applyData(fitOnDataChangeRef.current);
+
+      // Hover/курсор/клик на интерактивных слоях.
+      for (const layer of HOVER_LAYERS) {
+        map.on("mousemove", layer, (event) => {
+          map.getCanvas().style.cursor = "pointer";
+          const id = event.features?.[0]?.id;
+          if (id == null) return;
+          const next = String(id);
+          if (hoveredIdRef.current === next) return;
+          if (hoveredIdRef.current) setHover(hoveredIdRef.current, false);
+          hoveredIdRef.current = next;
+          setHover(next, true);
+          onHoverRef.current?.(next);
+        });
+        map.on("mouseleave", layer, () => {
+          map.getCanvas().style.cursor = "";
+          if (hoveredIdRef.current) setHover(hoveredIdRef.current, false);
+          hoveredIdRef.current = null;
+          onHoverRef.current?.(null);
+        });
+        map.on("click", layer, (event) => {
+          const id = event.features?.[0]?.id;
+          if (id != null) onSelectRef.current?.(String(id));
+        });
+      }
+
+      // Пульсация свежих точек: синус по радиусу/прозрачности. Уважаем
+      // prefers-reduced-motion — тогда пульс статичный, без анимации.
+      const reducedMotion =
+        typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      if (!reducedMotion) {
+        const animate = () => {
+          const phase = (Math.sin(Date.now() / 500) + 1) / 2; // 0..1
+          if (map.getLayer(LYR_DOT_PULSE)) {
+            map.setPaintProperty(LYR_DOT_PULSE, "circle-radius", 6 + phase * 12);
+            map.setPaintProperty(LYR_DOT_PULSE, "circle-opacity", 0.35 * (1 - phase));
+          }
+          pulseFrame = requestAnimationFrame(animate);
+        };
+        pulseFrame = requestAnimationFrame(animate);
+      }
     };
+
+    // styledata надёжно срабатывает после загрузки стиля; load оставляем как
+    // дополнительный путь (на полных тайлах он сработает раньше).
+    map.on("styledata", setupMap);
+    map.on("load", setupMap);
+    if (map.isStyleLoaded()) setupMap();
+
+    map.on("moveend", emitBoundsIfUserMoved);
+
+    return () => {
+      cancelAnimationFrame(pulseFrame);
+      readyRef.current = false;
+      map.remove();
+      mapRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Обновление данных и вида при смене набора точек.
+  useEffect(() => {
+    applyData(fitOnDataChangeRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointsKey]);
 
@@ -264,28 +410,13 @@ export function ListingMap({
   useEffect(() => {
     const previous = hoveredIdRef.current;
     const next = hoveredId ?? null;
-    if (previous && previous !== next) setObjectHover(previous, false);
-    if (next) setObjectHover(next, true);
+    if (previous && previous !== next) setHover(previous, false);
+    if (next) setHover(next, true);
     hoveredIdRef.current = next;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoveredId]);
 
-  // Очистка ресурсов при размонтировании.
-  useEffect(() => {
-    return () => {
-      clearObjects();
-      mapRef.current?.destroy();
-      mapRef.current = null;
-    };
-  }, []);
-
-  if (failed || !DGIS_MAPS_KEY) {
-    return (
-      <div className="mp-map-placeholder">
-        Карта временно недоступна{DGIS_MAPS_KEY ? " (ошибка загрузки 2ГИС)" : " — не задан ключ карт 2ГИС"}. Объявления
-        показаны списком ниже.
-      </div>
-    );
+  if (failed) {
+    return <div className="mp-map-placeholder">Карта временно недоступна. Объявления показаны списком ниже.</div>;
   }
 
   return <div ref={containerRef} className="mp-map" role="region" aria-label="Карта объявлений" />;

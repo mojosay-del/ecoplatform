@@ -422,25 +422,26 @@ describe("Company profile (Волна 7.2/7.3 — Address, расширенны�
       ok: true,
       status: 200,
       json: async () => ({
-        result: {
-          items: [
-            {
-              full_name: "Россия, Москва, Тверская улица, 1",
-              point: { lat: 55.755864, lon: 37.617698 },
-              adm_div: [
-                { type: "country", name: "Россия" },
-                { type: "region", name: "Москва" },
-                { type: "city", name: "Москва" },
-              ],
+        suggestions: [
+          {
+            value: "Россия, Москва, Тверская улица, 1",
+            data: {
+              country: "Россия",
+              region_with_type: "Москва",
+              city_with_type: "Москва",
+              street_with_type: "Тверская улица",
+              house: "1",
+              geo_lat: "55.755864",
+              geo_lon: "37.617698",
             },
-          ],
-        },
+          },
+        ],
       }),
     });
 
     try {
       vi.stubGlobal("fetch", fetchMock);
-      await withEnv({ DGIS_GEOCODER_API_KEY: "test-key" }, async () => {
+      await withEnv({ DADATA_API_KEY: "test-key" }, async () => {
         const { token, companyId } = await registerCompany("0700103");
 
         const res = await ctx.http
@@ -457,7 +458,10 @@ describe("Company profile (Волна 7.2/7.3 — Address, расширенны�
           });
 
         expect(res.status).toBe(200);
-        expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("125009"), expect.any(Object));
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining("suggestions.dadata.ru"),
+          expect.objectContaining({ body: expect.stringContaining("125009") }),
+        );
 
         const company = await ctx.prisma.company.findUniqueOrThrow({
           where: { id: companyId },

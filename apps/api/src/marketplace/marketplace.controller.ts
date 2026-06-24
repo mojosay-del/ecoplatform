@@ -21,6 +21,9 @@ import { MarketplaceReviewsService } from "./services/marketplace-reviews.servic
 
 export const addressSuggestQuerySchema = z.object({
   q: z.string().trim().min(3).max(200),
+  // Страна поиска адреса: РФ (вкл. новые территории) по умолчанию; Беларусь —
+  // только при явном BY (иначе DaData её не находит). См. AddressGeocoderService.
+  country: z.enum(["RU", "BY"]).default("RU"),
 });
 
 // Маршруты торговой площадки доступны только когда модуль включён настройкой.
@@ -58,7 +61,7 @@ export class MarketplaceController {
   @Get("marketplace/address-suggest")
   async addressSuggest(@Query() query: Record<string, unknown>) {
     const input = parseBody(addressSuggestQuerySchema, query);
-    return this.geocoder.suggest(input.q);
+    return this.geocoder.suggest(input.q, input.country);
   }
 
   @Get("marketplace/listings/:id")

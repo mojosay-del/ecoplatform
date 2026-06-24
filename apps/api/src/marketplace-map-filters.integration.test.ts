@@ -12,7 +12,7 @@ beforeEach(enableMarketplace);
 
 describe("Marketplace — карта и фильтры (фаза 2)", () => {
   it("адресные подсказки без ключа геокодера мягко возвращают пустой список", async () => {
-    await withEnv({ DGIS_GEOCODER_API_KEY: undefined }, async () => {
+    await withEnv({ DADATA_API_KEY: undefined }, async () => {
       const { token } = await registerCompany("0009399");
 
       const res = await ctx.http.get("/api/marketplace/address-suggest?q=Москва").set(bearer(token));
@@ -23,7 +23,7 @@ describe("Marketplace — карта и фильтры (фаза 2)", () => {
   });
 
   it("фильтры по региону/сырью + список регионов; без ключа геокодера круг пуст", async () => {
-    await withEnv({ DGIS_GEOCODER_API_KEY: undefined }, async () => {
+    await withEnv({ DADATA_API_KEY: undefined }, async () => {
       const { token } = await registerCompany("0009401");
       const cardboard = await ctx.prisma.nomenclature.create({
         data: { code: "MS-5B", name: "МС-5Б" },

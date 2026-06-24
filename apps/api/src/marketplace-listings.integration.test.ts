@@ -199,7 +199,7 @@ describe("Marketplace — объявления (фаза 1)", () => {
   });
 
   it("переподача заново геокодит адрес, если у исходного объявления нет координат", async () => {
-    await withEnv({ DGIS_GEOCODER_API_KEY: undefined }, async () => {
+    await withEnv({ DADATA_API_KEY: undefined }, async () => {
       const { token } = await registerCompany("0009109");
       const nomenclatureId = await seedNomenclature();
       const photos = await seedPhotos(4);
@@ -233,34 +233,32 @@ describe("Marketplace — объявления (фаза 1)", () => {
         ok: true,
         status: 200,
         json: async () => ({
-          result: {
-            items: [
-              {
-                full_name: "Россия, Москва, Тверская улица, 1",
-                point: { lat: 55.755864, lon: 37.617698 },
-                adm_div: [
-                  { type: "country", name: "Россия" },
-                  { type: "region", name: "Москва" },
-                  { type: "city", name: "Москва" },
-                ],
+          suggestions: [
+            {
+              value: "Россия, Москва, Тверская улица, 1",
+              data: {
+                country: "Россия",
+                region_with_type: "Москва",
+                city_with_type: "Москва",
+                street_with_type: "Тверская улица",
+                house: "1",
+                geo_lat: "55.755864",
+                geo_lon: "37.617698",
               },
-            ],
-          },
+            },
+          ],
         }),
       });
 
       try {
         vi.stubGlobal("fetch", fetchMock);
-        await withEnv({ DGIS_GEOCODER_API_KEY: "test-key" }, async () => {
+        await withEnv({ DADATA_API_KEY: "test-key" }, async () => {
           const republished = await ctx.http
             .post(`/api/marketplace/listings/${draft.body.id}/republish`)
             .set(bearer(token));
           expect(republished.status).toBe(201);
 
-          expect(fetchMock).toHaveBeenCalledWith(
-            expect.stringContaining("catalog.api.2gis.com/3.0/items/geocode"),
-            expect.any(Object),
-          );
+          expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("suggestions.dadata.ru"), expect.any(Object));
           const created = await ctx.prisma.marketplaceListing.findUniqueOrThrow({
             where: { id: republished.body.id },
             include: { address: true },

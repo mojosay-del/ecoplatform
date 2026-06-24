@@ -28,16 +28,23 @@ function buildContentSecurityPolicy(): string {
   // хэша и блокируются `script-src 'self'`, из-за чего гидрация падает и формы
   // уходят в нативный submit. Поэтому inline разрешён и в проде; перевод на
   // per-request nonce (proxy/middleware) — отдельная задача по hardening.
-  const scriptSrc = ["'self'", "'unsafe-inline'", "https://mapgl.2gis.com", "https://*.2gis.com"];
+  // Карта на MapLibre (тайлы/стиль/шрифты грузятся в браузер). Источник тайлов
+  // настраивается через NEXT_PUBLIC_MAP_TILES_ORIGIN (на проде — self-host на
+  // нашем домене); по умолчанию разрешаем растровый OSM для локальной разработки.
+  const mapTileOrigins = (process.env.NEXT_PUBLIC_MAP_TILES_ORIGIN ?? "https://tiles.openfreemap.org")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  // MapLibre-движок бандлится в приложение (внешний script не нужен).
+  const scriptSrc = ["'self'", "'unsafe-inline'"];
   const styleSrc = ["'self'", "'unsafe-inline'", "blob:"];
   const connectSrc = [
     "'self'",
     "https://s3.twcstorage.ru",
     "https://*.ingest.sentry.io",
     "https://*.ingest.us.sentry.io",
-    // 2ГИС MapGL: тайлы, стили и шрифты карты (геокодер каталога дёргает бэкенд,
-    // не браузер, но домены общие — *.2gis.com).
-    "https://*.2gis.com",
+    // MapLibre: векторные тайлы/стиль/glyphs тянутся fetch'ем.
+    ...mapTileOrigins,
   ];
   // Локальный dev ходит в API по http://localhost:4000. В проде API живёт на
   // том же origin (ecoplatform.pro/api → покрывается 'self'), внешний localhost
@@ -48,7 +55,7 @@ function buildContentSecurityPolicy(): string {
 
   return [
     "default-src 'self'",
-    "img-src 'self' data: blob: https://s3.twcstorage.ru https://*.s3.twcstorage.ru https://*.2gis.com",
+    `img-src 'self' data: blob: https://s3.twcstorage.ru https://*.s3.twcstorage.ru ${mapTileOrigins.join(" ")}`,
     // Видео/аудио уроков отдаются signed-URL с S3 (s3.twcstorage.ru). Без явного
     // media-src они наследовали default-src 'self', и в проде (блокирующая CSP)
     // браузер резал загрузку — Vidstack крутил спиннер бесконечно. Зеркалит img-src
@@ -57,9 +64,9 @@ function buildContentSecurityPolicy(): string {
     `script-src ${scriptSrc.join(" ")}`,
     `style-src ${styleSrc.join(" ")}`,
     `connect-src ${connectSrc.join(" ")}`,
-    "font-src 'self' https://*.2gis.com",
-    // MapGL поднимает web-workers из blob: — без worker-src карта молча не стартует
-    // (default-src 'self' заблокировал бы blob-воркер).
+    `font-src 'self' ${mapTileOrigins.join(" ")}`,
+    // MapLibre поднимает web-workers из blob: — без worker-src карта молча не
+    // стартует (default-src 'self' заблокировал бы blob-воркер).
     "worker-src 'self' blob:",
     // Жёсткие запреты, которые не влияют на штатную работу приложения, но
     // закрывают классические XSS/clickjacking-векторы:

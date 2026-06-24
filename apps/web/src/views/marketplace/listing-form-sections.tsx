@@ -190,7 +190,20 @@ export function AddressSection({ form }: { form: ListingFormController }) {
     <div className="mp-fieldset">
       {sectionTitle(MapPin, "Адрес отгрузки")}
       <div className={fieldClass(form.addressQuery)}>
-        <label>Поиск адреса (Яндекс)</label>
+        <label>Поиск адреса</label>
+        <div className="mp-country-toggle" role="group" aria-label="Страна адреса">
+          {(["RU", "BY"] as const).map((code) => (
+            <button
+              type="button"
+              key={code}
+              className={form.addressCountry === code ? "is-active" : ""}
+              aria-pressed={form.addressCountry === code}
+              onClick={() => form.setAddressCountry(code)}
+            >
+              {code === "RU" ? "Россия" : "Беларусь"}
+            </button>
+          ))}
+        </div>
         <div className="mp-address-search">
           <input
             id={ADDRESS_SEARCH_ID}

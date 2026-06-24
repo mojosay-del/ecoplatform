@@ -8,7 +8,7 @@ import type {
 } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { paginatedResponse, resolvePagination, type PaginationInput } from "../common/pagination";
-import { AddressGeocoderService } from "../geo/address-geocoder.service";
+import { AddressGeocoderService, dadataCountryFromName } from "../geo/address-geocoder.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
@@ -46,7 +46,7 @@ export class BillingService {
 
   private async resolveCompanyAddressGeo(address: AddressDto): Promise<CompanyAddressGeo | null> {
     const formatted = address.formatted?.trim() || composeFormattedAddress(address);
-    const result = await this.geocoder.geocode(formatted);
+    const result = await this.geocoder.geocode(formatted, dadataCountryFromName(address.country));
     if (!result) {
       return null;
     }

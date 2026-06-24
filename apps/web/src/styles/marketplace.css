@@ -576,6 +576,41 @@
   box-shadow: var(--focus-ring, 0 0 0 3px rgb(245 119 62 / 0.25));
 }
 
+/* Сегментированный тогл страны адреса (Россия/Беларусь) над строкой поиска. */
+.mp-country-toggle {
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 3px;
+  background: var(--surface-muted, #f5f6f8);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+}
+
+.mp-country-toggle button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  border-radius: 7px;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.mp-country-toggle button:hover {
+  color: var(--text, #0f172a);
+}
+
+.mp-country-toggle button.is-active {
+  background: var(--brand, #f5773e);
+  color: #fff;
+}
+
 .mp-address-search {
   position: relative;
 }
@@ -2023,59 +2058,8 @@
   background: #f8fafc;
 }
 
-/* DOM-точки дальнего масштаба (HtmlMarker 2ГИС): цвет по сырью через --dot,
-   увеличение при hover карточки/наведении, пульс у свежих объявлений (<24ч).
-   ::after выходит за 14px-бокс точки, не сдвигая якорь маркера. */
-.mp-map-dot {
-  position: relative;
-  box-sizing: border-box;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--dot, #1f8a4c);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
-  cursor: pointer;
-  pointer-events: auto;
-  transition: transform 0.12s ease;
-}
-
-.mp-map-dot.is-hovered {
-  transform: scale(1.5);
-  z-index: 2;
-}
-
-.mp-map-dot.is-fresh::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 14px;
-  height: 14px;
-  margin: -7px 0 0 -7px;
-  border-radius: 50%;
-  border: 2px solid var(--dot, #1f8a4c);
-  pointer-events: none;
-  animation: mp-map-dot-pulse 1.6s ease-out infinite;
-}
-
-@keyframes mp-map-dot-pulse {
-  0% {
-    transform: scale(1);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(2.6);
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mp-map-dot.is-fresh::after {
-    animation: none;
-    opacity: 0;
-  }
-}
+/* Точки/круги/пульс свежих объявлений рисует MapLibre data-driven слоями (см.
+   ListingMap.tsx) — отдельный CSS для маркеров больше не нужен. */
 
 /* ── Сплит лента+карта (как у гео-маркетплейсов) ─────────────────────────────
    Список скроллится слева, карта закреплена справа на всю высоту вьюпорта.

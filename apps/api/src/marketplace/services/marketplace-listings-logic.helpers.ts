@@ -9,7 +9,7 @@ import {
   type ListingMediaInput,
   type ListingPositionInput,
 } from "@ecoplatform/shared";
-import type { AddressGeocoderService } from "../../geo/address-geocoder.service";
+import { type AddressGeocoderService, dadataCountryFromName } from "../../geo/address-geocoder.service";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { MarketplaceFeedBbox } from "../marketplace.schemas";
 import { generateCircleCenter } from "./marketplace-geo.helpers";
@@ -33,7 +33,7 @@ export async function resolveListingAddressGeo(
   geocoder: AddressGeocoderService,
   addressData: AddressCreateData,
 ): Promise<AddressGeo> {
-  const result = await geocoder.geocode(addressData.formatted);
+  const result = await geocoder.geocode(addressData.formatted, dadataCountryFromName(addressData.country));
   if (!result) {
     return { coords: {}, circleLat: null, circleLon: null };
   }

@@ -64,6 +64,9 @@ export function useListingForm(listingId?: string) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addressQuery, setAddressQuery] = useState("");
+  // Страна поиска адреса: РФ (вкл. новые территории) или Беларусь. DaData находит
+  // белорусские адреса только при явном фильтре BY (см. AddressGeocoderService).
+  const [addressCountry, setAddressCountry] = useState<"RU" | "BY">("RU");
   const [addressSuggestions, setAddressSuggestions] = useState<MarketplaceAddressSuggestion[]>([]);
   const [addressSuggestState, setAddressSuggestState] = useState<AddressSuggestState>("idle");
 
@@ -121,7 +124,7 @@ export function useListingForm(listingId?: string) {
     setAddressSuggestState("loading");
     const timer = window.setTimeout(() => {
       api.marketplace
-        .addressSuggest(query)
+        .addressSuggest(query, addressCountry)
         .then((suggestions) => {
           if (cancelled || addressSuggestRequestRef.current !== requestId) return;
           setAddressSuggestions(suggestions);
@@ -138,7 +141,7 @@ export function useListingForm(listingId?: string) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [addressQuery]);
+  }, [addressQuery, addressCountry]);
 
   function applyAddressSuggestion(suggestion: MarketplaceAddressSuggestion) {
     setAddressQuery(suggestion.value);
@@ -307,6 +310,8 @@ export function useListingForm(listingId?: string) {
     // Адрес
     addressQuery,
     setAddressQuery,
+    addressCountry,
+    setAddressCountry,
     addressSuggestions,
     addressSuggestState,
     setAddressSuggestState,

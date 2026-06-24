@@ -39,7 +39,8 @@ export const marketplaceApi = {
   listings: (input: MarketplaceFeedInput = {}) =>
     apiFetch<PaginatedResponse<MarketplaceListingListItem>>(`/marketplace/listings${marketplaceFeedSuffix(input)}`),
   regions: () => apiFetch<string[]>("/marketplace/regions"),
-  addressSuggest: (q: string) => apiFetch<MarketplaceAddressSuggestion[]>(`/marketplace/address-suggest?q=${enc(q)}`),
+  addressSuggest: (q: string, country: "RU" | "BY" = "RU") =>
+    apiFetch<MarketplaceAddressSuggestion[]>(`/marketplace/address-suggest?q=${enc(q)}&country=${country}`),
   myListings: (pagination: PaginationInput = {}) =>
     apiFetch<PaginatedResponse<MyMarketplaceListingItem>>(`/marketplace/my/listings${paginationSuffix(pagination)}`),
   nomenclature: () => apiFetch<MarketplaceNomenclatureOption[]>("/marketplace/nomenclature"),

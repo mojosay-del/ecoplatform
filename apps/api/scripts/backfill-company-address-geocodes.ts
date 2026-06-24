@@ -13,7 +13,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { config as loadEnv } from "dotenv";
 import { resolve } from "path";
-import { AddressGeocoderService } from "../src/geo/address-geocoder.service";
+import { AddressGeocoderService, dadataCountryFromName } from "../src/geo/address-geocoder.service";
 
 loadEnv({ path: resolve(__dirname, "../../../.env") });
 
@@ -32,6 +32,7 @@ async function main() {
       id: true,
       formatted: true,
       region: true,
+      country: true,
       companyAsFactual: { select: { id: true, organizationName: true } },
     },
   });
@@ -41,7 +42,7 @@ async function main() {
 
   for (const address of addresses) {
     process.stdout.write(`Геокодирую ${address.companyAsFactual?.organizationName ?? address.id}... `);
-    const result = await geocoder.geocode(address.formatted);
+    const result = await geocoder.geocode(address.formatted, dadataCountryFromName(address.country));
     if (!result) {
       skipped += 1;
       process.stdout.write("нет результата\n");
