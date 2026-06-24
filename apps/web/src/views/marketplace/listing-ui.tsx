@@ -107,6 +107,8 @@ export function ListingCard({
   ];
   const expiry = isExpiringSoon(listing.expiresAt) ? expiryLabel(listing.expiresAt) : null;
   const distanceText = distanceKm != null ? formatDistanceKm(distanceKm) : "";
+  const totalWeight = formatWeight(totalWeightKg(listing.positions));
+  const hasFooterMeta = listing.offerCount > 0 || listing.sellerRating != null;
 
   return (
     <Link
@@ -135,35 +137,41 @@ export function ListingCard({
               <i key={slug} className="mp-material-dot" style={{ backgroundColor: materialColor(slug) }} />
             ))}
           </span>
-          {positionsSummaryText(listing.positions)}
+          <span className="mp-card-title-text">{positionsSummaryText(listing.positions)}</span>
+          {forms.map((form) => (
+            <span className="mp-card-pill" key={form}>
+              {form}
+            </span>
+          ))}
+          <span className="mp-card-pill mp-card-pill-weight">{totalWeight}</span>
         </div>
-        <div className="mp-card-meta">
+        <div className="mp-card-meta mp-card-location">
           <span>
-            {formatLocation(listing.city, listing.region)}
+            {listing.city}
             {distanceText ? ` · ${distanceText}` : ""}
           </span>
-          <span className="mp-card-weight">{formatWeight(totalWeightKg(listing.positions))}</span>
         </div>
-        <div className="mp-card-meta">
-          <span>{forms.join(" · ")}</span>
-          <span className="mp-card-meta-right">
-            {listing.offerCount > 0 ? (
-              <span aria-label={`Подано предложений: ${listing.offerCount}`} className="mp-card-offers">
-                <Mail aria-hidden="true" size={12} />
-                {listing.offerCount}
-              </span>
-            ) : null}
-            {listing.sellerRating != null ? (
-              <span
-                aria-label={`Рейтинг продавца ${formatRatingValue(listing.sellerRating)} из 5`}
-                className="mp-card-rating"
-              >
-                <Star aria-hidden="true" size={13} />
-                {formatRatingValue(listing.sellerRating)}
-              </span>
-            ) : null}
-          </span>
-        </div>
+        {hasFooterMeta ? (
+          <div className="mp-card-meta mp-card-footer-meta">
+            <span className="mp-card-meta-right">
+              {listing.offerCount > 0 ? (
+                <span aria-label={`Подано предложений: ${listing.offerCount}`} className="mp-card-offers">
+                  <Mail aria-hidden="true" size={12} />
+                  {listing.offerCount}
+                </span>
+              ) : null}
+              {listing.sellerRating != null ? (
+                <span
+                  aria-label={`Рейтинг продавца ${formatRatingValue(listing.sellerRating)} из 5`}
+                  className="mp-card-rating"
+                >
+                  <Star aria-hidden="true" size={13} />
+                  {formatRatingValue(listing.sellerRating)}
+                </span>
+              ) : null}
+            </span>
+          </div>
+        ) : null}
       </div>
     </Link>
   );

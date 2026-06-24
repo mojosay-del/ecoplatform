@@ -79,35 +79,53 @@ export function MarketplaceFilterBar({
   sortOptions,
   selectedSort,
 }: MarketplaceFilterBarProps) {
+  const selectedCategoryCount = nomenclatureGroups.filter(
+    (group) => groupSelectionState(group, selectedNomenclature) !== "none",
+  ).length;
+
   return (
     <div className="mp-filterbar" ref={containerRef}>
-      {/* Чипы категорий сырья — те же цвета, что круги на карте. */}
-      <div aria-label="Категории сырья" className="mp-material-chips" role="group">
-        {nomenclatureGroups.map((group) => {
-          const state = groupSelectionState(group, selectedNomenclature);
-          const color = materialColor(group.slug);
-          const selectedCount = group.options.filter((option) => selectedNomenclature.includes(option.id)).length;
-          return (
-            <button
-              aria-pressed={state !== "none"}
-              className={`mp-material-chip${state === "all" ? " is-active" : ""}${
-                state === "partial" ? " is-partial" : ""
-              }`}
-              key={group.slug}
-              style={state !== "none" ? { borderColor: color, color, backgroundColor: `${color}14` } : undefined}
-              type="button"
-              onClick={() => setSelectedNomenclature((prev) => toggleNomenclatureGroup(prev, group))}
-            >
-              <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
-              {group.name}
-              {state === "partial" ? (
-                <span className="mp-material-chip-count" style={{ backgroundColor: color }}>
-                  {selectedCount}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
+      <div className={`mp-filter-popover${openPopover === "category" ? " is-open" : ""}`}>
+        <button
+          aria-controls="marketplace-category-popover"
+          aria-expanded={openPopover === "category"}
+          className="mp-filter-trigger"
+          type="button"
+          onClick={() => setOpenPopover((value) => (value === "category" ? null : "category"))}
+        >
+          <span>Категории{selectedCategoryCount ? ` · ${selectedCategoryCount}` : ""}</span>
+          <ChevronDown aria-hidden="true" size={16} />
+        </button>
+        {openPopover === "category" ? (
+          <div className="mp-filter-menu mp-filter-category-menu" id="marketplace-category-popover">
+            {nomenclatureGroups.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
+            {nomenclatureGroups.map((group) => {
+              const state = groupSelectionState(group, selectedNomenclature);
+              const color = materialColor(group.slug);
+              const selectedCount = group.options.filter((option) => selectedNomenclature.includes(option.id)).length;
+              return (
+                <button
+                  aria-pressed={state !== "none"}
+                  className={`mp-filter-option mp-filter-category-option${state === "all" ? " is-active" : ""}${
+                    state === "partial" ? " is-partial" : ""
+                  }`}
+                  key={group.slug}
+                  type="button"
+                  onClick={() => setSelectedNomenclature((prev) => toggleNomenclatureGroup(prev, group))}
+                >
+                  <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
+                  <span>{group.name}</span>
+                  {state === "partial" ? (
+                    <span className="mp-material-chip-count" style={{ backgroundColor: color }}>
+                      {selectedCount}
+                    </span>
+                  ) : null}
+                  {state === "all" ? <Check aria-hidden="true" size={15} /> : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
 
       <div className="mp-filterbar-group">

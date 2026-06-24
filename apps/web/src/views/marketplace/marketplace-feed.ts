@@ -4,7 +4,7 @@ import type { MapViewBounds } from "./ListingMap";
 import { totalWeightKg } from "./listing-ui";
 
 export type SortMode = "date" | "distance" | "weight" | "expires";
-export type FilterPopover = "nomenclature" | "region" | "sort";
+export type FilterPopover = "category" | "nomenclature" | "region" | "sort";
 export type CompanyPoint = { lat: number; lon: number };
 
 // Категория сырья со своими номенклатурами — чип фильтра + группа в «Точнее».
