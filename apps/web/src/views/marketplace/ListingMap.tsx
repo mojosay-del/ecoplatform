@@ -67,27 +67,28 @@ const BASEMAP_REVEAL_WINDOWS: Record<string, { start: number; end: number }> = {
   "highway-name-path": { start: 15, end: 16.8 },
   highway_major_casing: { start: 9.4, end: 11.6 },
   highway_major_inner: { start: 9.4, end: 11.6 },
-  highway_major_subtle: { start: 5.4, end: 8.8 },
+  highway_major_subtle: { start: 3.7, end: 7.2 },
   highway_minor: { start: 9.8, end: 12.4 },
   highway_motorway_bridge_casing: { start: 5.1, end: 7.1 },
   highway_motorway_bridge_inner: { start: 5.1, end: 7.1 },
   highway_motorway_casing: { start: 5.1, end: 7.1 },
   highway_motorway_inner: { start: 5.1, end: 7.1 },
-  highway_motorway_subtle: { start: 3.4, end: 5.8 },
+  highway_motorway_subtle: { start: 2.9, end: 5.5 },
   highway_path: { start: 13, end: 15.5 },
-  label_city: { start: 4.4, end: 6.9 },
-  label_city_capital: { start: 2.7, end: 4.7 },
+  label_city: { start: 3.05, end: 5.2 },
+  label_city_capital: { start: 2.55, end: 4.4 },
   label_other: { start: 11.2, end: 13.2 },
   label_town: { start: 5.1, end: 7.3 },
   label_village: { start: 9.1, end: 10.8 },
-  landcover_wood: { start: 7.8, end: 11.2 },
+  landcover_wood: { start: 4.8, end: 9.4 },
   landuse_residential: { start: 7.6, end: 9.8 },
+  park: { start: 3.8, end: 7.4 },
   railway: { start: 12.2, end: 14.2 },
   railway_dashline: { start: 12.2, end: 14.2 },
   road_shield_us: { start: 8.2, end: 10.2 },
   water_name_line_label: { start: 5.2, end: 8.2 },
   water_name_point_label: { start: 5.2, end: 8.2 },
-  waterway: { start: 4.2, end: 8.4 },
+  waterway: { start: 3.1, end: 8.2 },
   waterway_line_label: { start: 9.8, end: 11.6 },
 };
 
@@ -113,8 +114,9 @@ const BASEMAP_PAINT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
     "line-width": ["interpolate", ["exponential", 1.25], ["zoom"], 9.4, 0.2, 11, 0.8, 14, 3.6, 18, 12],
   },
   highway_major_subtle: {
-    "line-opacity": ["interpolate", ["linear"], ["zoom"], 5.4, 0, 7.4, 0.38, 9.2, 0.58, 11, 0],
-    "line-width": ["interpolate", ["linear"], ["zoom"], 5.4, 0.25, 8, 0.75, 11, 1.6],
+    "line-color": "hsl(0, 0%, 82%)",
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 3.7, 0, 4.4, 0.2, 5.8, 0.38, 8.6, 0.6, 11, 0],
+    "line-width": ["interpolate", ["linear"], ["zoom"], 3.7, 0.18, 5.2, 0.36, 8, 0.85, 11, 1.6],
   },
   highway_minor: {
     "line-opacity": ["interpolate", ["linear"], ["zoom"], 9.8, 0, 12.4, 0.58, 15, 0.82],
@@ -137,20 +139,21 @@ const BASEMAP_PAINT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
     "line-width": ["interpolate", ["exponential", 1.35], ["zoom"], 5.1, 0.2, 7, 1.1, 11, 2.6, 16, 10],
   },
   highway_motorway_subtle: {
-    "line-opacity": ["interpolate", ["linear"], ["zoom"], 3.4, 0, 4.8, 0.42, 5.8, 0.68],
-    "line-width": ["interpolate", ["linear"], ["zoom"], 3.4, 0.2, 5.8, 1.1],
+    "line-color": "hsl(0, 0%, 78%)",
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 2.9, 0, 3.6, 0.24, 4.8, 0.52, 5.8, 0.7],
+    "line-width": ["interpolate", ["linear"], ["zoom"], 2.9, 0.16, 4.2, 0.35, 5.8, 1.1],
   },
   highway_path: {
     "line-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0, 15.5, 0.46, 18, 0.7],
     "line-width": ["interpolate", ["exponential", 1.15], ["zoom"], 13, 0.2, 15, 0.7, 19, 4],
   },
   label_city: {
-    "icon-opacity": ["interpolate", ["linear"], ["zoom"], 4.4, 0, 6.9, 0.88],
-    "text-opacity": ["interpolate", ["linear"], ["zoom"], 4.4, 0, 6.9, 0.95],
+    "icon-opacity": ["interpolate", ["linear"], ["zoom"], 3.05, 0, 3.8, 0.32, 5.2, 0.78, 6.9, 0.88],
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 3.05, 0, 3.8, 0.46, 4.7, 0.82, 6.6, 0.95],
   },
   label_city_capital: {
-    "icon-opacity": ["interpolate", ["linear"], ["zoom"], 2.7, 0, 4.7, 0.92],
-    "text-opacity": ["interpolate", ["linear"], ["zoom"], 2.7, 0, 4.7, 1],
+    "icon-opacity": ["interpolate", ["linear"], ["zoom"], 2.55, 0, 3.25, 0.68, 4.4, 0.92],
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 2.55, 0, 3.25, 0.76, 4.4, 1],
   },
   label_other: {
     "text-opacity": ["interpolate", ["linear"], ["zoom"], 11.2, 0, 13.2, 0.72],
@@ -164,10 +167,13 @@ const BASEMAP_PAINT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
     "text-opacity": ["interpolate", ["linear"], ["zoom"], 9.1, 0, 10.8, 0.78],
   },
   landcover_wood: {
-    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 7.8, 0, 10, 0.18, 12, 0.48, 15, 0.62],
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 4.8, 0, 6.4, 0.08, 8, 0.18, 12, 0.48, 15, 0.62],
   },
   landuse_residential: {
     "fill-opacity": ["interpolate", ["linear"], ["zoom"], 7.6, 0, 9.8, 0.18, 12, 0.34],
+  },
+  park: {
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 3.8, 0, 5.4, 0.08, 7.4, 0.18, 10, 0.3],
   },
   railway: {
     "line-opacity": ["interpolate", ["linear"], ["zoom"], 12.2, 0, 14.2, 0.45, 17, 0.7],
@@ -188,8 +194,8 @@ const BASEMAP_PAINT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
     "text-opacity": ["interpolate", ["linear"], ["zoom"], 5.2, 0, 8.2, 0.58],
   },
   waterway: {
-    "line-opacity": ["interpolate", ["linear"], ["zoom"], 4.2, 0, 6.4, 0.28, 8.4, 0.64, 12, 0.78],
-    "line-width": ["interpolate", ["exponential", 1.2], ["zoom"], 4.2, 0.12, 7, 0.35, 10, 0.8, 14, 1.7],
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 3.1, 0, 4.4, 0.22, 6.4, 0.44, 8.4, 0.64, 12, 0.78],
+    "line-width": ["interpolate", ["exponential", 1.2], ["zoom"], 3.1, 0.1, 5.5, 0.28, 8, 0.62, 14, 1.7],
   },
   waterway_line_label: {
     "text-opacity": ["interpolate", ["linear"], ["zoom"], 9.8, 0, 11.6, 0.52],
@@ -198,12 +204,12 @@ const BASEMAP_PAINT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
 
 const BASEMAP_LAYOUT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
   label_city: {
-    "icon-size": ["interpolate", ["linear"], ["zoom"], 4.4, 0.18, 7, 0.32, 9, 0],
-    "text-size": ["interpolate", ["exponential", 1.15], ["zoom"], 4, 10, 7, 12, 11, 16],
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 3.05, 0.1, 5.2, 0.2, 7, 0.32, 9, 0],
+    "text-size": ["interpolate", ["exponential", 1.15], ["zoom"], 3.05, 9.5, 5, 10.5, 7, 12, 11, 16],
   },
   label_city_capital: {
-    "icon-size": ["interpolate", ["linear"], ["zoom"], 2.7, 0.24, 7, 0.44, 9, 0],
-    "text-size": ["interpolate", ["exponential", 1.15], ["zoom"], 3, 11, 7, 14, 11, 18],
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 2.55, 0.2, 7, 0.44, 9, 0],
+    "text-size": ["interpolate", ["exponential", 1.15], ["zoom"], 2.8, 10.8, 7, 14, 11, 18],
   },
   label_other: {
     "text-size": ["interpolate", ["linear"], ["zoom"], 11, 8, 14, 10],
