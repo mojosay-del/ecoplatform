@@ -21,11 +21,13 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 18px;
+  align-items: start;
 }
 
 .mp-card {
   display: flex;
   flex-direction: column;
+  align-self: start;
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 14px;
   overflow: hidden;
