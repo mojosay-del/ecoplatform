@@ -42,6 +42,7 @@ const LYR_CIRCLE_LINE = "listing-circle-line";
 const HOVER_LAYERS = [LYR_DOT, LYR_CIRCLE_FILL];
 const LAYER_FADE_ZOOM_RANGE = 0.45;
 const BASEMAP_LAYER_FADE_ZOOM_RANGE = 0.9;
+const MAP_TILE_FADE_DURATION_MS = 420;
 const MAX_MAP_ZOOM = 24;
 const CIRCLE_FADE_START_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD - LAYER_FADE_ZOOM_RANGE;
 const CIRCLE_FADE_END_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD + LAYER_FADE_ZOOM_RANGE;
@@ -56,24 +57,165 @@ const BASEMAP_OPACITY_PROPERTIES_BY_TYPE: Record<string, readonly string[]> = {
   symbol: ["text-opacity", "icon-opacity"],
 };
 
-const BASEMAP_SYMBOL_REVEAL_WINDOWS: Record<string, { start: number; end: number }> = {
+const HIDDEN_BASEMAP_LAYER_IDS = new Set(["label_state", "label_country_1", "label_country_2", "label_country_3"]);
+
+const BASEMAP_REVEAL_WINDOWS: Record<string, { start: number; end: number }> = {
   airport: { start: 10.2, end: 11.8 },
-  "highway-name-major": { start: 11.2, end: 13.2 },
-  "highway-name-minor": { start: 14, end: 16 },
-  "highway-name-path": { start: 14.4, end: 16.4 },
+  building: { start: 12.4, end: 14.2 },
+  "highway-name-major": { start: 11.6, end: 13.4 },
+  "highway-name-minor": { start: 14.2, end: 16.2 },
+  "highway-name-path": { start: 15, end: 16.8 },
+  highway_major_casing: { start: 9.4, end: 11.6 },
+  highway_major_inner: { start: 9.4, end: 11.6 },
+  highway_major_subtle: { start: 5.4, end: 8.8 },
+  highway_minor: { start: 9.8, end: 12.4 },
+  highway_motorway_bridge_casing: { start: 5.1, end: 7.1 },
+  highway_motorway_bridge_inner: { start: 5.1, end: 7.1 },
+  highway_motorway_casing: { start: 5.1, end: 7.1 },
+  highway_motorway_inner: { start: 5.1, end: 7.1 },
+  highway_motorway_subtle: { start: 3.4, end: 5.8 },
+  highway_path: { start: 13, end: 15.5 },
   label_city: { start: 4.4, end: 6.9 },
   label_city_capital: { start: 2.7, end: 4.7 },
-  label_country_1: { start: 0, end: 2.2 },
-  label_country_2: { start: 0, end: 3 },
-  label_country_3: { start: 1.3, end: 3.5 },
-  label_other: { start: 7.1, end: 9.2 },
-  label_state: { start: 4.1, end: 6.4 },
+  label_other: { start: 11.2, end: 13.2 },
   label_town: { start: 5.1, end: 7.3 },
-  label_village: { start: 8.1, end: 9.8 },
-  road_shield_us: { start: 11.2, end: 12.8 },
-  water_name_line_label: { start: 3.8, end: 6.6 },
-  water_name_point_label: { start: 3.8, end: 6.6 },
-  waterway_line_label: { start: 9.1, end: 10.9 },
+  label_village: { start: 9.1, end: 10.8 },
+  landcover_wood: { start: 7.8, end: 11.2 },
+  landuse_residential: { start: 7.6, end: 9.8 },
+  railway: { start: 12.2, end: 14.2 },
+  railway_dashline: { start: 12.2, end: 14.2 },
+  road_shield_us: { start: 8.2, end: 10.2 },
+  water_name_line_label: { start: 5.2, end: 8.2 },
+  water_name_point_label: { start: 5.2, end: 8.2 },
+  waterway: { start: 4.2, end: 8.4 },
+  waterway_line_label: { start: 9.8, end: 11.6 },
+};
+
+const BASEMAP_PAINT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
+  building: {
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12.4, 0, 14.2, 0.55, 16, 0.75],
+  },
+  "highway-name-major": {
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 11.6, 0, 13.4, 0.9],
+  },
+  "highway-name-minor": {
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 14.2, 0, 16.2, 0.82],
+  },
+  "highway-name-path": {
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 15, 0, 16.8, 0.72],
+  },
+  highway_major_casing: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 9.4, 0, 11.6, 0.78, 14, 0.9],
+    "line-width": ["interpolate", ["exponential", 1.25], ["zoom"], 9.4, 0.35, 11, 1.2, 14, 5, 18, 15],
+  },
+  highway_major_inner: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 9.4, 0, 11.6, 0.9],
+    "line-width": ["interpolate", ["exponential", 1.25], ["zoom"], 9.4, 0.2, 11, 0.8, 14, 3.6, 18, 12],
+  },
+  highway_major_subtle: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 5.4, 0, 7.4, 0.38, 9.2, 0.58, 11, 0],
+    "line-width": ["interpolate", ["linear"], ["zoom"], 5.4, 0.25, 8, 0.75, 11, 1.6],
+  },
+  highway_minor: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 9.8, 0, 12.4, 0.58, 15, 0.82],
+    "line-width": ["interpolate", ["exponential", 1.25], ["zoom"], 9.8, 0.15, 12, 0.75, 15, 2.4, 19, 11],
+  },
+  highway_motorway_bridge_casing: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 5.1, 0, 7.1, 0.9],
+    "line-width": ["interpolate", ["exponential", 1.35], ["zoom"], 5.1, 0.45, 7, 2, 11, 4, 16, 15],
+  },
+  highway_motorway_bridge_inner: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 5.1, 0, 7.1, 1],
+    "line-width": ["interpolate", ["exponential", 1.35], ["zoom"], 5.1, 0.25, 7, 1.2, 11, 2.8, 16, 11],
+  },
+  highway_motorway_casing: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 5.1, 0, 7.1, 0.9],
+    "line-width": ["interpolate", ["exponential", 1.35], ["zoom"], 5.1, 0.4, 7, 1.8, 11, 3.8, 16, 14],
+  },
+  highway_motorway_inner: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 5.1, 0, 7.1, 1],
+    "line-width": ["interpolate", ["exponential", 1.35], ["zoom"], 5.1, 0.2, 7, 1.1, 11, 2.6, 16, 10],
+  },
+  highway_motorway_subtle: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 3.4, 0, 4.8, 0.42, 5.8, 0.68],
+    "line-width": ["interpolate", ["linear"], ["zoom"], 3.4, 0.2, 5.8, 1.1],
+  },
+  highway_path: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0, 15.5, 0.46, 18, 0.7],
+    "line-width": ["interpolate", ["exponential", 1.15], ["zoom"], 13, 0.2, 15, 0.7, 19, 4],
+  },
+  label_city: {
+    "icon-opacity": ["interpolate", ["linear"], ["zoom"], 4.4, 0, 6.9, 0.88],
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 4.4, 0, 6.9, 0.95],
+  },
+  label_city_capital: {
+    "icon-opacity": ["interpolate", ["linear"], ["zoom"], 2.7, 0, 4.7, 0.92],
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 2.7, 0, 4.7, 1],
+  },
+  label_other: {
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 11.2, 0, 13.2, 0.72],
+  },
+  label_town: {
+    "icon-opacity": ["interpolate", ["linear"], ["zoom"], 5.1, 0, 7.3, 0.72],
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 5.1, 0, 7.3, 0.9],
+  },
+  label_village: {
+    "icon-opacity": ["interpolate", ["linear"], ["zoom"], 9.1, 0, 10.8, 0.45],
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 9.1, 0, 10.8, 0.78],
+  },
+  landcover_wood: {
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 7.8, 0, 10, 0.18, 12, 0.48, 15, 0.62],
+  },
+  landuse_residential: {
+    "fill-opacity": ["interpolate", ["linear"], ["zoom"], 7.6, 0, 9.8, 0.18, 12, 0.34],
+  },
+  railway: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 12.2, 0, 14.2, 0.45, 17, 0.7],
+    "line-width": ["interpolate", ["exponential", 1.2], ["zoom"], 12.2, 0.2, 15, 1.1, 19, 4.5],
+  },
+  railway_dashline: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 12.2, 0, 14.2, 0.6],
+    "line-width": ["interpolate", ["exponential", 1.2], ["zoom"], 12.2, 0.15, 15, 0.8, 19, 3.5],
+  },
+  road_shield_us: {
+    "icon-opacity": ["interpolate", ["linear"], ["zoom"], 8.2, 0, 10.2, 0.82],
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 8.2, 0, 10.2, 0.9],
+  },
+  water_name_line_label: {
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 5.2, 0, 8.2, 0.58],
+  },
+  water_name_point_label: {
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 5.2, 0, 8.2, 0.58],
+  },
+  waterway: {
+    "line-opacity": ["interpolate", ["linear"], ["zoom"], 4.2, 0, 6.4, 0.28, 8.4, 0.64, 12, 0.78],
+    "line-width": ["interpolate", ["exponential", 1.2], ["zoom"], 4.2, 0.12, 7, 0.35, 10, 0.8, 14, 1.7],
+  },
+  waterway_line_label: {
+    "text-opacity": ["interpolate", ["linear"], ["zoom"], 9.8, 0, 11.6, 0.52],
+  },
+};
+
+const BASEMAP_LAYOUT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
+  label_city: {
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 4.4, 0.18, 7, 0.32, 9, 0],
+    "text-size": ["interpolate", ["exponential", 1.15], ["zoom"], 4, 10, 7, 12, 11, 16],
+  },
+  label_city_capital: {
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 2.7, 0.24, 7, 0.44, 9, 0],
+    "text-size": ["interpolate", ["exponential", 1.15], ["zoom"], 3, 11, 7, 14, 11, 18],
+  },
+  label_other: {
+    "text-size": ["interpolate", ["linear"], ["zoom"], 11, 8, 14, 10],
+  },
+  label_town: {
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 5.1, 0.1, 8, 0.18, 10, 0],
+    "text-size": ["interpolate", ["exponential", 1.15], ["zoom"], 5, 9, 8, 11, 12, 13],
+  },
+  label_village: {
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 9.1, 0.08, 10.5, 0],
+    "text-size": ["interpolate", ["exponential", 1.12], ["zoom"], 9, 8.5, 11, 10.5, 14, 12],
+  },
 };
 
 // Тайлы подложки обрезаны по зоне Экоплатформы (РФ+новые территории+РБ) ещё на
@@ -333,8 +475,8 @@ function expressionHasZoom(value: unknown): boolean {
   return value.some((item) => item === "zoom" || expressionHasZoom(item));
 }
 
-function symbolRevealWindow(layer: BasemapLayerSpec) {
-  return BASEMAP_SYMBOL_REVEAL_WINDOWS[layer.id] ?? null;
+function basemapRevealWindow(layer: BasemapLayerSpec) {
+  return BASEMAP_REVEAL_WINDOWS[layer.id] ?? null;
 }
 
 function opacityFadeExpression(
@@ -343,7 +485,7 @@ function opacityFadeExpression(
 ): PropertyValueSpecification<number> | null {
   const minZoom = finiteNumber(layer.minzoom);
   const maxZoom = finiteNumber(layer.maxzoom);
-  const revealWindow = symbolRevealWindow(layer);
+  const revealWindow = basemapRevealWindow(layer);
   const fadeInStart = revealWindow?.start ?? (minZoom != null ? minZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE : null);
   const fadeInEnd = revealWindow?.end ?? (minZoom != null ? minZoom + BASEMAP_LAYER_FADE_ZOOM_RANGE : null);
   const shouldFadeIn = fadeInStart != null && fadeInEnd != null && fadeInEnd > fadeInStart;
@@ -380,11 +522,12 @@ function opacityFadeExpression(
 }
 
 function applySmoothBasemapZoom(map: MlMap, layer: BasemapLayerSpec) {
+  const revealWindow = basemapRevealWindow(layer);
   const opacityProperties = BASEMAP_OPACITY_PROPERTIES_BY_TYPE[layer.type];
-  if (!opacityProperties) return;
+  if (!opacityProperties && !revealWindow) return;
 
   let didSetOpacity = false;
-  for (const property of opacityProperties) {
+  for (const property of opacityProperties ?? []) {
     const currentValue = map.getPaintProperty(layer.id, property) ?? layer.paint?.[property];
     if (currentValue != null && finiteNumber(currentValue) == null && expressionHasZoom(currentValue)) continue;
 
@@ -396,12 +539,11 @@ function applySmoothBasemapZoom(map: MlMap, layer: BasemapLayerSpec) {
     didSetOpacity = true;
   }
 
-  if (!didSetOpacity) return;
+  if (!didSetOpacity && !revealWindow) return;
 
   const minZoom = finiteNumber(layer.minzoom);
   const maxZoom = finiteNumber(layer.maxzoom);
-  const fadeStartZoom =
-    symbolRevealWindow(layer)?.start ?? (minZoom != null ? minZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE : 0);
+  const fadeStartZoom = revealWindow?.start ?? (minZoom != null ? minZoom - BASEMAP_LAYER_FADE_ZOOM_RANGE : 0);
   const nextMinZoom = minZoom != null ? Math.max(0, Math.min(minZoom, fadeStartZoom)) : Math.max(0, fadeStartZoom);
   const nextMaxZoom =
     maxZoom != null && maxZoom < MAX_MAP_ZOOM - BASEMAP_LAYER_FADE_ZOOM_RANGE
@@ -409,6 +551,22 @@ function applySmoothBasemapZoom(map: MlMap, layer: BasemapLayerSpec) {
       : (maxZoom ?? MAX_MAP_ZOOM);
 
   map.setLayerZoomRange(layer.id, nextMinZoom, nextMaxZoom);
+}
+
+function applyBasemapOverrides(map: MlMap, layer: BasemapLayerSpec) {
+  const paintOverrides = BASEMAP_PAINT_OVERRIDES_BY_ID[layer.id];
+  if (paintOverrides) {
+    for (const [property, value] of Object.entries(paintOverrides)) {
+      map.setPaintProperty(layer.id, property, value);
+    }
+  }
+
+  const layoutOverrides = BASEMAP_LAYOUT_OVERRIDES_BY_ID[layer.id];
+  if (layoutOverrides) {
+    for (const [property, value] of Object.entries(layoutOverrides)) {
+      map.setLayoutProperty(layer.id, property, value);
+    }
+  }
 }
 
 function hasTextLabel(map: MlMap, layer: BasemapLayerSpec) {
@@ -454,6 +612,11 @@ function applyRussianRfBasemap(map: MlMap) {
         map.setLayoutProperty(spec.id, "visibility", "none");
         continue;
       }
+      if (HIDDEN_BASEMAP_LAYER_IDS.has(spec.id)) {
+        map.setLayoutProperty(spec.id, "visibility", "none");
+        continue;
+      }
+      applyBasemapOverrides(map, spec);
       applySmoothBasemapZoom(map, spec);
       // text-field может лежать в layout слоя ИЛИ быть применён через стиль —
       // надёжнее спросить у карты текущее значение.
@@ -628,6 +791,7 @@ export function ListingMap({
         style: MAP_STYLE_URL,
         center: LISTING_MAP_DEFAULT_CENTER,
         zoom: LISTING_MAP_DEFAULT_ZOOM,
+        fadeDuration: MAP_TILE_FADE_DURATION_MS,
         attributionControl: { compact: true },
       });
     } catch {
