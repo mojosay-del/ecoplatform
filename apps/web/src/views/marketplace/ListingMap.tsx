@@ -34,10 +34,9 @@ import {
   listingIdFromMapFeature,
 } from "./listing-map-view";
 import {
-  HIDDEN_LABEL_NAMES,
   LABEL_TEXT_FIELD,
-  LITHUANIA_LABEL_EXCLUSION_ZONE,
   RF_AND_BELARUS_LABEL_ZONE,
+  shouldConstrainLabelLayerToPlatformZone,
 } from "./listing-map-label-zones";
 
 // Идентификаторы источников/слоёв MapLibre.
@@ -443,25 +442,16 @@ function hasTextLabel(map: MlMap, layer: BasemapLayerSpec) {
   );
 }
 
-function labelZoneFilterFor(layer: BasemapLayerSpec, currentFilter: FilterSpecification | null): FilterSpecification {
+function labelZoneFilterFor(
+  layer: BasemapLayerSpec,
+  currentFilter: FilterSpecification | null,
+): FilterSpecification | null {
   const filters: FilterSpecification[] = [];
   if (currentFilter) filters.push(currentFilter);
-  if (layer["source-layer"] && layer["source-layer"] !== "place") {
+  if (shouldConstrainLabelLayerToPlatformZone(layer["source-layer"])) {
     filters.push(["within", RF_AND_BELARUS_LABEL_ZONE] as FilterSpecification);
   }
-  if (layer["source-layer"] === "place") {
-    filters.push(["!", ["within", LITHUANIA_LABEL_EXCLUSION_ZONE]] as FilterSpecification);
-    filters.push([
-      "!",
-      [
-        "match",
-        ["coalesce", ["get", "name:ru"], ["get", "name"], ["get", "name_en"], ""],
-        HIDDEN_LABEL_NAMES,
-        true,
-        false,
-      ],
-    ] as FilterSpecification);
-  }
+  if (filters.length === 0) return null;
   if (filters.length === 1 && filters[0]) return filters[0];
   return ["all", ...filters] as FilterSpecification;
 }
@@ -469,7 +459,8 @@ function labelZoneFilterFor(layer: BasemapLayerSpec, currentFilter: FilterSpecif
 function applyLabelZoneFilter(map: MlMap, layer: BasemapLayerSpec) {
   if (!hasTextLabel(map, layer)) return;
   const currentFilter = (map.getFilter(layer.id) ?? layer.filter ?? null) as FilterSpecification | null;
-  map.setFilter(layer.id, labelZoneFilterFor(layer, currentFilter));
+  const nextFilter = labelZoneFilterFor(layer, currentFilter);
+  if (nextFilter) map.setFilter(layer.id, nextFilter);
 }
 
 // Приводим подложку к требованиям РФ: подписи — на русском, пограничные линии

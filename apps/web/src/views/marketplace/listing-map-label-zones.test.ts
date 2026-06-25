@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LITHUANIA_LABEL_EXCLUSION_ZONE, RF_AND_BELARUS_LABEL_ZONE } from "./listing-map-label-zones";
+import { RF_AND_BELARUS_LABEL_ZONE, shouldConstrainLabelLayerToPlatformZone } from "./listing-map-label-zones";
 
 type LonLat = [number, number];
 type Ring = LonLat[];
@@ -32,21 +32,13 @@ function pointInMultiPolygon(point: LonLat): boolean {
 }
 
 function auxiliaryLabelAllowed(point: LonLat): boolean {
-  return (
-    pointInMultiPolygon(point) &&
-    !pointInPolygon(point, LITHUANIA_LABEL_EXCLUSION_ZONE.coordinates as PolygonCoordinates)
-  );
-}
-
-function placeLabelAllowed(point: LonLat): boolean {
-  return !pointInPolygon(point, LITHUANIA_LABEL_EXCLUSION_ZONE.coordinates as PolygonCoordinates);
+  return pointInMultiPolygon(point);
 }
 
 describe("marketplace map label zones", () => {
-  it("does not depend on the coarse zone for Russian settlement labels", () => {
-    expect(placeLabelAllowed([39.7015, 47.2357])).toBe(true);
-    expect(placeLabelAllowed([38.9753, 45.0355])).toBe(true);
-    expect(placeLabelAllowed([39.7231, 43.5855])).toBe(true);
+  it("does not constrain settlement labels to the platform zone", () => {
+    expect(shouldConstrainLabelLayerToPlatformZone("place")).toBe(false);
+    expect(shouldConstrainLabelLayerToPlatformZone("transportation_name")).toBe(true);
   });
 
   it("keeps southern auxiliary labels inside the visible label zone", () => {
@@ -55,8 +47,7 @@ describe("marketplace map label zones", () => {
     expect(auxiliaryLabelAllowed([39.7231, 43.5855])).toBe(true);
   });
 
-  it("keeps Lithuania city labels excluded from the visible label zone", () => {
-    expect(placeLabelAllowed([25.2797, 54.6872])).toBe(false);
-    expect(placeLabelAllowed([23.9036, 54.8985])).toBe(false);
+  it("does not hide Lithuania settlement labels anymore", () => {
+    expect(shouldConstrainLabelLayerToPlatformZone("place")).toBe(false);
   });
 });

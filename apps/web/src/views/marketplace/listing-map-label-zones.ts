@@ -1,4 +1,4 @@
-import type { MultiPolygon, Polygon } from "geojson";
+import type { MultiPolygon } from "geojson";
 
 // Точечные русские названия для мест новых территорий, где в тайлах OpenFreeMap
 // нет name:ru. Полное покрытие придёт с self-host тайлов.
@@ -16,6 +16,10 @@ export const LABEL_TEXT_FIELD = [
   ["get", "name:ru"],
   ["match", ["get", "name"], ...Object.entries(RU_NAME_OVERRIDES).flat(), ["get", "name"]],
 ];
+
+export function shouldConstrainLabelLayerToPlatformZone(sourceLayer: string | undefined): boolean {
+  return Boolean(sourceLayer && sourceLayer !== "place");
+}
 
 // Маска только для фильтра подписей. Она НЕ рисуется на карте: геометрия нужна,
 // чтобы не показывать названия за пределами РФ-зоны по выбранной правовой логике
@@ -170,24 +174,3 @@ export const RF_AND_BELARUS_LABEL_ZONE: MultiPolygon = {
     ],
   ],
 };
-
-export const LITHUANIA_LABEL_EXCLUSION_ZONE: Polygon = {
-  type: "Polygon",
-  coordinates: [
-    [
-      [20.7, 55.2],
-      [20.95, 55.9],
-      [21.4, 56.35],
-      [24.8, 56.45],
-      [26.9, 56.2],
-      [27.15, 55.1],
-      [26.55, 54.35],
-      [25.6, 53.9],
-      [23.2, 53.85],
-      [21.6, 54.2],
-      [20.7, 55.2],
-    ],
-  ],
-};
-
-export const HIDDEN_LABEL_NAMES = ["Автономная Республика Крым"];
