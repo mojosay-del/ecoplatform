@@ -19,7 +19,7 @@ import maplibregl, {
 } from "maplibre-gl";
 import { Protocol as PmtilesProtocol } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
-import type { Feature, FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
+import type { Feature, FeatureCollection, Point, Polygon } from "geojson";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
 import { isFreshListing } from "./listing-card-meta";
@@ -33,6 +33,12 @@ import {
   getSinglePointFocusView,
   listingIdFromMapFeature,
 } from "./listing-map-view";
+import {
+  HIDDEN_LABEL_NAMES,
+  LABEL_TEXT_FIELD,
+  LITHUANIA_LABEL_EXCLUSION_ZONE,
+  RF_AND_BELARUS_LABEL_ZONE,
+} from "./listing-map-label-zones";
 
 // Идентификаторы источников/слоёв MapLibre.
 const SRC_POINTS = "listing-points";
@@ -249,168 +255,6 @@ const BASEMAP_LAYOUT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = 
 // госграниц, ни заливки-маски (чище и без территориальных акцентов).
 const FIT_PADDING = { top: 48, right: 48, bottom: 48, left: 48 };
 
-// Маска только для фильтра подписей. Она НЕ рисуется на карте: геометрия нужна,
-// чтобы не показывать названия за пределами РФ-зоны по выбранной правовой логике
-// и Беларуси. Контур упрощён для клиентской маски: он не заменяет геоданные
-// тайлов, а закрывает видимый слой подписей без отрисовки государственных границ.
-const RF_AND_BELARUS_LABEL_ZONE: MultiPolygon = {
-  type: "MultiPolygon",
-  coordinates: [
-    [
-      [
-        [30.8, 69.8],
-        [40, 70.8],
-        [60, 70.2],
-        [82, 72.8],
-        [105, 77.4],
-        [135, 76.5],
-        [160, 72.5],
-        [180, 71.5],
-        [180, 60],
-        [168, 60],
-        [158, 58.5],
-        [151, 54.5],
-        [142, 52],
-        [135, 47.7],
-        [132, 43],
-        [124, 42],
-        [119, 49.5],
-        [112, 49.5],
-        [106, 51.1],
-        [98, 50.2],
-        [92, 50.5],
-        [87, 49],
-        [82, 50.2],
-        [76, 53.3],
-        [68, 54.8],
-        [61, 53.7],
-        [56, 51],
-        [51, 50.5],
-        [47.2, 47],
-        [44, 43.2],
-        [41, 43.2],
-        [38.8, 45.2],
-        [40.2, 47.8],
-        [39.8, 50.2],
-        [37.2, 51.1],
-        [34.5, 51.5],
-        [32, 53.7],
-        [31, 56],
-        [28.5, 58],
-        [29, 60.2],
-        [31.2, 62.5],
-        [30, 65.5],
-        [30.8, 69.8],
-      ],
-    ],
-    [
-      [
-        [19.4, 54.2],
-        [22.9, 54.2],
-        [22.9, 55.4],
-        [19.4, 55.4],
-        [19.4, 54.2],
-      ],
-    ],
-    [
-      [
-        [23.1, 51.1],
-        [24, 52.1],
-        [23.4, 53.6],
-        [24.7, 55],
-        [27.4, 56.2],
-        [30.9, 55.4],
-        [32.8, 53.6],
-        [31.6, 51.3],
-        [28.2, 51.2],
-        [25.2, 51],
-        [23.1, 51.1],
-      ],
-    ],
-    [
-      [
-        [36.8, 50.4],
-        [40.3, 50.3],
-        [40.4, 47.8],
-        [38.2, 47],
-        [36.8, 47.3],
-        [36.8, 50.4],
-      ],
-    ],
-    [
-      [
-        [31.4, 46],
-        [32.7, 47.5],
-        [35.2, 48.1],
-        [37, 47.2],
-        [38.1, 46.4],
-        [36.2, 45.3],
-        [33, 45.2],
-        [31.4, 46],
-      ],
-    ],
-    [
-      [
-        [31.8, 44.3],
-        [33.1, 45.6],
-        [36.7, 45.5],
-        [36.9, 44.8],
-        [34.8, 44.2],
-        [32.8, 44.1],
-        [31.8, 44.3],
-      ],
-    ],
-    [
-      [
-        [140.5, 45],
-        [146.5, 45],
-        [146.5, 55.5],
-        [140.5, 55.5],
-        [140.5, 45],
-      ],
-    ],
-    [
-      [
-        [154, 50],
-        [166, 50],
-        [166, 63],
-        [154, 63],
-        [154, 50],
-      ],
-    ],
-    [
-      [
-        [-180, 60],
-        [-168, 60],
-        [-168, 72],
-        [-180, 72],
-        [-180, 60],
-      ],
-    ],
-  ],
-};
-
-const LITHUANIA_LABEL_EXCLUSION_ZONE: Polygon = {
-  type: "Polygon",
-  coordinates: [
-    [
-      [20.7, 55.2],
-      [20.95, 55.9],
-      [21.4, 56.35],
-      [24.8, 56.45],
-      [26.9, 56.2],
-      [27.15, 55.1],
-      [26.55, 54.35],
-      [25.6, 53.9],
-      [23.2, 53.85],
-      [21.6, 54.2],
-      [20.7, 55.2],
-    ],
-  ],
-};
-
-const HIDDEN_LABEL_NAMES = ["Автономная Республика Крым"];
-
 // Базовый стиль карты: ВЕКТОРНЫЙ (OpenMapTiles-схема) — обязателен, чтобы (1)
 // принудительно ставить русские подписи и (2) скрывать пограничные линии
 // подложки (международный вид). positron — светлый минималистичный стиль (как
@@ -428,27 +272,6 @@ function ensurePmtilesProtocol() {
   maplibregl.addProtocol("pmtiles", new PmtilesProtocol().tile);
   pmtilesRegistered = true;
 }
-
-// Точечные русские названия для мест новых территорий, где в тайлах OpenFreeMap
-// нет name:ru (пробел данных провайдера; у большинства — Донецк/Луганск/Мариуполь/
-// Симферополь/Ялта и т.д. — name:ru есть). Полное покрытие придёт с self-host
-// тайлов (Фаза 5: name:ru гарантируется при сборке/дополняется из РФ-справочника).
-const RU_NAME_OVERRIDES: Record<string, string> = {
-  Запоріжжя: "Запорожье",
-  Оріхів: "Орехов",
-  Комишуваха: "Камышеваха",
-  Надіївка: "Надеевка",
-  Червоногригорівка: "Червоногригоровка",
-};
-
-// Подписи: name:ru → точечный РФ-словарь по name → исходное name. Для РФ-зоны
-// нельзя уходить в name_int/name:en: эти поля часто дают латиницу или
-// транслитерацию даже там, где основное name уже русское.
-const LABEL_TEXT_FIELD = [
-  "coalesce",
-  ["get", "name:ru"],
-  ["match", ["get", "name"], ...Object.entries(RU_NAME_OVERRIDES).flat(), ["get", "name"]],
-];
 
 const DOT_ZOOM_OPACITY: PropertyValueSpecification<number> = [
   "interpolate",
@@ -623,7 +446,9 @@ function hasTextLabel(map: MlMap, layer: BasemapLayerSpec) {
 function labelZoneFilterFor(layer: BasemapLayerSpec, currentFilter: FilterSpecification | null): FilterSpecification {
   const filters: FilterSpecification[] = [];
   if (currentFilter) filters.push(currentFilter);
-  if (layer["source-layer"]) filters.push(["within", RF_AND_BELARUS_LABEL_ZONE] as FilterSpecification);
+  if (layer["source-layer"] && layer["source-layer"] !== "place") {
+    filters.push(["within", RF_AND_BELARUS_LABEL_ZONE] as FilterSpecification);
+  }
   if (layer["source-layer"] === "place") {
     filters.push(["!", ["within", LITHUANIA_LABEL_EXCLUSION_ZONE]] as FilterSpecification);
     filters.push([
