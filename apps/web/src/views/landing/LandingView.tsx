@@ -2,7 +2,9 @@ import localFont from "next/font/local";
 import "../../styles/landing.css";
 import { LandingClient } from "../../components/LandingClient";
 import { CtaSection } from "./CtaSection";
+import { DocumentationSection } from "./DocumentationSection";
 import { EducationSection } from "./EducationSection";
+import { ForumSection } from "./ForumSection";
 import { HeroSection } from "./HeroSection";
 import { KnowledgeSection } from "./KnowledgeSection";
 import { LandingFooter } from "./LandingFooter";
@@ -44,6 +46,8 @@ export function LandingView() {
         <NewsSection />
         <EducationSection />
         <KnowledgeSection />
+        <DocumentationSection />
+        <ForumSection />
         <WhySection />
         <MetricsSection />
         <CtaSection />

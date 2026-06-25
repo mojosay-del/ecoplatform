@@ -6,7 +6,7 @@ export function PriceIndicesSection() {
     <section className="lp-section lp-shell">
       <div className="lp-show lp-show--rev">
         <div className="lp-show__text" data-reveal>
-          <span className="lp-chapter-label">02 · Индексы цен</span>
+          <span className="lp-chapter-label">01 · Индексы цен</span>
           <h3 className="lp-show__t">Цены живут здесь</h3>
           <p className="lp-show__d">
             Ежедневные котировки по ключевым видам вторсырья: динамика, тренды и история. Вы видите справедливую{" "}

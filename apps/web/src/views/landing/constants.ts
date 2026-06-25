@@ -1,5 +1,16 @@
 import { Clock, Layers, Sparkles, TrendingUp, Users } from "lucide-react";
-import type { EducationCard, IndexCard, KnowledgeNavItem, Metric, NewsTile, WhyCard } from "./types";
+import type {
+  DocumentationTile,
+  EducationCard,
+  ForumExpert,
+  ForumProfile,
+  ForumTile,
+  IndexCard,
+  KnowledgeNavItem,
+  Metric,
+  NewsTile,
+  WhyCard,
+} from "./types";
 
 export const LEGAL_LINKS = [
   { href: "/legal/privacy", label: "Конфиденциальность" },
@@ -11,9 +22,11 @@ export const LEGAL_LINKS = [
 
 export const MARQUEE = [
   "Индексы цен",
-  "Обучение",
-  "База знаний",
   "Новости отрасли",
+  "Обучение",
+  "База знаний по сырью",
+  "Документация",
+  "Форум",
   "Аналитика",
   "Инструменты",
   "Сообщество",
@@ -82,6 +95,73 @@ export const KB_NAV: KnowledgeNavItem[] = [
 ];
 
 export const KB_CHILDREN = ["Гофрокартон", "Короба", "Обрезь"];
+
+export const DOC_TILES: DocumentationTile[] = [
+  {
+    title: "Договор поставки вторсырья",
+    subtitle: "Базовый шаблон с реквизитами и спецификацией.",
+    format: "DOCX",
+    meta: "48 КБ",
+    status: "updated",
+  },
+  {
+    title: "Акт приёма-передачи отходов",
+    subtitle: "Таблица с автоподсчётом массы по фракциям.",
+    format: "XLSX",
+    meta: "76 КБ",
+    status: "updated",
+  },
+  {
+    title: "Регламент качества сырья",
+    subtitle: "Короткая памятка для отдела закупок и склада.",
+    format: "PDF",
+    meta: "1,2 МБ",
+    status: "new",
+  },
+];
+
+export const FORUM_TILES: ForumTile[] = [
+  {
+    title: "Как принять влажный картон без спора по весу?",
+    excerpt: "Лучший ответ: фиксируйте влажность в акте и заранее согласуйте поправку к партии.",
+    status: "solved",
+    rawMaterial: "Картон",
+    questionType: "Документы",
+    answers: 8,
+    views: 146,
+  },
+  {
+    title: "Какой пресс подходит для небольшого склада?",
+    excerpt: "Сравниваем вертикальный и горизонтальный пресс под объём до 60 тонн в месяц.",
+    status: "open",
+    rawMaterial: "Макулатура",
+    questionType: "Оборудование",
+    answers: 3,
+    views: 92,
+  },
+  {
+    title: "Что проверить перед первой поставкой переработчику?",
+    excerpt: "Участники собрали чек-лист: договор, фото партии, график вывоза и условия приёмки.",
+    status: "solved",
+    rawMaterial: "Сделки",
+    questionType: "Практика",
+    answers: 12,
+    views: 218,
+  },
+];
+
+export const FORUM_PROFILE: ForumProfile = {
+  name: "Иван Ф.",
+  role: "Заготовитель",
+  answers: 14,
+  solved: 5,
+};
+
+export const FORUM_EXPERTS: ForumExpert[] = [
+  { name: "Анна К.", role: "Переработчик", solved: 6 },
+  { name: "Илья М.", role: "Заготовитель", solved: 4 },
+  { name: "Мария С.", role: "ЭкоПлатформа", solved: 3 },
+];
 
 export const WHY: WhyCard[] = [
   {

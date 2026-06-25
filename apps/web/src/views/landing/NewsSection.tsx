@@ -7,7 +7,7 @@ export function NewsSection() {
     <section className="lp-section lp-shell">
       <div className="lp-show">
         <div className="lp-show__text" data-reveal>
-          <span className="lp-chapter-label">03 · Новости</span>
+          <span className="lp-chapter-label">02 · Новости</span>
           <h3 className="lp-show__t">Главное в отрасли — без шума</h3>
           <p className="lp-show__d">
             Лента с обложками, тегами и удобным чтением: регулирование, цены, технологии. Будьте в курсе перемен за

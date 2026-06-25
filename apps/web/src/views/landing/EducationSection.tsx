@@ -8,7 +8,7 @@ export function EducationSection() {
     <section className="lp-section lp-shell">
       <div className="lp-show lp-show--rev">
         <div className="lp-show__text" data-reveal>
-          <span className="lp-chapter-label">04 · Обучение</span>
+          <span className="lp-chapter-label">03 · Обучение</span>
           <h3 className="lp-show__t">Учитесь сами и обучайте команду</h3>
           <p className="lp-show__d">
             Курсы с уроками и понятным прогрессом. От основ рынка до экономики переработки — новый человек входит в

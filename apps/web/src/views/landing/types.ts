@@ -25,6 +25,37 @@ export type EducationCard = {
   photo: string;
 };
 
+export type DocumentationTile = {
+  title: string;
+  subtitle: string;
+  format: "DOCX" | "PDF" | "XLSX";
+  meta: string;
+  status: "new" | "updated";
+};
+
+export type ForumTile = {
+  title: string;
+  excerpt: string;
+  status: "solved" | "open";
+  rawMaterial: string;
+  questionType: string;
+  answers: number;
+  views: number;
+};
+
+export type ForumExpert = {
+  name: string;
+  role: string;
+  solved: number;
+};
+
+export type ForumProfile = {
+  name: string;
+  role: string;
+  answers: number;
+  solved: number;
+};
+
 export type KnowledgeNavItem = {
   label: string;
   head?: boolean;

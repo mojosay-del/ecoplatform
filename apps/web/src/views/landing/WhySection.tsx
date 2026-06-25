@@ -6,7 +6,7 @@ export function WhySection() {
     <section className="lp-section lp-shell" id="why">
       <div className="lp-section__head">
         <span className="lp-chapter-label" data-reveal>
-          06
+          07
         </span>
         <h2 className="lp-section__title" data-reveal>
           Почему ЭкоПлатформа?

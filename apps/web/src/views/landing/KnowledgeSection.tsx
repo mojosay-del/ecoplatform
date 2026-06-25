@@ -7,11 +7,11 @@ export function KnowledgeSection() {
     <section className="lp-section lp-shell">
       <div className="lp-show">
         <div className="lp-show__text" data-reveal>
-          <span className="lp-chapter-label">05 · База знаний</span>
-          <h3 className="lp-show__t">Сначала сырьё, потом документы</h3>
+          <span className="lp-chapter-label">04 · База знаний по сырью</span>
+          <h3 className="lp-show__t">Сначала разберитесь в сырье</h3>
           <p className="lp-show__d">
-            По каждому виду вторсырья: характеристики, требования, обработка. А затем — нормативы, 152-ФЗ и вся
-            документация. Навигация слева, материалы — справа.
+            По каждому виду вторсырья: характеристики, требования, обработка и практические признаки. Навигация слева,
+            материалы — справа.
           </p>
         </div>
         <div className="lp-show__mock" data-reveal style={reveal(120)}>
