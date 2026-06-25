@@ -32,6 +32,16 @@ ecoplatform.pro {
 		reverse_proxy api:4000
 	}
 
+	# DEM-тайлы Terrarium для hillshade/рельефа карты. Проксируем под тем же
+	# origin, чтобы браузерная CSP не блокировала raster-dem источник MapLibre.
+	handle /maptiles/terrain-tiles/* {
+		uri replace /maptiles/terrain-tiles /elevation-tiles-prod/terrarium
+		header Cache-Control "public, max-age=86400"
+		reverse_proxy https://s3.amazonaws.com {
+			header_up Host s3.amazonaws.com
+		}
+	}
+
 	# Самостоятельные векторные тайлы карты (MapLibre): eco.pmtiles + шрифты/
 	# спрайты/стиль. Раздаются как статика из тома /srv/maptiles (см.
 	# docker-compose.prod.yml). file_server сам поддерживает Range-запросы (206),
