@@ -82,6 +82,12 @@ async function prepareUploadFile(file: File, imagePreset?: "cover"): Promise<Fil
   return file;
 }
 
+function throwIfUploadAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    throw new ApiError("Загрузка отменена.", 0);
+  }
+}
+
 // Загрузка с прогрессом. fetch() не умеет отдавать upload-progress, поэтому
 // здесь XMLHttpRequest. Воспроизводим ту же авторизацию, что и fetchWithAuthRetry:
 // Bearer-токен, CSRF-заголовок, cookie (withCredentials) и один ретрай на 401.
@@ -95,11 +101,18 @@ export async function apiUploadFileWithProgress(
     signal?: AbortSignal;
   } = {},
 ): Promise<FileAsset> {
+  throwIfUploadAborted(options.signal);
   const prepared = await prepareUploadFile(file, options.imagePreset);
+  throwIfUploadAborted(options.signal);
 
   const send = async (authToken: string | null): Promise<{ status: number; body: string }> => {
     const csrfToken = await ensureCsrfToken();
     return new Promise((resolve, reject) => {
+      if (options.signal?.aborted) {
+        reject(new ApiError("Загрузка отменена.", 0));
+        return;
+      }
+
       const xhr = new XMLHttpRequest();
       let abortHandler: (() => void) | null = null;
       const cleanup = () => {
@@ -132,10 +145,6 @@ export async function apiUploadFileWithProgress(
       };
 
       if (options.signal) {
-        if (options.signal.aborted) {
-          xhr.abort();
-          return;
-        }
         abortHandler = () => xhr.abort();
         options.signal.addEventListener("abort", abortHandler, { once: true });
       }

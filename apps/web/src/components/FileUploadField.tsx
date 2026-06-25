@@ -121,6 +121,26 @@ export function FileUploadField({
     }
   }
 
+  function resetUploadState() {
+    if (!mountedRef.current) return;
+    setProgress(null);
+    setUploadingName("");
+    setDragActive(false);
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }
+
+  function cancelUpload() {
+    const controller = uploadAbortRef.current;
+    if (!controller) return;
+
+    uploadAbortRef.current = null;
+    controller.abort();
+    setError(null);
+    resetUploadState();
+  }
+
   async function clear() {
     const fileId = uploaded?.id;
     setUploadedLocal(null);
@@ -179,6 +199,15 @@ export function FileUploadField({
         <Upload size={tile ? 16 : 18} className="file-upload-progress-spin" />
         <span className="file-upload-progress-name">{uploadingName || "Загрузка…"}</span>
         <span className="file-upload-progress-percent">{percent >= 100 ? "Обработка…" : `${percent}%`}</span>
+        <button
+          aria-label={`Отменить загрузку ${uploadingName || "файла"}`}
+          className="file-upload-progress-cancel"
+          onClick={cancelUpload}
+          title="Отменить загрузку"
+          type="button"
+        >
+          <X size={tile ? 14 : 16} />
+        </button>
       </div>
       <div className="file-upload-progress-track">
         <div

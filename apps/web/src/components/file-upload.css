@@ -131,6 +131,34 @@
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
+.file-upload-progress-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+.file-upload-progress-cancel:hover {
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  transform: translateY(-1px);
+}
+.file-upload-progress-cancel:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 .file-upload-progress-track {
   position: relative;
   height: 8px;

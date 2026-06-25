@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiFetch, clearAccessToken, errorText, getAccessToken, tryRestoreSession } from "./core";
+import {
+  ApiError,
+  apiFetch,
+  apiUploadFileWithProgress,
+  clearAccessToken,
+  errorText,
+  getAccessToken,
+  tryRestoreSession,
+} from "./core";
 import { extractApiErrorMessage } from "./errors";
 
 describe("errorText", () => {
@@ -172,5 +180,18 @@ describe("apiFetch", () => {
         }),
       }),
     );
+  });
+});
+
+describe("apiUploadFileWithProgress", () => {
+  it("rejects immediately when upload is cancelled before request starts", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      apiUploadFileWithProgress(new File(["content"], "cover.png", { type: "image/png" }), {
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ message: "Загрузка отменена.", status: 0 });
   });
 });
