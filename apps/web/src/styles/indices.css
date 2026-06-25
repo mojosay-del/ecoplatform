@@ -756,12 +756,30 @@
   overflow-wrap: anywhere;
 }
 
-.index-pulse-leader-foot {
+.index-pulse-leader-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-top: auto;
+  gap: 16px;
+  min-width: 0;
+  margin-top: 1px;
+}
+
+.index-pulse-leader-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.index-pulse-leader-delta {
+  flex: 0 0 auto;
+}
+
+.index-pulse-leader-chart {
+  flex: 0 0 auto;
+  line-height: 0;
 }
 
 .index-pulse-muted {
@@ -939,12 +957,12 @@
   }
   .index-current-price strong {
     flex: 0 1 auto;
-    font-size: clamp(30px, 8vw, 34px);
+    font-size: 18px;
     line-height: 1;
   }
   .index-current-unit {
     flex: 0 0 auto;
-    font-size: 13px;
+    font-size: 10.5px;
     line-height: 1.1;
   }
   .index-current-price .index-delta {
@@ -962,29 +980,36 @@
     margin-top: 0;
   }
   .index-chart {
-    width: min(100%, 340px);
+    width: 100%;
     margin-inline: auto;
   }
   .index-chart-tooltip-text {
     font-size: 15px;
   }
   .index-chart-axis-label {
-    font-size: 15px;
+    font-size: 11.5px;
     font-weight: 600;
   }
   .index-card-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     justify-content: center;
     width: 100%;
   }
   .index-card-periods.index-period-tabs {
+    justify-self: stretch;
     width: 100%;
+    min-width: 100%;
+    max-width: none;
     justify-content: center;
-    gap: 6px;
-    margin-inline: auto;
+    gap: 4px;
+    margin-inline: 0;
   }
   .index-card .index-period-tab {
-    flex: 1 1 0;
-    min-width: 0;
+    flex: 1 1 38px;
+    min-width: 38px;
+    min-height: 44px;
     padding-inline: 6px;
     text-align: center;
   }

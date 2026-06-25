@@ -60,7 +60,7 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
 
   const width = 760;
   const height = 300;
-  const padding = { top: 56, right: 20, bottom: 46, left: 20 };
+  const padding = { top: 56, right: 8, bottom: 46, left: 8 };
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
 
@@ -91,10 +91,10 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
   const color = TREND_COLOR[netDirection(points)];
 
   // Подписи на оси X: короткие периоды чаще, длинные — реже, чтобы даты не наезжали.
-  const labelDivisor = period === "2W" || period === "1M" || period === "3M" ? 4 : 6;
+  const labelDivisor = period === "2W" || period === "1M" || period === "3M" ? 3 : 5;
   const labelStep = Math.max(1, Math.floor(points.length / labelDivisor));
   const labels: Array<{ x: number; text: string }> = [];
-  const minLabelGap = 112;
+  const minLabelGap = period === "2W" || period === "1M" || period === "3M" ? 220 : 170;
   points.forEach((p, i) => {
     if (i % labelStep === 0 || i === lastIndex) {
       const date = new Date(p.date);

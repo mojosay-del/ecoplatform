@@ -54,21 +54,23 @@ export function IndexMarketPulse({ items }: { items: NomenclatureListItem[] }) {
       <article className="index-pulse-card">
         <span className="index-pulse-label">Лидер недели</span>
         {pulse.leader ? (
-          <>
-            <div className="index-pulse-leader-name">{pulse.leader.item.name}</div>
-            <div className="index-pulse-leader-foot">
-              <span className={`index-delta ${leaderDir} index-num`}>
+          <div className="index-pulse-leader-content">
+            <div className="index-pulse-leader-main">
+              <div className="index-pulse-leader-name">{pulse.leader.item.name}</div>
+              <span className={`index-delta ${leaderDir} index-num index-pulse-leader-delta`}>
                 <TrendArrow direction={leaderDir} />
                 {formatIndexMovementChange(pulse.leader.change)}
               </span>
+            </div>
+            <div className="index-pulse-leader-chart" aria-hidden="true">
               <IndexSparkline
                 points={pickRecentSeries(pulse.leader.item.chart)}
                 direction={leaderDir}
-                width={84}
-                height={30}
+                width={108}
+                height={42}
               />
             </div>
-          </>
+          </div>
         ) : (
           <div className="index-pulse-leader-name index-pulse-muted">Пока без заметных движений</div>
         )}
