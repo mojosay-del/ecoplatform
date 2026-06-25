@@ -10,7 +10,7 @@ import { useAuth } from "../lib/auth";
  *   1. авто-редирект уже залогиненного пользователя в кабинет (/news);
  *   2. появление блоков по скроллу (IntersectionObserver);
  *   3. счётчики-«count-up» у метрик;
- *   4. прогресс-бар, параллакс и «пиннинг» горизонтальной ленты (rAF на скролл).
+ *   4. прогресс-бар и параллакс (rAF на скролл).
  * Всё «двигательное» отключается при prefers-reduced-motion.
  */
 export function LandingClient() {
@@ -86,36 +86,13 @@ export function LandingClient() {
     );
     countEls.forEach((el) => countObserver.observe(el));
 
-    // 4. Скролл-движок: прогресс-бар, параллакс превью, горизонтальная лента.
+    // 4. Скролл-движок: прогресс-бар и параллакс превью.
     const bar = document.querySelector<HTMLElement>(".lp-progress__bar");
     const preview = document.querySelector<HTMLElement>("[data-parallax]");
-    const horizontal = document.querySelector<HTMLElement>(".lp-horizontal");
-    const track = horizontal?.querySelector<HTMLElement>(".lp-horizontal__track");
 
     // 3D-наклон плашек: поворачиваем их по оси X в зависимости от положения
     // в окне — создаёт ощущение объёма и лёгкого вращения при скролле.
     const tiltEls = Array.from(document.querySelectorAll<HTMLElement>("[data-tilt]"));
-
-    // Включаем «пиннинг» ленты только на широких экранах и без reduced-motion.
-    // canPin пересчитываем при каждом layout — чтобы корректно реагировать на
-    // ресайз и поворот экрана (десктоп ⇄ мобайл).
-    let canPin = false;
-    let maxTranslate = 0;
-
-    const layoutHorizontal = () => {
-      if (!horizontal || !track) return;
-      canPin = !reduceMotion && window.innerWidth >= 980;
-      if (!canPin) {
-        horizontal.classList.remove("is-pinned");
-        horizontal.style.removeProperty("height");
-        track.style.removeProperty("transform");
-        return;
-      }
-      horizontal.classList.add("is-pinned");
-      maxTranslate = Math.max(0, track.scrollWidth - window.innerWidth);
-      horizontal.style.height = `${window.innerHeight + maxTranslate}px`;
-    };
-    layoutHorizontal();
 
     let frame = 0;
     const onScroll = () => {
@@ -134,13 +111,6 @@ export function LandingClient() {
           preview.style.transform = `translateY(${Math.min(scrollY * 0.05, 70)}px)`;
         }
 
-        if (canPin && horizontal && track && maxTranslate > 0) {
-          const rect = horizontal.getBoundingClientRect();
-          const span = horizontal.offsetHeight - window.innerHeight;
-          const progress = span > 0 ? Math.min(Math.max(-rect.top / span, 0), 1) : 0;
-          track.style.transform = `translateX(${-progress * maxTranslate}px)`;
-        }
-
         if (!reduceMotion && tiltEls.length && window.innerWidth >= 980) {
           const vh = window.innerHeight;
           for (const el of tiltEls) {
@@ -155,20 +125,13 @@ export function LandingClient() {
       });
     };
 
-    const onResize = () => {
-      layoutHorizontal();
-      onScroll();
-    };
-
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onResize);
     onScroll();
 
     return () => {
       revealObserver.disconnect();
       countObserver.disconnect();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onResize);
       if (frame) cancelAnimationFrame(frame);
     };
   }, []);

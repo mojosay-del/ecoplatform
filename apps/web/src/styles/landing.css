@@ -590,102 +590,6 @@
   color: var(--lp-muted);
 }
 
-/* ───────────────────────── Глава 2 — Горизонтальная лента ───────────────────────── */
-
-.lp-horizontal {
-  position: relative;
-}
-/* Высоту секции задаёт JS (= ширине ленты), чтобы вертикальный скролл двигал ленту вбок. */
-.lp-horizontal__viewport {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  overflow: hidden;
-}
-.lp-horizontal__head {
-  width: var(--lp-shell);
-  margin: 0 auto 36px;
-}
-.lp-horizontal__track {
-  display: flex;
-  gap: 28px;
-  padding-inline: max(calc((100vw - var(--lp-shell)) / 2), 24px);
-  will-change: transform;
-}
-.lp-feature {
-  position: relative;
-  flex: 0 0 clamp(280px, 34vw, 420px);
-  padding: 34px;
-  border-radius: 24px;
-  border: 1px solid var(--lp-line);
-  background: linear-gradient(180deg, #fff, var(--lp-paper-deep));
-  box-shadow: 0 20px 44px rgb(26 18 8 / 0.07);
-  display: flex;
-  flex-direction: column;
-  min-height: 380px;
-}
-.lp-feature__icon {
-  width: 54px;
-  height: 54px;
-  display: grid;
-  place-items: center;
-  border-radius: 15px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--lp-ember), var(--lp-ember-deep));
-  box-shadow: 0 10px 22px var(--lp-ember-glow);
-}
-.lp-feature__num {
-  position: absolute;
-  top: 28px;
-  right: 30px;
-  font-family: var(--lp-display);
-  font-size: 13px;
-  font-weight: 700;
-  color: rgb(26 18 8 / 0.22);
-}
-.lp-feature__t {
-  margin: 26px 0 10px;
-  font-family: var(--lp-display);
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.lp-feature__d {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.62;
-  color: var(--lp-muted);
-}
-.lp-feature__more {
-  margin-top: auto;
-  padding-top: 22px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--lp-ember-deep);
-}
-
-/* На устройствах без JS-«пиннинга» лента превращается в горизонтальный скролл-снап. */
-.lp-horizontal:not(.is-pinned) .lp-horizontal__viewport {
-  position: static;
-  height: auto;
-  padding-bottom: 24px;
-}
-.lp-horizontal:not(.is-pinned) .lp-horizontal__track {
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 16px;
-  transform: none !important;
-}
-.lp-horizontal:not(.is-pinned) .lp-feature {
-  scroll-snap-align: center;
-}
-
 /* ───────────────────────── Bento «Почему это работает» ───────────────────────── */
 
 .lp-bento {
@@ -1373,13 +1277,6 @@
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
-  }
-  .lp-horizontal__viewport {
-    position: static !important;
-    height: auto !important;
-  }
-  .lp-horizontal__track {
-    transform: none !important;
   }
   .lp-tilt {
     transform: none !important;

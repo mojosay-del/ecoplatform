@@ -12,7 +12,6 @@ import { MetricsSection } from "./MetricsSection";
 import { NewsSection } from "./NewsSection";
 import { PriceIndicesSection } from "./PriceIndicesSection";
 import { WhySection } from "./WhySection";
-import { WorkspaceSection } from "./WorkspaceSection";
 
 // Display-шрифт только для заголовков лендинга; файл лежит в репозитории,
 // чтобы сборка не зависела от внешних font-сервисов.
@@ -40,7 +39,6 @@ export function LandingView() {
 
       <main className="lp-main" id="main-content" tabIndex={-1}>
         <HeroSection />
-        <WorkspaceSection />
         <MarqueeSection />
         <PriceIndicesSection />
         <NewsSection />

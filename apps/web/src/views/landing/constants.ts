@@ -1,5 +1,5 @@
-import { BookOpen, Clock, GraduationCap, Layers, Newspaper, Sparkles, TrendingUp, Users } from "lucide-react";
-import type { EducationCard, FeatureCard, IndexCard, KnowledgeNavItem, Metric, NewsTile, WhyCard } from "./types";
+import { Clock, Layers, Sparkles, TrendingUp, Users } from "lucide-react";
+import type { EducationCard, IndexCard, KnowledgeNavItem, Metric, NewsTile, WhyCard } from "./types";
 
 export const LEGAL_LINKS = [
   { href: "/legal/privacy", label: "Конфиденциальность" },
@@ -17,29 +17,6 @@ export const MARQUEE = [
   "Аналитика",
   "Инструменты",
   "Сообщество",
-];
-
-export const FEATURES: FeatureCard[] = [
-  {
-    icon: TrendingUp,
-    t: "Индексы цен",
-    d: "Ежедневные котировки по ключевым видам вторсырья. Динамика, тренды и история — чтобы видеть рынок целиком.",
-  },
-  {
-    icon: GraduationCap,
-    t: "Обучение",
-    d: "Курсы и модули, которые превращают новичка в специалиста отрасли. От основ сортировки до экономики переработки.",
-  },
-  {
-    icon: BookOpen,
-    t: "База знаний",
-    d: "Сначала — по каждому виду сырья: характеристики, требования, обработка. Затем — нормативы, 152-ФЗ и вся документация.",
-  },
-  {
-    icon: Newspaper,
-    t: "Новости",
-    d: "Только отраслевое и только важное. Лента, очищенная от шума, чтобы вы первыми узнавали о переменах.",
-  },
 ];
 
 export const INDEX_CARDS: IndexCard[] = [

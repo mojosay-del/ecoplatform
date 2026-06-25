@@ -1,11 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 
-export type FeatureCard = {
-  icon: LucideIcon;
-  t: string;
-  d: string;
-};
-
 export type IndexCard = {
   name: string;
   code: string;
