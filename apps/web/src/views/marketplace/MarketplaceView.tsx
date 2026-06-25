@@ -33,6 +33,7 @@ import {
 } from "./marketplace-feed";
 import { MarketplaceFeedList } from "./marketplace-feed-list";
 import { MarketplaceActiveFilters, MarketplaceFilterBar, useMarketplaceFilterDismiss } from "./marketplace-filters";
+import { MarketplaceMobileFilters } from "./marketplace-mobile-filters";
 
 const ListingMap = dynamic<ListingMapProps>(() => import("./ListingMap").then((module) => module.ListingMap), {
   ssr: false,
@@ -190,6 +191,21 @@ export function MarketplaceView() {
               setOpenPopover={setOpenPopover}
               sortOptions={sortOptions}
               selectedSort={selectedSort}
+            />
+            <MarketplaceMobileFilters
+              nomenclatureGroups={nomenclatureGroups}
+              selectedNomenclature={selectedNomenclature}
+              setSelectedNomenclature={setSelectedNomenclature}
+              regions={regions}
+              selectedRegions={selectedRegions}
+              setSelectedRegions={setSelectedRegions}
+              sortBy={sortBy}
+              setSortBy={setSortBy}
+              sortOptions={sortOptions}
+              selectedSort={selectedSort}
+              mapBbox={mapBbox}
+              setMapBbox={setMapBbox}
+              total={total}
             />
             {hasActiveFilters ? (
               <MarketplaceActiveFilters
