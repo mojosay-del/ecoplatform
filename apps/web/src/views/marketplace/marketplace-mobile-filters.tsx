@@ -75,7 +75,7 @@ function categorySummary(groups: NomenclatureGroup[], selected: string[]): strin
 }
 
 function nomenclatureSummary(selected: string[]): string {
-  if (!selected.length) return "Любая номенклатура";
+  if (!selected.length) return "Любое сырьё";
   return `${selected.length} выбрано`;
 }
 
@@ -90,7 +90,7 @@ function regionSummary(selected: string[], mapBbox: string | null): string {
 
 function screenTitle(screen: MobileFilterScreen): string {
   if (screen === "category") return "Категории";
-  if (screen === "nomenclature") return "Точнее";
+  if (screen === "nomenclature") return "Сырьё";
   if (screen === "region") return "Где искать";
   if (screen === "sort") return "Сортировка";
   return "Фильтры";
@@ -225,16 +225,18 @@ export function MarketplaceMobileFilters({
           type="button"
           onClick={() => setIsOpen(true)}
         >
-          Точнее{selectedNomenclature.length ? ` · ${selectedNomenclature.length}` : ""}
+          Сырьё{selectedNomenclature.length ? ` · ${selectedNomenclature.length}` : ""}
         </button>
         <button
           className={`mp-mobile-filter-chip${selectedRegions.length || mapBbox ? " is-active" : ""}`}
           type="button"
           onClick={() => setIsOpen(true)}
         >
-          {selectedRegions.length === 1
-            ? selectedRegions[0]
-            : `Регион${selectedRegions.length ? ` · ${selectedRegions.length}` : ""}`}
+          {mapBbox && selectedRegions.length === 0
+            ? "Область карты"
+            : selectedRegions.length === 1
+              ? selectedRegions[0]
+              : `Регион${selectedRegions.length ? ` · ${selectedRegions.length}` : ""}`}
         </button>
         <button
           className={`mp-mobile-filter-chip${sortBy !== DEFAULT_SORT_OPTION.value ? " is-active" : ""}`}
@@ -290,7 +292,7 @@ export function MarketplaceMobileFilters({
                         onClick={() => setScreen("category")}
                       />
                       <MobileFilterRow
-                        label="Номенклатура"
+                        label="Сырьё"
                         value={nomenclatureSummary(draftNomenclature)}
                         onClick={() => setScreen("nomenclature")}
                       />

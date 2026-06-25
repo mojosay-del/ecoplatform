@@ -7,7 +7,7 @@ export type SortMode = "date" | "distance" | "weight" | "expires";
 export type FilterPopover = "category" | "nomenclature" | "region" | "sort";
 export type CompanyPoint = { lat: number; lon: number };
 
-// Категория сырья со своими номенклатурами — чип фильтра + группа в «Точнее».
+// Категория сырья со своими номенклатурами — чип фильтра + группа в «Сырьё».
 export type NomenclatureGroup = {
   slug: string;
   name: string;

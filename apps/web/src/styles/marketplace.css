@@ -1786,74 +1786,6 @@
   line-height: 1;
 }
 
-/* ── Карта и фильтры (фаза 2) ──────────────────────────────────────────────── */
-.mp-filterbar {
-  display: flex;
-  justify-content: flex-start;
-  gap: 8px;
-  flex-wrap: nowrap;
-  align-items: center;
-  margin-top: 10px;
-  margin-bottom: 14px;
-}
-
-.mp-filterbar-group {
-  display: flex;
-  flex: 2 1 0;
-  min-width: 0;
-  gap: 8px;
-  flex-wrap: nowrap;
-  align-items: center;
-}
-
-.mp-filter-popover {
-  position: relative;
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.mp-filter-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  cursor: pointer;
-  min-height: 36px;
-  padding: 8px 10px;
-  border: 1px solid var(--border, #cbd5e1);
-  border-radius: 8px;
-  background: #fff;
-  color: #0f172a;
-  font: inherit;
-  font-size: 13px;
-  line-height: 1;
-  user-select: none;
-}
-
-.mp-filter-trigger span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mp-filter-trigger svg {
-  color: #64748b;
-  transition: transform 0.16s ease;
-}
-
-.mp-filter-popover.is-open .mp-filter-trigger,
-.mp-filter-trigger:hover {
-  border-color: var(--accent, #1f8a4c);
-  color: var(--accent, #1f8a4c);
-}
-
-.mp-filter-popover.is-open .mp-filter-trigger svg {
-  transform: rotate(180deg);
-  color: currentColor;
-}
-
 /* Счётчик частичного выбора: фон — цвет материала (инлайном из materials.ts). */
 .mp-material-chip-count {
   min-width: 18px;
@@ -1865,216 +1797,15 @@
   text-align: center;
 }
 
-.mp-filter-category-menu {
-  min-width: 220px;
-}
-
-.mp-filter-category-option {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  text-align: left;
-}
-
-.mp-filter-category-option.is-active,
-.mp-filter-category-option.is-partial {
-  background: #fff4ee;
-  color: var(--text-secondary-strong);
-}
-
-.mp-filter-category-option.is-partial {
-  outline: 1px dashed var(--border-strong);
-  outline-offset: -3px;
-}
-
-.mp-filter-category-option svg {
-  margin-left: auto;
-  color: var(--accent, #1f8a4c);
-}
-
-/* Группы в попапе «Точнее». */
-.mp-filter-menu-grouped {
-  min-width: 300px;
-  gap: 10px;
-}
-
-.mp-filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.mp-filter-group-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-
-/* Ряд активных фильтров с крестиками. */
-.mp-active-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: -8px 0 18px;
-}
-
-.mp-active-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px 6px 12px;
-  border: none;
-  border-radius: 999px;
-  background: var(--surface-muted-strong);
-  color: var(--text-secondary-strong);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.2;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.mp-active-chip:hover {
-  background: var(--surface-muted-hover);
-}
-
-.mp-active-chip svg {
-  color: var(--text-muted);
-}
-
-.mp-active-chip:hover svg {
-  color: var(--danger-text);
-}
-
-.mp-active-clear {
-  border: none;
-  background: none;
-  padding: 6px 8px;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.mp-active-clear:hover {
-  color: var(--danger-text);
-}
-
-.mp-filter-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 40;
-  width: max-content;
-  min-width: 260px;
-  max-width: min(360px, calc(100vw - 48px));
-  max-height: 320px;
-  overflow: auto;
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 12px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
-}
-
-.mp-filter-popover-sort {
-  flex: 1.15 1 0;
-  margin-left: 0;
-}
-
-.mp-filter-popover-sort .mp-filter-menu {
-  right: 0;
-  left: auto;
-}
-
-.mp-filter-option {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 8px;
-  font-size: 14px;
-  line-height: 1.25;
-  cursor: pointer;
-}
-
-.mp-filter-option:hover {
-  background: #f8fafc;
-}
-
-.mp-filter-option input {
-  margin-top: 1px;
-  accent-color: var(--accent, #1f8a4c);
-}
-
 .mp-filter-empty {
   padding: 8px;
   color: #64748b;
   font-size: 14px;
 }
 
-.mp-sort-menu {
-  min-width: 300px;
-}
-
-.mp-sort-option {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #0f172a;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-}
-
-.mp-sort-option:hover,
-.mp-sort-option.is-active {
-  background: #fff4ee;
-}
-
-.mp-sort-option strong {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.mp-sort-option small {
-  display: block;
-  margin-top: 3px;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.3;
-}
-
-.mp-sort-option svg {
-  flex: 0 0 auto;
-  margin-top: 1px;
-  color: var(--accent, #1f8a4c);
-}
-
-/* Мобильная упаковка фильтров: короткая лента чипов + полноэкранная панель. */
+/* Адаптивная упаковка фильтров: короткая лента чипов + полноэкранная панель. */
 .mp-mobile-filters {
-  display: none;
+  display: block;
 }
 
 .mp-mobile-filter-rail {
@@ -2122,6 +1853,10 @@
 
 .mp-mobile-view-chip svg {
   color: var(--brand);
+}
+
+.mp-mobile-view-chip {
+  display: none;
 }
 
 .mp-mobile-filter-count {
@@ -2454,8 +2189,8 @@
   min-width: 0;
 }
 
-.mp-split-list .mp-filterbar {
-  margin-bottom: 12px;
+.mp-split-list .mp-mobile-filter-rail {
+  margin-bottom: 14px;
 }
 
 .mp-split-map {
@@ -2605,6 +2340,10 @@
     display: inline-flex;
   }
 
+  .mp-mobile-view-chip {
+    display: inline-flex;
+  }
+
   .mp-split-list {
     position: relative;
     top: auto;
@@ -2674,20 +2413,8 @@
     display: none;
   }
 
-  .mp-filterbar {
-    display: none;
-  }
-
-  .mp-mobile-filters {
-    display: block;
-  }
-
   .mp-split-map.is-mobile-visible .mp-mobile-map-controls {
     display: block;
-  }
-
-  .mp-active-filters {
-    display: none;
   }
 }
 
@@ -3315,20 +3042,13 @@
 /* Touch-таргеты ≥44px (WCAG 2.5.5): на сенсорных устройствах и узких экранах
    мышиные размеры подрастают под палец. */
 @media (pointer: coarse), (max-width: 760px) {
-  .mp-filter-trigger,
-  .mp-material-chip,
-  .mp-active-chip,
-  .mp-active-clear {
+  .mp-material-chip {
     min-height: 44px;
   }
 
   .mp-modal-close {
     width: 44px;
     height: 44px;
-  }
-
-  .mp-filter-option {
-    padding: 11px 8px;
   }
 }
 

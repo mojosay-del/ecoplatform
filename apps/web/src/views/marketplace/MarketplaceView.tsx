@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BillingStatus } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
@@ -21,7 +21,6 @@ import { MATERIAL_LEGEND } from "./materials";
 import type { ListingMapProps } from "./ListingMap";
 import {
   type CompanyPoint,
-  type FilterPopover,
   type SortMode,
   DEFAULT_SORT_OPTION,
   MARKETPLACE_FEED_PAGE_SIZE,
@@ -32,7 +31,6 @@ import {
   sortMarketplaceListings,
 } from "./marketplace-feed";
 import { MarketplaceFeedList } from "./marketplace-feed-list";
-import { MarketplaceActiveFilters, MarketplaceFilterBar, useMarketplaceFilterDismiss } from "./marketplace-filters";
 import { MarketplaceMobileFilters } from "./marketplace-mobile-filters";
 
 const ListingMap = dynamic<ListingMapProps>(() => import("./ListingMap").then((module) => module.ListingMap), {
@@ -55,7 +53,6 @@ export function MarketplaceView() {
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [selectedNomenclature, setSelectedNomenclature] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortMode>("date");
-  const [openPopover, setOpenPopover] = useState<FilterPopover | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Hover-синхронизация ленты и карты (id объявления под курсором).
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -65,9 +62,7 @@ export function MarketplaceView() {
   const [pendingBbox, setPendingBbox] = useState<string | null>(null);
   // Узкие экраны: сплит сворачивается, активна либо лента, либо карта.
   const [mobileView, setMobileView] = useState<"list" | "map">("list");
-  const filtersRef = useRef<HTMLDivElement>(null);
 
-  useMarketplaceFilterDismiss(filtersRef, setOpenPopover);
   const regions = regionsQuery.data;
   const companyPoint = useMemo<CompanyPoint | null>(() => {
     const address = billingStatusQuery.data?.factualAddress;
@@ -177,21 +172,6 @@ export function MarketplaceView() {
               </button>
             </div>
 
-            <MarketplaceFilterBar
-              containerRef={filtersRef}
-              nomenclatureGroups={nomenclatureGroups}
-              selectedNomenclature={selectedNomenclature}
-              setSelectedNomenclature={setSelectedNomenclature}
-              regions={regions}
-              selectedRegions={selectedRegions}
-              setSelectedRegions={setSelectedRegions}
-              sortBy={sortBy}
-              setSortBy={setSortBy}
-              openPopover={openPopover}
-              setOpenPopover={setOpenPopover}
-              sortOptions={sortOptions}
-              selectedSort={selectedSort}
-            />
             <MarketplaceMobileFilters
               nomenclatureGroups={nomenclatureGroups}
               selectedNomenclature={selectedNomenclature}
@@ -209,18 +189,6 @@ export function MarketplaceView() {
               setMobileView={setMobileView}
               total={total}
             />
-            {hasActiveFilters ? (
-              <MarketplaceActiveFilters
-                nomenclatureGroups={nomenclatureGroups}
-                selectedNomenclature={selectedNomenclature}
-                setSelectedNomenclature={setSelectedNomenclature}
-                selectedRegions={selectedRegions}
-                setSelectedRegions={setSelectedRegions}
-                mapBbox={mapBbox}
-                onClearMapBbox={() => setMapBbox(null)}
-                onResetFilters={resetFilters}
-              />
-            ) : null}
             <MarketplaceFeedList
               listings={listings}
               assets={assets}
