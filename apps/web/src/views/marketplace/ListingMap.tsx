@@ -31,6 +31,7 @@ import {
   LISTING_MAP_MIN_ZOOM,
   circlePolygon,
   getSinglePointFocusView,
+  listingIdFromMapFeature,
 } from "./listing-map-view";
 
 // Идентификаторы источников/слоёв MapLibre.
@@ -860,8 +861,8 @@ export function ListingMap({
       // Подложку — к виду РФ: русские подписи + скрытые пограничные линии.
       applyRussianRfBasemap(map);
 
-      map.addSource(SRC_POINTS, { type: "geojson", data: pointsCollection(points) });
-      map.addSource(SRC_CIRCLES, { type: "geojson", data: circlesCollection(points) });
+      map.addSource(SRC_POINTS, { type: "geojson", data: pointsCollection(points), promoteId: "id" });
+      map.addSource(SRC_CIRCLES, { type: "geojson", data: circlesCollection(points), promoteId: "id" });
 
       // Круг 4 км — на городском масштабе и ближе.
       map.addLayer({
@@ -918,9 +919,8 @@ export function ListingMap({
       for (const layer of HOVER_LAYERS) {
         map.on("mousemove", layer, (event) => {
           map.getCanvas().style.cursor = "pointer";
-          const id = event.features?.[0]?.id;
-          if (id == null) return;
-          const next = String(id);
+          const next = listingIdFromMapFeature(event.features?.[0]);
+          if (!next) return;
           if (hoveredIdRef.current === next) return;
           if (hoveredIdRef.current) setHover(hoveredIdRef.current, false);
           hoveredIdRef.current = next;
@@ -934,8 +934,8 @@ export function ListingMap({
           onHoverRef.current?.(null);
         });
         map.on("click", layer, (event) => {
-          const id = event.features?.[0]?.id;
-          if (id != null) onSelectRef.current?.(String(id));
+          const id = listingIdFromMapFeature(event.features?.[0]);
+          if (id) onSelectRef.current?.(id);
         });
       }
 

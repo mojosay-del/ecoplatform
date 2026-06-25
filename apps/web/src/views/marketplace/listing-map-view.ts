@@ -2,6 +2,10 @@ import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 
 export type ListingMapPoint = Pick<MarketplaceListingListItem, "circleLat" | "circleLon">;
 export type ListingMapMode = "dot" | "circle";
+export type ListingMapFeatureLike = {
+  id?: number | string | null;
+  properties?: { id?: unknown } | null;
+} | null;
 
 // Центр по умолчанию — Москва. ВАЖНО: MapLibre ждёт [lon, lat] (GeoJSON), поэтому
 // долгота идёт первой.
@@ -29,6 +33,17 @@ export function getSinglePointFocusView(points: ListingMapPoint[]): { center: [n
     center: [point.circleLon, point.circleLat],
     zoom: LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
   };
+}
+
+export function listingIdFromMapFeature(feature: ListingMapFeatureLike | undefined): string | null {
+  const propertyId = feature?.properties?.id;
+  if (typeof propertyId === "string" && propertyId.length > 0) return propertyId;
+  if (typeof propertyId === "number" && Number.isFinite(propertyId)) return String(propertyId);
+
+  const featureId = feature?.id;
+  if (typeof featureId === "string" && featureId.length > 0) return featureId;
+  if (typeof featureId === "number" && Number.isFinite(featureId)) return String(featureId);
+  return null;
 }
 
 const EARTH_RADIUS_KM = 6371;

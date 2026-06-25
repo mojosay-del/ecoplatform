@@ -3,6 +3,7 @@ import {
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
   circlePolygon,
   getSinglePointFocusView,
+  listingIdFromMapFeature,
   modeForZoom,
 } from "./listing-map-view";
 
@@ -31,6 +32,12 @@ describe("marketplace listing map view", () => {
   it("switches to circle mode at the zoom threshold, dots below", () => {
     expect(modeForZoom(LISTING_MAP_CIRCLE_ZOOM_THRESHOLD)).toBe("circle");
     expect(modeForZoom(LISTING_MAP_CIRCLE_ZOOM_THRESHOLD - 1)).toBe("dot");
+  });
+
+  it("uses the listing id from feature properties before MapLibre feature id", () => {
+    expect(listingIdFromMapFeature({ id: 12, properties: { id: "listing-real-id" } })).toBe("listing-real-id");
+    expect(listingIdFromMapFeature({ id: "fallback-id", properties: {} })).toBe("fallback-id");
+    expect(listingIdFromMapFeature({ properties: {} })).toBeNull();
   });
 
   it("circlePolygon — замкнутое кольцо нужного радиуса вокруг центра", () => {
