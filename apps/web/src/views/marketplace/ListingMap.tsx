@@ -28,6 +28,7 @@ import {
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
   LISTING_MAP_DEFAULT_CENTER,
   LISTING_MAP_DEFAULT_ZOOM,
+  LISTING_MAP_MIN_ZOOM,
   circlePolygon,
   getSinglePointFocusView,
 } from "./listing-map-view";
@@ -388,6 +389,25 @@ const RF_AND_BELARUS_LABEL_ZONE: MultiPolygon = {
   ],
 };
 
+const LITHUANIA_LABEL_EXCLUSION_ZONE: Polygon = {
+  type: "Polygon",
+  coordinates: [
+    [
+      [20.7, 55.2],
+      [20.95, 55.9],
+      [21.4, 56.35],
+      [24.8, 56.45],
+      [26.9, 56.2],
+      [27.15, 55.1],
+      [26.55, 54.35],
+      [25.6, 53.9],
+      [23.2, 53.85],
+      [21.6, 54.2],
+      [20.7, 55.2],
+    ],
+  ],
+};
+
 const HIDDEN_LABEL_NAMES = ["Автономная Республика Крым"];
 
 // Базовый стиль карты: ВЕКТОРНЫЙ (OpenMapTiles-схема) — обязателен, чтобы (1)
@@ -604,6 +624,7 @@ function labelZoneFilterFor(layer: BasemapLayerSpec, currentFilter: FilterSpecif
   if (currentFilter) filters.push(currentFilter);
   if (layer["source-layer"]) filters.push(["within", RF_AND_BELARUS_LABEL_ZONE] as FilterSpecification);
   if (layer["source-layer"] === "place") {
+    filters.push(["!", ["within", LITHUANIA_LABEL_EXCLUSION_ZONE]] as FilterSpecification);
     filters.push([
       "!",
       [
@@ -815,6 +836,7 @@ export function ListingMap({
         style: MAP_STYLE_URL,
         center: LISTING_MAP_DEFAULT_CENTER,
         zoom: LISTING_MAP_DEFAULT_ZOOM,
+        minZoom: LISTING_MAP_MIN_ZOOM,
         fadeDuration: MAP_TILE_FADE_DURATION_MS,
         attributionControl: { compact: true },
       });

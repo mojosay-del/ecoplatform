@@ -7,6 +7,7 @@ export type ListingMapMode = "dot" | "circle";
 // долгота идёт первой.
 export const LISTING_MAP_DEFAULT_CENTER: [number, number] = [37.64, 55.76];
 export const LISTING_MAP_DEFAULT_ZOOM = 5;
+export const LISTING_MAP_MIN_ZOOM = LISTING_MAP_DEFAULT_ZOOM;
 export const LISTING_MAP_CIRCLE_ZOOM_THRESHOLD = 9;
 
 // Начиная с городского масштаба показываем круг 4 км; дальше — маленькая точка,
