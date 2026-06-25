@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Check, ChevronRight, SlidersHorizontal, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, List, Map as MapIcon, SlidersHorizontal, X } from "lucide-react";
 import { api } from "../../lib/api";
 import { materialColor } from "./materials";
 import {
@@ -30,6 +30,8 @@ type MarketplaceMobileFiltersProps = {
   selectedSort: SortOption;
   mapBbox: string | null;
   setMapBbox: Dispatch<SetStateAction<string | null>>;
+  mobileView: "list" | "map";
+  setMobileView: Dispatch<SetStateAction<"list" | "map">>;
   total: number;
 };
 
@@ -107,6 +109,8 @@ export function MarketplaceMobileFilters({
   selectedSort,
   mapBbox,
   setMapBbox,
+  mobileView,
+  setMobileView,
   total,
 }: MarketplaceMobileFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -199,8 +203,17 @@ export function MarketplaceMobileFilters({
   return (
     <div className="mp-mobile-filters">
       <div className="mp-mobile-filter-rail" aria-label="Быстрые фильтры">
+        <button
+          aria-label={mobileView === "list" ? "Показать карту" : "Показать список"}
+          className="mp-mobile-filter-chip mp-mobile-view-chip"
+          type="button"
+          onClick={() => setMobileView((current) => (current === "list" ? "map" : "list"))}
+        >
+          {mobileView === "list" ? <MapIcon aria-hidden="true" size={16} /> : <List aria-hidden="true" size={16} />}
+          <span>{mobileView === "list" ? "Карта" : "Список"}</span>
+        </button>
         <button className="mp-mobile-filter-chip mp-mobile-filter-open" type="button" onClick={() => setIsOpen(true)}>
-          <SlidersHorizontal aria-hidden="true" size={17} />
+          <SlidersHorizontal aria-hidden="true" size={16} />
           <span>Фильтры</span>
           {activeCount ? <span className="mp-mobile-filter-count">{activeCount}</span> : null}
         </button>

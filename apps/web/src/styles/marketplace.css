@@ -2079,9 +2079,9 @@
 
 .mp-mobile-filter-rail {
   display: flex;
-  gap: 8px;
-  margin: 2px 0 14px;
-  padding: 0 0 2px;
+  gap: 7px;
+  margin: 0 0 12px;
+  padding: 0 0 1px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
@@ -2096,16 +2096,16 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  gap: 6px;
-  min-height: 44px;
+  gap: 5px;
+  min-height: 40px;
   max-width: min(72vw, 260px);
-  padding: 10px 14px;
+  padding: 8px 12px;
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
   background: var(--surface-elevated);
   color: var(--text-secondary-strong);
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
@@ -2120,17 +2120,21 @@
   color: var(--brand);
 }
 
+.mp-mobile-view-chip svg {
+  color: var(--brand);
+}
+
 .mp-mobile-filter-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: 999px;
   background: var(--brand);
   color: var(--text-inverse);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -2461,6 +2465,10 @@
   min-height: 620px;
 }
 
+.mp-mobile-map-controls {
+  display: none;
+}
+
 /* Relative-обёртка — якорь для оверлеев карты (легенда, «Искать в области»). */
 .mp-map-shell {
   position: relative;
@@ -2662,11 +2670,19 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .mp-view-toggle {
+    display: none;
+  }
+
   .mp-filterbar {
     display: none;
   }
 
   .mp-mobile-filters {
+    display: block;
+  }
+
+  .mp-split-map.is-mobile-visible .mp-mobile-map-controls {
     display: block;
   }
 

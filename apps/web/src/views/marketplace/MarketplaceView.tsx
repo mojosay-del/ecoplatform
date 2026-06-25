@@ -205,6 +205,8 @@ export function MarketplaceView() {
               selectedSort={selectedSort}
               mapBbox={mapBbox}
               setMapBbox={setMapBbox}
+              mobileView={mobileView}
+              setMobileView={setMobileView}
               total={total}
             />
             {hasActiveFilters ? (
@@ -240,6 +242,25 @@ export function MarketplaceView() {
           {/* Карта живёт всегда (и при загрузке, и при пустой выдаче) — нет
               layout-прыжков, а пустое состояние сохраняет географический контекст. */}
           <aside className={`mp-split-map${mobileView === "map" ? " is-mobile-visible" : ""}`}>
+            <div className="mp-mobile-map-controls">
+              <MarketplaceMobileFilters
+                nomenclatureGroups={nomenclatureGroups}
+                selectedNomenclature={selectedNomenclature}
+                setSelectedNomenclature={setSelectedNomenclature}
+                regions={regions}
+                selectedRegions={selectedRegions}
+                setSelectedRegions={setSelectedRegions}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
+                sortOptions={sortOptions}
+                selectedSort={selectedSort}
+                mapBbox={mapBbox}
+                setMapBbox={setMapBbox}
+                mobileView={mobileView}
+                setMobileView={setMobileView}
+                total={total}
+              />
+            </div>
             <div className="mp-map-shell">
               <ListingMap
                 fitOnDataChange={!mapBbox}
