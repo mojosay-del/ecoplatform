@@ -21,13 +21,14 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .mp-card {
   display: flex;
   flex-direction: column;
-  align-self: start;
+  align-self: stretch;
+  min-width: 0;
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 12px;
   overflow: hidden;
@@ -49,11 +50,15 @@
 
 .mp-card-cover {
   position: relative;
+  flex: 0 0 auto;
   aspect-ratio: 4 / 3;
+  overflow: hidden;
   background: #f1f5f9;
 }
 
 .mp-card-cover img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -61,6 +66,8 @@
 }
 
 .mp-card-cover-empty {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
