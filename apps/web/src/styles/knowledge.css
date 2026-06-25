@@ -30,7 +30,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   width: min(100%, 680px);
   max-width: 680px;
   margin: 0 auto;
@@ -40,8 +40,8 @@
 .knowledge-title {
   margin: 0;
   color: var(--text);
-  font-size: 36px;
-  line-height: 1.08;
+  font-size: 32px;
+  line-height: 1.1;
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -49,7 +49,7 @@
 .knowledge-subtitle {
   margin: 0;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
@@ -58,11 +58,11 @@
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 56px;
-  padding: 0 58px;
+  min-height: 50px;
+  padding: 0 52px;
   overflow: hidden;
   border: 1px solid var(--border-strong);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--surface-elevated);
   color: var(--text-muted);
   box-shadow: var(--shadow-card);
@@ -80,40 +80,27 @@
   flex: 1;
   width: 100%;
   min-width: 0;
-  padding: 15px 0;
+  padding: 13px 0;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 17px;
+  font-size: 16px;
   text-align: center;
 }
 
 .knowledge-search-placeholder {
   position: absolute;
-  inset: 0 58px;
+  inset: 0 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding-inline-start: clamp(18px, 21%, 136px);
   min-width: 0;
   color: var(--text-muted);
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.2;
   pointer-events: none;
-}
-
-.knowledge-search-placeholder svg {
-  flex: 0 0 auto;
-}
-
-.knowledge-search-placeholder span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .knowledge-search input::-webkit-search-cancel-button,
@@ -762,21 +749,22 @@
   }
 
   .knowledge-title {
-    font-size: 32px;
+    font-size: 28px;
   }
 
   .knowledge-search {
-    min-height: 52px;
-    padding: 0 48px;
+    min-height: 46px;
+    padding: 0 40px;
+    border-radius: 15px;
   }
 
   .knowledge-search input,
   .knowledge-search-placeholder {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .knowledge-search-placeholder {
-    inset: 0 48px;
+    inset: 0 40px;
   }
 
   .knowledge-search-grid {

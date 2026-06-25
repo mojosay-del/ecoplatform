@@ -620,8 +620,8 @@
 .indices-title {
   margin: 0;
   color: var(--text);
-  font-size: 36px;
-  line-height: 1.08;
+  font-size: 32px;
+  line-height: 1.1;
   font-weight: 700;
   letter-spacing: 0;
   text-align: center;
@@ -630,7 +630,7 @@
 .indices-subtitle {
   margin: 0;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.5;
   text-align: center;
 }
@@ -796,7 +796,7 @@
     margin-bottom: 20px;
   }
   .indices-title {
-    font-size: 30px;
+    font-size: 28px;
     line-height: 1.1;
   }
   .indices-subtitle {

@@ -9,7 +9,7 @@ const ANIMATION_MS = 460;
 export function AnimatedSearchPlaceholder({
   className,
   examples,
-  iconSize = 22,
+  iconSize = 20,
   prefix = "Например:",
 }: {
   className: string;
@@ -54,16 +54,18 @@ export function AnimatedSearchPlaceholder({
 
   return (
     <span className={`${className} animated-search-placeholder`} aria-hidden="true">
-      <Search size={iconSize} />
-      <span className="animated-search-placeholder-text">
-        <span className="animated-search-placeholder-prefix">{prefix}</span>
-        <span className="animated-search-placeholder-window">
-          {previousIndex !== null ? (
-            <span className="animated-search-placeholder-item is-exiting">{normalizedExamples[previousIndex]}</span>
-          ) : null}
-          <span className="animated-search-placeholder-item is-entering" key={`${examplesKey}:${activeIndex}`}>
-            {normalizedExamples[activeIndex]}
+      <span className="animated-search-placeholder-window">
+        {previousIndex !== null ? (
+          <span className="animated-search-placeholder-item is-exiting">
+            <Search size={iconSize} />
+            <span className="animated-search-placeholder-prefix">{prefix}</span>
+            <span className="animated-search-placeholder-example">{normalizedExamples[previousIndex]}</span>
           </span>
+        ) : null}
+        <span className="animated-search-placeholder-item is-entering" key={`${examplesKey}:${activeIndex}`}>
+          <Search size={iconSize} />
+          <span className="animated-search-placeholder-prefix">{prefix}</span>
+          <span className="animated-search-placeholder-example">{normalizedExamples[activeIndex]}</span>
         </span>
       </span>
     </span>
