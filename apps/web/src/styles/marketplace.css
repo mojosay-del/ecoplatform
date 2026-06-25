@@ -2380,7 +2380,7 @@
 
 @media (max-width: 680px) {
   .mp-split-list .mp-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .mp-filterbar {
@@ -2410,6 +2410,12 @@
     right: auto;
     left: 0;
     width: min(100%, calc(100vw - 48px));
+  }
+}
+
+@media (max-width: 360px) {
+  .mp-split-list .mp-grid {
+    grid-template-columns: 1fr;
   }
 }
 

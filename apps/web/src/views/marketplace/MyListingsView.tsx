@@ -71,7 +71,7 @@ export function MyListingsView() {
               К ленте
             </Link>
             <Link className="button" href="/marketplace/new">
-              Разместить объявление
+              + Объявление
             </Link>
           </div>
         </div>

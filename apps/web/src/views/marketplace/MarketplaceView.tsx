@@ -143,7 +143,7 @@ export function MarketplaceView() {
                     Мои объявления
                   </Link>
                   <Link className="button" href="/marketplace/new">
-                    Разместить объявление
+                    + Объявление
                   </Link>
                 </div>
               ) : isBuyer ? (

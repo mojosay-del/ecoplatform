@@ -935,11 +935,12 @@ body.account-password-modal-open {
   }
 
   .account-password-modal-backdrop {
-    align-items: end;
+    place-items: center;
     padding: 12px;
   }
 
   .account-password-modal {
+    width: min(100%, 540px);
     max-height: calc(100dvh - 24px);
   }
 
@@ -2072,6 +2073,32 @@ body.account-password-modal-open {
   color: var(--muted);
   font-size: 13px;
 }
+
+@media (max-width: 980px) {
+  .account-subscription-modal .account-plans {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .account-subscription-modal {
+    width: min(100%, 540px);
+  }
+
+  .account-subscription-modal .account-plan {
+    padding: 18px;
+  }
+
+  .account-subscription-modal .account-plan-price.is-switchable {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .account-subscription-modal .account-plan-desc {
+    min-height: 0;
+  }
+}
+
 .account-history-list {
   display: grid;
   gap: 10px;

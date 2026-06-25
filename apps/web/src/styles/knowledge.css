@@ -13,6 +13,19 @@
   max-width: 1400px;
 }
 
+.knowledge-topbar-nav-trigger {
+  border-color: rgb(var(--brand-rgb) / 0.42);
+  background: var(--brand);
+  color: var(--text-inverse);
+  box-shadow: 0 10px 22px rgb(var(--brand-rgb) / 0.18);
+}
+
+.knowledge-topbar-nav-trigger:hover {
+  border-color: var(--brand-hover);
+  background: var(--brand-hover);
+  color: var(--text-inverse);
+}
+
 .knowledge-header {
   display: flex;
   flex-direction: column;
