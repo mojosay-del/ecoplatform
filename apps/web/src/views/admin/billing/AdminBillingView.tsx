@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState, type SetStateAction } from "react";
-import { CreditCard } from "lucide-react";
+import { FormEvent, useRef, useState, type SetStateAction } from "react";
+import { CreditCard, RotateCcw, Search } from "lucide-react";
 import { subscriptionPlans } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "../../../components/StatusPill";
@@ -13,7 +13,10 @@ import {
   SUBSCRIPTION_PLAN_LABELS,
   SUBSCRIPTION_STATUS_LABELS,
 } from "../../../lib/display-labels";
+import { useApiQuery } from "../../shared";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
+
+type BillingSummary = { activeSubscriptions: number; expiringSoon: number };
 
 type CompanyItem = {
   id: string;
@@ -35,32 +38,37 @@ type CompanyItem = {
 export function AdminBillingView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const companiesQuery = useInfiniteApiQuery<CompanyItem>(
-    queryKeys.admin.billingCompanies(""),
+    queryKeys.admin.billingCompanies(appliedSearch),
     50,
     async ({ limit, offset }) => {
       const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+      if (appliedSearch) query.set("search", appliedSearch);
       return apiFetch<{ items: CompanyItem[]; total: number; hasMore: boolean }>(`/admin/billing/companies?${query}`);
     },
   );
   const companies = companiesQuery.items;
 
-  // Сводка по загруженному списку компаний (быстрый взгляд «сколько активно /
-  // скоро истекает»). Считается по подтянутым записям.
-  const summary = useMemo(() => {
-    const now = Date.now();
-    const soon = now + 7 * 24 * 60 * 60 * 1000;
-    let active = 0;
-    let expiring = 0;
-    for (const company of companies) {
-      if (!company.subscriptionPlan || !company.subscriptionEndsAt) continue;
-      const ends = new Date(company.subscriptionEndsAt).getTime();
-      if (ends <= now) continue;
-      active += 1;
-      if (ends <= soon) expiring += 1;
-    }
-    return { active, expiring };
-  }, [companies]);
+  // Точные счётчики по всей БД (не по загруженной странице) — отдельный лёгкий
+  // агрегат-эндпоинт, чтобы сводка не врала при пагинации.
+  const summaryQuery = useApiQuery<BillingSummary>(
+    queryKeys.admin.billingSummary(),
+    () => apiFetch<BillingSummary>("/admin/billing/summary"),
+    { activeSubscriptions: 0, expiringSoon: 0 },
+  );
+  const summary = summaryQuery.data;
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAppliedSearch(search.trim());
+  }
+
+  function resetSearch() {
+    setSearch("");
+    setAppliedSearch("");
+  }
 
   const [form, setForm] = useState({
     companyId: "",
@@ -68,6 +76,9 @@ export function AdminBillingView() {
     endsAt: defaultEndsAt(),
     reason: "",
   });
+  // Сохраняем подпись выбранной компании отдельно: если поиск отфильтрует её из
+  // списка, выбор в форме всё равно остаётся видимым.
+  const [selectedCompanyLabel, setSelectedCompanyLabel] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const submitInFlight = useRef(false);
   const idempotencyKey = useRef(createIdempotencyKey());
@@ -98,8 +109,9 @@ export function AdminBillingView() {
       setSuccessMessage("Подписка активирована.");
       idempotencyKey.current = createIdempotencyKey();
       setForm((prev) => ({ ...prev, reason: "" }));
-      // Список — react-query: инвалидируем, чтобы подтянуть новый статус.
+      // Список и сводку — инвалидируем, чтобы подтянуть новый статус/счётчики.
       companiesQuery.reload();
+      void summaryQuery.refetch();
     } catch (error) {
       setErrorMessage(errorText(error, "Не удалось активировать подписку"));
     } finally {
@@ -151,6 +163,31 @@ export function AdminBillingView() {
         ) : null}
         {companiesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
 
+        <form className="admin-filter-bar" onSubmit={submitSearch} role="search">
+          <label className="admin-filter-field">
+            <Search aria-hidden size={16} />
+            <input
+              aria-label="Поиск компаний"
+              className="input"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Поиск по названию или ИНН"
+              type="search"
+              value={search}
+            />
+          </label>
+          <div className="admin-filter-actions">
+            <button className="button" type="submit">
+              Найти
+            </button>
+            {appliedSearch ? (
+              <button className="button secondary" onClick={resetSearch} type="button">
+                <RotateCcw aria-hidden size={16} />
+                Сбросить
+              </button>
+            ) : null}
+          </div>
+        </form>
+
         <div className="admin-billing-layout">
           <form className="admin-billing-form" onSubmit={submit}>
             <header className="admin-billing-form-head">
@@ -168,16 +205,27 @@ export function AdminBillingView() {
               <select
                 className="select"
                 value={form.companyId}
-                onChange={(event) => updateForm((prev) => ({ ...prev, companyId: event.target.value }))}
+                onChange={(event) => {
+                  const id = event.target.value;
+                  const picked = companies.find((company) => company.id === id);
+                  setSelectedCompanyLabel(picked ? picked.organizationName : "");
+                  updateForm((prev) => ({ ...prev, companyId: id }));
+                }}
                 required
               >
                 <option value="">Выберите компанию…</option>
+                {/* Если выбранная компания отфильтрована поиском — показываем её
+                    отдельной опцией, чтобы выбор не «слетал». */}
+                {form.companyId && !companies.some((company) => company.id === form.companyId) ? (
+                  <option value={form.companyId}>{selectedCompanyLabel || "Выбранная компания"}</option>
+                ) : null}
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>
                     {company.organizationName} · {COMPANY_STATUS_LABELS[company.status] ?? company.status}
                   </option>
                 ))}
               </select>
+              <small className="form-field-hint">Не нашли компанию? Сузьте список поиском выше.</small>
             </label>
 
             <label className="form-field">
@@ -226,22 +274,22 @@ export function AdminBillingView() {
           </form>
 
           <div className="admin-billing-companies">
-            {companies.length > 0 ? (
-              <div className="admin-billing-summary">
-                <div className="admin-billing-summary-chip">
-                  <span className="admin-billing-summary-value">{summary.active}</span>
-                  <span className="admin-billing-summary-label">Активных подписок</span>
-                </div>
-                <div className="admin-billing-summary-chip admin-billing-summary-chip-warning">
-                  <span className="admin-billing-summary-value">{summary.expiring}</span>
-                  <span className="admin-billing-summary-label">Истекают ≤ 7 дней</span>
-                </div>
+            <div className="admin-billing-summary">
+              <div className="admin-billing-summary-chip">
+                <span className="admin-billing-summary-value">{summary.activeSubscriptions}</span>
+                <span className="admin-billing-summary-label">Активных подписок</span>
               </div>
-            ) : null}
+              <div className="admin-billing-summary-chip admin-billing-summary-chip-warning">
+                <span className="admin-billing-summary-value">{summary.expiringSoon}</span>
+                <span className="admin-billing-summary-label">Истекают ≤ 7 дней</span>
+              </div>
+            </div>
 
             <div className="admin-table-shell">
               <div className="admin-table-meta">
-                <p className="page-subtitle">Компании на платформе</p>
+                <p className="page-subtitle">
+                  {appliedSearch ? `Результаты поиска · ${companiesQuery.total}` : "Компании на платформе"}
+                </p>
               </div>
               <div className="admin-table-scroll">
                 <table className="admin-table">
@@ -303,9 +351,13 @@ export function AdminBillingView() {
 
               {companies.length === 0 && !companiesQuery.isInitialLoading ? (
                 <AdminEmptyState
-                  description="Здесь появятся компании после регистрации на платформе."
-                  icon={CreditCard}
-                  title="Компаний пока нет"
+                  description={
+                    appliedSearch
+                      ? "По вашему запросу ничего не нашлось — попробуйте другое название или ИНН."
+                      : "Здесь появятся компании после регистрации на платформе."
+                  }
+                  icon={appliedSearch ? Search : CreditCard}
+                  title={appliedSearch ? "Ничего не найдено" : "Компаний пока нет"}
                 />
               ) : null}
 

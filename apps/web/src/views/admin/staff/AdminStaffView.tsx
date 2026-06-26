@@ -6,6 +6,7 @@ import { StatusPill } from "../../../components/StatusPill";
 import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import { CreateStaffForm } from "./create-staff-form";
 import { AdminStaffFilterBar } from "./filter-bar";
+import { StaffResetPasswordModal } from "./reset-password-modal";
 import { StaffTable } from "./staff-table";
 import { useAdminStaff } from "./use-admin-staff";
 
@@ -82,6 +83,7 @@ export function AdminStaffView() {
             sort={view.sort}
             onSort={view.setSort}
             onUpdateStaff={view.updateStaff}
+            onResetPassword={view.resetPassword}
           />
 
           {view.sortedItems.length === 0 && !staffQuery.isInitialLoading ? (
@@ -111,6 +113,14 @@ export function AdminStaffView() {
             sentinelRef={staffQuery.sentinelRef}
           />
         </div>
+
+        {view.resetResult ? (
+          <StaffResetPasswordModal
+            staff={view.resetResult.staff}
+            password={view.resetResult.password}
+            onClose={view.closeReset}
+          />
+        ) : null}
       </section>
     </AppShell>
   );

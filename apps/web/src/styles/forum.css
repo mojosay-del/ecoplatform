@@ -1138,6 +1138,146 @@ section.forum-page .forum-expert-rank {
   color: var(--brand);
 }
 
+/* Дисмисс-флэш (успех/ошибка действия). */
+.forum-flash {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.forum-flash button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 6px;
+}
+
+/* Поиск вопросов. */
+.forum-admin-search {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.forum-admin-search .admin-filter-field {
+  flex: 1 1 260px;
+}
+
+/* Разворачиваемая строка вопроса + ответы. */
+.forum-admin-q-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.forum-admin-q-item .forum-admin-q-row {
+  border: none;
+}
+.forum-admin-q-main {
+  flex: 1 1 320px;
+}
+.forum-admin-q-expand {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-self: flex-start;
+}
+.forum-admin-q-expand:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+/* Переупорядочивание справочника. */
+.forum-admin-tax-reorder {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.forum-admin-tax-reorder button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+}
+.forum-admin-tax-reorder button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.forum-admin-tax-reorder button:not(:disabled):hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+.forum-admin-tax-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.forum-admin-tax-row.is-editing {
+  background: var(--surface-muted);
+  border-radius: var(--radius-md);
+  padding: 8px;
+}
+
+/* Панель модерации ответов. */
+.forum-answers-panel {
+  padding: 12px 12px 12px 40px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-soft);
+}
+.forum-answers-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.forum-answer-mod {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  flex-wrap: wrap;
+}
+.forum-answer-mod.is-hidden {
+  opacity: 0.6;
+}
+.forum-answer-mod-body {
+  min-width: 0;
+  flex: 1 1 260px;
+}
+.forum-answer-mod-body p {
+  margin: 0 0 4px;
+}
+.forum-answer-mod-body small {
+  color: var(--text-muted);
+}
+.forum-answers-error {
+  color: var(--danger-text);
+  margin: 0 0 8px;
+}
+.forum-seed-answer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.forum-seed-answer textarea {
+  flex: 1 1 260px;
+}
+
 @media (max-width: 760px) {
   .forum-admin-grid {
     grid-template-columns: 1fr;

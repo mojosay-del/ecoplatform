@@ -145,6 +145,22 @@ export const MODERATION_DECISION_LABELS: Record<string, string> = {
   escalate_to_admin: "Эскалировать администратору",
 };
 
+// Санкции, доступные администратору из карточки кейса.
+export const ADMIN_SANCTION_TYPE_LABELS: Record<string, string> = {
+  user_block: "Блокировка пользователя",
+  company_block: "Блокировка компании",
+  module_restriction: "Ограничение модуля",
+  // На случай отображения исторических санкций других типов:
+  warning: "Предупреждение",
+  content_removal: "Снятие контента",
+};
+
+export const RESTRICTABLE_MODULE_LABELS: Record<string, string> = {
+  comments: "Комментарии",
+  marketplace: "Площадка",
+  reviews: "Отзывы",
+};
+
 export const MODERATION_REASON_LABELS: Record<string, string> = {
   valid_complaint: "Жалоба обоснована",
   repeated_violation: "Повторное нарушение",
@@ -159,6 +175,12 @@ export const MODERATION_REASON_LABELS: Record<string, string> = {
   billing_issue: "Биллинг",
   manual_activation: "Ручная активация",
   manual_archive: "Архивирование",
+  // Коды причин жалоб (complaintReasonCodes).
+  contact_data: "Контактные данные",
+  false_information: "Недостоверная информация",
+  offensive_content: "Оскорбительный контент",
+  spam: "Спам",
+  illegal_content: "Запрещённый контент",
 };
 
 export const PAYMENT_METHOD_TYPE_LABELS: Record<string, string> = {

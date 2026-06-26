@@ -1235,6 +1235,121 @@
   align-items: start;
 }
 
+/* На узких экранах мастер-деталь складывается в одну колонку (модерация,
+   компании, пользователи используют этот грид). */
+@media (max-width: 900px) {
+  .moderation-layout,
+  .moderation-layout.admin-master-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .mod-case-list {
+    max-height: none;
+  }
+}
+
+/* Тулбар модерации: сегмент-фильтр статуса + поиск. */
+.mod-status-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 16px 0 12px;
+  padding: 4px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+}
+
+.mod-status-filter button {
+  border: none;
+  background: transparent;
+  padding: 7px 14px;
+  border-radius: var(--radius-chip);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.mod-status-filter button[aria-pressed="true"] {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.mod-search {
+  max-width: 520px;
+  margin-bottom: 16px;
+}
+
+.mod-case-list {
+  max-height: 72vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.mod-lock-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mod-lock-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--warning-soft);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+/* Подзаголовок внутри секции (напр. «Применить санкцию»). */
+.auser-section-subhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.mod-sanction-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mod-sanction.is-lifted {
+  opacity: 0.6;
+}
+
+.mod-sanction-lift {
+  margin-top: 8px;
+}
+
+.mod-sanction-form {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mod-sanction-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
 .admin-master-detail {
   grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
 }
@@ -1841,9 +1956,61 @@
   gap: 6px;
 }
 
+.admin-table-actions-end {
+  justify-content: flex-end;
+}
+
+/* В таблицах kebab-кнопка всегда видима (нет hover-родителя .tree-row). */
+.admin-table-actions .tree-row-kebab-button {
+  opacity: 1;
+}
+
+/* Плавающее меню рендерится порталом — поднимаем над прокручиваемой таблицей. */
+.tree-row-menu-floating {
+  z-index: 60;
+}
+
 .admin-table .staff-avatar {
   width: 36px;
   height: 36px;
+}
+
+/* Окно одноразового показа сброшенного пароля сотрудника. */
+.staff-reset-modal {
+  max-width: 440px;
+}
+
+.staff-reset-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.staff-reset-warning {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.staff-reset-password {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.staff-reset-code {
+  flex: 1 1 200px;
+  padding: 12px 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  user-select: all;
 }
 
 .admin-journal-table {

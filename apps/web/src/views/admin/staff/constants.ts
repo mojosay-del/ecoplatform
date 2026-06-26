@@ -24,6 +24,33 @@ export const genderOptions = [
   { value: "female", label: USER_GENDER_LABELS.female },
 ] as const;
 
+// Сильный временный пароль для сброса админом. Гарантируем по символу из
+// каждого класса (верх/низ/цифра/спецсимвол) + добор до 16 символов, чтобы
+// проходить политику и не попадать в базы утечек.
+export function generateTempPassword(): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const symbols = "!@#$%*-_";
+  const all = upper + lower + digits + symbols;
+  // charAt никогда не возвращает undefined — безопасно под strict index access.
+  const pick = (set: string): string => set.charAt(Math.floor(randomFraction() * set.length));
+  const chars: string[] = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+  while (chars.length < 16) chars.push(pick(all));
+  // Тасуем, чтобы обязательные символы не стояли всегда в начале.
+  return chars.sort(() => randomFraction() - 0.5).join("");
+}
+
+function randomFraction(): number {
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj?.getRandomValues) {
+    const buffer = new Uint32Array(1);
+    cryptoObj.getRandomValues(buffer);
+    return (buffer[0] ?? 0) / 2 ** 32;
+  }
+  return Math.random();
+}
+
 export const staffSortSelectors: Record<StaffSortKey, (item: StaffItem) => SortValue> = {
   name: (item) => `${item.user.lastName} ${item.user.firstName}`,
   status: (item) => (item.isActive ? STAFF_STATUS_LABELS.active : STAFF_STATUS_LABELS.inactive),

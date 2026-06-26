@@ -25,11 +25,12 @@ function normalizeQueryKey(key: InfiniteQueryKey): QueryKey {
 }
 
 function flattenPages<T>(data: InfiniteData<InfinitePage<T>, number> | undefined): T[] {
-  return data?.pages.flatMap((page) => page.items) ?? [];
+  // Защищаемся от страницы без items (стейл-кэш/гонка при HMR или ошибке fetch).
+  return data?.pages.flatMap((page) => page?.items ?? []) ?? [];
 }
 
 function loadedItemsCount<T>(pages: InfinitePage<T>[]): number {
-  return pages.reduce((sum, page) => sum + page.items.length, 0);
+  return pages.reduce((sum, page) => sum + (page?.items?.length ?? 0), 0);
 }
 
 function patchInfiniteItems<T>(
@@ -84,7 +85,7 @@ export function useInfiniteApiQuery<T>(
     queryFn: ({ pageParam }) => fetchPageRef.current({ limit: pageSize, offset: pageParam }),
     enabled,
     initialPageParam: 0,
-    getNextPageParam: (lastPage, pages) => (lastPage.hasMore ? loadedItemsCount(pages) : undefined),
+    getNextPageParam: (lastPage, pages) => (lastPage?.hasMore ? loadedItemsCount(pages) : undefined),
   });
 
   const items = flattenPages(query.data);

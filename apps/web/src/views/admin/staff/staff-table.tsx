@@ -8,9 +8,10 @@ type StaffTableProps = {
   sort: SortState<StaffSortKey>;
   onSort: (sort: SortState<StaffSortKey>) => void;
   onUpdateStaff: (userId: string, patch: StaffPatch) => void;
+  onResetPassword: (staff: StaffItem) => void;
 };
 
-export function StaffTable({ staff, sort, onSort, onUpdateStaff }: StaffTableProps) {
+export function StaffTable({ staff, sort, onSort, onUpdateStaff, onResetPassword }: StaffTableProps) {
   return (
     <div className="admin-table-scroll">
       <table className="admin-table">
@@ -36,7 +37,7 @@ export function StaffTable({ staff, sort, onSort, onUpdateStaff }: StaffTablePro
         </thead>
         <tbody>
           {staff.map((item) => (
-            <StaffRow key={item.id} staff={item} onUpdateStaff={onUpdateStaff} />
+            <StaffRow key={item.id} staff={item} onUpdateStaff={onUpdateStaff} onResetPassword={onResetPassword} />
           ))}
         </tbody>
       </table>

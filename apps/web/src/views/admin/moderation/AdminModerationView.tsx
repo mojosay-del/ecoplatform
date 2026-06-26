@@ -1,25 +1,27 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type {
   ModerationCaseDetail,
   ModerationCaseListItem,
+  ModerationCaseStatus,
   ModerationDecisionType,
-  PaginatedResponse,
 } from "@ecoplatform/shared";
-import { ShieldCheck } from "lucide-react";
+import { Lock, LockOpen, MessageSquareWarning, ScrollText, Search, ShieldAlert, ShieldCheck } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, moderationStatusPillVariant } from "../../../components/StatusPill";
-import { AdminEmptyState, AdminPageHeader } from "../../../components/admin";
+import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import { formatModerationCaseTitle, formatModerationEntityPreview } from "../../../components/admin-entity-display";
 import { apiFetch } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
 import { queryKeys } from "../../../lib/query/keys";
-import { useApiQuery } from "../../shared";
+import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 import {
   MODERATION_CASE_STATUS_LABELS,
   MODERATION_DECISION_LABELS,
   MODERATION_REASON_LABELS,
 } from "../../../lib/display-labels";
+import { ModerationSanctions } from "./moderation-sanctions";
 import "../../content-blocks/checklist.css";
 
 const decisionCodes = ["leave_as_is", "remove_content", "warn_company", "escalate_to_admin"] as const;
@@ -34,62 +36,89 @@ const reasonCodes = [
 
 type ModerationReasonCode = (typeof reasonCodes)[number];
 
+const STATUS_FILTERS: { value: "" | ModerationCaseStatus; label: string }[] = [
+  { value: "", label: "Все" },
+  { value: "open", label: "Открытые" },
+  { value: "in_review", label: "В работе" },
+  { value: "escalated", label: "Эскалированные" },
+  { value: "resolved", label: "Решённые" },
+];
+
 export function AdminModerationView() {
+  const { user } = useAuth();
+  const isAdmin = (user?.platformRoles ?? []).includes("admin");
+
+  const [statusFilter, setStatusFilter] = useState<"" | ModerationCaseStatus>("");
+  const [search, setSearch] = useState("");
   const [selectedCase, setSelectedCase] = useState<ModerationCaseDetail | null>(null);
   const [decisionType, setDecisionType] = useState<ModerationDecisionType>("leave_as_is");
   const [reasonCode, setReasonCode] = useState<ModerationReasonCode>("valid_complaint");
   const [comment, setComment] = useState("");
-  const {
-    data: cases,
-    state,
-    errorMessage,
-    refetch,
-  } = useApiQuery<ModerationCaseListItem[]>(
-    queryKeys.admin.moderationCases(),
-    async () => (await apiFetch<PaginatedResponse<ModerationCaseListItem>>("/admin/moderation/cases?limit=100")).items,
-    [],
+
+  const casesQuery = useInfiniteApiQuery<ModerationCaseListItem>(
+    queryKeys.admin.moderationCases(statusFilter),
+    50,
+    async ({ limit, offset }) => {
+      const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+      if (statusFilter) query.set("status", statusFilter);
+      return apiFetch<{ items: ModerationCaseListItem[]; total: number; hasMore: boolean }>(
+        `/admin/moderation/cases?${query}`,
+      );
+    },
   );
 
-  // Держим выбор синхронным со списком: при загрузке/обновлении очереди
-  // оставляем текущий кейс, если он ещё в списке, иначе выбираем первый.
+  // Поиск по заголовку/превью среди загруженных кейсов (полнотекст по
+  // полиморфному контенту слишком тяжёл; статус фильтруется на сервере).
+  const visibleCases = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return casesQuery.items;
+    return casesQuery.items.filter((item) =>
+      `${formatModerationCaseTitle(item)} ${formatModerationEntityPreview(item)}`.toLowerCase().includes(term),
+    );
+  }, [casesQuery.items, search]);
+
+  // Держим выбор синхронным со списком.
   useEffect(() => {
-    if (state !== "ready") return;
+    if (casesQuery.state !== "ready") return;
     setSelectedCase((current) => {
-      if (current && cases.some((item) => item.id === current.id)) return current;
-      return cases[0] ?? null;
+      if (current && visibleCases.some((item) => item.id === current.id)) return current;
+      return null;
     });
-  }, [state, cases]);
+  }, [casesQuery.state, visibleCases]);
 
   async function openCase(id: string) {
     const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${id}`);
     setSelectedCase(data);
   }
 
+  async function reloadSelected() {
+    if (selectedCase) {
+      const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${selectedCase.id}`);
+      setSelectedCase(data);
+    }
+    casesQuery.reload();
+  }
+
   async function mutateCase(path: string) {
     if (!selectedCase) return;
     const data = await apiFetch<ModerationCaseDetail>(path, { method: "POST" });
     setSelectedCase(data);
-    await refetch();
+    casesQuery.reload();
   }
 
   async function submitDecision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedCase) return;
-
     const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${selectedCase.id}/decisions`, {
       method: "POST",
-      body: {
-        type: decisionType,
-        reasonCode,
-        comment: comment.trim() || undefined,
-      },
+      body: { type: decisionType, reasonCode, comment: comment.trim() || undefined },
     });
     setComment("");
     setSelectedCase(data);
-    await refetch();
+    casesQuery.reload();
   }
 
-  if (state === "unauthenticated") {
+  if (casesQuery.state === "unauthenticated") {
     return (
       <AppShell>
         <section className="page">
@@ -100,7 +129,7 @@ export function AdminModerationView() {
     );
   }
 
-  if (state === "forbidden") {
+  if (casesQuery.state === "forbidden") {
     return (
       <AppShell>
         <section className="page">
@@ -115,84 +144,136 @@ export function AdminModerationView() {
     <AppShell>
       <section className="page">
         <AdminPageHeader
-          count={state === "ready" ? cases.length : undefined}
+          count={casesQuery.state === "ready" ? casesQuery.total : undefined}
           subtitle="Очередь жалоб на пользовательский контент."
           title="Модерация"
         />
-        {state === "error" ? (
+
+        <div className="forum-seg mod-status-filter" role="group" aria-label="Фильтр по статусу">
+          {STATUS_FILTERS.map((option) => (
+            <button
+              key={option.value || "all"}
+              type="button"
+              aria-pressed={statusFilter === option.value}
+              onClick={() => setStatusFilter(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        <label className="admin-filter-field mod-search">
+          <Search aria-hidden size={16} />
+          <input
+            aria-label="Поиск по кейсам"
+            className="input"
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Поиск по заголовку или содержимому загруженных кейсов"
+            type="search"
+            value={search}
+          />
+        </label>
+
+        {casesQuery.errorMessage ? (
           <StatusPill as="p" variant="danger">
-            {errorMessage}
+            {casesQuery.errorMessage}
           </StatusPill>
         ) : null}
-        {state === "loading" ? <p className="page-subtitle">Загрузка…</p> : null}
-        {state === "ready" ? (
-          <div className="moderation-layout">
-            <div className="stack-list">
-              {cases.length === 0 ? (
-                <AdminEmptyState
-                  description="Новых жалоб на пользовательский контент сейчас нет."
-                  icon={ShieldCheck}
-                  title="Очередь пуста"
-                />
-              ) : null}
-              {cases.map((item) => (
-                <button
-                  className={`moderation-case-row ${selectedCase?.id === item.id ? "active" : ""}`}
-                  key={item.id}
-                  onClick={() => openCase(item.id)}
-                  type="button"
-                >
-                  <StatusPill variant={moderationStatusPillVariant(item.status)}>
-                    {MODERATION_CASE_STATUS_LABELS[item.status] ?? item.status}
-                  </StatusPill>
-                  <strong>{formatModerationCaseTitle(item)}</strong>
-                  <span>{formatModerationEntityPreview(item)}</span>
-                  <small>Жалоб: {item.complaints.length}</small>
-                </button>
-              ))}
-            </div>
-            <div className="moderation-detail">
-              {!selectedCase ? (
-                <p className="page-subtitle">Выберите кейс.</p>
-              ) : (
-                <>
-                  <div className="list-row moderation-detail-heading">
-                    <div>
-                      <StatusPill as="p" variant={moderationStatusPillVariant(selectedCase.status)}>
-                        {MODERATION_CASE_STATUS_LABELS[selectedCase.status] ?? selectedCase.status}
-                      </StatusPill>
-                      <h2>{formatModerationCaseTitle(selectedCase)}</h2>
-                      <p className="admin-table-muted">{formatModerationEntityPreview(selectedCase)}</p>
-                    </div>
-                    <div className="moderation-detail-side">
-                      <span className="technical-id">ID кейса: {selectedCase.id}</span>
-                      <span className="technical-id">ID сущности: {selectedCase.entityId}</span>
-                      <div className="form-actions">
-                        <button
-                          className="button secondary"
-                          onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/lock`)}
-                        >
-                          Взять
-                        </button>
-                        <button
-                          className="button secondary"
-                          onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/release`)}
-                        >
-                          Освободить
-                        </button>
-                      </div>
-                    </div>
+        {casesQuery.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
+
+        <div className="moderation-layout">
+          <div className="stack-list mod-case-list">
+            {visibleCases.length === 0 && !casesQuery.isInitialLoading ? (
+              <AdminEmptyState
+                description={
+                  search
+                    ? "Под запрос ничего не подошло среди загруженных кейсов."
+                    : "Новых жалоб на пользовательский контент сейчас нет."
+                }
+                icon={ShieldCheck}
+                title={search ? "Ничего не найдено" : "Очередь пуста"}
+              />
+            ) : null}
+            {visibleCases.map((item) => (
+              <button
+                className={`moderation-case-row ${selectedCase?.id === item.id ? "active" : ""}`}
+                key={item.id}
+                onClick={() => openCase(item.id)}
+                type="button"
+              >
+                <StatusPill variant={moderationStatusPillVariant(item.status)}>
+                  {MODERATION_CASE_STATUS_LABELS[item.status] ?? item.status}
+                </StatusPill>
+                <strong>{formatModerationCaseTitle(item)}</strong>
+                <span>{formatModerationEntityPreview(item)}</span>
+                <small>Жалоб: {item.complaints.length}</small>
+              </button>
+            ))}
+            <AdminInfiniteFooter
+              endLabel="Это все кейсы."
+              hasItems={casesQuery.items.length > 0}
+              hasMore={casesQuery.hasMore}
+              isLoadingMore={casesQuery.isLoadingMore}
+              sentinelRef={casesQuery.sentinelRef}
+            />
+          </div>
+
+          <div className="moderation-detail admin-user-detail">
+            {!selectedCase ? (
+              <p className="page-subtitle auser-empty">Выберите кейс, чтобы увидеть жалобы, решения и санкции.</p>
+            ) : (
+              <>
+                <header className="auser-head">
+                  <div className="auser-avatar" aria-hidden="true">
+                    <ShieldAlert size={20} />
                   </div>
-                  {selectedCase.lockedBy ? (
-                    <p className="page-subtitle">
-                      В работе у {selectedCase.lockedBy.firstName} {selectedCase.lockedBy.lastName} до{" "}
-                      {selectedCase.lockedUntil ? new Date(selectedCase.lockedUntil).toLocaleTimeString("ru-RU") : ""}
-                    </p>
-                  ) : null}
+                  <div className="auser-id">
+                    <StatusPill variant={moderationStatusPillVariant(selectedCase.status)}>
+                      {MODERATION_CASE_STATUS_LABELS[selectedCase.status] ?? selectedCase.status}
+                    </StatusPill>
+                    <h2 className="auser-name">{formatModerationCaseTitle(selectedCase)}</h2>
+                    <p className="auser-contacts">{formatModerationEntityPreview(selectedCase)}</p>
+                  </div>
+                  <div className="mod-lock-actions">
+                    <button
+                      className="button secondary"
+                      onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/lock`)}
+                      type="button"
+                    >
+                      <Lock aria-hidden size={15} /> Взять
+                    </button>
+                    <button
+                      className="button secondary"
+                      onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/release`)}
+                      type="button"
+                    >
+                      <LockOpen aria-hidden size={15} /> Освободить
+                    </button>
+                  </div>
+                </header>
+
+                {selectedCase.lockedBy ? (
+                  <p className="mod-lock-banner">
+                    <Lock aria-hidden size={14} /> В работе у {selectedCase.lockedBy.firstName}{" "}
+                    {selectedCase.lockedBy.lastName}
+                    {selectedCase.lockedUntil
+                      ? ` · до ${new Date(selectedCase.lockedUntil).toLocaleTimeString("ru-RU", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`
+                      : ""}
+                  </p>
+                ) : null}
+
+                <section className="auser-section">
+                  <div className="auser-section-head">
+                    <ScrollText aria-hidden size={15} />
+                    <span>Модерируемый контент</span>
+                  </div>
                   <article className="moderated-content">
-                    {selectedCase.entity?.type === "news_comment" ? (
+                    {selectedCase.entity?.type === "news_comment" && selectedCase.entity.author ? (
                       <strong>
-                        {selectedCase.entity.author?.firstName} {selectedCase.entity.author?.lastName}
+                        {selectedCase.entity.author.firstName} {selectedCase.entity.author.lastName}
                       </strong>
                     ) : null}
                     {selectedCase.entity?.type === "marketplace_listing" && selectedCase.entity.sellerCompany ? (
@@ -203,36 +284,67 @@ export function AdminModerationView() {
                     ) : null}
                     <p>{formatModerationEntityPreview(selectedCase)}</p>
                   </article>
-                  <section>
-                    <h3>Жалобы</h3>
-                    <div className="stack-list">
-                      {selectedCase.complaints.map((complaint) => (
-                        <article className="checklist-block" key={complaint.id}>
-                          <strong>{MODERATION_REASON_LABELS[complaint.reasonCode] ?? complaint.reasonCode}</strong>
-                          <p>{complaint.comment || "Без комментария"}</p>
+                </section>
+
+                <section className="auser-section">
+                  <div className="auser-section-head">
+                    <MessageSquareWarning aria-hidden size={15} />
+                    <span>Жалобы ({selectedCase.complaints.length})</span>
+                  </div>
+                  <div className="stack-list">
+                    {selectedCase.complaints.map((complaint) => (
+                      <article className="auser-restriction" key={complaint.id}>
+                        <strong>{MODERATION_REASON_LABELS[complaint.reasonCode] ?? complaint.reasonCode}</strong>
+                        <p>{complaint.comment || "Без комментария"}</p>
+                        {complaint.author ? (
                           <small>
-                            {complaint.author?.firstName} {complaint.author?.lastName}
+                            {complaint.author.firstName} {complaint.author.lastName}
                           </small>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                  <section>
-                    <h3>Решения</h3>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="auser-section">
+                  <div className="auser-section-head">
+                    <ScrollText aria-hidden size={15} />
+                    <span>Решения</span>
+                  </div>
+                  {selectedCase.decisions.length === 0 ? (
+                    <p className="auser-muted">Решений пока нет.</p>
+                  ) : (
                     <div className="stack-list">
-                      {selectedCase.decisions.length === 0 ? <p className="page-subtitle">Решений пока нет.</p> : null}
                       {selectedCase.decisions.map((decision) => (
-                        <article className="checklist-block" key={decision.id}>
+                        <article className="auser-restriction" key={decision.id}>
                           <strong>{MODERATION_DECISION_LABELS[decision.type] ?? decision.type}</strong>
                           <p>{MODERATION_REASON_LABELS[decision.reasonCode] ?? decision.reasonCode}</p>
-                          <small>
-                            {decision.actor?.firstName} {decision.actor?.lastName}
-                          </small>
+                          {decision.actor ? (
+                            <small>
+                              {decision.actor.firstName} {decision.actor.lastName}
+                            </small>
+                          ) : null}
                         </article>
                       ))}
                     </div>
-                  </section>
-                  {selectedCase.status !== "resolved" && selectedCase.status !== "closed_by_admin" ? (
+                  )}
+                </section>
+
+                {isAdmin ? (
+                  <ModerationSanctions
+                    caseId={selectedCase.id}
+                    caseStatus={selectedCase.status}
+                    sanctions={selectedCase.sanctions}
+                    onChanged={reloadSelected}
+                  />
+                ) : null}
+
+                {selectedCase.status !== "resolved" && selectedCase.status !== "closed_by_admin" ? (
+                  <section className="auser-section">
+                    <div className="auser-section-head">
+                      <ShieldCheck aria-hidden size={15} />
+                      <span>Решение по кейсу</span>
+                    </div>
                     <form className="form moderation-decision-form" onSubmit={submitDecision}>
                       <select
                         className="select"
@@ -266,12 +378,12 @@ export function AdminModerationView() {
                         Сохранить решение
                       </button>
                     </form>
-                  ) : null}
-                </>
-              )}
-            </div>
+                  </section>
+                ) : null}
+              </>
+            )}
           </div>
-        ) : null}
+        </div>
       </section>
     </AppShell>
   );

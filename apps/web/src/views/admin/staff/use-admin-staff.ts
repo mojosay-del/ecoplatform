@@ -7,7 +7,13 @@ import { apiFetch, errorText } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { formatPlatformRoles } from "../../../lib/display-labels";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
-import { ADMIN_STAFF_PAGE_SIZE, EMPTY_CREATE_STAFF_FORM, EMPTY_STAFF_FILTERS, staffSortSelectors } from "./constants";
+import {
+  ADMIN_STAFF_PAGE_SIZE,
+  EMPTY_CREATE_STAFF_FORM,
+  EMPTY_STAFF_FILTERS,
+  generateTempPassword,
+  staffSortSelectors,
+} from "./constants";
 import type {
   CreateStaffForm,
   StaffFilters,
@@ -39,6 +45,8 @@ export function useAdminStaff() {
   const [sort, setSort] = useState<SortState<StaffSortKey>>({ key: "createdAt", direction: "desc" });
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState<CreateStaffForm>(EMPTY_CREATE_STAFF_FORM);
+  // Окно с одноразовым показом сброшенного пароля.
+  const [resetResult, setResetResult] = useState<{ staff: StaffItem; password: string } | null>(null);
 
   const staffQuery = useInfiniteApiQuery<StaffItem>(
     token ? "admin-staff" : null,
@@ -77,6 +85,13 @@ export function useAdminStaff() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      if (!token) throw new Error("Нет доступа.");
+      return apiFetch(`/admin/staff/${userId}/reset-password`, { method: "POST", token, body: { password } });
+    },
+  });
+
   const filteredItems = useMemo(() => filterStaffItems(staffQuery.items, filters), [filters, staffQuery.items]);
   const sortedItems = useMemo(() => sortItems(filteredItems, sort, staffSortSelectors), [filteredItems, sort]);
   const hasActiveFilters = Boolean(filters.search || filters.status || filters.role);
@@ -110,6 +125,17 @@ export function useAdminStaff() {
     }
   }
 
+  async function resetPassword(staff: StaffItem) {
+    const password = generateTempPassword();
+    try {
+      await resetPasswordMutation.mutateAsync({ userId: staff.userId, password });
+      setErrorMessage(null);
+      setResetResult({ staff, password });
+    } catch (error) {
+      setErrorMessage(errorText(error, "Не удалось сбросить пароль"));
+    }
+  }
+
   return {
     token,
     errorMessage,
@@ -122,10 +148,13 @@ export function useAdminStaff() {
     sortedItems,
     hasActiveFilters,
     staffQuery,
+    resetResult,
     applyFilters,
     resetFilters,
     createStaff,
     updateStaff,
+    resetPassword,
+    closeReset: () => setResetResult(null),
     setSearch,
     setStatusFilter,
     setRoleFilter,

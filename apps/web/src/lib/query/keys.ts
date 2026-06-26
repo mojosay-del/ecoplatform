@@ -47,16 +47,18 @@ export const queryKeys = {
     education: () => ["admin", "education"] as const,
     indices: () => ["admin", "indices"] as const,
     settings: () => ["admin", "settings"] as const,
-    moderationCases: () => ["admin", "moderation", "cases"] as const,
+    moderationCases: (status = "") => ["admin", "moderation", "cases", status] as const,
     // Списки с поиском кэшируются per-query — смена строки сама триггерит
     // запрос (без ручного debounce-refetch в компоненте).
     billingCompanies: (q: string) => ["admin", "billing", "companies", q.trim()] as const,
+    billingSummary: () => ["admin", "billing", "summary"] as const,
     newsList: (q: string) => ["admin", "news", "list", q.trim()] as const,
     newsTags: () => ["admin", "news", "tags"] as const,
     knowledge: () => ["admin", "knowledge"] as const,
     documentation: () => ["admin", "documentation"] as const,
     forumTaxonomy: () => ["admin", "forum", "taxonomy"] as const,
-    forumQuestions: (status: string) => ["admin", "forum", "questions", status] as const,
+    forumQuestions: (status: string, q = "") => ["admin", "forum", "questions", status, q.trim()] as const,
+    forumQuestion: (id: string) => ["admin", "forum", "question", id] as const,
   },
   news: {
     all: ["news"] as const,

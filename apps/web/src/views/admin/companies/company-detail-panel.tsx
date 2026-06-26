@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { Building2, CreditCard, LifeBuoy, Users } from "lucide-react";
 import {
   StatusPill,
   companyStatusPillVariant,
@@ -40,12 +41,31 @@ export function AdminCompanyDetailPanel({
   onSubmitStatus,
 }: AdminCompanyDetailPanelProps) {
   return (
-    <div className="moderation-detail">
+    <div className="moderation-detail admin-user-detail">
       {!selected ? (
-        <p className="page-subtitle">Выберите компанию.</p>
+        <p className="page-subtitle auser-empty">Выберите компанию, чтобы увидеть профиль, пользователей и подписки.</p>
       ) : (
         <>
-          <CompanySummary company={selected} />
+          <header className="auser-head">
+            <div className="auser-avatar" aria-hidden="true">
+              <Building2 size={20} />
+            </div>
+            <div className="auser-id">
+              <StatusPill variant={companyStatusPillVariant(selected.status)}>
+                {COMPANY_STATUS_LABELS[selected.status] ?? selected.status}
+              </StatusPill>
+              <h2 className="auser-name">{selected.organizationName}</h2>
+              <p className="auser-contacts">
+                {selected.subscriptionPlan
+                  ? (SUBSCRIPTION_PLAN_LABELS[selected.subscriptionPlan] ?? selected.subscriptionPlan)
+                  : "Без активного тарифа"}
+                {selected.subscriptionEndsAt
+                  ? ` · до ${new Date(selected.subscriptionEndsAt).toLocaleDateString("ru-RU")}`
+                  : ""}
+              </p>
+            </div>
+          </header>
+
           <CompanyUsersSection company={selected} />
           <CompanySubscriptionsSection company={selected} />
           <CompanySupportTicketsSection company={selected} />
@@ -64,60 +84,49 @@ export function AdminCompanyDetailPanel({
   );
 }
 
-function CompanySummary({ company }: { company: AdminCompanyDetail }) {
-  return (
-    <div className="list-row">
-      <div>
-        <StatusPill as="p" variant={companyStatusPillVariant(company.status)}>
-          {COMPANY_STATUS_LABELS[company.status] ?? company.status}
-        </StatusPill>
-        <h2>{company.organizationName}</h2>
-        <p className="page-subtitle">
-          {company.subscriptionPlan
-            ? (SUBSCRIPTION_PLAN_LABELS[company.subscriptionPlan] ?? company.subscriptionPlan)
-            : "Без активного тарифа"}
-          {company.subscriptionEndsAt
-            ? ` · до ${new Date(company.subscriptionEndsAt).toLocaleDateString("ru-RU")}`
-            : ""}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function CompanyUsersSection({ company }: { company: AdminCompanyDetail }) {
   return (
-    <section>
-      <h3>Пользователи ({company.users.length})</h3>
-      <div className="stack-list">
-        {company.users.map((user) => (
-          <article className="checklist-block" key={user.id}>
-            <strong>
-              {user.firstName} {user.lastName}
-            </strong>
-            <p>
-              {user.email} ·{" "}
-              <StatusPill variant={userStatusPillVariant(user.status)}>
-                {USER_STATUS_LABELS[user.status] ?? user.status}
-              </StatusPill>
-            </p>
-          </article>
-        ))}
+    <section className="auser-section">
+      <div className="auser-section-head">
+        <Users aria-hidden size={15} />
+        <span>Пользователи ({company.users.length})</span>
       </div>
+      {company.users.length === 0 ? (
+        <p className="auser-muted">Нет пользователей.</p>
+      ) : (
+        <div className="stack-list">
+          {company.users.map((user) => (
+            <article className="auser-restriction" key={user.id}>
+              <strong>
+                {user.firstName} {user.lastName}
+              </strong>
+              <p>
+                {user.email} ·{" "}
+                <StatusPill variant={userStatusPillVariant(user.status)}>
+                  {USER_STATUS_LABELS[user.status] ?? user.status}
+                </StatusPill>
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
 function CompanySubscriptionsSection({ company }: { company: AdminCompanyDetail }) {
   return (
-    <section>
-      <h3>Подписки</h3>
+    <section className="auser-section">
+      <div className="auser-section-head">
+        <CreditCard aria-hidden size={15} />
+        <span>Подписки</span>
+      </div>
       {company.subscriptions.length === 0 ? (
-        <p className="page-subtitle">Нет.</p>
+        <p className="auser-muted">Нет.</p>
       ) : (
         <div className="stack-list">
           {company.subscriptions.map((subscription) => (
-            <article className="checklist-block" key={subscription.id}>
+            <article className="auser-restriction" key={subscription.id}>
               <strong>
                 {SUBSCRIPTION_PLAN_LABELS[subscription.plan] ?? subscription.plan} ·{" "}
                 <StatusPill variant={subscriptionStatusPillVariant(subscription.status)}>
@@ -139,14 +148,17 @@ function CompanySubscriptionsSection({ company }: { company: AdminCompanyDetail 
 
 function CompanySupportTicketsSection({ company }: { company: AdminCompanyDetail }) {
   return (
-    <section>
-      <h3>Последние тикеты</h3>
+    <section className="auser-section">
+      <div className="auser-section-head">
+        <LifeBuoy aria-hidden size={15} />
+        <span>Последние тикеты</span>
+      </div>
       {company.supportTickets.length === 0 ? (
-        <p className="page-subtitle">Нет.</p>
+        <p className="auser-muted">Нет.</p>
       ) : (
         <div className="stack-list">
           {company.supportTickets.map((ticket) => (
-            <article className="checklist-block" key={ticket.id}>
+            <article className="auser-restriction" key={ticket.id}>
               <strong>{ticket.subject}</strong>
               <p>
                 {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
