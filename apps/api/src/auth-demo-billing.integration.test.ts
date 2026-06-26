@@ -398,4 +398,40 @@ describe("Demo gating", () => {
     expectPaginatedEnvelope(good.body);
     expect(good.body.items).toHaveLength(1);
   });
+
+  it("billing summary возвращает агрегаты активных и истекающих подписок", async () => {
+    const adminToken = await loginAdmin();
+    const { companyId } = await registerCompany("0000023");
+    const endsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await ctx.http
+      .post("/api/admin/billing/manual-subscriptions")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Idempotency-Key", `summary-${companyId}`)
+      .send({ companyId, plan: "basic", endsAt, reason: "summary-test" });
+
+    const summary = await ctx.http.get("/api/admin/billing/summary").set("Authorization", `Bearer ${adminToken}`);
+    expect(summary.status).toBe(200);
+    expect(typeof summary.body.activeSubscriptions).toBe("number");
+    expect(typeof summary.body.expiringSoon).toBe("number");
+    expect(summary.body.activeSubscriptions).toBeGreaterThanOrEqual(1);
+  });
+
+  it("поиск billing-компаний фильтрует по названию", async () => {
+    const adminToken = await loginAdmin();
+    await registerCompany("0000024");
+    const all = await ctx.http.get("/api/admin/billing/companies?limit=5").set("Authorization", `Bearer ${adminToken}`);
+    expect(all.status).toBe(200);
+    const term: string = String(all.body.items[0].organizationName).slice(0, 4);
+
+    const found = await ctx.http
+      .get(`/api/admin/billing/companies?search=${encodeURIComponent(term)}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(found.status).toBe(200);
+    expect(found.body.items.length).toBeGreaterThanOrEqual(1);
+    expect(
+      found.body.items.every((c: { organizationName: string }) =>
+        c.organizationName.toLowerCase().includes(term.toLowerCase()),
+      ),
+    ).toBe(true);
+  });
 });

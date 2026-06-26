@@ -128,8 +128,8 @@ export class ModerationService {
     return { complaint, duplicate: false };
   }
 
-  async listCases(paginationInput: PaginationInput = {}) {
-    return listCasesWorkflow(this.moderationCaseDeps(), paginationInput);
+  async listCases(input: PaginationInput & { status?: string } = {}) {
+    return listCasesWorkflow(this.moderationCaseDeps(), input);
   }
 
   async getCase(id: string) {

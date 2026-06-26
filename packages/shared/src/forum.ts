@@ -156,3 +156,21 @@ export type ForumAdminQuestionItem = {
   authorName: string;
   createdAt: IsoDateString;
 };
+
+// Ответ в админской карточке вопроса (для модерации) — с флагом скрытия,
+// в отличие от публичного ответа, где скрытые просто не отдаются.
+export type ForumAdminAnswerItem = {
+  id: string;
+  body: string;
+  hidden: boolean;
+  isAccepted: boolean;
+  authorName: string;
+  createdAt: IsoDateString;
+};
+
+// Полная админская карточка вопроса с телом и всеми ответами (вкл. скрытые) —
+// разворачивается в списке модерации, чтобы модерировать отдельные ответы.
+export type ForumAdminQuestionDetail = ForumAdminQuestionItem & {
+  body: string;
+  answers: ForumAdminAnswerItem[];
+};

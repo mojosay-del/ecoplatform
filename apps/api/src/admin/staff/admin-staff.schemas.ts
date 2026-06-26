@@ -42,3 +42,8 @@ export const adminStaffUpdateInputSchema = z
   .refine((input) => input.roles !== undefined || input.isActive !== undefined, {
     message: "Нужно указать roles или isActive.",
   });
+
+export const adminStaffResetPasswordInputSchema = z.object({
+  // Тот же минимум, что и при создании; max(120) против DoS на bcrypt.
+  password: passwordSchema.max(120, `Пароль должен быть короче 120 символов.`),
+});

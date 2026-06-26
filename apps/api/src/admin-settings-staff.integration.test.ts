@@ -403,4 +403,66 @@ describe("Admin staff panel", () => {
       .send({ roles: ["moderator"] });
     expect(res.status).toBe(400);
   });
+
+  it("сброс пароля сотрудника: новый пароль работает, старые сессии отозваны", async () => {
+    const adminToken = await loginAdmin();
+    const created = await ctx.http
+      .post("/api/admin/staff")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        email: "reset.staff@test.local",
+        phone: "+79991234502",
+        firstName: "К",
+        lastName: "М",
+        gender: "male",
+        password: "Password1234!",
+        roles: ["moderator"],
+      });
+    expect(created.status).toBe(201);
+
+    const firstLogin = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "reset.staff@test.local", password: "Password1234!" });
+    expect(firstLogin.status).toBe(201);
+
+    const reset = await ctx.http
+      .post(`/api/admin/staff/${created.body.id}/reset-password`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ password: "NewPassword9876!" });
+    expect(reset.status).toBe(201);
+
+    // Старые сессии отозваны.
+    const activeSessions = await ctx.prisma.session.count({
+      where: { userId: created.body.id, revokedAt: null },
+    });
+    expect(activeSessions).toBe(0);
+
+    // Старый пароль больше не подходит, новый — подходит.
+    const oldLogin = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "reset.staff@test.local", password: "Password1234!" });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await ctx.http
+      .post("/api/auth/login")
+      .send({ email: "reset.staff@test.local", password: "NewPassword9876!" });
+    expect(newLogin.status).toBe(201);
+
+    const log = await ctx.prisma.adminActionLog.findFirst({
+      where: { entityId: created.body.id, action: "admin.staff.reset_password" },
+    });
+    expect(log).toBeTruthy();
+  });
+
+  it("сброс пароля доступен только админу", async () => {
+    const adminToken = await loginAdmin();
+    const moderatorToken = await loginModerator();
+    const me = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+
+    const res = await ctx.http
+      .post(`/api/admin/staff/${me.body.id}/reset-password`)
+      .set("Authorization", `Bearer ${moderatorToken}`)
+      .send({ password: "NewPassword9876!" });
+    expect(res.status).toBe(403);
+  });
 });

@@ -157,12 +157,20 @@ export class BillingService {
     });
   }
 
-  async listCompanies(paginationInput: PaginationInput = {}) {
-    const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 200 });
+  async listCompanies(input: { search?: string } & PaginationInput = {}) {
+    const pagination = resolvePagination(input, { defaultLimit: 50, maxLimit: 200 });
+    const where: Prisma.CompanyWhereInput = {};
+    if (input.search) {
+      where.OR = [
+        { organizationName: { contains: input.search, mode: "insensitive" } },
+        { billingInn: { contains: input.search } },
+      ];
+    }
 
     const [total, items] = await this.prisma.$transaction([
-      this.prisma.company.count(),
+      this.prisma.company.count({ where }),
       this.prisma.company.findMany({
+        where,
         orderBy: { createdAt: "desc" },
         take: pagination.limit,
         skip: pagination.offset,
@@ -186,6 +194,25 @@ export class BillingService {
     ]);
 
     return paginatedResponse(items, total, pagination);
+  }
+
+  // Точные счётчики по всей БД (не по загруженной странице): активные платные
+  // подписки и те, что истекают в ближайшие 7 дней. Демо-доступ не считаем —
+  // сводка про платный биллинг.
+  async billingSummary(): Promise<{ activeSubscriptions: number; expiringSoon: number }> {
+    const now = new Date();
+    const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const [activeSubscriptions, expiringSoon] = await this.prisma.$transaction([
+      this.prisma.company.count({
+        where: { subscriptionPlan: { not: null }, subscriptionEndsAt: { gt: now } },
+      }),
+      this.prisma.company.count({
+        where: { subscriptionPlan: { not: null }, subscriptionEndsAt: { gt: now, lte: soon } },
+      }),
+    ]);
+
+    return { activeSubscriptions, expiringSoon };
   }
 
   async activateManually(

@@ -7,7 +7,11 @@ export const adminBillingCompaniesQuerySchema = z
     offset: z.coerce.number().int().min(0).optional(),
     page: z.coerce.number().int().min(1).optional(),
     take: z.coerce.number().int().min(1).max(200).optional(),
+    search: z.string().trim().min(1).max(200).optional(),
   })
-  .transform(({ page, take, ...input }) =>
-    resolvePagination({ ...input, page, take }, { defaultLimit: 50, maxLimit: 200 }),
-  );
+  .transform(({ page, take, search, ...input }) => ({
+    ...resolvePagination({ ...input, page, take }, { defaultLimit: 50, maxLimit: 200 }),
+    search,
+  }));
+
+export type AdminBillingCompaniesQuery = z.infer<typeof adminBillingCompaniesQuerySchema>;

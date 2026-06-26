@@ -1,5 +1,7 @@
 import type { ForumAnswer, ForumQuestion, ForumQuestionType, ForumRawMaterial } from "@prisma/client";
 import type {
+  ForumAdminAnswerItem,
+  ForumAdminQuestionDetail,
   ForumAdminQuestionItem,
   ForumAnswerItem,
   ForumAnswerReplyItem,
@@ -136,5 +138,26 @@ export function mapForumAdminQuestionItem(row: ForumQuestionRow & { authorName: 
     views: row.views,
     authorName: row.authorName,
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+// Полная админская карточка (модерация ответов): тело + все ответы со скрытыми.
+export function mapForumAdminQuestionDetail(
+  row: ForumQuestionRow & { authorName: string; answers: ForumAnswerRow[] },
+  authorNameById: Map<string, string>,
+): ForumAdminQuestionDetail {
+  return {
+    ...mapForumAdminQuestionItem(row),
+    body: row.body,
+    answers: row.answers.map(
+      (answer): ForumAdminAnswerItem => ({
+        id: answer.id,
+        body: answer.body,
+        hidden: answer.hidden,
+        isAccepted: answer.isAccepted,
+        authorName: authorNameById.get(answer.authorId) ?? "—",
+        createdAt: answer.createdAt.toISOString(),
+      }),
+    ),
   };
 }

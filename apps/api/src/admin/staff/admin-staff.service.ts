@@ -5,11 +5,16 @@ import { AdminActionLogService } from "../../common/admin-action-log.service";
 import type { RequestUser } from "../../common/request-user";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SessionCacheService } from "../../redis/session-cache.service";
-import type { adminStaffCreateInputSchema, adminStaffUpdateInputSchema } from "./admin-staff.schemas";
+import type {
+  adminStaffCreateInputSchema,
+  adminStaffResetPasswordInputSchema,
+  adminStaffUpdateInputSchema,
+} from "./admin-staff.schemas";
 import type { z } from "zod";
 
 type CreateInput = z.infer<typeof adminStaffCreateInputSchema>;
 type UpdateInput = z.infer<typeof adminStaffUpdateInputSchema>;
+type ResetPasswordInput = z.infer<typeof adminStaffResetPasswordInputSchema>;
 
 @Injectable()
 export class AdminStaffService {
@@ -182,5 +187,38 @@ export class AdminStaffService {
     });
 
     return updated;
+  }
+
+  // Сброс пароля сотрудника админом: задаём новый временный пароль, ревокаем
+  // все активные сессии (со старым паролем дальше работать нельзя) и пишем в
+  // журнал. Сам пароль возвращаем единожды — UI показывает его один раз.
+  async resetPassword(id: string, input: ResetPasswordInput, actor: RequestUser) {
+    const staff = await this.prisma.platformStaff.findUnique({
+      where: { userId: id },
+      select: { userId: true },
+    });
+    if (!staff) {
+      throw new NotFoundException("Сотрудник не найден.");
+    }
+
+    await this.passwordPolicy.assertAcceptablePassword(input.password);
+    const passwordHash = await hash(input.password, 12);
+
+    await this.prisma.user.update({ where: { id }, data: { passwordHash } });
+
+    await this.prisma.session.updateMany({
+      where: { userId: id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    await this.sessionCache.invalidateUser(id);
+
+    await this.auditLog.record({
+      actorId: actor.id,
+      action: "admin.staff.reset_password",
+      entityType: "User",
+      entityId: id,
+    });
+
+    return { ok: true };
   }
 }

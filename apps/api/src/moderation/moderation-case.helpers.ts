@@ -64,11 +64,13 @@ type UserSummary = {
   company: { id: string; organizationName: string } | null;
 };
 
-export async function listCases(deps: ModerationCaseDeps, paginationInput: PaginationInput = {}) {
-  const pagination = resolvePagination(paginationInput, { defaultLimit: 50, maxLimit: 100 });
+export async function listCases(deps: ModerationCaseDeps, input: PaginationInput & { status?: string } = {}) {
+  const pagination = resolvePagination(input, { defaultLimit: 50, maxLimit: 100 });
+  const where: Prisma.ModerationCaseWhereInput = input.status ? { status: input.status as ModerationCaseStatus } : {};
   const [total, cases] = await deps.prisma.$transaction([
-    deps.prisma.moderationCase.count(),
+    deps.prisma.moderationCase.count({ where }),
     deps.prisma.moderationCase.findMany({
+      where,
       orderBy: { createdAt: "asc" },
       include: moderationCaseInclude,
       take: pagination.limit,

@@ -8,6 +8,7 @@ import { parseBody } from "../../common/zod";
 import {
   adminStaffCreateInputSchema,
   adminStaffListQuerySchema,
+  adminStaffResetPasswordInputSchema,
   adminStaffUpdateInputSchema,
 } from "./admin-staff.schemas";
 import { AdminStaffService } from "./admin-staff.service";
@@ -31,5 +32,10 @@ export class AdminStaffController {
   @Patch(":id")
   async update(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     return this.service.updateStaff(id, parseBody(adminStaffUpdateInputSchema, body), user);
+  }
+
+  @Post(":id/reset-password")
+  async resetPassword(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
+    return this.service.resetPassword(id, parseBody(adminStaffResetPasswordInputSchema, body), user);
   }
 }

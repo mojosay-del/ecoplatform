@@ -538,4 +538,34 @@ describe("Forum: модерация и уведомления", () => {
     });
     expect(notification).not.toBeNull();
   });
+
+  it("админская карточка вопроса отдаёт ответы включая скрытые", async () => {
+    const adminToken = await loginAdmin();
+    const asker = await registerCompany("0900060");
+    const responder = await registerCompany("0900061");
+    const rawMaterialId = await createRawMaterial(adminToken, "Стекло Б/У");
+    const questionTypeId = await createQuestionType(adminToken, "Документы-2");
+    const questionId = await ask(asker.token, {
+      title: "Вопрос с ответом для модерации",
+      rawMaterialId,
+      questionTypeId,
+    });
+    const answerId = await answer(responder.token, questionId, "Ответ, который скроем для проверки.");
+
+    const hide = await ctx.http.post(`/api/admin/content/forum/answers/${answerId}/hide`).set(auth(adminToken));
+    expect(hide.status).toBe(201);
+
+    const detail = await ctx.http.get(`/api/admin/content/forum/questions/${questionId}`).set(auth(adminToken));
+    expect(detail.status).toBe(200);
+    expect(detail.body.id).toBe(questionId);
+    expect(Array.isArray(detail.body.answers)).toBe(true);
+    const found = detail.body.answers.find((a: { id: string }) => a.id === answerId);
+    expect(found).toBeTruthy();
+    expect(found.hidden).toBe(true);
+
+    const restore = await ctx.http.post(`/api/admin/content/forum/answers/${answerId}/restore`).set(auth(adminToken));
+    expect(restore.status).toBe(201);
+    const detail2 = await ctx.http.get(`/api/admin/content/forum/questions/${questionId}`).set(auth(adminToken));
+    expect(detail2.body.answers.find((a: { id: string }) => a.id === answerId).hidden).toBe(false);
+  });
 });

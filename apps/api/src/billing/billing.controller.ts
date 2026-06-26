@@ -65,6 +65,13 @@ export class BillingController {
 
   @UseGuards(RolesGuard)
   @Roles("admin")
+  @Get("admin/billing/summary")
+  async summary() {
+    return this.billing.billingSummary();
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
   @Post("admin/billing/manual-subscriptions")
   async activate(
     @Body() body: unknown,

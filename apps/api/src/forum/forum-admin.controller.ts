@@ -28,6 +28,12 @@ export class ForumAdminController {
   }
 
   @Roles("admin", "content_manager", "moderator")
+  @Get("questions/:id")
+  async getQuestion(@Param("id") id: string) {
+    return this.forumAdmin.getQuestionForModeration(id);
+  }
+
+  @Roles("admin", "content_manager", "moderator")
   @Get("taxonomy")
   async taxonomy() {
     return this.forumAdmin.taxonomy();

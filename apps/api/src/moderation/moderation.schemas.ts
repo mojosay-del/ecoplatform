@@ -29,12 +29,16 @@ export const decisionReasonCodes = [
   "other",
 ] as const;
 
+export const moderationCaseStatuses = ["open", "in_review", "resolved", "escalated", "closed_by_admin"] as const;
+export type ModerationCaseStatusValue = (typeof moderationCaseStatuses)[number];
+
 export const moderationCaseListQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
     offset: z.coerce.number().int().min(0).optional(),
     page: z.coerce.number().int().min(1).optional(),
     take: z.coerce.number().int().min(1).max(100).optional(),
+    status: z.enum(moderationCaseStatuses).optional(),
   })
   .transform((input) => ({
     ...input,

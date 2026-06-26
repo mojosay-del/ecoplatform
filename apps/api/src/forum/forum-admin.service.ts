@@ -8,7 +8,13 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { createForumAnswer } from "./forum-answer-workflow.helpers";
 import { createForumQuestion } from "./forum-question-workflow.helpers";
-import { mapForumAdminQuestionItem, toTaxonomyValue, type ForumQuestionRow } from "./forum-response.helpers";
+import {
+  mapForumAdminQuestionDetail,
+  mapForumAdminQuestionItem,
+  toTaxonomyValue,
+  type ForumAnswerRow,
+  type ForumQuestionRow,
+} from "./forum-response.helpers";
 import { recomputeForumQuestionState } from "./forum-state.helpers";
 import type {
   forumAdminListQuerySchema,
@@ -74,6 +80,31 @@ export class ForumAdminService {
       mapForumAdminQuestionItem({ ...row, authorName: nameById.get(row.authorId) ?? "—" }),
     );
     return paginatedResponse(items, total, pagination);
+  }
+
+  // ── Детальная карточка для модерации (тело + все ответы, включая скрытые) ────
+  async getQuestionForModeration(id: string) {
+    const row = await this.prisma.forumQuestion.findUnique({
+      where: { id },
+      include: {
+        rawMaterial: true,
+        questionType: true,
+        answers: { orderBy: { createdAt: "asc" } },
+      },
+    });
+    if (!row) {
+      throw new NotFoundException("Вопрос не найден.");
+    }
+
+    const typedRow = row as ForumQuestionRow & { answers: ForumAnswerRow[] };
+    const authorIds = [...new Set([typedRow.authorId, ...typedRow.answers.map((answer) => answer.authorId)])];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: authorIds } },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    const nameById = new Map(users.map((user) => [user.id, `${user.firstName} ${user.lastName}`.trim()]));
+
+    return mapForumAdminQuestionDetail({ ...typedRow, authorName: nameById.get(typedRow.authorId) ?? "—" }, nameById);
   }
 
   // ── Справочники (две оси) ───────────────────────────────────────────────────
