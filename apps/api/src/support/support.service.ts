@@ -4,16 +4,28 @@ import type { SupportTicketDto } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { paginatedResponse, resolvePagination } from "../common/pagination";
 import { swallowAndLog } from "../common/silent-catch";
+import { publicUrl } from "../files/files-storage.helpers";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 const supportMessageSelect = {
   id: true,
+  authorId: true,
   authorRole: true,
   text: true,
   isInternal: true,
   createdAt: true,
 } satisfies Prisma.SupportTicketMessageSelect;
+
+const supportMessageAuthorSelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  avatarFile: { select: { storageKey: true, accessLevel: true } },
+} satisfies Prisma.UserSelect;
+
+type SupportMessagePayload = Prisma.SupportTicketMessageGetPayload<{ select: typeof supportMessageSelect }>;
+type SupportMessageAuthorPayload = Prisma.UserGetPayload<{ select: typeof supportMessageAuthorSelect }>;
 
 function supportMessages(includeInternal: boolean) {
   const base = {
@@ -22,6 +34,26 @@ function supportMessages(includeInternal: boolean) {
   };
 
   return includeInternal ? base : { ...base, where: { isInternal: false } };
+}
+
+function decorateSupportMessageAuthor(user: SupportMessageAuthorPayload | undefined) {
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    avatarUrl: user.avatarFile ? publicUrl(user.avatarFile.storageKey, user.avatarFile.accessLevel) : null,
+  };
+}
+
+function decorateSupportMessage(message: SupportMessagePayload, authorById: Map<string, SupportMessageAuthorPayload>) {
+  const { authorId, ...publicMessage } = message;
+
+  return {
+    ...publicMessage,
+    author: decorateSupportMessageAuthor(authorById.get(authorId)),
+  };
 }
 
 @Injectable()
@@ -64,7 +96,7 @@ export class SupportService {
 
     await this.notifyTicketCreated(ticket).catch(swallowAndLog("support.ticket.created", { ticketId: ticket.id }));
 
-    return ticket;
+    return this.decorateSupportTicket(ticket);
   }
 
   async listOwn(companyId: string, pagination: { limit?: number; offset?: number } = {}) {
@@ -84,7 +116,9 @@ export class SupportService {
       }),
     ]);
 
-    return paginatedResponse(items, total, { limit, offset });
+    const decoratedItems = await this.decorateSupportTickets(items);
+
+    return paginatedResponse(decoratedItems, total, { limit, offset });
   }
 
   async listAdmin(pagination: { limit?: number; offset?: number } = {}) {
@@ -104,7 +138,9 @@ export class SupportService {
       }),
     ]);
 
-    return paginatedResponse(items, total, { limit, offset });
+    const decoratedItems = await this.decorateSupportTickets(items);
+
+    return paginatedResponse(decoratedItems, total, { limit, offset });
   }
 
   async replyAsCompanyUser(ticketId: string, actorId: string, companyId: string, text: string) {
@@ -154,7 +190,7 @@ export class SupportService {
   private async addReply(ticketId: string, actorId: string, actorRole: "admin" | "company_user", text: string) {
     const status = actorRole === "admin" ? SupportTicketStatus.awaiting_user : SupportTicketStatus.in_progress;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const message = await tx.supportTicketMessage.create({
         data: {
           ticketId,
@@ -172,6 +208,37 @@ export class SupportService {
 
       return { ticket, message };
     });
+
+    return { ...result, ticket: await this.decorateSupportTicket(result.ticket) };
+  }
+
+  private async decorateSupportTicket<T extends { messages?: SupportMessagePayload[] }>(ticket: T) {
+    const [decoratedTicket] = await this.decorateSupportTickets([ticket]);
+    return decoratedTicket;
+  }
+
+  private async decorateSupportTickets<T extends { messages?: SupportMessagePayload[] }>(tickets: T[]) {
+    const authorIds = [
+      ...new Set(tickets.flatMap((ticket) => ticket.messages?.map((message) => message.authorId) ?? [])),
+    ];
+
+    if (authorIds.length === 0) {
+      return tickets.map((ticket) => ({
+        ...ticket,
+        messages: ticket.messages?.map((message) => decorateSupportMessage(message, new Map())),
+      }));
+    }
+
+    const authors = await this.prisma.user.findMany({
+      where: { id: { in: authorIds } },
+      select: supportMessageAuthorSelect,
+    });
+    const authorById = new Map(authors.map((author) => [author.id, author]));
+
+    return tickets.map((ticket) => ({
+      ...ticket,
+      messages: ticket.messages?.map((message) => decorateSupportMessage(message, authorById)),
+    }));
   }
 
   private async notifyTicketCreated(ticket: {

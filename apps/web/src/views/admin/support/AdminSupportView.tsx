@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw, Search } from "lucide-react";
 import "../../../components/support-drawer.css";
@@ -24,6 +24,14 @@ type Message = {
   text: string;
   createdAt: string;
   authorRole: string;
+  author?: SupportMessageAuthor | null;
+};
+
+type SupportMessageAuthor = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
 };
 
 type Ticket = {
@@ -56,8 +64,51 @@ const ticketSortSelectors: Record<TicketSortKey, (ticket: Ticket) => string | nu
   company: (ticket) => ticket.company?.organizationName ?? "",
 };
 
+const supportDateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
+  dateStyle: "short",
+  timeStyle: "short",
+});
+
+function formatSupportDateTime(value: string) {
+  return supportDateTimeFormatter.format(new Date(value));
+}
+
+function supportAuthorInitials(author: SupportMessageAuthor | null, fallbackLabel: string) {
+  const nameParts = author ? [author.firstName, author.lastName].filter(Boolean) : [];
+  const initials = nameParts
+    .map((part) => part.trim()[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("");
+
+  return (initials || fallbackLabel.trim()[0] || "?").toLocaleUpperCase("ru-RU");
+}
+
+function SupportChatAvatar({
+  author,
+  className,
+  fallbackLabel,
+}: {
+  author: SupportMessageAuthor | null;
+  className: string;
+  fallbackLabel: string;
+}) {
+  const avatarUrl = author?.avatarUrl ?? null;
+
+  return (
+    <span
+      className={`${className}${avatarUrl ? " has-image" : ""}`}
+      style={avatarUrl ? { backgroundImage: `url(${avatarUrl})` } : undefined}
+      aria-hidden="true"
+    >
+      {avatarUrl ? null : supportAuthorInitials(author, fallbackLabel)}
+    </span>
+  );
+}
+
 export function AdminSupportView() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const messagesRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filter, setFilter] = useState<Filter>("active");
@@ -111,6 +162,20 @@ export function AdminSupportView() {
   const sortedTickets = useMemo(() => sortItems(filteredTickets, sort, ticketSortSelectors), [filteredTickets, sort]);
   const selectedTicket = useMemo(() => tickets.find((t) => t.id === selectedId) ?? null, [tickets, selectedId]);
   const hasActiveFilters = filter !== "all" || Boolean(query.trim());
+  const currentAdminAuthor: SupportMessageAuthor | null = user
+    ? {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
+      }
+    : null;
+
+  useEffect(() => {
+    const list = messagesRef.current;
+    if (!list) return;
+    list.scrollTop = list.scrollHeight;
+  }, [selectedTicket?.id, selectedTicket?.messages?.length]);
 
   function resetFilters() {
     setFilter("active");
@@ -235,7 +300,7 @@ export function AdminSupportView() {
                       </span>
                       {preview ? <span className="support-inbox-item-preview">{preview}</span> : null}
                       <span className="support-inbox-item-time">
-                        {new Date(ticket.updatedAt).toLocaleString("ru-RU")}
+                        <time dateTime={ticket.updatedAt}>{formatSupportDateTime(ticket.updatedAt)}</time>
                       </span>
                     </button>
                   </li>
@@ -275,28 +340,78 @@ export function AdminSupportView() {
                   </div>
                 </header>
 
-                <div className="support-inbox-thread">
-                  {(selectedTicket.messages ?? []).length === 0 ? (
-                    <p className="page-subtitle">Сообщений пока нет.</p>
-                  ) : null}
-                  {(selectedTicket.messages ?? []).map((m) => (
-                    <div key={m.id} className={`support-inbox-message${m.authorRole === "admin" ? " from-admin" : ""}`}>
-                      <span className="support-inbox-message-author">
-                        {m.authorRole === "admin" ? "Поддержка" : "Клиент"}
-                      </span>
-                      <p>{m.text}</p>
-                      <small>{new Date(m.createdAt).toLocaleString("ru-RU")}</small>
-                    </div>
-                  ))}
-                </div>
+                <div className="support-drawer-chat-surface support-inbox-chat-surface">
+                  <div
+                    aria-label="История переписки"
+                    aria-live="polite"
+                    aria-relevant="additions text"
+                    className="support-drawer-messages support-inbox-thread"
+                    ref={messagesRef}
+                    role="log"
+                    tabIndex={(selectedTicket.messages ?? []).length > 0 ? 0 : undefined}
+                  >
+                    {(selectedTicket.messages ?? []).length === 0 ? (
+                      <p className="support-drawer-thread-empty">Сообщений пока нет.</p>
+                    ) : null}
+                    {(selectedTicket.messages ?? []).map((m) => {
+                      const isAdminReply = m.authorRole === "admin";
+                      const authorLabel = isAdminReply ? "Поддержка" : "Клиент";
+                      const messageAuthor = m.author ?? (isAdminReply ? currentAdminAuthor : null);
 
-                <form className="support-inbox-reply" onSubmit={(event) => onReply(event, selectedTicket.id)}>
-                  <textarea className="textarea" name="text" placeholder="Ответ клиенту" required rows={3} />
-                  <button className="button" type="submit" disabled={sending}>
-                    <SendActionIcon size={18} />
-                    {sending ? "Отправляю…" : "Ответить"}
-                  </button>
-                </form>
+                      return (
+                        <article key={m.id} className={`support-drawer-message${isAdminReply ? " from-user" : ""}`}>
+                          <SupportChatAvatar
+                            author={messageAuthor}
+                            className="support-drawer-message-avatar"
+                            fallbackLabel={authorLabel}
+                          />
+                          <div className="support-drawer-message-bubble">
+                            <header className="support-drawer-message-head">
+                              <strong>{authorLabel}</strong>
+                              <time className="support-drawer-message-time" dateTime={m.createdAt}>
+                                {formatSupportDateTime(m.createdAt)}
+                              </time>
+                            </header>
+                            <p>{m.text}</p>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+
+                  <form
+                    className="support-drawer-reply support-inbox-reply"
+                    onSubmit={(event) => onReply(event, selectedTicket.id)}
+                  >
+                    <SupportChatAvatar
+                      author={currentAdminAuthor}
+                      className="support-drawer-composer-avatar"
+                      fallbackLabel="Поддержка"
+                    />
+                    <div className="support-drawer-composer-body">
+                      <label className="support-drawer-sr-only" htmlFor={`admin-support-reply-${selectedTicket.id}`}>
+                        Ответ клиенту
+                      </label>
+                      <textarea
+                        className="support-drawer-textarea"
+                        id={`admin-support-reply-${selectedTicket.id}`}
+                        name="text"
+                        placeholder="Ответ клиенту"
+                        required
+                        rows={2}
+                      />
+                      <button
+                        aria-label={sending ? "Отправляем ответ" : "Ответить"}
+                        className="button support-drawer-submit"
+                        disabled={sending}
+                        title={sending ? "Отправляем ответ" : "Ответить"}
+                        type="submit"
+                      >
+                        <SendActionIcon size={22} />
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </>
             )}
           </div>

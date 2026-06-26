@@ -67,6 +67,12 @@ type SupportTicket = {
     id: string;
     text: string;
     authorRole: string;
+    author?: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      avatarUrl: string | null;
+    } | null;
     createdAt: string;
     isInternal: boolean;
   }>;
@@ -141,7 +147,6 @@ export const notificationsApi = {
   unreadCount: () => apiFetch<{ count: number }>("/notifications/unread-count"),
   markRead: (id: string) => apiFetch<{ ok: true }>(`/notifications/${enc(id)}/read`, { method: "POST" }),
   markAllRead: () => apiFetch<{ ok: true }>("/notifications/read-all", { method: "POST" }),
-  archive: (id: string) => apiFetch<{ ok: true }>(`/notifications/${enc(id)}/archive`, { method: "POST" }),
   preferences: {
     get: () => apiFetch<NotificationPreferences>("/notifications/preferences"),
     update: (body: { inAppMutedCategories?: string[]; emailMutedCategories?: string[] }) =>

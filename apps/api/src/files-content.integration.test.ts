@@ -452,6 +452,12 @@ describe("Support ownership", () => {
     expect(ownTicket.messages.every((m: { authorId?: string; ticketId?: string }) => !m.authorId && !m.ticketId)).toBe(
       true,
     );
+    expect(
+      ownTicket.messages.every(
+        (m: { author?: { avatarUrl?: string | null } }) =>
+          Boolean(m.author) && Object.prototype.hasOwnProperty.call(m.author, "avatarUrl"),
+      ),
+    ).toBe(true);
 
     // B не видит
     const listB = await ctx.http.get("/api/support/tickets").set("Authorization", `Bearer ${b.token}`);
@@ -480,7 +486,11 @@ describe("Support ownership", () => {
     expect(adminReply.body.messages.some((m: { isInternal: boolean }) => m.isInternal)).toBe(true);
     expect(
       adminReply.body.messages.some(
-        (m: { authorRole: string; text: string }) => m.authorRole === "admin" && m.text === "Ответ админа",
+        (m: { author?: { avatarUrl?: string | null; firstName?: string }; authorRole: string; text: string }) =>
+          m.authorRole === "admin" &&
+          m.text === "Ответ админа" &&
+          m.author?.firstName === "Админ" &&
+          Object.prototype.hasOwnProperty.call(m.author, "avatarUrl"),
       ),
     ).toBe(true);
   });

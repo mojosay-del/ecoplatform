@@ -18,6 +18,17 @@ import {
 import { netDirection, TREND_COLOR } from "./trend";
 import type { IndexPeriod, IndexPoint } from "./types";
 
+const TOOLTIP_MIN_WIDTH = 168;
+const TOOLTIP_TEXT_WIDTH_FACTOR = 10;
+const TOOLTIP_HORIZONTAL_PADDING = 50;
+const TOOLTIP_HEIGHT = 46;
+const TOOLTIP_RADIUS = 23;
+const TOOLTIP_RECT_Y = -40;
+const TOOLTIP_TEXT_CENTER_Y = TOOLTIP_RECT_Y + TOOLTIP_HEIGHT / 2;
+const TOOLTIP_FONT_SIZE = 19;
+const TOOLTIP_OFFSET_Y = 42;
+const TOOLTIP_TOP_GAP = 10;
+
 export function IndexChart({ points, period }: { points: IndexPoint[]; period: IndexPeriod }) {
   // useId даёт стабильный идентификатор и на SSR, и на клиенте. Раньше тут был
   // Math.random(): на сервере и при гидрации значения расходились, из-за чего
@@ -155,9 +166,12 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
 
   // Ширина плашки масштабируем под содержимое: «20 мая · 31 635».
   const tooltipText = `${activeDateLabel} · ${formatIndexPrice(activePrice)}`;
-  const tooltipWidth = Math.max(138, tooltipText.length * 8.4 + 34);
+  const tooltipWidth = Math.max(
+    TOOLTIP_MIN_WIDTH,
+    tooltipText.length * TOOLTIP_TEXT_WIDTH_FACTOR + TOOLTIP_HORIZONTAL_PADDING,
+  );
   const tooltipX = Math.min(Math.max(activeX, tooltipWidth / 2 + 6), width - tooltipWidth / 2 - 6);
-  const tooltipY = Math.max(activeY - 34, padding.top + 7);
+  const tooltipY = Math.max(activeY - TOOLTIP_OFFSET_Y, padding.top + TOOLTIP_TOP_GAP);
   const isHoveringChart = hoverIndex !== null;
 
   return (
@@ -212,18 +226,19 @@ export function IndexChart({ points, period }: { points: IndexPoint[]; period: I
           <rect
             className="index-chart-tooltip-bg"
             x={-tooltipWidth / 2}
-            y="-31"
+            y={TOOLTIP_RECT_Y}
             width={tooltipWidth}
-            height="38"
-            rx="19"
+            height={TOOLTIP_HEIGHT}
+            rx={TOOLTIP_RADIUS}
             fill="#1a202e"
           />
           <text
             className="index-chart-tooltip-text"
             x="0"
-            y="-9"
+            y={TOOLTIP_TEXT_CENTER_Y}
+            dominantBaseline="middle"
             textAnchor="middle"
-            fontSize="15.5"
+            fontSize={TOOLTIP_FONT_SIZE}
             fontWeight="700"
             fill="white"
           >

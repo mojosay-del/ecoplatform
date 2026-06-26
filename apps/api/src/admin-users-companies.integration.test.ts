@@ -8,12 +8,14 @@ import {
   ContentStatus,
   FileAccessLevel,
   LegalDocumentType,
+  NotificationCategory,
   PlatformRole,
   SanctionType,
   SubscriptionStatus,
   UserStatus,
 } from "@prisma/client";
 import { BillingNotificationsService } from "./billing/billing-notifications.service";
+import { NotificationsService } from "./notifications/notifications.service";
 import { SchedulerService } from "./scheduler/scheduler.service";
 import { setupIntegrationContext } from "./test/integration-context";
 import {
@@ -346,6 +348,37 @@ describe("Email channel queue (задел)", () => {
     expect(archive.status).toBe(201);
     expect(archive.body.archivedAt).toBeTruthy();
     expect(archive.body).not.toHaveProperty("payload");
+  });
+
+  it("автоматически архивирует уведомления старше 100 активных", async () => {
+    const company = await registerCompany("0699912");
+    const service = ctx.app.get(NotificationsService);
+
+    for (let i = 0; i < 101; i += 1) {
+      await service.createInApp({
+        userId: company.userId,
+        eventType: "audit.notification.retention",
+        sourceId: String(i),
+        category: NotificationCategory.system,
+        title: `Уведомление ${i}`,
+        body: "Проверка автоматического ограничения списка.",
+        link: "/notifications",
+      });
+    }
+
+    const activeCount = await ctx.prisma.inAppNotification.count({
+      where: { userId: company.userId, archivedAt: null },
+    });
+    const archivedCount = await ctx.prisma.inAppNotification.count({
+      where: { userId: company.userId, archivedAt: { not: null } },
+    });
+    expect(activeCount).toBe(100);
+    expect(archivedCount).toBe(1);
+
+    const list = await ctx.http.get("/api/notifications?limit=100").set("Authorization", `Bearer ${company.token}`);
+    expect(list.status).toBe(200);
+    expect(list.body.total).toBe(100);
+    expect(list.body.items).toHaveLength(100);
   });
 
   it("preferences API сохраняет только управляемые категории", async () => {

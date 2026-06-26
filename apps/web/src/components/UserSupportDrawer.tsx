@@ -23,6 +23,14 @@ type Message = {
   text: string;
   createdAt: string;
   authorRole?: string;
+  author?: SupportMessageAuthor | null;
+};
+
+type SupportMessageAuthor = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
 };
 
 type Ticket = {
@@ -39,6 +47,48 @@ type DrawerProps = {
   open: boolean;
   onClose: () => void;
 };
+
+const supportDateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
+  dateStyle: "short",
+  timeStyle: "short",
+});
+
+function formatSupportDateTime(value: string) {
+  return supportDateTimeFormatter.format(new Date(value));
+}
+
+function supportAuthorInitials(author: SupportMessageAuthor | null, fallbackLabel: string) {
+  const nameParts = author ? [author.firstName, author.lastName].filter(Boolean) : [];
+  const initials = nameParts
+    .map((part) => part.trim()[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("");
+
+  return (initials || fallbackLabel.trim()[0] || "?").toLocaleUpperCase("ru-RU");
+}
+
+function SupportDrawerAvatar({
+  author,
+  className,
+  fallbackLabel,
+}: {
+  author: SupportMessageAuthor | null;
+  className: string;
+  fallbackLabel: string;
+}) {
+  const avatarUrl = author?.avatarUrl ?? null;
+
+  return (
+    <span
+      className={`${className}${avatarUrl ? " has-image" : ""}`}
+      style={avatarUrl ? { backgroundImage: `url(${avatarUrl})` } : undefined}
+      aria-hidden="true"
+    >
+      {avatarUrl ? null : supportAuthorInitials(author, fallbackLabel)}
+    </span>
+  );
+}
 
 export function UserSupportDrawer({ open, onClose }: DrawerProps) {
   const { token } = useAuth();
@@ -128,6 +178,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
 
         {activeTicket ? (
           <TicketThread
+            key={activeTicket.id}
             ticket={activeTicket}
             onReplied={() => {
               ticketsQuery.reload();
@@ -179,7 +230,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                         </div>
                         <span className="support-drawer-ticket-meta">
                           {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
-                          {new Date(ticket.updatedAt).toLocaleString("ru-RU")}
+                          <time dateTime={ticket.updatedAt}>{formatSupportDateTime(ticket.updatedAt)}</time>
                         </span>
                       </button>
                     </li>
@@ -233,7 +284,8 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
 }
 
 function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => void }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const messagesRef = useRef<HTMLDivElement>(null);
   const [reply, setReply] = useState("");
 
   const sendReply = useMutation({
@@ -252,6 +304,20 @@ function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => 
   }
 
   const messages = ticket.messages ?? [];
+  const currentUserAuthor: SupportMessageAuthor | null = user
+    ? {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
+      }
+    : null;
+
+  useEffect(() => {
+    const list = messagesRef.current;
+    if (!list) return;
+    list.scrollTop = list.scrollHeight;
+  }, [messages.length, ticket.id]);
 
   return (
     <div className="support-drawer-thread">
@@ -264,28 +330,72 @@ function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => 
           </StatusPill>
         </span>
       </header>
-      <div className="support-drawer-messages">
-        {messages.length === 0 ? <p className="page-subtitle">Пока нет сообщений.</p> : null}
-        {messages.map((m) => (
-          <div key={m.id} className={`support-drawer-message${m.authorRole === "admin" ? " from-admin" : ""}`}>
-            <p>{m.text}</p>
-            <small>{new Date(m.createdAt).toLocaleString("ru-RU")}</small>
+      <div className="support-drawer-chat-surface">
+        <div
+          aria-label="История переписки"
+          aria-live="polite"
+          aria-relevant="additions text"
+          className="support-drawer-messages"
+          ref={messagesRef}
+          role="log"
+          tabIndex={messages.length > 0 ? 0 : undefined}
+        >
+          {messages.length === 0 ? <p className="support-drawer-thread-empty">Пока нет сообщений.</p> : null}
+          {messages.map((m) => {
+            const isSupportReply = m.authorRole === "admin";
+            const authorLabel = isSupportReply ? "Поддержка" : "Вы";
+            const messageAuthor = m.author ?? (isSupportReply ? null : currentUserAuthor);
+
+            return (
+              <article key={m.id} className={`support-drawer-message${isSupportReply ? " from-admin" : " from-user"}`}>
+                <SupportDrawerAvatar
+                  author={messageAuthor}
+                  className="support-drawer-message-avatar"
+                  fallbackLabel={authorLabel}
+                />
+                <div className="support-drawer-message-bubble">
+                  <header className="support-drawer-message-head">
+                    <strong>{authorLabel}</strong>
+                    <time className="support-drawer-message-time" dateTime={m.createdAt}>
+                      {formatSupportDateTime(m.createdAt)}
+                    </time>
+                  </header>
+                  <p>{m.text}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        <form className="support-drawer-reply" onSubmit={send}>
+          <SupportDrawerAvatar
+            author={currentUserAuthor}
+            className="support-drawer-composer-avatar"
+            fallbackLabel="Вы"
+          />
+          <div className="support-drawer-composer-body">
+            <label className="support-drawer-sr-only" htmlFor={`support-reply-${ticket.id}`}>
+              Ваш ответ
+            </label>
+            <textarea
+              className="support-drawer-textarea"
+              id={`support-reply-${ticket.id}`}
+              placeholder="Сообщение"
+              value={reply}
+              onChange={(event) => setReply(event.target.value)}
+              rows={2}
+            />
+            <button
+              aria-label={sendReply.isPending ? "Отправляем ответ" : "Ответить"}
+              className="button support-drawer-submit"
+              disabled={sendReply.isPending || !reply.trim()}
+              title={sendReply.isPending ? "Отправляем ответ" : "Ответить"}
+              type="submit"
+            >
+              <SendActionIcon size={22} />
+            </button>
           </div>
-        ))}
+        </form>
       </div>
-      <form className="support-drawer-reply" onSubmit={send}>
-        <textarea
-          className="textarea"
-          placeholder="Ваш ответ…"
-          value={reply}
-          onChange={(event) => setReply(event.target.value)}
-          rows={3}
-        />
-        <button className="button" type="submit" disabled={sendReply.isPending || !reply.trim()}>
-          <SendActionIcon size={18} />
-          {sendReply.isPending ? "Отправляю…" : "Ответить"}
-        </button>
-      </form>
     </div>
   );
 }

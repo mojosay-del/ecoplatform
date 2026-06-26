@@ -49,6 +49,8 @@ const publicNotificationSelect = {
   createdAt: true,
 } satisfies Prisma.InAppNotificationSelect;
 
+const MAX_ACTIVE_IN_APP_NOTIFICATIONS = 100;
+
 @Injectable()
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -124,7 +126,7 @@ export class NotificationsService {
         update: {},
       });
 
-      return tx.inAppNotification.upsert({
+      const notification = await tx.inAppNotification.upsert({
         where: { domainEventId_userId: { domainEventId, userId: input.userId } },
         create: {
           userId: input.userId,
@@ -140,6 +142,10 @@ export class NotificationsService {
         },
         update: { deliveryId: delivery.id },
       });
+
+      await this.archiveOverflowingInAppNotifications(tx, input.userId, now);
+
+      return notification;
     });
     if (!inAppMuted) {
       recordNotificationSent(input.category, "in_app");
@@ -162,6 +168,29 @@ export class NotificationsService {
     });
 
     return Promise.all(admins.map((admin) => this.createInApp({ ...input, userId: admin.userId })));
+  }
+
+  private async archiveOverflowingInAppNotifications(tx: Prisma.TransactionClient, userId: string, archivedAt: Date) {
+    const overflow = await tx.inAppNotification.findMany({
+      where: {
+        userId,
+        archivedAt: null,
+        category: { notIn: [...DISABLED_CATEGORIES] },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: MAX_ACTIVE_IN_APP_NOTIFICATIONS,
+      select: { id: true },
+    });
+
+    if (overflow.length === 0) return;
+
+    await tx.inAppNotification.updateMany({
+      where: {
+        id: { in: overflow.map((notification) => notification.id) },
+        archivedAt: null,
+      },
+      data: { archivedAt },
+    });
   }
 
   async list(user: RequestUser, options: { includeArchived?: boolean; limit?: number; offset?: number } = {}) {

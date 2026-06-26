@@ -21,11 +21,67 @@ describe("SupportService", () => {
         include: {
           messages: expect.objectContaining({
             where: { isInternal: false },
-            select: expect.not.objectContaining({ authorId: true, ticketId: true }),
+            select: expect.objectContaining({ authorId: true }),
           }),
         },
       }),
     );
+    expect(findMany.mock.calls[0]?.[0]?.include?.messages?.select).not.toEqual(
+      expect.objectContaining({ ticketId: true }),
+    );
+  });
+
+  it("decorates messages with public author data without exposing author ids", async () => {
+    const createdAt = new Date("2026-06-26T09:16:00.000Z");
+    const service = new SupportService({
+      $transaction: vi.fn().mockResolvedValue([
+        1,
+        [
+          {
+            id: "ticket-1",
+            messages: [
+              {
+                id: "message-1",
+                authorId: "user-1",
+                authorRole: "company_user",
+                text: "Описание",
+                isInternal: false,
+                createdAt,
+              },
+            ],
+          },
+        ],
+      ]),
+      supportTicket: {
+        count: vi.fn().mockReturnValue("count-query"),
+        findMany: vi.fn().mockReturnValue("items-query"),
+      },
+      user: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "user-1",
+            firstName: "Иван",
+            lastName: "Ферум",
+            avatarFile: null,
+          },
+        ]),
+      },
+    } as any);
+
+    const result = await service.listOwn("company-1");
+    const message = result.items[0].messages[0];
+
+    expect(message).toMatchObject({
+      id: "message-1",
+      text: "Описание",
+      author: {
+        id: "user-1",
+        firstName: "Иван",
+        lastName: "Ферум",
+        avatarUrl: null,
+      },
+    });
+    expect(message).not.toHaveProperty("authorId");
   });
 
   it("does not let company users reply to another company's ticket", async () => {

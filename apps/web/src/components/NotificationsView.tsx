@@ -21,16 +21,28 @@ const categoryIcons: Record<string, LucideIcon> = {
 };
 
 const NOTIFICATIONS_PAGE_SIZE = 30;
+const notificationDateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+function formatNotificationDateTime(value: string) {
+  return notificationDateTimeFormatter.format(new Date(value));
+}
 
 export function NotificationsView() {
   const { token } = useAuth();
-  const { markRead, markAllRead, archive } = useNotificationMutations();
+  const { markRead, markAllRead } = useNotificationMutations();
   const notifications = useInfiniteApiQuery<NotificationItem>(
     token ? queryKeys.notifications.list() : null,
     NOTIFICATIONS_PAGE_SIZE,
     ({ limit, offset }) => api.notifications.list({ limit, offset }),
   );
   const items = notifications.items;
+  const hasUnread = items.some((item) => !item.readAt);
 
   // Открытие страницы помечает всё прочитанным — один раз за монтирование.
   // Мутация инвалидирует кэш уведомлений → список и счётчик в колокольчике
@@ -66,10 +78,25 @@ export function NotificationsView() {
 
   return (
     <AppShell>
-      <section className="page">
-        <header className="page-header">
-          <h1 className="page-title">Уведомления</h1>
-          <p className="page-subtitle">Все системные сообщения по вашему аккаунту.</p>
+      <section className="page notifications-page">
+        <header className="page-header notifications-page-header">
+          <div className="notifications-header-copy">
+            <h1 className="page-title">Уведомления</h1>
+            <p className="page-subtitle">Последние системные сообщения по вашему аккаунту.</p>
+          </div>
+          {isReady && hasUnread ? (
+            <div className="notifications-header-actions">
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => markAllRead.mutate()}
+                disabled={markAllRead.isPending}
+              >
+                <CheckCheck aria-hidden size={16} />
+                Отметить прочитанными
+              </button>
+            </div>
+          ) : null}
         </header>
         {notifications.errorMessage && !notifications.isInitialLoading ? (
           <StatusPill as="p" variant="danger">
@@ -79,16 +106,6 @@ export function NotificationsView() {
         {notifications.isInitialLoading ? <p className="page-subtitle">Загрузка…</p> : null}
         {isReady ? (
           <>
-            <div className="notifications-toolbar">
-              <button
-                className="button secondary"
-                onClick={() => markAllRead.mutate()}
-                disabled={items.every((item) => item.readAt) || markAllRead.isPending}
-              >
-                <CheckCheck aria-hidden size={16} />
-                Отметить все прочитанными
-              </button>
-            </div>
             {items.length === 0 ? (
               <div className="notification-empty">
                 <span className="notification-empty-icon" aria-hidden>
@@ -98,7 +115,7 @@ export function NotificationsView() {
                 <p className="page-subtitle">Здесь появятся системные сообщения по вашему аккаунту.</p>
               </div>
             ) : (
-              <div className="notification-list">
+              <div className="notification-list" role="list" aria-label="Список уведомлений">
                 {items.map((item) => {
                   const Icon = categoryIcons[item.category] ?? Settings;
                   return (
@@ -106,6 +123,7 @@ export function NotificationsView() {
                       className={`notification-card ${item.readAt ? "is-read" : "is-unread"}`}
                       data-category={item.category}
                       key={item.id}
+                      role="listitem"
                     >
                       <div className="notification-icon" aria-hidden>
                         <Icon size={18} />
@@ -115,7 +133,9 @@ export function NotificationsView() {
                           <span className="notification-cat">
                             {NOTIFICATION_CATEGORY_LABELS[item.category] ?? item.category}
                           </span>
-                          <time className="notification-time">{new Date(item.createdAt).toLocaleString("ru-RU")}</time>
+                          <time className="notification-time" dateTime={item.createdAt}>
+                            {formatNotificationDateTime(item.createdAt)}
+                          </time>
                         </div>
                         <h2 className="notification-title">{item.title}</h2>
                         <p className="notification-text">{item.body}</p>
@@ -126,13 +146,15 @@ export function NotificationsView() {
                             </Link>
                           ) : null}
                           {!item.readAt ? (
-                            <button className="button ghost" onClick={() => markRead.mutate(item.id)}>
+                            <button
+                              className="button ghost"
+                              type="button"
+                              onClick={() => markRead.mutate(item.id)}
+                              disabled={markRead.isPending}
+                            >
                               Прочитано
                             </button>
                           ) : null}
-                          <button className="button ghost" onClick={() => archive.mutate(item.id)}>
-                            В архив
-                          </button>
                         </div>
                       </div>
                     </article>
@@ -141,8 +163,9 @@ export function NotificationsView() {
               </div>
             )}
             <div ref={notifications.sentinelRef} aria-hidden="true" />
-            {notifications.isLoadingMore ? <p className="page-subtitle">Загружаем ещё…</p> : null}
-            {!notifications.hasMore && items.length > 0 ? <p className="page-subtitle">Это все записи.</p> : null}
+            {notifications.isLoadingMore ? (
+              <p className="page-subtitle notifications-loading-more">Загружаем ещё…</p>
+            ) : null}
           </>
         ) : null}
       </section>

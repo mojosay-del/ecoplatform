@@ -85,10 +85,5 @@ export function useNotificationMutations() {
     onSuccess: invalidate,
   });
 
-  const archive = useMutation({
-    mutationFn: (id: string) => api.notifications.archive(id),
-    onSuccess: invalidate,
-  });
-
-  return { markRead, markAllRead, archive };
+  return { markRead, markAllRead };
 }
