@@ -15,10 +15,15 @@ function buildPrismaMock(options: {
 
   const deliveryUpsert = vi.fn(({ create }) => Promise.resolve({ id: `delivery-${create.channel}`, ...create }));
   const notificationUpsert = vi.fn(({ create }) => Promise.resolve({ id: `note-${create.domainEventId}`, ...create }));
+  // archiveOverflowingInAppNotifications трогает findMany/updateMany — по умолчанию
+  // «переполнения нет» (пустой findMany), чтобы не мешать основным проверкам.
+  const notificationFindMany = vi.fn().mockResolvedValue([]);
+  const notificationUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 
-  const tx = {
-    notificationDelivery: { upsert: deliveryUpsert },
-    inAppNotification: { upsert: notificationUpsert },
+  const inAppNotification = {
+    upsert: notificationUpsert,
+    findMany: notificationFindMany,
+    updateMany: notificationUpdateMany,
   };
 
   const prisma: any = {
@@ -33,11 +38,11 @@ function buildPrismaMock(options: {
       findMany: vi.fn().mockResolvedValue(admins),
     },
     notificationDelivery: { upsert: deliveryUpsert },
-    inAppNotification: { upsert: notificationUpsert },
+    inAppNotification,
     $transaction: (callback: (tx: typeof prisma) => unknown) => Promise.resolve(callback(prisma)),
   };
 
-  return { prisma, deliveryUpsert, notificationUpsert };
+  return { prisma, deliveryUpsert, notificationUpsert, notificationFindMany, notificationUpdateMany };
 }
 
 describe("NotificationsService", () => {
