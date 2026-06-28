@@ -1,4 +1,5 @@
 import { SUBSCRIPTION_PLAN_TITLE_LABELS } from "../../lib/display-labels";
+import { formatDateTime } from "../../lib/formatters";
 
 // Приветствие по времени суток. Значение по умолчанию ("Добрый день")
 // одинаково на сервере и при первом клиентском рендере — гидратация не рвётся,
@@ -51,7 +52,7 @@ export function describeSubscription(
 }
 
 export function formatAccountDateTime(value?: string | Date | null) {
-  return value ? new Date(value).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" }) : "—";
+  return formatDateTime(value);
 }
 
 export function formatAccountDate(value?: string | Date | null) {

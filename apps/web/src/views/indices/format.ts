@@ -17,11 +17,8 @@ export function pickRecentSeries(chart: Partial<Record<IndexPeriod, IndexPoint[]
   return [];
 }
 
-export function formatIndexPrice(value: number) {
-  return value.toLocaleString("ru-RU", {
-    maximumFractionDigits: 1,
-  });
-}
+// Значение индекса (число с одним знаком после запятой, ru-RU) — общий форматтер.
+export { formatDecimal1 as formatIndexPrice } from "../../lib/formatters";
 
 export function formatIndexDateLabel(date: Date, period: IndexPeriod) {
   const month = MONTH_LABELS[date.getMonth()];
