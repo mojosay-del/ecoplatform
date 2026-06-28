@@ -94,7 +94,7 @@ apps/
   api/                         NestJS-сервер
     prisma/
       schema.prisma            модель PostgreSQL
-      migrations/              30 SQL-миграций (2026-05-20 … 2026-06-04)
+      migrations/              62 SQL-миграции (2026-05-20 … 2026-06-21)
       seed.ts                  сидер admin/demo + юр-документы
     src/
       auth/                    регистрация, вход, JWT, refresh-cookie, lockout,
@@ -113,7 +113,7 @@ apps/
     app/                       публичные и админ-маршруты
     src/
       views/                   страницы по доменам:
-                               account, admin/* (13 панелей), news, indices,
+                               account, admin/* (17 панелей), news, indices,
                                learning, knowledge-base (content-blocks — рендер блоков)
       components/              app-shell, auth (формы/поля/степпер), editor
       components/editor/ + lib/editor/   Tiptap-редактор CMS + сериализатор «блоки ↔ Tiptap»
