@@ -10,7 +10,15 @@ import type { AdminStaffSummary } from "@ecoplatform/shared";
 import { visibleAdminHomeGroups } from "../../../components/admin-panel-tabs";
 import { formatNumber } from "./format";
 
-export function AdminQuickLinks({ groups }: { groups: ReturnType<typeof visibleAdminHomeGroups> }) {
+export function AdminQuickLinks({
+  groups,
+  badges,
+}: {
+  groups: ReturnType<typeof visibleAdminHomeGroups>;
+  // Карта href → число для бейджа на карточке раздела (напр. сколько обращений
+  // ждут ответа). Универсальная — годится и для будущих очередей.
+  badges?: Record<string, number>;
+}) {
   return (
     <section className="admin-home-shortcuts" aria-labelledby="admin-home-shortcuts-title">
       <header className="admin-home-shortcuts-head">
@@ -29,6 +37,7 @@ export function AdminQuickLinks({ groups }: { groups: ReturnType<typeof visibleA
             <div className="admin-home-links">
               {group.items.map((item, index) => {
                 const Icon = item.icon;
+                const badge = badges?.[item.href] ?? 0;
                 return (
                   <Link
                     className="admin-home-link"
@@ -43,6 +52,11 @@ export function AdminQuickLinks({ groups }: { groups: ReturnType<typeof visibleA
                       <strong className="admin-home-link-title">{item.label}</strong>
                       <small className="admin-home-link-description">{item.description}</small>
                     </span>
+                    {badge > 0 ? (
+                      <span className="admin-home-link-badge" aria-label={`${badge} в очереди`}>
+                        {badge > 99 ? "99+" : badge}
+                      </span>
+                    ) : null}
                     <ArrowRight className="admin-home-link-arrow" aria-hidden size={17} />
                   </Link>
                 );

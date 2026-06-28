@@ -1,11 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import {
-  NotificationCategory,
-  NotificationChannel,
-  NotificationDeliveryStatus,
-  PlatformRole,
-  Prisma,
-} from "@prisma/client";
+import { NotificationCategory, NotificationChannel, NotificationDeliveryStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import type { RequestUser } from "../common/request-user";
 import { recordNotificationSent } from "../observability/metrics.registry";
@@ -159,15 +153,6 @@ export class NotificationsService {
   private async lookupEmailAddress(userId: string): Promise<string | null> {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     return user?.email ?? null;
-  }
-
-  async createInAppForAdmins(input: Omit<CreateInAppNotificationInput, "userId">) {
-    const admins = await this.prisma.platformStaff.findMany({
-      where: { isActive: true, roles: { has: PlatformRole.admin } },
-      select: { userId: true },
-    });
-
-    return Promise.all(admins.map((admin) => this.createInApp({ ...input, userId: admin.userId })));
   }
 
   private async archiveOverflowingInAppNotifications(tx: Prisma.TransactionClient, userId: string, archivedAt: Date) {

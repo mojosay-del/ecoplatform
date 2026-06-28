@@ -10,6 +10,7 @@ import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { errorText, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../lib/display-labels";
+import { formatDateTime } from "../lib/formatters";
 import { useDialogA11y } from "../lib/use-dialog-a11y";
 import { useInfiniteApiQuery } from "../lib/use-infinite-api-query";
 
@@ -47,15 +48,6 @@ type DrawerProps = {
   open: boolean;
   onClose: () => void;
 };
-
-const supportDateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
-  dateStyle: "short",
-  timeStyle: "short",
-});
-
-function formatSupportDateTime(value: string) {
-  return supportDateTimeFormatter.format(new Date(value));
-}
 
 function supportAuthorInitials(author: SupportMessageAuthor | null, fallbackLabel: string) {
   const nameParts = author ? [author.firstName, author.lastName].filter(Boolean) : [];
@@ -230,7 +222,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                         </div>
                         <span className="support-drawer-ticket-meta">
                           {SUPPORT_CATEGORY_LABELS[ticket.category] ?? ticket.category} ·{" "}
-                          <time dateTime={ticket.updatedAt}>{formatSupportDateTime(ticket.updatedAt)}</time>
+                          <time dateTime={ticket.updatedAt}>{formatDateTime(ticket.updatedAt)}</time>
                         </span>
                       </button>
                     </li>
@@ -357,7 +349,7 @@ function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => 
                   <header className="support-drawer-message-head">
                     <strong>{authorLabel}</strong>
                     <time className="support-drawer-message-time" dateTime={m.createdAt}>
-                      {formatSupportDateTime(m.createdAt)}
+                      {formatDateTime(m.createdAt)}
                     </time>
                   </header>
                   <p>{m.text}</p>

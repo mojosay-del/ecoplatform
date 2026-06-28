@@ -7,11 +7,9 @@ import { NotificationsService } from "./notifications.service";
 function buildPrismaMock(options: {
   preferences?: { inAppMutedCategories: NotificationCategory[]; emailMutedCategories: NotificationCategory[] } | null;
   userEmail?: string | null;
-  admins?: Array<{ userId: string }>;
 }) {
   const preferences = options.preferences ?? null;
   const userEmail = options.userEmail ?? null;
-  const admins = options.admins ?? [];
 
   const deliveryUpsert = vi.fn(({ create }) => Promise.resolve({ id: `delivery-${create.channel}`, ...create }));
   const notificationUpsert = vi.fn(({ create }) => Promise.resolve({ id: `note-${create.domainEventId}`, ...create }));
@@ -33,9 +31,6 @@ function buildPrismaMock(options: {
     },
     user: {
       findUnique: vi.fn().mockResolvedValue(userEmail ? { email: userEmail } : null),
-    },
-    platformStaff: {
-      findMany: vi.fn().mockResolvedValue(admins),
     },
     notificationDelivery: { upsert: deliveryUpsert },
     inAppNotification,
@@ -157,29 +152,6 @@ describe("NotificationsService", () => {
     });
     const billingChannels = deliveryUpsert.mock.calls.map((args) => args[0].create.channel);
     expect(billingChannels).toEqual(expect.arrayContaining([NotificationChannel.in_app, NotificationChannel.email]));
-  });
-
-  it("createInAppForAdmins зовёт createInApp для каждого активного админа и не для других", async () => {
-    const { prisma, notificationUpsert } = buildPrismaMock({
-      preferences: null,
-      userEmail: "admin@test.local",
-      admins: [{ userId: "admin-1" }, { userId: "admin-2" }],
-    });
-    const service = new NotificationsService(prisma);
-
-    await service.createInAppForAdmins({
-      eventType: "system.event",
-      category: NotificationCategory.system,
-      title: "—",
-      body: "—",
-    });
-
-    expect(prisma.platformStaff.findMany).toHaveBeenCalledWith({
-      where: { isActive: true, roles: { has: "admin" } },
-      select: { userId: true },
-    });
-    const recipientIds = notificationUpsert.mock.calls.map((args) => args[0].create.userId);
-    expect(recipientIds).toEqual(["admin-1", "admin-2"]);
   });
 
   it("updatePreferences сохраняет только управляемые категории", async () => {

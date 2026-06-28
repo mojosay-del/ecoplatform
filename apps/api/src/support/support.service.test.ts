@@ -143,4 +143,44 @@ describe("SupportService", () => {
       }),
     );
   });
+
+  it("countAwaitingAdmin считает только обращения в статусах new и in_progress", async () => {
+    const count = vi.fn().mockResolvedValue(7);
+    const service = new SupportService({
+      supportTicket: { count },
+    } as any);
+
+    const result = await service.countAwaitingAdmin();
+
+    expect(count).toHaveBeenCalledWith({
+      where: { status: { in: ["new", "in_progress"] } },
+    });
+    expect(result).toEqual({ count: 7 });
+  });
+
+  it("ответ админа уведомляет автора обращения и не веерит уведомления на админов", async () => {
+    const createInApp = vi.fn().mockResolvedValue(null);
+    const service = new SupportService(
+      {
+        $transaction: (callback: any) =>
+          callback({
+            supportTicketMessage: { create: vi.fn().mockResolvedValue({ id: "message-9" }) },
+            supportTicket: { update: vi.fn().mockResolvedValue({ id: "ticket-1", messages: [] }) },
+          }),
+        supportTicket: {
+          findUnique: vi.fn().mockResolvedValue({ id: "ticket-1", subject: "Тема", authorId: "user-7" }),
+        },
+        user: { findMany: vi.fn().mockResolvedValue([]) },
+      } as any,
+      undefined,
+      { createInApp } as any,
+    );
+
+    await service.replyAsAdmin("ticket-1", "admin-1", "Ответ");
+
+    expect(createInApp).toHaveBeenCalledTimes(1);
+    expect(createInApp).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-7", eventType: "support.ticket.replied_by_admin" }),
+    );
+  });
 });

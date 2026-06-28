@@ -87,14 +87,8 @@ export class SupportService {
           },
         },
       },
-      include: {
-        author: { select: { id: true, firstName: true, lastName: true, email: true } },
-        company: { select: { id: true, organizationName: true } },
-        messages: supportMessages(false),
-      },
+      include: { messages: supportMessages(false) },
     });
-
-    await this.notifyTicketCreated(ticket).catch(swallowAndLog("support.ticket.created", { ticketId: ticket.id }));
 
     return this.decorateSupportTicket(ticket);
   }
@@ -111,7 +105,7 @@ export class SupportService {
         take: limit,
         skip: offset,
         // Сообщения остаются в выдаче — UI рендерит thread прямо из listing,
-        // отдельной /tickets/:id-ручки пока нет (см. PROGRESS.md, 4.1).
+        // отдельной /tickets/:id-ручки пока нет.
         include: { messages: supportMessages(false) },
       }),
     ]);
@@ -143,15 +137,22 @@ export class SupportService {
     return paginatedResponse(decoratedItems, total, { limit, offset });
   }
 
+  // Очередь поддержки: сколько обращений ждут ответа администратора. Это источник
+  // правды для бейджа в админ-навигации — персональных уведомлений админам по
+  // обращениям мы не шлём, чтобы при тысячах обращений не засыпать их колокольчик.
+  async countAwaitingAdmin() {
+    const count = await this.prisma.supportTicket.count({
+      where: { status: { in: [SupportTicketStatus.new, SupportTicketStatus.in_progress] } },
+    });
+    return { count };
+  }
+
   async replyAsCompanyUser(ticketId: string, actorId: string, companyId: string, text: string) {
     // Владелец обращения определяется не пользователем из запроса, а компанией:
     // так сотрудник одной компании не сможет ответить в чужой тикет, даже зная id.
     const ticket = await this.prisma.supportTicket.findFirst({
       where: { id: ticketId, companyId },
-      include: {
-        author: { select: { id: true, firstName: true, lastName: true, email: true } },
-        company: { select: { id: true, organizationName: true } },
-      },
+      select: { id: true },
     });
 
     if (!ticket) {
@@ -159,9 +160,6 @@ export class SupportService {
     }
 
     const result = await this.addReply(ticket.id, actorId, "company_user", text);
-    await this.notifyUserReply(ticket, result.message.id).catch(
-      swallowAndLog("support.user.reply", { ticketId: ticket.id }),
-    );
 
     return result.ticket;
   }
@@ -169,10 +167,7 @@ export class SupportService {
   async replyAsAdmin(ticketId: string, actorId: string, text: string) {
     const ticket = await this.prisma.supportTicket.findUnique({
       where: { id: ticketId },
-      include: {
-        author: { select: { id: true, firstName: true, lastName: true, email: true } },
-        company: { select: { id: true, organizationName: true } },
-      },
+      select: { id: true, subject: true, authorId: true },
     });
 
     if (!ticket) {
@@ -241,26 +236,6 @@ export class SupportService {
     }));
   }
 
-  private async notifyTicketCreated(ticket: {
-    id: string;
-    subject: string;
-    category: string;
-    author: { firstName: string; lastName: string };
-    company: { organizationName: string };
-  }) {
-    if (!this.notifications) return;
-
-    await this.notifications.createInAppForAdmins({
-      eventType: "support.ticket.created",
-      sourceId: ticket.id,
-      category: NotificationCategory.support,
-      title: "Новое обращение в поддержку",
-      body: `${ticket.company.organizationName}: ${ticket.subject}. Автор: ${ticket.author.firstName} ${ticket.author.lastName}.`,
-      link: "/admin/support",
-      payload: { ticketId: ticket.id, category: ticket.category },
-    });
-  }
-
   private async notifyAdminReply(ticket: { id: string; subject: string; authorId: string }, messageId: string) {
     if (!this.notifications) return;
 
@@ -272,28 +247,6 @@ export class SupportService {
       title: "Ответ поддержки",
       body: `По обращению «${ticket.subject}» появился ответ администратора.`,
       link: "/account",
-      payload: { ticketId: ticket.id, messageId },
-    });
-  }
-
-  private async notifyUserReply(
-    ticket: {
-      id: string;
-      subject: string;
-      author: { firstName: string; lastName: string };
-      company: { organizationName: string };
-    },
-    messageId: string,
-  ) {
-    if (!this.notifications) return;
-
-    await this.notifications.createInAppForAdmins({
-      eventType: "support.ticket.replied_by_user",
-      sourceId: messageId,
-      category: NotificationCategory.support,
-      title: "Новый ответ в обращении",
-      body: `${ticket.company.organizationName}: ${ticket.subject}. Ответил ${ticket.author.firstName} ${ticket.author.lastName}.`,
-      link: "/admin/support",
       payload: { ticketId: ticket.id, messageId },
     });
   }

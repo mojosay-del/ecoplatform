@@ -168,6 +168,10 @@ export const supportApi = {
     apiFetch<SupportTicket>("/support/tickets", { method: "POST", body }),
   replyToTicket: (id: string, body: { text: string }) =>
     apiFetch<{ ok: true }>(`/support/tickets/${enc(id)}/replies`, { method: "POST", body }),
+  // Очередь админа: сколько обращений ждут ответа (new + in_progress). Лёгкий
+  // счётчик для бейджа в админ-лаунчпаде и заголовке страницы поддержки —
+  // он заменил персональные уведомления админам на каждое сообщение.
+  adminAwaitingCount: () => apiFetch<{ count: number }>("/admin/support/awaiting-count"),
 };
 
 export const moderationApi = {

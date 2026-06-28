@@ -17,6 +17,7 @@ import { errorText, api } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { AppShell } from "../../../components/AppShell";
 import { visibleAdminHomeGroups } from "../../../components/admin-panel-tabs";
+import { useSupportAwaitingCount } from "../../../lib/support/use-support-queue";
 import { AdminCommandCenter } from "./command-center";
 import { AdminQuickLinks, StaffRoleSummary } from "./quick-links";
 
@@ -91,6 +92,7 @@ export function AdminHomeView() {
   }, [isAdmin, ready, token]);
 
   const groups = visibleAdminHomeGroups(roles);
+  const supportAwaiting = useSupportAwaitingCount();
 
   return (
     <AppShell>
@@ -113,7 +115,7 @@ export function AdminHomeView() {
         {groups.length === 0 ? (
           <p className="page-subtitle">Открываем основной раздел…</p>
         ) : (
-          <AdminQuickLinks groups={groups} />
+          <AdminQuickLinks groups={groups} badges={{ "/admin/support": supportAwaiting }} />
         )}
       </section>
     </AppShell>

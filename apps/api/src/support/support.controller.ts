@@ -61,6 +61,13 @@ export class SupportController {
 
   @UseGuards(RolesGuard)
   @Roles("admin")
+  @Get("admin/support/awaiting-count")
+  async adminAwaitingCount() {
+    return this.support.countAwaitingAdmin();
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles("admin")
   @Post("admin/support/tickets/:id/replies")
   async adminReply(@Param("id") id: string, @Body() body: unknown, @CurrentUser() user: RequestUser) {
     const input = parseBody(supportReplySchema, body);

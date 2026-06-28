@@ -976,6 +976,21 @@
   overflow-wrap: anywhere;
 }
 
+.admin-home-link-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .admin-home-link-arrow {
   color: var(--muted);
   transition:

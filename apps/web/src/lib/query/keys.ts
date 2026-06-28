@@ -59,6 +59,7 @@ export const queryKeys = {
     forumTaxonomy: () => ["admin", "forum", "taxonomy"] as const,
     forumQuestions: (status: string, q = "") => ["admin", "forum", "questions", status, q.trim()] as const,
     forumQuestion: (id: string) => ["admin", "forum", "question", id] as const,
+    supportAwaitingCount: () => ["admin", "support", "awaiting-count"] as const,
   },
   news: {
     all: ["news"] as const,

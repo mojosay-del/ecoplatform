@@ -12,8 +12,10 @@ import { SendActionIcon } from "../../../components/app-shell/nav-icons";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
 import { errorText, apiFetch } from "../../../lib/api";
 import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../../../lib/display-labels";
+import { formatDateTime } from "../../../lib/formatters";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 import { useAuth } from "../../../lib/auth";
+import { useSupportAwaitingCount } from "../../../lib/support/use-support-queue";
 
 // Inbox-режим админской поддержки: слева — список тикетов с фильтрами,
 // справа — выбранный тикет с тредом и формой ответа. Раньше всё валилось
@@ -63,15 +65,6 @@ const ticketSortSelectors: Record<TicketSortKey, (ticket: Ticket) => string | nu
   status: (ticket) => SUPPORT_STATUS_LABELS[ticket.status] ?? ticket.status,
   company: (ticket) => ticket.company?.organizationName ?? "",
 };
-
-const supportDateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
-  dateStyle: "short",
-  timeStyle: "short",
-});
-
-function formatSupportDateTime(value: string) {
-  return supportDateTimeFormatter.format(new Date(value));
-}
 
 function supportAuthorInitials(author: SupportMessageAuthor | null, fallbackLabel: string) {
   const nameParts = author ? [author.firstName, author.lastName].filter(Boolean) : [];
@@ -127,6 +120,7 @@ export function AdminSupportView() {
     },
   );
   const tickets = ticketsQuery.items;
+  const awaitingCount = useSupportAwaitingCount();
 
   const selectedId = searchParams?.get("ticketId") ?? null;
 
@@ -137,7 +131,7 @@ export function AdminSupportView() {
       if (filter === "active" && (ticket.status === "resolved" || ticket.status === "closed")) {
         return false;
       }
-      if (filter === "open" && ticket.status !== "open") return false;
+      if (filter === "open" && ticket.status !== "new") return false;
       if (filter === "in_progress" && ticket.status !== "in_progress" && ticket.status !== "awaiting_user")
         return false;
       if (filter === "resolved" && ticket.status !== "resolved" && ticket.status !== "closed") return false;
@@ -228,6 +222,12 @@ export function AdminSupportView() {
           title="Поддержка"
         />
 
+        {awaitingCount > 0 ? (
+          <StatusPill as="p" variant="warning">
+            Ждут ответа: {awaitingCount}
+          </StatusPill>
+        ) : null}
+
         {result ? (
           <StatusPill as="p" variant="danger">
             {result}
@@ -300,7 +300,7 @@ export function AdminSupportView() {
                       </span>
                       {preview ? <span className="support-inbox-item-preview">{preview}</span> : null}
                       <span className="support-inbox-item-time">
-                        <time dateTime={ticket.updatedAt}>{formatSupportDateTime(ticket.updatedAt)}</time>
+                        <time dateTime={ticket.updatedAt}>{formatDateTime(ticket.updatedAt)}</time>
                       </span>
                     </button>
                   </li>
@@ -369,7 +369,7 @@ export function AdminSupportView() {
                             <header className="support-drawer-message-head">
                               <strong>{authorLabel}</strong>
                               <time className="support-drawer-message-time" dateTime={m.createdAt}>
-                                {formatSupportDateTime(m.createdAt)}
+                                {formatDateTime(m.createdAt)}
                               </time>
                             </header>
                             <p>{m.text}</p>
