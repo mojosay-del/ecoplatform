@@ -1,18 +1,14 @@
 import Link from "next/link";
 import type { LegalDocumentDetail, LegalDocumentSummary, LegalDocumentType } from "@ecoplatform/shared";
+import { api } from "../lib/api";
 import "./legal-document.css";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
-
-// Серверный fetch без проброса auth-cookie — страница публична.
+// Публичная страница: активный документ и его текст тянем через общий
+// типизированный клиент (api.legal) — единый источник путей и типов. Ошибка
+// или отсутствие документа → null, ниже показываем заглушку «ещё не опубликован».
 async function fetchActive(type: LegalDocumentType): Promise<LegalDocumentSummary | null> {
   try {
-    const res = await fetch(`${API_URL}/legal/documents?types=${encodeURIComponent(type)}`, {
-      // На dev перезагружаем при каждом запросе; на проде Next.js закеширует.
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const list = (await res.json()) as LegalDocumentSummary[];
+    const list = await api.legal.list([type]);
     return list[0] ?? null;
   } catch {
     return null;
@@ -21,11 +17,7 @@ async function fetchActive(type: LegalDocumentType): Promise<LegalDocumentSummar
 
 async function fetchDetail(type: LegalDocumentType, version: string): Promise<LegalDocumentDetail | null> {
   try {
-    const res = await fetch(`${API_URL}/legal/documents/${encodeURIComponent(type)}/${encodeURIComponent(version)}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as LegalDocumentDetail;
+    return await api.legal.get(type, version);
   } catch {
     return null;
   }
