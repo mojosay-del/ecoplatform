@@ -6,13 +6,24 @@ export type ListingMapFeatureLike = {
   id?: number | string | null;
   properties?: { id?: unknown } | null;
 } | null;
+export type ListingMapBasemapLayerLike = {
+  id: string;
+  "source-layer"?: string;
+};
 
 // Центр по умолчанию — Москва. ВАЖНО: MapLibre ждёт [lon, lat] (GeoJSON), поэтому
 // долгота идёт первой.
 export const LISTING_MAP_DEFAULT_CENTER: [number, number] = [37.64, 55.76];
 export const LISTING_MAP_DEFAULT_ZOOM = 5;
-export const LISTING_MAP_MIN_ZOOM = LISTING_MAP_DEFAULT_ZOOM;
+export const LISTING_MAP_MIN_ZOOM = -2;
 export const LISTING_MAP_CIRCLE_ZOOM_THRESHOLD = 9;
+
+const HIDDEN_BASEMAP_LAYER_IDS = new Set(["label_state", "label_country_1", "label_country_2", "label_country_3"]);
+const HIDDEN_BASEMAP_SOURCE_LAYERS = new Set(["boundary", "poi", "aerodrome_label"]);
+
+export function shouldHideBasemapLayer(layer: ListingMapBasemapLayerLike): boolean {
+  return HIDDEN_BASEMAP_LAYER_IDS.has(layer.id) || HIDDEN_BASEMAP_SOURCE_LAYERS.has(layer["source-layer"] ?? "");
+}
 
 // Начиная с городского масштаба показываем круг 4 км; дальше — маленькая точка,
 // чтобы не загромождать карту. В MapLibre переключение делает сам движок через

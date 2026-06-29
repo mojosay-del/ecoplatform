@@ -32,6 +32,7 @@ import {
   circlePolygon,
   getSinglePointFocusView,
   listingIdFromMapFeature,
+  shouldHideBasemapLayer,
 } from "./listing-map-view";
 import {
   LABEL_TEXT_FIELD,
@@ -63,8 +64,6 @@ const BASEMAP_OPACITY_PROPERTIES_BY_TYPE: Record<string, readonly string[]> = {
   raster: ["raster-opacity"],
   symbol: ["text-opacity", "icon-opacity"],
 };
-
-const HIDDEN_BASEMAP_LAYER_IDS = new Set(["label_state", "label_country_1", "label_country_2", "label_country_3"]);
 
 const BASEMAP_REVEAL_WINDOWS: Record<string, { start: number; end: number }> = {
   airport: { start: 10.2, end: 11.8 },
@@ -470,11 +469,7 @@ function applyRussianRfBasemap(map: MlMap) {
   for (const layer of map.getStyle().layers ?? []) {
     const spec = layer as BasemapLayerSpec;
     try {
-      if (spec["source-layer"] === "boundary") {
-        map.setLayoutProperty(spec.id, "visibility", "none");
-        continue;
-      }
-      if (HIDDEN_BASEMAP_LAYER_IDS.has(spec.id)) {
+      if (shouldHideBasemapLayer(spec)) {
         map.setLayoutProperty(spec.id, "visibility", "none");
         continue;
       }

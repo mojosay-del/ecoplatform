@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
+  LISTING_MAP_DEFAULT_ZOOM,
+  LISTING_MAP_MIN_ZOOM,
   circlePolygon,
   getSinglePointFocusView,
   listingIdFromMapFeature,
   modeForZoom,
+  shouldHideBasemapLayer,
 } from "./listing-map-view";
 
 describe("marketplace listing map view", () => {
@@ -32,6 +35,22 @@ describe("marketplace listing map view", () => {
   it("switches to circle mode at the zoom threshold, dots below", () => {
     expect(modeForZoom(LISTING_MAP_CIRCLE_ZOOM_THRESHOLD)).toBe("circle");
     expect(modeForZoom(LISTING_MAP_CIRCLE_ZOOM_THRESHOLD - 1)).toBe("dot");
+  });
+
+  it("allows zooming out past the default marketplace overview", () => {
+    expect(LISTING_MAP_MIN_ZOOM).toBeLessThan(LISTING_MAP_DEFAULT_ZOOM);
+  });
+
+  it("hides basemap POI layers while keeping roads and place labels visible", () => {
+    expect(shouldHideBasemapLayer({ id: "poi_r20", "source-layer": "poi" })).toBe(true);
+    expect(shouldHideBasemapLayer({ id: "poi_r7", "source-layer": "poi" })).toBe(true);
+    expect(shouldHideBasemapLayer({ id: "poi_r1", "source-layer": "poi" })).toBe(true);
+    expect(shouldHideBasemapLayer({ id: "poi_transit", "source-layer": "poi" })).toBe(true);
+    expect(shouldHideBasemapLayer({ id: "airport", "source-layer": "aerodrome_label" })).toBe(true);
+    expect(shouldHideBasemapLayer({ id: "label_country_1", "source-layer": "place" })).toBe(true);
+    expect(shouldHideBasemapLayer({ id: "boundary", "source-layer": "boundary" })).toBe(true);
+    expect(shouldHideBasemapLayer({ id: "road_minor", "source-layer": "transportation" })).toBe(false);
+    expect(shouldHideBasemapLayer({ id: "label_city", "source-layer": "place" })).toBe(false);
   });
 
   it("uses the listing id from feature properties before MapLibre feature id", () => {
