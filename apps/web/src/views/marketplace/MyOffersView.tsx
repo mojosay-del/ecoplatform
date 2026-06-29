@@ -6,27 +6,22 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { MyOfferItem, PaginatedResponse } from "@ecoplatform/shared";
+import type { MyOfferItem } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { ApiError, api } from "../../lib/api";
 import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
+import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
+import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
 import { OfferStatusBadge, PRICE_CONDITION_LABEL, formatPrice } from "./offer-ui";
 import { ReviewForm } from "./ReviewForm";
 
 export function MyOffersView() {
   const queryClient = useQueryClient();
-  const {
-    data: page,
-    state,
-    errorMessage,
-  } = useApiQuery(queryKeys.marketplace.myOffers(), () => api.marketplace.offers.mine({ limit: 100 }), {
-    items: [],
-    total: 0,
-    hasMore: false,
-  } as PaginatedResponse<MyOfferItem>);
-
-  const offers = page.items;
+  const query = useInfiniteApiQuery<MyOfferItem>(queryKeys.marketplace.myOffers(), 50, ({ limit, offset }) =>
+    api.marketplace.offers.mine({ limit, offset }),
+  );
+  const { state, errorMessage } = query;
+  const offers = query.items;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
@@ -133,6 +128,9 @@ export function MyOffersView() {
             ))}
           </div>
         )}
+
+        {query.hasMore ? <div ref={query.sentinelRef} aria-hidden /> : null}
+        {query.isLoadingMore ? <p className="page-subtitle u-text-center u-py-60">Загрузка…</p> : null}
       </section>
     </AppShell>
   );

@@ -6,12 +6,13 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { MyMarketplaceListingItem, PaginatedResponse } from "@ecoplatform/shared";
+import type { MyMarketplaceListingItem } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { ApiError, api, preferredFileAssetImageUrl } from "../../lib/api";
 import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
+import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
+import { AccessClosed, AuthRequired, ErrorState, PageHeader } from "../shared";
 import {
   ListingStatusBadge,
   archiveReasonLabel,
@@ -22,17 +23,13 @@ import {
 
 export function MyListingsView() {
   const queryClient = useQueryClient();
-  const {
-    data: page,
-    state,
-    errorMessage,
-  } = useApiQuery(queryKeys.marketplace.myListings(), () => api.marketplace.myListings({ limit: 100 }), {
-    items: [],
-    total: 0,
-    hasMore: false,
-  } as PaginatedResponse<MyMarketplaceListingItem>);
-
-  const listings = page.items;
+  const query = useInfiniteApiQuery<MyMarketplaceListingItem>(
+    queryKeys.marketplace.myListings(),
+    50,
+    ({ limit, offset }) => api.marketplace.myListings({ limit, offset }),
+  );
+  const { state, errorMessage } = query;
+  const listings = query.items;
   const coverIds = listings.map((listing) => listing.coverFileId).filter((id): id is string => Boolean(id));
   const assets = useFileAssetsByIds(coverIds);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -146,6 +143,9 @@ export function MyListingsView() {
             })}
           </div>
         )}
+
+        {query.hasMore ? <div ref={query.sentinelRef} aria-hidden /> : null}
+        {query.isLoadingMore ? <p className="page-subtitle u-text-center u-py-60">Загрузка…</p> : null}
       </section>
     </AppShell>
   );
