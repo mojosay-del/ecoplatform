@@ -9,7 +9,7 @@ import {
   MODERATION_REASON_LABELS,
   RESTRICTABLE_MODULE_LABELS,
 } from "../../../lib/display-labels";
-import { apiFetch, errorText } from "../../../lib/api";
+import { api, errorText } from "../../../lib/api";
 
 const sanctionTypes = ["user_block", "company_block", "module_restriction"] as const;
 const moduleCodes = ["comments", "marketplace", "reviews"] as const;
@@ -59,14 +59,11 @@ export function ModerationSanctions({
     setBusy(true);
     setError(null);
     try {
-      await apiFetch(`/admin/moderation/cases/${caseId}/admin-sanctions`, {
-        method: "POST",
-        body: {
-          type,
-          reasonCode,
-          comment: comment.trim() || undefined,
-          ...(type === "module_restriction" ? { moduleCode, durationDays } : {}),
-        },
+      await api.admin.moderation.applyAdminSanction(caseId, {
+        type,
+        reasonCode,
+        comment: comment.trim() || undefined,
+        ...(type === "module_restriction" ? { moduleCode, durationDays } : {}),
       });
       setComment("");
       await onChanged();
@@ -82,9 +79,9 @@ export function ModerationSanctions({
     setBusy(true);
     setError(null);
     try {
-      await apiFetch(`/admin/moderation/sanctions/${sanctionId}/lift`, {
-        method: "POST",
-        body: { reasonCode: "unfounded_complaint", comment: "Снято администратором." },
+      await api.admin.moderation.liftSanction(sanctionId, {
+        reasonCode: "unfounded_complaint",
+        comment: "Снято администратором.",
       });
       await onChanged();
     } catch (err) {

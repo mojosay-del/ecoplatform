@@ -12,7 +12,7 @@ import { AppShell } from "../../../components/AppShell";
 import { StatusPill, moderationStatusPillVariant } from "../../../components/StatusPill";
 import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import { formatModerationCaseTitle, formatModerationEntityPreview } from "../../../components/admin-entity-display";
-import { apiFetch } from "../../../lib/api";
+import { api } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { queryKeys } from "../../../lib/query/keys";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
@@ -58,13 +58,7 @@ export function AdminModerationView() {
   const casesQuery = useInfiniteApiQuery<ModerationCaseListItem>(
     queryKeys.admin.moderationCases(statusFilter),
     50,
-    async ({ limit, offset }) => {
-      const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-      if (statusFilter) query.set("status", statusFilter);
-      return apiFetch<{ items: ModerationCaseListItem[]; total: number; hasMore: boolean }>(
-        `/admin/moderation/cases?${query}`,
-      );
-    },
+    ({ limit, offset }) => api.admin.moderation.cases({ limit, offset }, { status: statusFilter }),
   );
 
   // Поиск по заголовку/превью среди загруженных кейсов (полнотекст по
@@ -87,21 +81,21 @@ export function AdminModerationView() {
   }, [casesQuery.state, visibleCases]);
 
   async function openCase(id: string) {
-    const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${id}`);
+    const data = await api.admin.moderation.case(id);
     setSelectedCase(data);
   }
 
   async function reloadSelected() {
     if (selectedCase) {
-      const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${selectedCase.id}`);
+      const data = await api.admin.moderation.case(selectedCase.id);
       setSelectedCase(data);
     }
     casesQuery.reload();
   }
 
-  async function mutateCase(path: string) {
+  async function mutateCase(action: (caseId: string) => Promise<ModerationCaseDetail>) {
     if (!selectedCase) return;
-    const data = await apiFetch<ModerationCaseDetail>(path, { method: "POST" });
+    const data = await action(selectedCase.id);
     setSelectedCase(data);
     casesQuery.reload();
   }
@@ -109,9 +103,10 @@ export function AdminModerationView() {
   async function submitDecision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedCase) return;
-    const data = await apiFetch<ModerationCaseDetail>(`/admin/moderation/cases/${selectedCase.id}/decisions`, {
-      method: "POST",
-      body: { type: decisionType, reasonCode, comment: comment.trim() || undefined },
+    const data = await api.admin.moderation.decide(selectedCase.id, {
+      type: decisionType,
+      reasonCode,
+      comment: comment.trim() || undefined,
     });
     setComment("");
     setSelectedCase(data);
@@ -237,14 +232,14 @@ export function AdminModerationView() {
                   <div className="mod-lock-actions">
                     <button
                       className="button secondary"
-                      onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/lock`)}
+                      onClick={() => mutateCase(api.admin.moderation.lock)}
                       type="button"
                     >
                       <Lock aria-hidden size={15} /> Взять
                     </button>
                     <button
                       className="button secondary"
-                      onClick={() => mutateCase(`/admin/moderation/cases/${selectedCase.id}/release`)}
+                      onClick={() => mutateCase(api.admin.moderation.release)}
                       type="button"
                     >
                       <LockOpen aria-hidden size={15} /> Освободить

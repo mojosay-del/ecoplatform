@@ -9,7 +9,7 @@ import { Bell, Users } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { SendActionIcon } from "../../../components/app-shell/nav-icons";
 import { AdminPageHeader } from "../../../components/admin";
-import { errorText, apiFetch } from "../../../lib/api";
+import { errorText, api } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { COMPANY_TYPE_LABELS, SUBSCRIPTION_PLAN_LABELS, USER_GENDER_LABELS } from "../../../lib/display-labels";
 
@@ -62,11 +62,7 @@ export function AdminBroadcastView() {
     setPreviewing(true);
     setError(null);
     try {
-      const res = await apiFetch<{ recipientCount: number }>("/admin/broadcast/recipients-count", {
-        method: "POST",
-        token,
-        body: { audience: buildAudienceBody() },
-      });
+      const res = await api.admin.broadcast.recipientsCount(buildAudienceBody(), { token });
       setRecipientCount(res.recipientCount);
     } catch (err) {
       setError(errorText(err, "Не удалось посчитать аудиторию."));
@@ -84,16 +80,15 @@ export function AdminBroadcastView() {
     setError(null);
     setFlash(null);
     try {
-      const res = await apiFetch<{ recipientCount: number }>("/admin/broadcast", {
-        method: "POST",
-        token,
-        body: {
+      const res = await api.admin.broadcast.send(
+        {
           title: title.trim(),
           body: body.trim(),
           link: link.trim() || undefined,
           audience: buildAudienceBody(),
         },
-      });
+        { token },
+      );
       setFlash(`Отправлено получателям: ${res.recipientCount}.`);
       setTitle("");
       setBody("");

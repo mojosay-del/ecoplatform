@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw, Search } from "lucide-react";
+import type { AdminSupportMessageAuthor, AdminSupportTicket } from "@ecoplatform/shared";
 import "../../../components/support-drawer.css";
 import { AdminSortButton } from "../../../components/AdminSortButton";
 import { AppShell } from "../../../components/AppShell";
@@ -10,7 +11,7 @@ import { StatusPill, supportStatusPillVariant } from "../../../components/Status
 import { AdminPageHeader } from "../../../components/admin";
 import { SendActionIcon } from "../../../components/app-shell/nav-icons";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
-import { errorText, apiFetch } from "../../../lib/api";
+import { errorText, api } from "../../../lib/api";
 import { SUPPORT_CATEGORY_LABELS, SUPPORT_STATUS_LABELS } from "../../../lib/display-labels";
 import { formatDateTime } from "../../../lib/formatters";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
@@ -21,32 +22,10 @@ import { useSupportAwaitingCount } from "../../../lib/support/use-support-queue"
 // справа — выбранный тикет с тредом и формой ответа. Раньше всё валилось
 // в одну ленту, и просматривать длинные обращения было неудобно.
 
-type Message = {
-  id: string;
-  text: string;
-  createdAt: string;
-  authorRole: string;
-  author?: SupportMessageAuthor | null;
-};
-
-type SupportMessageAuthor = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  avatarUrl: string | null;
-};
-
-type Ticket = {
-  id: string;
-  category: string;
-  subject: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  company?: { id: string; organizationName: string; status: string } | null;
-  author?: { id: string; email: string; firstName: string; lastName: string } | null;
-  messages?: Message[];
-};
+// Каноничные типы — в shared (api-response.ts); локальные псевдонимы сохраняют
+// привычные имена в этом файле.
+type SupportMessageAuthor = AdminSupportMessageAuthor;
+type Ticket = AdminSupportTicket;
 
 type Filter = "all" | "active" | "new" | "in_progress" | "resolved";
 type TicketSortKey = "updatedAt" | "subject" | "status" | "company";
@@ -109,15 +88,8 @@ export function AdminSupportView() {
   const [sort, setSort] = useState<SortState<TicketSortKey>>({ key: "updatedAt", direction: "desc" });
   const [result, setResult] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const ticketsQuery = useInfiniteApiQuery<Ticket>(
-    token ? "admin-support-tickets" : null,
-    50,
-    async ({ limit, offset }) => {
-      const queryString = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-      return apiFetch<{ items: Ticket[]; total: number; hasMore: boolean }>(`/admin/support/tickets?${queryString}`, {
-        token,
-      });
-    },
+  const ticketsQuery = useInfiniteApiQuery<Ticket>(token ? "admin-support-tickets" : null, 50, ({ limit, offset }) =>
+    api.admin.support.tickets({ limit, offset }, { token }),
   );
   const tickets = ticketsQuery.items;
   const awaitingCount = useSupportAwaitingCount();
@@ -199,11 +171,7 @@ export function AdminSupportView() {
     setSending(true);
     setResult(null);
     try {
-      await apiFetch(`/admin/support/tickets/${ticketId}/replies`, {
-        method: "POST",
-        token,
-        body: { text },
-      });
+      await api.admin.support.reply(ticketId, text, { token });
       formElement.reset();
       ticketsQuery.reload();
     } catch (error) {

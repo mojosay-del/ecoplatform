@@ -2,19 +2,18 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { RotateCcw, ScrollText } from "lucide-react";
-import type { AdminJournalEntry, AdminJournalPayload, PaginatedResponse } from "@ecoplatform/shared";
+import type { AdminJournalEntry, AdminJournalPayload } from "@ecoplatform/shared";
 import { AdminSortButton } from "../../../components/AdminSortButton";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
 import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import { getJournalEntityDisplay } from "../../../components/admin-entity-display";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
-import { apiFetch } from "../../../lib/api";
+import { api } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { formatAuditFieldLabel, formatAuditValue } from "../../../lib/display-labels";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 
-type JournalList = PaginatedResponse<AdminJournalEntry>;
 type JournalSortKey = "createdAt" | "action" | "entity" | "actor";
 
 type AdminJournalsViewProps = {
@@ -48,17 +47,18 @@ export function AdminJournalsView({ embedded = false }: AdminJournalsViewProps) 
       ? `admin-journals:${filters.action}:${filters.entityType}:${filters.actorId}:${filters.from}:${filters.to}`
       : null,
     take,
-    async ({ limit, offset }) => {
-      const params = new URLSearchParams();
-      params.set("limit", String(limit));
-      params.set("offset", String(offset));
-      if (filters.action) params.set("action", filters.action);
-      if (filters.entityType) params.set("entityType", filters.entityType);
-      if (filters.actorId) params.set("actorId", filters.actorId);
-      if (filters.from) params.set("from", new Date(filters.from).toISOString());
-      if (filters.to) params.set("to", new Date(filters.to).toISOString());
-      return apiFetch<JournalList>(`/admin/journals?${params.toString()}`, { token });
-    },
+    async ({ limit, offset }) =>
+      api.admin.journals.list(
+        { limit, offset },
+        {
+          action: filters.action,
+          entityType: filters.entityType,
+          actorId: filters.actorId,
+          from: filters.from ? new Date(filters.from).toISOString() : undefined,
+          to: filters.to ? new Date(filters.to).toISOString() : undefined,
+        },
+        { token },
+      ),
   );
 
   function submit(event: FormEvent<HTMLFormElement>) {

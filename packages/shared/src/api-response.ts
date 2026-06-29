@@ -765,6 +765,46 @@ export type AdminUserDetail = AdminUserListItem & {
   }>;
 };
 
+// Очередь обращений /admin/support/tickets (тикет + тред сообщений).
+export type AdminSupportMessageAuthor = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+};
+
+export type AdminSupportMessage = {
+  id: string;
+  text: string;
+  createdAt: IsoDateString;
+  authorRole: string;
+  author?: AdminSupportMessageAuthor | null;
+};
+
+export type AdminSupportTicket = {
+  id: string;
+  category: string;
+  subject: string;
+  status: string;
+  createdAt: IsoDateString;
+  updatedAt: IsoDateString;
+  company?: { id: string; organizationName: string; status: string } | null;
+  author?: { id: string; email: string; firstName: string; lastName: string } | null;
+  messages?: AdminSupportMessage[];
+};
+
+// Запись /admin/settings: одна настройка платформы с текущим/дефолтным значением.
+export type AdminSettingItem = {
+  key: string;
+  type: "number" | "boolean";
+  label: string;
+  description: string;
+  defaultValue: number | boolean;
+  value: number | boolean;
+  updatedAt: IsoDateString | null;
+  updatedById: string | null;
+};
+
 // ── Moderation ────────────────────────────────────────────────────────────
 export type ModerationCaseType = "complaint" | "suspicious_activity";
 

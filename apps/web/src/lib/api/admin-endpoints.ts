@@ -1,4 +1,11 @@
 import type { AdminDashboardSummary, AdminStaffSummary, PaginatedResponse } from "@ecoplatform/shared";
+import {
+  adminBroadcastApi,
+  adminJournalsApi,
+  adminModerationApi,
+  adminSettingsApi,
+  adminSupportApi,
+} from "./admin-ops-endpoints";
 import { adminBillingApi, adminCompaniesApi, adminStaffApi, adminUsersApi } from "./admin-people-endpoints";
 import { enc, type ApiRequestOptions, type PaginationInput } from "./endpoint-utils";
 import { apiFetch } from "./requests";
@@ -48,4 +55,9 @@ export const adminApi = {
   staff: adminStaffApi,
   companies: adminCompaniesApi,
   users: adminUsersApi,
+  support: adminSupportApi,
+  broadcast: adminBroadcastApi,
+  settings: adminSettingsApi,
+  journals: adminJournalsApi,
+  moderation: adminModerationApi,
 };

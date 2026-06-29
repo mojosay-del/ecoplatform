@@ -1,25 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { AdminSettingItem } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
 import { AdminPageHeader } from "../../../components/admin";
-import { errorText, apiFetch } from "../../../lib/api";
+import { errorText, api } from "../../../lib/api";
 import { queryKeys } from "../../../lib/query/keys";
 import { useApiQuery } from "../../shared";
 import { useAuth } from "../../../lib/auth";
 import { hasStaleAuthFeaturesAfterSettingsLoad, shouldRefreshAuthAfterSettingChange } from "./settings-auth-refresh";
 
-type SettingItem = {
-  key: string;
-  type: "number" | "boolean";
-  label: string;
-  description: string;
-  defaultValue: number | boolean;
-  value: number | boolean;
-  updatedAt: string | null;
-  updatedById: string | null;
-};
+// Каноничный тип — в shared (api-response.ts); локальный псевдоним сохраняет имя.
+type SettingItem = AdminSettingItem;
 
 // Группировка настроек по префиксу ключа (часть до точки). Раньше всё
 // валилось в одну простыню — пользователь не понимал, что где. Теперь
@@ -122,7 +115,7 @@ export function AdminSettingsView() {
     state,
     errorMessage: readError,
     refetch,
-  } = useApiQuery<SettingItem[]>(queryKeys.admin.settings(), () => apiFetch<SettingItem[]>("/admin/settings"), []);
+  } = useApiQuery<SettingItem[]>(queryKeys.admin.settings(), () => api.admin.settings.list(), []);
 
   // Драфты-инпуты пересеваем значениями с сервера при каждой загрузке/
   // обновлении настроек (в т.ч. после сохранения — refetch обновит items).
@@ -134,7 +127,7 @@ export function AdminSettingsView() {
     setSavingKey(key);
     setErrorMessage(null);
     try {
-      await apiFetch(`/admin/settings/${key}`, { method: "PATCH", body: { value } });
+      await api.admin.settings.update(key, value);
       await refetch();
       if (shouldRefreshAuthAfterSettingChange(key)) {
         await refreshMe();
