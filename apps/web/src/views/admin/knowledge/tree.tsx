@@ -32,7 +32,7 @@ export function KnowledgeCategoryNode({
   onReorder: (event: DragEndEvent) => void;
 }) {
   return (
-    <li role="treeitem" aria-expanded={expanded}>
+    <li role="treeitem" aria-expanded={expanded} aria-selected={draftId === category.id}>
       <KnowledgeTreeRow
         depth={0}
         expandable={materials.length > 0}
@@ -92,6 +92,7 @@ function SortableKnowledgeMaterial({
       ref={setNodeRef}
       style={style}
       role="treeitem"
+      aria-selected={active}
       className={isDragging ? "knowledge-sortable-item is-dragging" : "knowledge-sortable-item"}
     >
       <KnowledgeMaterialRow
@@ -128,7 +129,7 @@ export function KnowledgeUncategorizedNode({
   onSelect: (article: Article) => void;
 }) {
   return (
-    <li role="treeitem" aria-expanded={expanded}>
+    <li role="treeitem" aria-expanded={expanded} aria-selected={false}>
       <KnowledgeTreeRow
         depth={0}
         expandable={materials.length > 0}
@@ -142,7 +143,7 @@ export function KnowledgeUncategorizedNode({
       {expanded ? (
         <ul className="tree-children" role="group">
           {materials.map((material) => (
-            <li key={material.id} role="treeitem">
+            <li key={material.id} role="treeitem" aria-selected={draftId === material.id}>
               <KnowledgeMaterialRow material={material} active={draftId === material.id} onSelect={onSelect} />
             </li>
           ))}

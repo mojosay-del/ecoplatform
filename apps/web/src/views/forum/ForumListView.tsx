@@ -152,6 +152,7 @@ function ForumFilterSelect({
   return (
     <div className={`forum-filter-select${open ? " is-open" : ""}`} ref={rootRef}>
       <button
+        role="combobox"
         aria-activedescendant={open ? `${listboxId}-${activeIndex}` : undefined}
         aria-controls={open ? listboxId : undefined}
         aria-expanded={open}
@@ -168,6 +169,7 @@ function ForumFilterSelect({
       {open ? (
         <ul aria-labelledby={id} className="forum-filter-select-list" id={listboxId} ref={listRef} role="listbox">
           {options.map((option, index) => (
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- выбор мышью; клавиатура — через onKeyDown триггера (combobox)
             <li
               aria-selected={option.value === value}
               className={`forum-filter-select-option${index === activeIndex ? " is-active" : ""}${

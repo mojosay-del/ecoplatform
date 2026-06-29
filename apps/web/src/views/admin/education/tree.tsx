@@ -131,7 +131,12 @@ export function EducationTree({
         {modules.map((module) => {
           const isExpanded = expandedModules.has(module.id);
           return (
-            <li key={module.id} role="treeitem" aria-expanded={isExpanded}>
+            <li
+              key={module.id}
+              role="treeitem"
+              aria-expanded={isExpanded}
+              aria-selected={selection.kind === "module" && selection.id === module.id}
+            >
               <TreeRow
                 depth={0}
                 expandable={module.chapters.length > 0}
@@ -222,6 +227,7 @@ function SortableChapterNode({
       style={style}
       role="treeitem"
       aria-expanded={expanded}
+      aria-selected={selection.kind === "chapter" && selection.id === chapter.id}
       className={isDragging ? "education-sortable-item is-dragging" : "education-sortable-item"}
     >
       <TreeRow
@@ -284,6 +290,7 @@ function SortableLessonNode({ lesson, active, onSelect }: { lesson: Lesson; acti
       ref={setNodeRef}
       style={style}
       role="treeitem"
+      aria-selected={active}
       className={isDragging ? "education-sortable-item is-dragging" : "education-sortable-item"}
     >
       <TreeRow

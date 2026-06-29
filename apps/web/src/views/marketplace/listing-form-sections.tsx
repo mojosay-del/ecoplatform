@@ -67,6 +67,7 @@ export function PositionsSection({ form }: { form: ListingFormController }) {
 
             <div className="mp-position-pickers">
               <div className={fieldClass(category)}>
+                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол FormSelect самоозначивается через проп label */}
                 <label>Категория</label>
                 <FormSelect
                   icon={Layers}
@@ -79,6 +80,7 @@ export function PositionsSection({ form }: { form: ListingFormController }) {
                 />
               </div>
               <div className={fieldClass(position.nomenclatureId)}>
+                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол FormSelect самоозначивается через проп label */}
                 <label>Позиция</label>
                 <FormSelect
                   icon={Package}
@@ -94,12 +96,13 @@ export function PositionsSection({ form }: { form: ListingFormController }) {
 
             <div className="mp-position-details">
               <div className={fieldClass(position.weightTons)}>
-                <label>
+                <label htmlFor={`mp-weight-${index}`}>
                   <Scale size={14} strokeWidth={2.1} aria-hidden="true" />
                   Вес, т
                 </label>
                 <div className={`mp-unit-input${position.weightTons ? " is-filled" : ""}`}>
                   <input
+                    id={`mp-weight-${index}`}
                     className="mp-input"
                     type="number"
                     min="0"
@@ -111,6 +114,7 @@ export function PositionsSection({ form }: { form: ListingFormController }) {
                 </div>
               </div>
               <div className={fieldClass(position.form)}>
+                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол FormSelect самоозначивается через проп label */}
                 <label>
                   <PackageCheck size={14} strokeWidth={2.1} aria-hidden="true" />
                   Форма
@@ -127,6 +131,7 @@ export function PositionsSection({ form }: { form: ListingFormController }) {
                 />
               </div>
               <div className={fieldClass(position.moistureCondition)}>
+                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол FormSelect самоозначивается через проп label */}
                 <label>
                   <Droplets size={14} strokeWidth={2.1} aria-hidden="true" />
                   Влажность
@@ -143,6 +148,7 @@ export function PositionsSection({ form }: { form: ListingFormController }) {
                 />
               </div>
               <div className={fieldClass(position.contaminationCondition)}>
+                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол FormSelect самоозначивается через проп label */}
                 <label>
                   <Filter size={14} strokeWidth={2.1} aria-hidden="true" />
                   Иные включения
@@ -161,6 +167,7 @@ export function PositionsSection({ form }: { form: ListingFormController }) {
                 />
               </div>
               <div className={`${fieldClass(position.packaging.join(""))} mp-position-packaging`}>
+                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол PackagingSelect самоозначивается через aria */}
                 <label>
                   <Layers size={14} strokeWidth={2.1} aria-hidden="true" />
                   Упаковка
@@ -190,7 +197,7 @@ export function AddressSection({ form }: { form: ListingFormController }) {
     <div className="mp-fieldset">
       {sectionTitle(MapPin, "Адрес отгрузки")}
       <div className={fieldClass(form.addressQuery)}>
-        <label>Поиск адреса</label>
+        <label htmlFor={ADDRESS_SEARCH_ID}>Поиск адреса</label>
         <div className="mp-country-toggle" role="group" aria-label="Страна адреса">
           {(["RU", "BY"] as const).map((code) => (
             <button
@@ -207,6 +214,7 @@ export function AddressSection({ form }: { form: ListingFormController }) {
         <div className="mp-address-search">
           <input
             id={ADDRESS_SEARCH_ID}
+            role="combobox"
             className="mp-input"
             placeholder="Начните вводить адрес и выберите вариант…"
             autoComplete="off"
@@ -229,6 +237,7 @@ export function AddressSection({ form }: { form: ListingFormController }) {
                 <button
                   type="button"
                   role="option"
+                  aria-selected={false}
                   key={`${suggestion.value}-${index}`}
                   onMouseDown={(event) => {
                     event.preventDefault();
@@ -279,8 +288,9 @@ export function ContactsSection({ form }: { form: ListingFormController }) {
       </label>
       {!form.readyNow ? (
         <div className={fieldClass(form.readinessDate)}>
-          <label>Дата готовности</label>
+          <label htmlFor="mp-readiness-date">Дата готовности</label>
           <input
+            id="mp-readiness-date"
             className="mp-input"
             type="date"
             value={form.readinessDate}
@@ -289,6 +299,7 @@ export function ContactsSection({ form }: { form: ListingFormController }) {
         </div>
       ) : null}
       <div className={fieldClass(form.phoneDigits)}>
+        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; PhoneInput самоозначивает свои поля */}
         <label>Контактный телефон *</label>
         <PhoneInput
           name="contactPhone"
@@ -307,11 +318,12 @@ export function ExtraSection({ form }: { form: ListingFormController }) {
     <div className="mp-fieldset">
       {sectionTitle(FileText, "Дополнительно")}
       <div className={fieldClass(form.description)}>
-        <label>
+        <label htmlFor="mp-description">
           <FileText size={14} strokeWidth={2.1} aria-hidden="true" />
           Описание
         </label>
         <textarea
+          id="mp-description"
           className="mp-input"
           rows={3}
           value={form.description}
@@ -320,22 +332,24 @@ export function ExtraSection({ form }: { form: ListingFormController }) {
       </div>
       <div className="mp-grid-2">
         <div className={fieldClass(form.paymentTerms)}>
-          <label>
+          <label htmlFor="mp-payment-terms">
             <CreditCard size={14} strokeWidth={2.1} aria-hidden="true" />
             Условия оплаты
           </label>
           <input
+            id="mp-payment-terms"
             className="mp-input"
             value={form.paymentTerms}
             onChange={(event) => form.setPaymentTerms(event.target.value)}
           />
         </div>
         <div className={fieldClass(form.typicalLoadTons)}>
-          <label>
+          <label htmlFor="mp-typical-load">
             <Truck size={14} strokeWidth={2.1} aria-hidden="true" />
             Обычно гружу в машину, т
           </label>
           <input
+            id="mp-typical-load"
             className="mp-input"
             type="number"
             min="0"

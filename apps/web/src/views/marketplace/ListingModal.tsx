@@ -76,6 +76,7 @@ export function ListingModal({
   const isBuyer = user?.company?.type === "trader" || user?.company?.type === "processor";
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону закрывает; с клавиатуры — кнопка закрытия и Escape
     <div
       className={`mp-modal-backdrop${lightboxOpen ? " is-locked" : ""}`}
       role="dialog"
@@ -83,6 +84,7 @@ export function ListingModal({
       aria-modal="true"
       onClick={onClose}
     >
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- onClick гасит всплытие, чтобы клик по содержимому не закрывал окно; клавиатура не требуется */}
       <div className="mp-modal" onClick={(event) => event.stopPropagation()} ref={modalRef}>
         <button className="mp-modal-close" type="button" aria-label="Закрыть" onClick={onClose}>
           <X size={20} />

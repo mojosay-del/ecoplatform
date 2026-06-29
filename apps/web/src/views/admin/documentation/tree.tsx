@@ -41,7 +41,7 @@ export function DocCategoryNode({
   onReorder: (event: DragEndEvent) => void;
 }) {
   return (
-    <li role="treeitem" aria-expanded={expanded}>
+    <li role="treeitem" aria-expanded={expanded} aria-selected={draftId === category.id}>
       <DocTreeRow
         depth={0}
         expandable={documents.length > 0}
@@ -101,6 +101,7 @@ function SortableDocument({
       ref={setNodeRef}
       style={style}
       role="treeitem"
+      aria-selected={active}
       className={isDragging ? "knowledge-sortable-item is-dragging" : "knowledge-sortable-item"}
     >
       <DocumentRow
@@ -137,7 +138,7 @@ export function DocUncategorizedNode({
   onSelect: (article: DocArticle) => void;
 }) {
   return (
-    <li role="treeitem" aria-expanded={expanded}>
+    <li role="treeitem" aria-expanded={expanded} aria-selected={false}>
       <DocTreeRow
         depth={0}
         expandable={documents.length > 0}
@@ -151,7 +152,7 @@ export function DocUncategorizedNode({
       {expanded ? (
         <ul className="tree-children" role="group">
           {documents.map((document) => (
-            <li key={document.id} role="treeitem">
+            <li key={document.id} role="treeitem" aria-selected={draftId === document.id}>
               <DocumentRow document={document} active={draftId === document.id} onSelect={onSelect} />
             </li>
           ))}

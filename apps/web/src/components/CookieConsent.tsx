@@ -176,14 +176,24 @@ export function CookieConsent() {
               </span>
             </label>
             <label className="cookie-banner-option">
-              <input type="checkbox" checked={analytics} onChange={(e) => setAnalytics(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={analytics}
+                onChange={(e) => setAnalytics(e.target.checked)}
+                aria-label="Аналитика"
+              />
               <span>
                 <strong>Аналитика</strong>
                 <span>Анонимная статистика посещаемости.</span>
               </span>
             </label>
             <label className="cookie-banner-option">
-              <input type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={marketing}
+                onChange={(e) => setMarketing(e.target.checked)}
+                aria-label="Маркетинг"
+              />
               <span>
                 <strong>Маркетинг</strong>
                 <span>Для будущих рассылок и таргетинга.</span>

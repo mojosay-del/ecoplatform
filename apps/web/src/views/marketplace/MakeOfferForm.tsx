@@ -160,16 +160,23 @@ export function MakeOfferForm({
       </div>
       <div className="mp-grid-2">
         <div className="mp-field">
+          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол PriceConditionSelect самоозначивается */}
           <label>Условие цены</label>
           <PriceConditionSelect value={priceCondition} onChange={setPriceCondition} />
         </div>
         {priceCondition === "at_gate" ? (
           <div className="mp-field">
-            <label>Город доставки</label>
-            <input className="mp-input" value={city} onChange={(event) => setCity(event.target.value)} />
+            <label htmlFor="mp-offer-city">Город доставки</label>
+            <input
+              id="mp-offer-city"
+              className="mp-input"
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+            />
           </div>
         ) : null}
         <div className="mp-field">
+          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; PhoneInput самоозначивает свои поля */}
           <label>Контактный телефон</label>
           <PhoneInput
             name="offerContactPhone"

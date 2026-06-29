@@ -37,6 +37,7 @@ export function ListingModalGallery({
             <img className="mp-modal-photo" src={activePhotoUrl} alt="" />
           </button>
         ) : activeVideoUrl ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption -- пользовательское видео объявления, дорожки субтитров нет
           <video className="mp-modal-video" controls playsInline preload="metadata" src={activeVideoUrl} />
         ) : selectedMedia?.kind === "video" ? (
           <div className="mp-modal-media-empty">{selectedAsset ? "Видео обрабатывается" : "Видео загружается"}</div>

@@ -268,6 +268,7 @@ export function ContactChangeDialog({
   }
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону — мышиное удобство; с клавиатуры окно закрывается кнопкой закрытия и Escape
     <div
       aria-labelledby="account-contact-dialog-title"
       aria-modal="true"
@@ -415,9 +416,10 @@ export function ContactChangeDialog({
             {field === "email" ? (
               <label>
                 <span>Новый email</span>
+                { }
                 <input
-                  autoComplete="email"
                   autoFocus
+                  autoComplete="email"
                   className="input"
                   onChange={(event) => setEmailValue(event.currentTarget.value)}
                   required
@@ -426,6 +428,7 @@ export function ContactChangeDialog({
                 />
               </label>
             ) : (
+              // eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; PhoneInput самоозначивает свои поля
               <label>
                 <span>Новый телефон</span>
                 <PhoneInput

@@ -157,7 +157,8 @@ export function PriceIndexCard({
             </div>
 
             <form className="indices-value-form" onSubmit={addValue}>
-              <label className="indices-value-control">
+              {/* DatePicker самоозначивается через ariaLabel — обёртка визуальная, не form-label. */}
+              <div className="indices-value-control">
                 <span className="indices-value-control-label">Дата</span>
                 <DatePicker
                   value={valueDraft.date}
@@ -165,7 +166,7 @@ export function PriceIndexCard({
                   required
                   ariaLabel="Дата значения индекса"
                 />
-              </label>
+              </div>
               <label className="indices-value-control">
                 <span className="indices-value-control-label">Значение</span>
                 <span className="indices-price-input">

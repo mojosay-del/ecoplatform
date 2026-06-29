@@ -34,6 +34,8 @@ export function SortableNomenclatureRow({
       ref={setNodeRef}
       style={style}
       role="treeitem"
+      aria-selected={active}
+      aria-label={nomenclature.name}
       className={isDragging ? "indices-sortable-item is-dragging" : "indices-sortable-item"}
     >
       <div className={`tree-row has-drag-handle depth-0${active ? " is-active" : ""}`}>

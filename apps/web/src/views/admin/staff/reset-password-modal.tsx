@@ -50,6 +50,7 @@ export function StaffResetPasswordModal({
   }
 
   return createPortal(
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону — мышиное удобство; с клавиатуры окно закрывается кнопкой закрытия и Escape
     <div
       className="news-modal-backdrop admin-sessions-modal-backdrop"
       onClick={(event) => {

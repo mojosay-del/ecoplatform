@@ -34,6 +34,7 @@ export function MediaLightbox({
   }, [index, items.length, onIndexChange, showNav]);
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону закрывает; с клавиатуры — кнопка закрытия и стрелки
     <div aria-label="Просмотр медиа" aria-modal="true" className="mp-lightbox" role="dialog" onClick={onClose}>
       <button aria-label="Закрыть просмотр" className="mp-lightbox-close" type="button" onClick={onClose}>
         <X size={22} />
@@ -51,8 +52,10 @@ export function MediaLightbox({
           <ChevronLeft size={30} />
         </button>
       ) : null}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- onClick гасит всплытие, чтобы клик по медиа не закрывал просмотр; клавиатура не требуется */}
       <figure className="mp-lightbox-stage" onClick={(event) => event.stopPropagation()}>
         {item?.kind === "video" && item.url ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption -- пользовательское видео объявления, дорожки субтитров нет
           <video controls playsInline preload="metadata" src={item.url} />
         ) : item?.url ? (
           <img alt="" src={item.url} />

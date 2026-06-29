@@ -127,6 +127,7 @@ export function CompanyProfileForm({
       />
       {message ? <p className={`account-form-message account-form-message-${message.type}`}>{message.text}</p> : null}
       {editingField && activeFieldConfig ? (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону — мышиное удобство; с клавиатуры окно закрывается кнопкой закрытия и Escape
         <div
           aria-labelledby="account-company-dialog-title"
           aria-modal="true"
@@ -156,6 +157,7 @@ export function CompanyProfileForm({
             <form className="account-form account-password-modal-form" onSubmit={onSubmit}>
               <label>
                 <span>{activeFieldConfig.inputLabel}</span>
+                { }
                 <input
                   autoFocus
                   className="input"

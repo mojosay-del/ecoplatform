@@ -151,6 +151,7 @@ export function AdminIconPicker({
       <button
         ref={triggerRef}
         type="button"
+        role="combobox"
         className="knowledge-icon-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -180,6 +181,7 @@ export function AdminIconPicker({
             const isSelected = value === name;
             const isActive = index === activeIndex;
             return (
+              // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- выбор мышью; клавиатура — через onKeyDown триггера (combobox)
               <li
                 key={name}
                 id={`${listboxId}-${name}`}

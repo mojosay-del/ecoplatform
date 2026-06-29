@@ -26,6 +26,7 @@ export function NotificationsDialog({
   useAccountDialogBodyLock(true, onClose);
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону закрывает (мышиное удобство); клавиатурный паритет даёт Escape (useAccountDialogBodyLock) + кнопка закрытия
     <div
       aria-labelledby="account-notifications-dialog-title"
       aria-modal="true"
@@ -68,6 +69,7 @@ export function NotificationsDialog({
                     </div>
                     <label className="account-switch">
                       <input
+                        aria-label={row.label}
                         checked={notificationEnabled(row.category, "in_app")}
                         disabled={notificationPreferencesState === "loading" || notificationBusyKey === busyKey}
                         onChange={(event) =>

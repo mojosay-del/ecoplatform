@@ -18,6 +18,7 @@ export function PaymentDialog({
   useAccountDialogBodyLock(true, onClose);
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону — мышиное удобство; с клавиатуры окно закрывается кнопкой закрытия и Escape
     <div
       aria-labelledby="account-payment-dialog-title"
       aria-modal="true"

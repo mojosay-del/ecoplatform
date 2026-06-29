@@ -197,6 +197,7 @@ export function NewsModal({
   const showCloseButton = !showLoadingShell;
 
   return createPortal(
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону — мышиное удобство; с клавиатуры окно закрывается кнопкой закрытия и Escape
     <div
       className="news-modal-backdrop"
       ref={backdropRef}

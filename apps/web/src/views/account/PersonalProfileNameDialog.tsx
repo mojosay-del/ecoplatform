@@ -43,6 +43,7 @@ export function NameEditDialog({
   }
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону — мышиное удобство; с клавиатуры окно закрывается кнопкой закрытия и Escape
     <div
       aria-labelledby="account-name-dialog-title"
       aria-modal="true"
@@ -73,9 +74,10 @@ export function NameEditDialog({
           <div className="account-form-grid-2">
             <label>
               <span>Фамилия</span>
+              { }
               <input
-                autoComplete="family-name"
                 autoFocus
+                autoComplete="family-name"
                 className="input"
                 onChange={(event) => setLastName(event.currentTarget.value)}
                 required

@@ -61,6 +61,7 @@ export function AudioPlayerView({
 
   return (
     <figure className={rootClassName} aria-label={displayTitle}>
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- голосовое сообщение пользователя, дорожки субтитров нет */}
       <audio ref={audioRef} preload="metadata" src={sourceUrl ?? undefined} />
       <div className="audio-player-shell">
         <button

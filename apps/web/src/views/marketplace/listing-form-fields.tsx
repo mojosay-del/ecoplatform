@@ -181,6 +181,7 @@ export function FormSelect({
             const isSelected = option.value === value;
             const isActive = index === activeIndex;
             return (
+              // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- выбор мышью; клавиатура — через onKeyDown триггера (combobox)
               <li
                 key={option.value}
                 role="option"
@@ -275,6 +276,7 @@ export function PackagingSelect({ value, onToggle }: { value: string[]; onToggle
             const isSelected = value.includes(option);
             const isActive = index === activeIndex;
             return (
+              // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- выбор мышью; клавиатура — через onKeyDown триггера (combobox)
               <li
                 key={option}
                 role="option"
