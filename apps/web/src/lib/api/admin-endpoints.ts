@@ -1,4 +1,5 @@
 import type { AdminDashboardSummary, AdminStaffSummary, PaginatedResponse } from "@ecoplatform/shared";
+import { adminForumApi } from "./admin-content-endpoints";
 import {
   adminBroadcastApi,
   adminJournalsApi,
@@ -50,6 +51,15 @@ export const adminApi = {
     list: (pagination: AdminNewsListInput = {}) =>
       apiFetch<PaginatedResponse<AdminNewsListItem>>(`/admin/content/news${adminNewsListSuffix(pagination)}`),
     get: (id: string) => apiFetch<AdminNewsDetail>(`/admin/content/news/${enc(id)}`),
+    tags: () => apiFetch<Array<{ id: string; name: string; usageCount: number }>>("/admin/content/news/tags"),
+    create: (body: unknown) => apiFetch<unknown>("/admin/content/news", { method: "POST", body }),
+    update: (id: string, body: unknown) =>
+      apiFetch<unknown>(`/admin/content/news/${enc(id)}`, { method: "PATCH", body }),
+    remove: (id: string) => apiFetch<{ ok: true }>(`/admin/content/news/${enc(id)}`, { method: "DELETE" }),
+    setPublished: (id: string, published: boolean) =>
+      apiFetch<{ ok: true }>(`/admin/content/news/${enc(id)}/${published ? "publish" : "unpublish"}`, {
+        method: "POST",
+      }),
   },
   billing: adminBillingApi,
   staff: adminStaffApi,
@@ -60,4 +70,5 @@ export const adminApi = {
   settings: adminSettingsApi,
   journals: adminJournalsApi,
   moderation: adminModerationApi,
+  forum: adminForumApi,
 };

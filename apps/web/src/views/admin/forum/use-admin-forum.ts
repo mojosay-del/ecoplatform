@@ -1,13 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState, type FormEvent } from "react";
-import type {
-  ForumAdminQuestionItem,
-  ForumQuestionStatus,
-  ForumTaxonomy,
-  ForumTaxonomyValue,
-} from "@ecoplatform/shared";
-import { errorText, apiFetch } from "../../../lib/api";
+import type { ForumAdminQuestionItem, ForumQuestionStatus, ForumTaxonomy } from "@ecoplatform/shared";
+import { errorText, api } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { queryKeys } from "../../../lib/query/keys";
 import { useApiQuery, type ApiState } from "../../shared";
@@ -16,7 +11,6 @@ import { useInfiniteApiQuery, type InfiniteApiState } from "../../../lib/use-inf
 export type AdminForumState = "unauthenticated" | "forbidden" | "loading" | "ready" | "error";
 export type ForumAxis = "raw-materials" | "question-types";
 
-const BASE = "/admin/content/forum";
 const EMPTY_TAXONOMY: ForumTaxonomy = { rawMaterials: [], questionTypes: [] };
 
 type SeedInput = { title: string; body: string; rawMaterialId: string; questionTypeId: string };
@@ -50,7 +44,7 @@ export function useAdminForum() {
 
   const taxonomyQuery = useApiQuery<ForumTaxonomy>(
     queryKeys.admin.forumTaxonomy(),
-    () => apiFetch<ForumTaxonomy>(`${BASE}/taxonomy`),
+    () => api.admin.forum.taxonomy(),
     EMPTY_TAXONOMY,
   );
 
@@ -58,14 +52,7 @@ export function useAdminForum() {
   const questionsQuery = useInfiniteApiQuery<ForumAdminQuestionItem>(
     token ? queryKeys.admin.forumQuestions(statusFilter, appliedSearch) : null,
     50,
-    async ({ limit, offset }) => {
-      const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-      if (statusFilter) query.set("status", statusFilter);
-      if (appliedSearch) query.set("q", appliedSearch);
-      return apiFetch<{ items: ForumAdminQuestionItem[]; total: number; hasMore: boolean }>(
-        `${BASE}/questions?${query}`,
-      );
-    },
+    ({ limit, offset }) => api.admin.forum.questions({ limit, offset }, { status: statusFilter, q: appliedSearch }),
   );
 
   const taxonomy = taxonomyQuery.data;
@@ -95,7 +82,7 @@ export function useAdminForum() {
     async (axis: ForumAxis, label: string) => {
       if (!label.trim()) return;
       try {
-        await apiFetch<ForumTaxonomyValue>(`${BASE}/${axis}`, { method: "POST", body: { label: label.trim() } });
+        await api.admin.forum.createTaxonomyValue(axis, label.trim());
         await reloadTaxonomy();
         setMessage("Значение добавлено.");
       } catch (error) {
@@ -109,7 +96,7 @@ export function useAdminForum() {
     async (axis: ForumAxis, id: string, label: string) => {
       if (!label.trim()) return;
       try {
-        await apiFetch(`${BASE}/${axis}/${id}`, { method: "PATCH", body: { label: label.trim() } });
+        await api.admin.forum.updateTaxonomyValue(axis, id, { label: label.trim() });
         await reloadTaxonomy();
         setMessage("Значение переименовано.");
       } catch (error) {
@@ -131,13 +118,10 @@ export function useAdminForum() {
       if (!current || !neighbor) return;
       try {
         await Promise.all([
-          apiFetch(`${BASE}/${axis}/${id}`, {
-            method: "PATCH",
-            body: { label: current.label, position: neighbor.position },
-          }),
-          apiFetch(`${BASE}/${axis}/${neighbor.id}`, {
-            method: "PATCH",
-            body: { label: neighbor.label, position: current.position },
+          api.admin.forum.updateTaxonomyValue(axis, id, { label: current.label, position: neighbor.position }),
+          api.admin.forum.updateTaxonomyValue(axis, neighbor.id, {
+            label: neighbor.label,
+            position: current.position,
           }),
         ]);
         await reloadTaxonomy();
@@ -155,9 +139,7 @@ export function useAdminForum() {
         return;
       }
       try {
-        const result = await apiFetch<{ ok: true; affectedQuestions: number }>(`${BASE}/${axis}/${id}`, {
-          method: "DELETE",
-        });
+        const result = await api.admin.forum.deleteTaxonomyValue(axis, id);
         await Promise.all([reloadTaxonomy(), Promise.resolve(reloadQuestions())]);
         setMessage(`Значение удалено. Затронуто вопросов: ${result.affectedQuestions}.`);
       } catch (error) {
@@ -173,9 +155,9 @@ export function useAdminForum() {
       if (action === "hide" && !window.confirm("Скрыть вопрос из публичного форума?")) return;
       try {
         if (action === "delete") {
-          await apiFetch(`${BASE}/questions/${id}`, { method: "DELETE" });
+          await api.admin.forum.deleteQuestion(id);
         } else {
-          await apiFetch(`${BASE}/questions/${id}/${action}`, { method: "POST" });
+          await api.admin.forum.moderateQuestion(id, action);
         }
         reloadQuestions();
         setMessage(
@@ -191,7 +173,7 @@ export function useAdminForum() {
   const seedQuestion = useCallback(
     async (input: SeedInput) => {
       try {
-        await apiFetch<{ id: string }>(`${BASE}/questions`, { method: "POST", body: input });
+        await api.admin.forum.seedQuestion(input);
         reloadQuestions();
         setMessage("Вопрос засеян.");
         return true;

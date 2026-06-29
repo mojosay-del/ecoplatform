@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, Send, Trash2 } from "lucide-react";
-import type { ForumAdminAnswerItem, ForumAdminQuestionDetail } from "@ecoplatform/shared";
-import { apiFetch, errorText } from "../../../lib/api";
+import type { ForumAdminAnswerItem } from "@ecoplatform/shared";
+import { api, errorText } from "../../../lib/api";
 import { relativeTime } from "../../forum/forum-helpers";
-
-const BASE = "/admin/content/forum";
 
 // Разворачиваемый блок ответов вопроса для модерации: список ответов (вкл.
 // скрытые) + действия hide/restore/delete и засев ответа от лица команды.
@@ -29,7 +27,7 @@ export function ForumQuestionAnswers({
     setLoading(true);
     setError(null);
     try {
-      const detail = await apiFetch<ForumAdminQuestionDetail>(`${BASE}/questions/${questionId}`);
+      const detail = await api.admin.forum.question(questionId);
       setAnswers(detail.answers);
     } catch (err) {
       setError(errorText(err, "Не удалось загрузить ответы."));
@@ -49,9 +47,9 @@ export function ForumQuestionAnswers({
     setBusy(true);
     try {
       if (action === "delete") {
-        await apiFetch(`${BASE}/answers/${answerId}`, { method: "DELETE" });
+        await api.admin.forum.deleteAnswer(answerId);
       } else {
-        await apiFetch(`${BASE}/answers/${answerId}/${action}`, { method: "POST" });
+        await api.admin.forum.moderateAnswer(answerId, action);
       }
       await load();
       onAfterChange();
@@ -66,7 +64,7 @@ export function ForumQuestionAnswers({
     if (!seedBody.trim()) return;
     setBusy(true);
     try {
-      await apiFetch(`${BASE}/questions/${questionId}/answers`, { method: "POST", body: { body: seedBody.trim() } });
+      await api.admin.forum.seedAnswer(questionId, seedBody.trim());
       setSeedBody("");
       await load();
       onAfterChange();

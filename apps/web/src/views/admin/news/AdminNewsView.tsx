@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useMemo, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
-import { errorText, api, apiFetch, preferredFileAssetImageUrl } from "../../../lib/api";
+import { errorText, api, preferredFileAssetImageUrl } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../../../lib/cms-autosave";
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
@@ -43,7 +43,7 @@ export function AdminNewsView() {
   // Теги — основа автокомплита; их сбой не должен ронять страницу.
   const { data: tagOptions } = useApiQuery<NewsTagOption[]>(
     queryKeys.admin.newsTags(),
-    () => apiFetch<NewsTagOption[]>("/admin/content/news/tags"),
+    () => api.admin.news.tags(),
     [],
   );
 
@@ -189,12 +189,8 @@ export function AdminNewsView() {
         return;
       }
     }
-    const path =
-      item.status === "published"
-        ? `/admin/content/news/${item.id}/unpublish`
-        : `/admin/content/news/${item.id}/publish`;
     try {
-      await apiFetch(path, { method: "POST" });
+      await api.admin.news.setPublished(item.id, item.status !== "published");
       newsQuery.reload();
       setMessage(item.status === "published" ? "Снято с публикации." : "Опубликовано.");
     } catch (error) {
@@ -206,7 +202,7 @@ export function AdminNewsView() {
     if (!token) return;
     if (!confirm(`Полностью удалить новость «${item.title}»? Действие необратимо.`)) return;
     try {
-      await apiFetch(`/admin/content/news/${item.id}`, { method: "DELETE" });
+      await api.admin.news.remove(item.id);
       newsQuery.reload();
       if (draft.id === item.id) startNew();
       setMessage("Новость удалена.");
@@ -239,8 +235,8 @@ export function AdminNewsView() {
     if (!token) throw new Error("Нет активной сессии.");
     const body = buildSaveBody();
     const saved = draft.id
-      ? ((await apiFetch(`/admin/content/news/${draft.id}`, { method: "PATCH", body })) as NewsDetail)
-      : ((await apiFetch("/admin/content/news", { method: "POST", body })) as NewsDetail);
+      ? ((await api.admin.news.update(draft.id, body)) as NewsDetail)
+      : ((await api.admin.news.create(body)) as NewsDetail);
     setEditingOriginal(saved);
     newsQuery.reload();
     return saved;
