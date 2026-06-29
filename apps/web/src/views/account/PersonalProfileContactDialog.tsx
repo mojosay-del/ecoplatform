@@ -416,7 +416,7 @@ export function ContactChangeDialog({
             {field === "email" ? (
               <label>
                 <span>Новый email</span>
-                { }
+                {/* eslint-disable jsx-a11y/no-autofocus -- автофокус первого поля переносит фокус в модалку при открытии (корректно для диалога) */}
                 <input
                   autoFocus
                   autoComplete="email"
@@ -426,6 +426,7 @@ export function ContactChangeDialog({
                   type="email"
                   value={emailValue}
                 />
+                {/* eslint-enable jsx-a11y/no-autofocus */}
               </label>
             ) : (
               // eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; PhoneInput самоозначивает свои поля

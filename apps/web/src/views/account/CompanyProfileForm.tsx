@@ -157,7 +157,7 @@ export function CompanyProfileForm({
             <form className="account-form account-password-modal-form" onSubmit={onSubmit}>
               <label>
                 <span>{activeFieldConfig.inputLabel}</span>
-                { }
+                {/* eslint-disable jsx-a11y/no-autofocus -- автофокус первого поля переносит фокус в модалку при открытии (корректно для диалога) */}
                 <input
                   autoFocus
                   className="input"
@@ -167,6 +167,7 @@ export function CompanyProfileForm({
                   type={activeFieldConfig.type}
                   value={form[editingField]}
                 />
+                {/* eslint-enable jsx-a11y/no-autofocus */}
               </label>
               {message?.type === "error" ? (
                 <p className="account-form-message account-form-message-error">{message.text}</p>

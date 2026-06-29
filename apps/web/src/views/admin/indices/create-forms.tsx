@@ -23,9 +23,7 @@ export function NomenclatureCreateForm({ onMutate, onClose }: { onMutate: Mutate
     <form className="card form indices-inline-form" onSubmit={submit}>
       <label className="form-field news-content-field">
         <span>Название сырья</span>
-        { }
         <input
-          autoFocus
           className="news-form-lead education-module-title-input"
           value={draft.name}
           onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}

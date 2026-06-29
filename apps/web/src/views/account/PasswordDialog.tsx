@@ -47,7 +47,7 @@ export function PasswordDialog({
         <form className="account-form account-password-modal-form" onSubmit={onChangePassword}>
           <label>
             <span>Текущий пароль</span>
-            { }
+            {/* eslint-disable jsx-a11y/no-autofocus -- автофокус первого поля переносит фокус в модалку при открытии (корректно для диалога) */}
             <input
               autoFocus
               autoComplete="current-password"
@@ -56,6 +56,7 @@ export function PasswordDialog({
               required
               type="password"
             />
+            {/* eslint-enable jsx-a11y/no-autofocus */}
           </label>
           <label>
             <span>Новый пароль</span>

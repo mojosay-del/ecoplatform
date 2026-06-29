@@ -74,7 +74,7 @@ export function NameEditDialog({
           <div className="account-form-grid-2">
             <label>
               <span>Фамилия</span>
-              { }
+              {/* eslint-disable jsx-a11y/no-autofocus -- автофокус первого поля переносит фокус в модалку при открытии (корректно для диалога) */}
               <input
                 autoFocus
                 autoComplete="family-name"
@@ -83,6 +83,7 @@ export function NameEditDialog({
                 required
                 value={lastName}
               />
+              {/* eslint-enable jsx-a11y/no-autofocus */}
             </label>
             <label>
               <span>Имя</span>
