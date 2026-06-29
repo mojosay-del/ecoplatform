@@ -1,5 +1,5 @@
 import { NotificationCategory, NotificationChannel } from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NotificationsService } from "./notifications.service";
 
 // Лёгкий мок PrismaService: реализует только то, что трогает NotificationsService.
@@ -41,6 +41,11 @@ function buildPrismaMock(options: {
 }
 
 describe("NotificationsService", () => {
+  // Email-канал гейтится NOTIFICATION_EMAIL_ENABLED. В этих тестах проверяем сам
+  // плюмбинг, поэтому включаем флаг; отдельный тест ниже проверяет дефолт (off).
+  beforeEach(() => vi.stubEnv("NOTIFICATION_EMAIL_ENABLED", "1"));
+  afterEach(() => vi.unstubAllEnvs());
+
   it("два вызова createInApp с одинаковым eventType+sourceId используют один domainEventId", async () => {
     const { prisma, notificationUpsert } = buildPrismaMock({
       preferences: null,
@@ -116,6 +121,29 @@ describe("NotificationsService", () => {
     expect(notificationUpsert).not.toHaveBeenCalled();
     expect(deliveryUpsert).toHaveBeenCalledTimes(1);
     expect(deliveryUpsert.mock.calls[0]?.[0].create.channel).toBe(NotificationChannel.email);
+  });
+
+  it("без NOTIFICATION_EMAIL_ENABLED email-плюмбинг не трогает БД", async () => {
+    vi.stubEnv("NOTIFICATION_EMAIL_ENABLED", "0");
+    const { prisma, deliveryUpsert, notificationUpsert } = buildPrismaMock({
+      preferences: { inAppMutedCategories: [], emailMutedCategories: [] },
+      userEmail: "user@test.local",
+    });
+    const service = new NotificationsService(prisma);
+
+    await service.createInApp({
+      userId: "user-1",
+      eventType: "billing.invoice.created",
+      category: NotificationCategory.billing,
+      title: "Счёт",
+      body: "—",
+    });
+
+    // Создаётся только in-app доставка; email-канал пропущен, lookup email не вызван.
+    const channels = deliveryUpsert.mock.calls.map((args) => args[0].create.channel);
+    expect(channels).toEqual([NotificationChannel.in_app]);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(notificationUpsert).toHaveBeenCalledTimes(1);
   });
 
   it("email-канал ставит запись queued; если категория замьючена в email — записи нет", async () => {

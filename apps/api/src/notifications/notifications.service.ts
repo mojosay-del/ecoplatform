@@ -63,14 +63,16 @@ export class NotificationsService {
       input.domainEventId ?? this.buildDomainEventId(input.eventType, input.sourceId ?? input.userId);
     const now = new Date();
 
-    // Email-канал: задел на будущее. Email-провайдера пока нет, поэтому
-    // создаём NotificationDelivery со статусом `queued` — когда появится
-    // воркер отправки, он подберёт эти записи и пометит как delivered/failed.
-    // Дублирование в системной категории и при mute не делаем.
+    // Email-канал — задел на будущее: рассыльщика пока нет, поэтому по умолчанию
+    // НЕ трогаем ради него БД (иначе на каждое уведомление лишний lookup email +
+    // запись queued-доставки, которую никто не отправит). Включается флагом
+    // NOTIFICATION_EMAIL_ENABLED=1, когда появится воркер: он подберёт записи
+    // queued и пометит delivered/failed. Системную категорию и mute не трогаем.
     const emailQueued =
+      process.env.NOTIFICATION_EMAIL_ENABLED === "1" &&
       input.category !== NotificationCategory.system &&
       !(MUTABLE_CATEGORIES.has(input.category) && prefs?.emailMutedCategories.includes(input.category));
-    const emailAddress = await this.lookupEmailAddress(input.userId);
+    const emailAddress = emailQueued ? await this.lookupEmailAddress(input.userId) : null;
 
     const notification = await this.prisma.$transaction(async (tx) => {
       if (emailQueued && emailAddress) {
