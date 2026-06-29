@@ -48,12 +48,12 @@ type Ticket = {
   messages?: Message[];
 };
 
-type Filter = "all" | "active" | "open" | "in_progress" | "resolved";
+type Filter = "all" | "active" | "new" | "in_progress" | "resolved";
 type TicketSortKey = "updatedAt" | "subject" | "status" | "company";
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "active", label: "Активные" },
-  { id: "open", label: "Открытые" },
+  { id: "new", label: "Открытые" },
   { id: "in_progress", label: "В работе" },
   { id: "resolved", label: "Решённые" },
   { id: "all", label: "Все" },
@@ -131,7 +131,7 @@ export function AdminSupportView() {
       if (filter === "active" && (ticket.status === "resolved" || ticket.status === "closed")) {
         return false;
       }
-      if (filter === "open" && ticket.status !== "new") return false;
+      if (filter === "new" && ticket.status !== "new") return false;
       if (filter === "in_progress" && ticket.status !== "in_progress" && ticket.status !== "awaiting_user")
         return false;
       if (filter === "resolved" && ticket.status !== "resolved" && ticket.status !== "closed") return false;
