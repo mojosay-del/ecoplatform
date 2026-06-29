@@ -644,6 +644,127 @@ export type AdminStaffSummary = {
   } | null;
 };
 
+// ── Admin: подписки / сотрудники / компании / пользователи ────────────────
+// DTO ответов админ-панели (api.admin.*). Это снимок выдачи admin-сервисов
+// (с `_count`, свёрнутыми связями), а не чистые Prisma-модели.
+
+// Свёрнутая запись подписки в админ-выдаче (история/последняя подписка).
+export type AdminBillingCompanySubscription = {
+  id: string;
+  plan: string;
+  status: string;
+  startsAt: IsoDateString;
+  endsAt: IsoDateString;
+  reason: string | null;
+};
+
+// Строка таблицы /admin/billing/companies.
+export type AdminBillingCompanyItem = {
+  id: string;
+  organizationName: string;
+  status: string;
+  subscriptionPlan: string | null;
+  subscriptionEndsAt: IsoDateString | null;
+  demoEndsAt: IsoDateString | null;
+  subscriptions: AdminBillingCompanySubscription[];
+};
+
+// Лёгкий агрегат /admin/billing/summary (счётчики по всей БД, не по странице).
+export type AdminBillingSummary = {
+  activeSubscriptions: number;
+  expiringSoon: number;
+};
+
+// Строка /admin/staff: запись platformStaff + вложенный пользователь.
+export type AdminStaffItem = {
+  id: string;
+  userId: string;
+  roles: string[];
+  isActive: boolean;
+  createdAt: IsoDateString;
+  user: {
+    id: string;
+    email: string;
+    phone: string;
+    firstName: string;
+    lastName: string;
+    gender: "male" | "female" | null;
+    status: string;
+    createdAt: IsoDateString;
+  };
+};
+
+// /admin/companies — строка списка и детальная карточка.
+export type AdminCompanyListItem = {
+  id: string;
+  organizationName: string;
+  status: string;
+  subscriptionPlan: string | null;
+  subscriptionEndsAt: IsoDateString | null;
+  demoEndsAt: IsoDateString | null;
+  createdAt: IsoDateString;
+  _count: { users: number; subscriptions: number; supportTickets: number };
+};
+
+export type AdminCompanyDetail = {
+  id: string;
+  organizationName: string;
+  status: string;
+  subscriptionPlan: string | null;
+  subscriptionEndsAt: IsoDateString | null;
+  demoEndsAt: IsoDateString | null;
+  createdAt: IsoDateString;
+  updatedAt: IsoDateString;
+  users: Array<{
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    status: string;
+    createdAt: IsoDateString;
+  }>;
+  subscriptions: AdminBillingCompanySubscription[];
+  supportTickets: Array<{
+    id: string;
+    category: string;
+    subject: string;
+    status: string;
+    createdAt: IsoDateString;
+  }>;
+};
+
+// /admin/users — строка списка и детальная карточка (с сессиями и ограничениями).
+export type AdminUserListItem = {
+  id: string;
+  email: string;
+  phone: string;
+  firstName: string;
+  lastName: string;
+  status: "active" | "blocked";
+  createdAt: IsoDateString;
+  company: { id: string; organizationName: string; status: string } | null;
+  platformStaff: { roles: string[]; isActive: boolean } | null;
+};
+
+export type AdminUserDetail = AdminUserListItem & {
+  updatedAt: IsoDateString;
+  activeRestrictions: Array<{
+    id: string;
+    moduleCode: string;
+    expiresAt: IsoDateString;
+    reasonCode: string;
+    comment: string | null;
+  }>;
+  recentSessions: Array<{
+    id: string;
+    userAgent: string | null;
+    ipAddress: string | null;
+    createdAt: IsoDateString;
+    expiresAt: IsoDateString;
+    revokedAt: IsoDateString | null;
+  }>;
+};
+
 // ── Moderation ────────────────────────────────────────────────────────────
 export type ModerationCaseType = "complaint" | "suspicious_activity";
 

@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
-import { apiFetch, errorText } from "../../../lib/api";
+import { api, errorText } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { formatPlatformRoles } from "../../../lib/display-labels";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
@@ -29,12 +29,6 @@ type StaffMutationInput = {
   patch: StaffPatch;
 };
 
-type StaffListResponse = {
-  items: StaffItem[];
-  total: number;
-  hasMore: boolean;
-};
-
 export function useAdminStaff() {
   const { token } = useAuth();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -51,20 +45,13 @@ export function useAdminStaff() {
   const staffQuery = useInfiniteApiQuery<StaffItem>(
     token ? "admin-staff" : null,
     ADMIN_STAFF_PAGE_SIZE,
-    async ({ limit, offset }) => {
-      const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-      return apiFetch<StaffListResponse>(`/admin/staff?${query}`, { token });
-    },
+    async ({ limit, offset }) => api.admin.staff.list({ limit, offset }, { token }),
   );
 
   const createMutation = useMutation({
     mutationFn: async (form: CreateStaffForm) => {
       if (!token) throw new Error("Нет доступа.");
-      return apiFetch("/admin/staff", {
-        method: "POST",
-        token,
-        body: { ...form, gender: form.gender || null },
-      });
+      return api.admin.staff.create({ ...form, gender: form.gender || null }, { token });
     },
     onSuccess: () => {
       setCreateOpen(false);
@@ -77,7 +64,7 @@ export function useAdminStaff() {
   const updateMutation = useMutation({
     mutationFn: async ({ userId, patch }: StaffMutationInput) => {
       if (!token) throw new Error("Нет доступа.");
-      return apiFetch(`/admin/staff/${userId}`, { method: "PATCH", token, body: patch });
+      return api.admin.staff.update(userId, patch, { token });
     },
     onSuccess: () => {
       setErrorMessage(null);
@@ -88,7 +75,7 @@ export function useAdminStaff() {
   const resetPasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
       if (!token) throw new Error("Нет доступа.");
-      return apiFetch(`/admin/staff/${userId}/reset-password`, { method: "POST", token, body: { password } });
+      return api.admin.staff.resetPassword(userId, password, { token });
     },
   });
 

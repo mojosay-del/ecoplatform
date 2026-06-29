@@ -6,10 +6,10 @@ import { AppShell } from "../../../components/AppShell";
 import { StatusPill } from "../../../components/StatusPill";
 import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
-import { errorText, apiFetch } from "../../../lib/api";
+import { errorText, api } from "../../../lib/api";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 import { useAuth } from "../../../lib/auth";
-import type { AdminUserDetail, AdminUserList, AdminUserListItem, UserSortKey } from "./types";
+import type { AdminUserDetail, AdminUserListItem, UserSortKey } from "./types";
 import { userSortSelectors, type PlatformRole } from "./constants";
 import { AdminUserDetailPanel } from "./detail-panel";
 import { AdminUsersFilterBar } from "./filter-bar";
@@ -39,14 +39,8 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
   const usersQuery = useInfiniteApiQuery<AdminUserListItem>(
     token ? `admin-users:${filters.search}:${filters.status}` : null,
     take,
-    async ({ limit, offset }) => {
-      const params = new URLSearchParams();
-      params.set("limit", String(limit));
-      params.set("offset", String(offset));
-      if (filters.search) params.set("search", filters.search);
-      if (filters.status) params.set("status", filters.status);
-      return apiFetch<AdminUserList>(`/admin/users?${params.toString()}`, { token });
-    },
+    async ({ limit, offset }) =>
+      api.admin.users.list({ limit, offset }, { search: filters.search, status: filters.status }, { token }),
   );
 
   const [blockReason, setBlockReason] = useState<string>("policy_violation");
@@ -77,7 +71,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
   async function openUser(id: string) {
     if (!token) return;
     try {
-      const data = await apiFetch<AdminUserDetail>(`/admin/users/${id}`, { token });
+      const data = await api.admin.users.get(id, { token });
       setSessionsOpen(false);
       setSelected(data);
       setRolesDraft(data.platformStaff?.roles ?? []);
@@ -90,11 +84,11 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
     event.preventDefault();
     if (!token || !selected) return;
     try {
-      const data = await apiFetch<AdminUserDetail>(`/admin/users/${selected.id}/block`, {
-        method: "POST",
-        token,
-        body: { reasonCode: blockReason, comment: blockComment.trim() || undefined },
-      });
+      const data = await api.admin.users.block(
+        selected.id,
+        { reasonCode: blockReason, comment: blockComment.trim() || undefined },
+        { token },
+      );
       setSelected(data);
       setBlockComment("");
       usersQuery.reload();
@@ -106,11 +100,7 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
   async function unblockUser() {
     if (!token || !selected) return;
     try {
-      const data = await apiFetch<AdminUserDetail>(`/admin/users/${selected.id}/unblock`, {
-        method: "POST",
-        token,
-        body: { comment: blockComment.trim() || undefined },
-      });
+      const data = await api.admin.users.unblock(selected.id, { comment: blockComment.trim() || undefined }, { token });
       setSelected(data);
       usersQuery.reload();
     } catch (error) {
@@ -121,11 +111,11 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
   async function saveRoles() {
     if (!token || !selected) return;
     try {
-      const data = await apiFetch<AdminUserDetail>(`/admin/users/${selected.id}/platform-roles`, {
-        method: "PATCH",
-        token,
-        body: { roles: rolesDraft, isActive: rolesDraft.length > 0 },
-      });
+      const data = await api.admin.users.setPlatformRoles(
+        selected.id,
+        { roles: rolesDraft, isActive: rolesDraft.length > 0 },
+        { token },
+      );
       setSelected(data);
       usersQuery.reload();
     } catch (error) {

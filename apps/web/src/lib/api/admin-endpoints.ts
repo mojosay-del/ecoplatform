@@ -1,4 +1,5 @@
 import type { AdminDashboardSummary, AdminStaffSummary, PaginatedResponse } from "@ecoplatform/shared";
+import { adminBillingApi, adminCompaniesApi, adminStaffApi, adminUsersApi } from "./admin-people-endpoints";
 import { enc, type ApiRequestOptions, type PaginationInput } from "./endpoint-utils";
 import { apiFetch } from "./requests";
 
@@ -43,4 +44,8 @@ export const adminApi = {
       apiFetch<PaginatedResponse<AdminNewsListItem>>(`/admin/content/news${adminNewsListSuffix(pagination)}`),
     get: (id: string) => apiFetch<AdminNewsDetail>(`/admin/content/news/${enc(id)}`),
   },
+  billing: adminBillingApi,
+  staff: adminStaffApi,
+  companies: adminCompaniesApi,
+  users: adminUsersApi,
 };

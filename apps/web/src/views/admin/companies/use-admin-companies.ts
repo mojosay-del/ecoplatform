@@ -3,13 +3,12 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { sortItems, type SortState } from "../../../components/admin-table-utils";
-import { apiFetch, errorText } from "../../../lib/api";
+import { api, errorText } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 import { ADMIN_COMPANIES_PAGE_SIZE, companySortSelectors, type CompanyStatusReason } from "./constants";
 import type {
   AdminCompanyDetail,
-  AdminCompanyList,
   AdminCompanyListItem,
   CompanyFilters,
   CompanyPlanFilter,
@@ -42,29 +41,22 @@ export function useAdminCompanies() {
   const companiesQuery = useInfiniteApiQuery<AdminCompanyListItem>(
     token ? ["admin", "companies", filters.search, filters.status, filters.plan] : null,
     ADMIN_COMPANIES_PAGE_SIZE,
-    async ({ limit, offset }) => {
-      const params = new URLSearchParams();
-      params.set("limit", String(limit));
-      params.set("offset", String(offset));
-      if (filters.search) params.set("search", filters.search);
-      if (filters.status) params.set("status", filters.status);
-      if (filters.plan) params.set("plan", filters.plan);
-      return apiFetch<AdminCompanyList>(`/admin/companies?${params.toString()}`, { token });
-    },
+    async ({ limit, offset }) =>
+      api.admin.companies.list(
+        { limit, offset },
+        { search: filters.search, status: filters.status, plan: filters.plan },
+        { token },
+      ),
   );
 
   const statusMutation = useMutation<AdminCompanyDetail, unknown, CompanyStatusMutationInput>({
     mutationFn: async (input) => {
       if (!token) throw new Error("Нет доступа.");
-      return apiFetch<AdminCompanyDetail>(`/admin/companies/${input.companyId}/status`, {
-        method: "POST",
-        token,
-        body: {
-          status: input.status,
-          reasonCode: input.reasonCode,
-          comment: input.comment,
-        },
-      });
+      return api.admin.companies.setStatus(
+        input.companyId,
+        { status: input.status, reasonCode: input.reasonCode, comment: input.comment },
+        { token },
+      );
     },
     onSuccess: (data) => {
       setSelected(data);
@@ -95,7 +87,7 @@ export function useAdminCompanies() {
   async function openCompany(id: string) {
     if (!token) return;
     try {
-      const data = await apiFetch<AdminCompanyDetail>(`/admin/companies/${id}`, { token });
+      const data = await api.admin.companies.get(id, { token });
       setSelected(data);
       setErrorMessage(null);
     } catch (error) {

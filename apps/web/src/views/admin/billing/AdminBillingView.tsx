@@ -2,11 +2,11 @@
 
 import { FormEvent, useRef, useState, type SetStateAction } from "react";
 import { CreditCard, RotateCcw, Search } from "lucide-react";
-import { subscriptionPlans } from "@ecoplatform/shared";
+import { subscriptionPlans, type AdminBillingCompanyItem, type AdminBillingSummary } from "@ecoplatform/shared";
 import { AppShell } from "../../../components/AppShell";
 import { StatusPill, companyStatusPillVariant, subscriptionStatusPillVariant } from "../../../components/StatusPill";
 import { AdminEmptyState, AdminInfiniteFooter, AdminPageHeader } from "../../../components/admin";
-import { errorText, apiFetch } from "../../../lib/api";
+import { errorText, api } from "../../../lib/api";
 import { queryKeys } from "../../../lib/query/keys";
 import {
   COMPANY_STATUS_LABELS,
@@ -16,46 +16,23 @@ import {
 import { useApiQuery } from "../../shared";
 import { useInfiniteApiQuery } from "../../../lib/use-infinite-api-query";
 
-type BillingSummary = { activeSubscriptions: number; expiringSoon: number };
-
-type CompanyItem = {
-  id: string;
-  organizationName: string;
-  status: string;
-  subscriptionPlan: string | null;
-  subscriptionEndsAt: string | null;
-  demoEndsAt: string | null;
-  subscriptions: Array<{
-    id: string;
-    plan: string;
-    status: string;
-    startsAt: string;
-    endsAt: string;
-    reason: string | null;
-  }>;
-};
-
 export function AdminBillingView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
-  const companiesQuery = useInfiniteApiQuery<CompanyItem>(
+  const companiesQuery = useInfiniteApiQuery<AdminBillingCompanyItem>(
     queryKeys.admin.billingCompanies(appliedSearch),
     50,
-    async ({ limit, offset }) => {
-      const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-      if (appliedSearch) query.set("search", appliedSearch);
-      return apiFetch<{ items: CompanyItem[]; total: number; hasMore: boolean }>(`/admin/billing/companies?${query}`);
-    },
+    ({ limit, offset }) => api.admin.billing.companies({ limit, offset }, { search: appliedSearch }),
   );
   const companies = companiesQuery.items;
 
   // Точные счётчики по всей БД (не по загруженной странице) — отдельный лёгкий
   // агрегат-эндпоинт, чтобы сводка не врала при пагинации.
-  const summaryQuery = useApiQuery<BillingSummary>(
+  const summaryQuery = useApiQuery<AdminBillingSummary>(
     queryKeys.admin.billingSummary(),
-    () => apiFetch<BillingSummary>("/admin/billing/summary"),
+    () => api.admin.billing.summary(),
     { activeSubscriptions: 0, expiringSoon: 0 },
   );
   const summary = summaryQuery.data;
@@ -96,16 +73,15 @@ export function AdminBillingView() {
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      await apiFetch("/admin/billing/manual-subscriptions", {
-        method: "POST",
-        headers: { "Idempotency-Key": idempotencyKey.current },
-        body: {
+      await api.admin.billing.activateManualSubscription(
+        {
           companyId: form.companyId,
           plan: form.plan,
           endsAt: new Date(form.endsAt).toISOString(),
           reason: form.reason.trim(),
         },
-      });
+        idempotencyKey.current,
+      );
       setSuccessMessage("Подписка активирована.");
       idempotencyKey.current = createIdempotencyKey();
       setForm((prev) => ({ ...prev, reason: "" }));

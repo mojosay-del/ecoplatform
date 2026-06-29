@@ -1,22 +1,8 @@
 import type { PlatformRole } from "@ecoplatform/shared";
 
-export type StaffItem = {
-  id: string;
-  userId: string;
-  roles: string[];
-  isActive: boolean;
-  createdAt: string;
-  user: {
-    id: string;
-    email: string;
-    phone: string;
-    firstName: string;
-    lastName: string;
-    gender: "male" | "female" | null;
-    status: string;
-    createdAt: string;
-  };
-};
+// Каноничный тип ответа — в shared (api-response.ts). Локально сохраняем
+// привычное имя StaffItem, чтобы не трогать импорты компонентов.
+export type { AdminStaffItem as StaffItem } from "@ecoplatform/shared";
 
 export type StaffSortKey = "name" | "status" | "role" | "email" | "createdAt";
 export type StaffStatusFilter = "" | "active" | "inactive";
