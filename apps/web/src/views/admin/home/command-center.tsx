@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AdminDashboardSummary } from "@ecoplatform/shared";
+import type { ApiState } from "../../shared";
 import { StatusPill } from "../../../components/StatusPill";
 import { AdminSignalCard, type AdminSignalTone } from "../../../components/admin";
 import { KPI_CARDS } from "./dashboard-config";
@@ -107,7 +108,7 @@ export function AdminCommandCenter({
   errorMessage,
 }: {
   dashboard: AdminDashboardSummary | null;
-  state: "idle" | "loading" | "ready" | "error";
+  state: ApiState;
   errorMessage: string | null;
 }) {
   if (state === "loading" && !dashboard) {

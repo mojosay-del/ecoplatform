@@ -6,58 +6,38 @@
 // переиспользуется из ../home/dashboard. Доступен только роли admin.
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import type { AdminDashboardSummary } from "@ecoplatform/shared";
-import { errorText, api } from "../../../lib/api";
+import { api } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { AppShell } from "../../../components/AppShell";
+import { useApiQuery } from "../../shared";
 import { AdminDashboard } from "../home/dashboard";
 
 export function AdminAnalyticsView() {
   const router = useRouter();
-  const { ready, token, user } = useAuth();
+  const { ready, user } = useAuth();
   const roles = user?.platformRoles ?? [];
   const roleKey = roles.join("|");
   const isAdmin = roles.includes("admin");
-  const [dashboard, setDashboard] = useState<AdminDashboardSummary | null>(null);
-  const [dashboardState, setDashboardState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [dashboardError, setDashboardError] = useState<string | null>(null);
+
+  // Единый паттерн загрузки (useApiQuery): дашборд тянем только для админа,
+  // иначе ключ null → запрос не уходит.
+  const {
+    data: dashboard,
+    state,
+    errorMessage,
+  } = useApiQuery<AdminDashboardSummary | null>(
+    isAdmin ? "admin-analytics-dashboard" : null,
+    () => api.admin.dashboard(),
+    null,
+  );
 
   useEffect(() => {
     if (ready && roleKey.length === 0) {
       router.replace("/news");
     }
   }, [ready, roleKey, router]);
-
-  useEffect(() => {
-    let isActive = true;
-    if (!ready || !token || !isAdmin) {
-      setDashboard(null);
-      setDashboardState("idle");
-      setDashboardError(null);
-      return;
-    }
-
-    setDashboardState("loading");
-    setDashboardError(null);
-    api.admin
-      .dashboard({ token })
-      .then((data) => {
-        if (!isActive) return;
-        setDashboard(data);
-        setDashboardState("ready");
-      })
-      .catch((error) => {
-        if (!isActive) return;
-        setDashboard(null);
-        setDashboardState("error");
-        setDashboardError(errorText(error, "Не удалось загрузить сводку."));
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [isAdmin, ready, token]);
 
   const maxRegistrations = useMemo(() => {
     if (!dashboard) return 1;
@@ -75,9 +55,9 @@ export function AdminAnalyticsView() {
         {isAdmin ? (
           <AdminDashboard
             dashboard={dashboard}
-            errorMessage={dashboardError}
+            errorMessage={errorMessage}
             maxRegistrations={maxRegistrations}
-            state={dashboardState}
+            state={state}
           />
         ) : (
           <p className="page-subtitle">Раздел доступен только администратору.</p>

@@ -6,6 +6,7 @@
 
 import type { AdminDashboardSummary } from "@ecoplatform/shared";
 import { StatusPill } from "../../../components/StatusPill";
+import type { ApiState } from "../../shared";
 import { AdminAuditFeed } from "./audit-feed";
 import { AdminBusinessPanels } from "./business-panels";
 import { AdminDashboardSkeleton, AdminKpiGrid } from "./kpi-cards";
@@ -21,7 +22,7 @@ export function AdminDashboard({
   dashboard: AdminDashboardSummary | null;
   errorMessage: string | null;
   maxRegistrations: number;
-  state: "idle" | "loading" | "ready" | "error";
+  state: ApiState;
 }) {
   if (state === "loading" && !dashboard) {
     return <AdminDashboardSkeleton />;
