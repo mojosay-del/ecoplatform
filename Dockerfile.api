@@ -30,7 +30,8 @@ COPY packages/shared/package.json ./packages/shared/
 # `--frozen-lockfile` гарантирует, что версии не «разъедутся» против lock.
 # Сеть до npm-реестра с этого сервера бывает нестабильной (таймауты тарболлов):
 # повышаем ретраи/таймаут, снижаем параллелизм и до 5 раз повторяем всю установку.
-RUN pnpm config set fetch-retries 8 && \
+RUN pnpm config set registry https://registry.npmmirror.com && \
+    pnpm config set fetch-retries 8 && \
     pnpm config set fetch-retry-maxtimeout 120000 && \
     pnpm config set network-concurrency 4 && \
     for i in 1 2 3 4 5; do pnpm install --frozen-lockfile && break; \
@@ -71,7 +72,10 @@ RUN sed -i 's#dl-cdn.alpinelinux.org/alpine#mirror.yandex.ru/mirrors/alpine#g' /
 # триггерит install под non-root → EACCES. Глобальные бинари решают обе беды.
 # Версия prisma совпадает со сгенерированным @prisma/client (6.19.3).
 # Запуск миграций и seed/promote использует именно эти глобальные бинари.
-RUN npm install -g prisma@6.19.3 ts-node typescript
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm install -g prisma@6.19.3 ts-node typescript
 WORKDIR /app
 
 ENV NODE_ENV=production \
