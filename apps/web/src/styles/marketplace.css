@@ -2124,8 +2124,105 @@
   background: #f8fafc;
 }
 
-/* Точки/круги/пульс свежих объявлений рисует MapLibre data-driven слоями (см.
-   ListingMap.tsx) — отдельный CSS для маркеров больше не нужен. */
+/* ── Маркеры объявлений: пины (капля с сырьём) и donut-кластеры ──────────────
+   4-км круг приватности по-прежнему рисует MapLibre fill/line-слоями; а вот пины
+   и кластеры — это HTML-маркеры (maplibregl.Marker), стилизуем здесь. */
+/* Пин: тёмная круглая голова с цветным кольцом и цветным хвостом (цвет = сырьё),
+   белый куб-кипа внутри. Свечение/пульс — в цвет категории (--marker-color). */
+.mp-pin {
+  cursor: pointer;
+  line-height: 0;
+  filter: drop-shadow(0 5px 7px rgba(9, 14, 22, 0.42));
+  transition: transform 0.14s ease;
+}
+.mp-pin .mk-inner {
+  position: relative;
+  transform-origin: 50% 100%;
+  transition: transform 0.16s ease;
+}
+.mp-pin svg {
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+.mp-pin .mk-pulse {
+  display: none;
+  position: absolute;
+  left: 23px;
+  top: 20px;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  background: var(--marker-color, #f5773e);
+  z-index: 0;
+}
+.mp-pin.is-hover,
+.mp-pin.is-active {
+  z-index: 5;
+  filter: drop-shadow(0 9px 13px rgba(9, 14, 22, 0.5)) drop-shadow(0 0 13px var(--marker-color, #f5773e));
+}
+.mp-pin.is-hover .mk-inner,
+.mp-pin.is-active .mk-inner {
+  transform: scale(1.14) translateY(-2px);
+}
+/* Пульс свежих объявлений (<24ч) — расходящееся кольцо в цвет категории. */
+.mp-pin.is-fresh .mk-pulse {
+  display: block;
+  animation: mp-pin-pulse 1.9s ease-out infinite;
+}
+@keyframes mp-pin-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-pin.is-fresh .mk-pulse {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.mp-cluster {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  cursor: pointer;
+  filter: drop-shadow(0 6px 14px rgba(214, 80, 20, 0.42));
+  transition: transform 0.12s ease;
+}
+.mp-cluster:hover {
+  transform: scale(1.06);
+}
+/* Кольцо-donut с долями сырья (conic-gradient задаётся инлайн в JS). */
+.mp-cluster-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.mp-cluster-core {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--brand, #f5773e), #e0601f);
+  color: #fff;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border: 2px solid #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-pin.is-fresh .mp-pin-pulse {
+    animation: none;
+    opacity: 0;
+  }
+}
 
 /* ── Карта как рабочая область, лента поверх ────────────────────────────────
    На desktop карта занимает всю ширину, а фильтры и объявления лежат поверх

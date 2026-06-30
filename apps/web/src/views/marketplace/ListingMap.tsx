@@ -18,12 +18,13 @@ import maplibregl, {
   type PropertyValueSpecification,
 } from "maplibre-gl";
 import { Protocol as PmtilesProtocol } from "pmtiles";
+import Supercluster from "supercluster";
 import { useEffect, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Point, Polygon } from "geojson";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
 import { isFreshListing } from "./listing-card-meta";
-import { materialColor } from "./materials";
+import { MATERIAL_COLORS, materialColor } from "./materials";
 import {
   LISTING_MAP_CIRCLE_ZOOM_THRESHOLD,
   LISTING_MAP_DEFAULT_CENTER,
@@ -44,16 +45,22 @@ import {
   BASEMAP_OPACITY_PROPERTIES_BY_TYPE,
   BASEMAP_PAINT_OVERRIDES_BY_ID,
   BASEMAP_REVEAL_WINDOWS,
+  basemapPaletteOverrides,
+  isBasemapTerrainLayer,
 } from "./listing-map-basemap-style";
 
-// Идентификаторы источников/слоёв MapLibre.
-const SRC_POINTS = "listing-points";
+// Пины и donut-кластеры — HTML-маркеры (maplibregl.Marker), кластеризацию считаем
+// на клиенте через supercluster (надёжнее, чем querySourceFeatures на обрезанных
+// по зоне тайлах). Круг приватности 4 км — fill/line-слои MapLibre на отдельном
+// источнике.
 const SRC_CIRCLES = "listing-circles";
-const LYR_DOT = "listing-dot";
-const LYR_DOT_PULSE = "listing-dot-pulse";
 const LYR_CIRCLE_FILL = "listing-circle-fill";
 const LYR_CIRCLE_LINE = "listing-circle-line";
-const HOVER_LAYERS = [LYR_DOT, LYR_CIRCLE_FILL];
+const HOVER_LAYERS = [LYR_CIRCLE_FILL];
+// До этого зума точки группируются в кластеры; на пороге круга (9) и ближе —
+// всегда отдельные пины + круг приватности.
+const CLUSTER_MAX_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD - 1;
+const CLUSTER_RADIUS_PX = 58;
 const LAYER_FADE_ZOOM_RANGE = 0.45;
 const BASEMAP_LAYER_FADE_ZOOM_RANGE = 0.9;
 const MAP_TILE_FADE_DURATION_MS = 420;
@@ -83,26 +90,6 @@ function ensurePmtilesProtocol() {
   maplibregl.addProtocol("pmtiles", new PmtilesProtocol().tile);
   pmtilesRegistered = true;
 }
-
-const DOT_ZOOM_OPACITY: PropertyValueSpecification<number> = [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  CIRCLE_FADE_START_ZOOM,
-  1,
-  CIRCLE_FADE_END_ZOOM,
-  0,
-];
-
-const PULSE_ZOOM_OPACITY: PropertyValueSpecification<number> = [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  CIRCLE_FADE_START_ZOOM,
-  0.3,
-  CIRCLE_FADE_END_ZOOM,
-  0,
-];
 
 const CIRCLE_LINE_ZOOM_OPACITY: PropertyValueSpecification<number> = [
   "interpolate",
@@ -134,12 +121,6 @@ type BasemapLayerSpec = {
   maxzoom?: number;
   "source-layer"?: string;
 };
-
-function dotFadeForZoom(zoom: number) {
-  if (zoom <= CIRCLE_FADE_START_ZOOM) return 1;
-  if (zoom >= CIRCLE_FADE_END_ZOOM) return 0;
-  return (CIRCLE_FADE_END_ZOOM - zoom) / (CIRCLE_FADE_END_ZOOM - CIRCLE_FADE_START_ZOOM);
-}
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -282,11 +263,19 @@ function applyRussianRfBasemap(map: MlMap) {
   for (const layer of map.getStyle().layers ?? []) {
     const spec = layer as BasemapLayerSpec;
     try {
-      if (shouldHideBasemapLayer(spec)) {
+      if (shouldHideBasemapLayer(spec) || isBasemapTerrainLayer(spec)) {
         map.setLayoutProperty(spec.id, "visibility", "none");
         continue;
       }
       applyBasemapOverrides(map, spec);
+      // Фирменная палитра (по OMT source-layer) — после точечных id-правок, чтобы
+      // цвет суши/воды/леса/дорог был один и тот же на любом базовом стиле.
+      const palette = basemapPaletteOverrides(spec);
+      if (palette) {
+        for (const [property, value] of Object.entries(palette)) {
+          map.setPaintProperty(spec.id, property, value);
+        }
+      }
       applySmoothBasemapZoom(map, spec);
       // text-field может лежать в layout слоя ИЛИ быть применён через стиль —
       // надёжнее спросить у карты текущее значение.
@@ -320,7 +309,15 @@ export type ListingMapProps = {
   fitOnDataChange?: boolean;
 };
 
-type PointProps = { id: string; color: string; fresh: boolean };
+type PointProps = { id: string; color: string; material: string; fresh: boolean };
+
+// Slug сырья объявления, приведённый к ключам палитры (для цвета пина и долей
+// donut-кластера); всё за пределами трёх категорий — «прочее».
+function materialSlugOf(categorySlug: string | undefined): keyof typeof MATERIAL_COLORS {
+  return categorySlug && Object.hasOwn(MATERIAL_COLORS, categorySlug)
+    ? (categorySlug as keyof typeof MATERIAL_COLORS)
+    : "default";
+}
 
 function listingPoints(listings: MarketplaceListingListItem[]): MarketplaceListingListItem[] {
   return listings.filter((listing) => listing.circleLat != null && listing.circleLon != null);
@@ -337,11 +334,137 @@ function pointsCollection(points: MarketplaceListingListItem[]): FeatureCollecti
         properties: {
           id: listing.id,
           color: materialColor(listing.positions[0]?.categorySlug),
+          material: materialSlugOf(listing.positions[0]?.categorySlug),
           fresh: isFreshListing(listing.publishedAt),
         },
       }),
     ),
   };
+}
+
+// ── HTML-маркеры: пин-капля и donut-кластер ─────────────────────────────────
+// Порядок долей donut совпадает с легендой/чипами фильтра.
+const CLUSTER_MATERIAL_ORDER = ["makulatura", "plenki", "plastiki", "default"] as const;
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function svgElement(name: string, attrs: Record<string, string | number>): SVGElement {
+  const node = document.createElementNS(SVG_NS, name);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+  return node;
+}
+
+// Белый куб-кипа (3D-блок прессованного сырья) на тёмной голове пина. Центр ~23,19.
+function appendCubeIcon(svg: SVGElement) {
+  const face = (d: string, opacity?: string) =>
+    svgElement("path", opacity ? { d, fill: "#fff", opacity } : { d, fill: "#fff" });
+  svg.append(
+    face("M23 8 L33 13.5 L23 19 L13 13.5 Z"), // верхняя грань
+    face("M13 13.5 L23 19 L23 30 L13 24.5 Z", "0.82"), // левая грань
+    face("M33 13.5 L23 19 L23 30 L33 24.5 Z", "0.6"), // правая грань
+    // Обвязка кипы — тонкие тёмные ремни поверх граней.
+    svgElement("path", {
+      d: "M13 18 L23 23.5 L33 18",
+      fill: "none",
+      stroke: "#0b1018",
+      "stroke-width": 1,
+      opacity: 0.32,
+      "stroke-linejoin": "round",
+    }),
+    svgElement("line", { x1: 23, y1: 19, x2: 23, y2: 30, stroke: "#0b1018", "stroke-width": 1, opacity: 0.28 }),
+  );
+}
+
+// Пин по образцу gdebenz: тёмная круглая голова с цветным кольцом + цветной хвост
+// (цвет = сырьё), белый куб-кипа внутри. Свечение/пульс — через CSS по
+// --marker-color. Строим через DOM (без innerHTML).
+function createPinElement(color: string, fresh: boolean): HTMLDivElement {
+  const el = document.createElement("div");
+  el.className = `mp-pin${fresh ? " is-fresh" : ""}`;
+  el.style.setProperty("--marker-color", color);
+  const inner = document.createElement("div");
+  inner.className = "mk-inner";
+  const pulse = document.createElement("div");
+  pulse.className = "mk-pulse";
+  const svg = svgElement("svg", { width: 46, height: 54, viewBox: "0 0 46 54", "aria-hidden": "true" });
+  svg.append(
+    svgElement("path", { d: "M23 51 L15.5 35 L30.5 35 Z", fill: color }), // хвост-указатель
+    svgElement("circle", { cx: 23, cy: 20, r: 17, fill: "rgba(9,14,22,0.92)", stroke: color, "stroke-width": 2.5 }),
+  );
+  appendCubeIcon(svg);
+  inner.append(pulse, svg);
+  el.append(inner);
+  return el;
+}
+
+// Диаметр кластера растёт с числом объявлений (38→58 px).
+function clusterDiameter(count: number): number {
+  if (count < 10) return 38;
+  if (count < 50) return 48;
+  return 58;
+}
+
+// conic-gradient кольца donut по долям сырья в кластере.
+function clusterRingGradient(counts: Record<string, number>, total: number): string {
+  if (total <= 0) return MATERIAL_COLORS.default;
+  const stops: string[] = [];
+  let acc = 0;
+  for (const slug of CLUSTER_MATERIAL_ORDER) {
+    const value = counts[slug] ?? 0;
+    if (value <= 0) continue;
+    const from = (acc / total) * 360;
+    acc += value;
+    const to = (acc / total) * 360;
+    stops.push(`${MATERIAL_COLORS[slug]} ${from}deg ${to}deg`);
+  }
+  return `conic-gradient(${stops.join(", ")})`;
+}
+
+function createClusterElement(count: number, counts: Record<string, number>): HTMLDivElement {
+  const diameter = clusterDiameter(count);
+  const el = document.createElement("div");
+  el.className = "mp-cluster";
+  el.style.width = `${diameter}px`;
+  el.style.height = `${diameter}px`;
+  const ring = document.createElement("div");
+  ring.className = "mp-cluster-ring";
+  ring.style.background = clusterRingGradient(counts, count);
+  const core = document.createElement("div");
+  core.className = "mp-cluster-core";
+  const coreSize = diameter - 12;
+  core.style.width = `${coreSize}px`;
+  core.style.height = `${coreSize}px`;
+  core.style.fontSize = `${count >= 100 ? 13 : 14}px`;
+  core.textContent = String(count);
+  el.append(ring, core);
+  return el;
+}
+
+// Аккумулятор долей сырья в кластере (для donut-кольца).
+type ClusterAccum = { mak: number; plen: number; plast: number; def: number };
+
+// Клиентский индекс кластеризации. supercluster — тот же алгоритм, что MapLibre
+// гоняет в воркере, но здесь считаем сами: getClusters(bbox, zoom) детерминированно
+// отдаёт кластеры/точки под текущий вид, не завися от загрузки тайлов.
+function buildClusterIndex(points: MarketplaceListingListItem[]): Supercluster<PointProps, ClusterAccum> {
+  const index = new Supercluster<PointProps, ClusterAccum>({
+    radius: CLUSTER_RADIUS_PX,
+    maxZoom: CLUSTER_MAX_ZOOM,
+    map: (props) => ({
+      mak: props.material === "makulatura" ? 1 : 0,
+      plen: props.material === "plenki" ? 1 : 0,
+      plast: props.material === "plastiki" ? 1 : 0,
+      def: props.material === "default" ? 1 : 0,
+    }),
+    reduce: (acc, props) => {
+      acc.mak += props.mak;
+      acc.plen += props.plen;
+      acc.plast += props.plast;
+      acc.def += props.def;
+    },
+  });
+  index.load(pointsCollection(points).features);
+  return index;
 }
 
 function circlesCollection(
@@ -389,20 +512,112 @@ export function ListingMap({
   fitOnDataChangeRef.current = fitOnDataChange;
   // Окно подавления moveend после программных setCenter/fitBounds.
   const suppressMovedUntilRef = useRef(0);
+  // HTML-маркеры пинов/кластеров: все созданные (кэш по ключу) и видимые сейчас.
+  const markersRef = useRef<Record<string, maplibregl.Marker>>({});
+  const markersOnScreenRef = useRef<Record<string, maplibregl.Marker>>({});
+  // Клиентский индекс кластеризации (supercluster) по текущему набору точек.
+  const clusterIndexRef = useRef<Supercluster<PointProps, ClusterAccum> | null>(null);
   const [failed, setFailed] = useState(false);
 
   const points = listingPoints(listings);
   const pointsKey = points.map((listing) => `${listing.id}:${listing.circleLat},${listing.circleLon}`).join("|");
+  // Через ref, чтобы setupMap/applyData всегда читали АКТУАЛЬНЫЙ набор точек, а не
+  // замыкание момента маунта (иначе данные не выставятся, если объявления
+  // загрузились раньше стиля карты).
+  const pointsRef = useRef(points);
+  pointsRef.current = points;
 
-  // Подсветка объекта — через feature-state hover на обоих источниках (точка и
-  // круг живут в разных source, активен лишь один по зуму, но состояние держим в
-  // обоих, чтобы переживать свап масштаба).
+  // Подсветка объекта: круг 4 км — через feature-state, пин — через CSS-класс на
+  // его HTML-маркере (если он сейчас на экране и не свёрнут в кластер).
   function setHover(id: string | null, on: boolean) {
     const map = mapRef.current;
     if (!map || !id || !readyRef.current) return;
-    for (const source of [SRC_POINTS, SRC_CIRCLES]) {
-      if (map.getSource(source)) map.setFeatureState({ source, id }, { hover: on });
+    if (map.getSource(SRC_CIRCLES)) map.setFeatureState({ source: SRC_CIRCLES, id }, { hover: on });
+    markersOnScreenRef.current[`p:${id}`]?.getElement().classList.toggle("is-hover", on);
+  }
+
+  // Перестроение HTML-маркеров под текущий вид: кластеры → donut, одиночные точки
+  // → пин-капля. Кластеры берём из supercluster по bbox+зуму. Вызываем при
+  // движении/зуме и после смены данных.
+  function updateMarkers() {
+    const map = mapRef.current;
+    const index = clusterIndexRef.current;
+    if (!map || !readyRef.current || !index) return;
+
+    const bounds = map.getBounds();
+    const bbox: [number, number, number, number] = [
+      bounds.getWest(),
+      bounds.getSouth(),
+      bounds.getEast(),
+      bounds.getNorth(),
+    ];
+    const clusters = index.getClusters(bbox, Math.round(map.getZoom()));
+    const next: Record<string, maplibregl.Marker> = {};
+
+    for (const feature of clusters) {
+      const coordinates = feature.geometry.coordinates as [number, number];
+      const props = feature.properties;
+
+      if ("cluster" in props && props.cluster) {
+        const key = `c:${props.cluster_id}`;
+        let marker = markersRef.current[key];
+        if (!marker) {
+          const element = createClusterElement(props.point_count, {
+            makulatura: props.mak,
+            plenki: props.plen,
+            plastiki: props.plast,
+            default: props.def,
+          });
+          element.addEventListener("click", () => {
+            const zoom = index.getClusterExpansionZoom(props.cluster_id as number);
+            suppressMovedUntilRef.current = Date.now() + 700;
+            map.easeTo({ center: coordinates, zoom: Math.min(zoom, MAX_MAP_ZOOM) });
+          });
+          marker = markersRef.current[key] = new maplibregl.Marker({ element }).setLngLat(coordinates);
+        }
+        next[key] = marker;
+        if (!markersOnScreenRef.current[key]) marker.addTo(map);
+        continue;
+      }
+
+      const pointProps = props as PointProps;
+      const id = pointProps.id;
+      if (!id) continue;
+      const key = `p:${id}`;
+      let marker = markersRef.current[key];
+      if (!marker) {
+        const element = createPinElement(pointProps.color, pointProps.fresh);
+        element.addEventListener("click", (event) => {
+          event.stopPropagation();
+          onSelectRef.current?.(id);
+        });
+        element.addEventListener("mouseenter", () => {
+          if (hoveredIdRef.current && hoveredIdRef.current !== id) setHover(hoveredIdRef.current, false);
+          hoveredIdRef.current = id;
+          setHover(id, true);
+          onHoverRef.current?.(id);
+        });
+        element.addEventListener("mouseleave", () => {
+          setHover(id, false);
+          hoveredIdRef.current = null;
+          onHoverRef.current?.(null);
+        });
+        marker = markersRef.current[key] = new maplibregl.Marker({
+          element,
+          anchor: "bottom",
+          offset: [0, 3],
+        }).setLngLat(coordinates);
+      }
+      next[key] = marker;
+      if (!markersOnScreenRef.current[key]) marker.addTo(map);
     }
+
+    for (const [key, marker] of Object.entries(markersOnScreenRef.current)) {
+      if (!next[key]) marker.remove();
+    }
+    markersOnScreenRef.current = next;
+    // Восстанавливаем подсветку наведённого пина после пересборки.
+    if (hoveredIdRef.current) setHover(hoveredIdRef.current, true);
   }
 
   function emitBoundsIfUserMoved() {
@@ -419,8 +634,10 @@ export function ListingMap({
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
 
-    (map.getSource(SRC_POINTS) as GeoJSONSource | undefined)?.setData(pointsCollection(points));
+    const points = pointsRef.current;
+    clusterIndexRef.current = buildClusterIndex(points);
     (map.getSource(SRC_CIRCLES) as GeoJSONSource | undefined)?.setData(circlesCollection(points));
+    updateMarkers();
 
     if (!fit || points.length === 0) return;
 
@@ -472,7 +689,12 @@ export function ListingMap({
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
-    let pulseFrame = 0;
+    // MapLibre сам следит лишь за ресайзом окна, но не за тем, как меняется размер
+    // самого контейнера (переключатель «Список/Карта» на узких экранах, сворачивание
+    // сайдбара). ResizeObserver гарантирует, что холст всегда занимает контейнер.
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    if (containerRef.current) resizeObserver.observe(containerRef.current);
+
     map.on("error", () => undefined); // тайловые ошибки не должны валить компонент
 
     // Настройку вешаем на styledata, а НЕ на load: с обрезанными по зоне тайлами
@@ -481,12 +703,13 @@ export function ListingMap({
     // добавлять). readyRef гарантирует однократный прогон.
     const setupMap = () => {
       if (readyRef.current || !mapRef.current) return;
-      if (map.getSource(SRC_POINTS)) return;
+      if (map.getSource(SRC_CIRCLES)) return;
       // Подложку — к виду РФ: русские подписи + скрытые пограничные линии.
       applyRussianRfBasemap(map);
 
-      map.addSource(SRC_POINTS, { type: "geojson", data: pointsCollection(points), promoteId: "id" });
-      map.addSource(SRC_CIRCLES, { type: "geojson", data: circlesCollection(points), promoteId: "id" });
+      // Точки кластеризуем на клиенте (supercluster) — индекс строит applyData;
+      // в MapLibre держим только источник 4-км круга приватности.
+      map.addSource(SRC_CIRCLES, { type: "geojson", data: circlesCollection(pointsRef.current), promoteId: "id" });
 
       // Круг 4 км — на городском масштабе и ближе.
       map.addLayer({
@@ -511,35 +734,14 @@ export function ListingMap({
         },
       });
 
-      // Пульс свежих объявлений (под точкой) — анимируется rAF ниже.
-      map.addLayer({
-        id: LYR_DOT_PULSE,
-        type: "circle",
-        source: SRC_POINTS,
-        maxzoom: CIRCLE_FADE_END_ZOOM,
-        filter: ["==", ["get", "fresh"], true],
-        paint: { "circle-color": ["get", "color"], "circle-opacity": PULSE_ZOOM_OPACITY, "circle-radius": 6 },
-      });
-      // Точка дальнего масштаба.
-      map.addLayer({
-        id: LYR_DOT,
-        type: "circle",
-        source: SRC_POINTS,
-        maxzoom: CIRCLE_FADE_END_ZOOM,
-        paint: {
-          "circle-color": ["get", "color"],
-          "circle-radius": ["case", ["boolean", ["feature-state", "hover"], false], 8, 6],
-          "circle-opacity": DOT_ZOOM_OPACITY,
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-opacity": DOT_ZOOM_OPACITY,
-        },
-      });
-
       readyRef.current = true;
       applyData(fitOnDataChangeRef.current);
 
-      // Hover/курсор/клик на интерактивных слоях.
+      // HTML-маркеры (пины/кластеры) пересобираем при любом изменении вида.
+      map.on("move", updateMarkers);
+      map.on("moveend", updateMarkers);
+
+      // Hover/курсор/клик на 4-км круге (одиночные пины обрабатывают свои DOM-события).
       for (const layer of HOVER_LAYERS) {
         map.on("mousemove", layer, (event) => {
           map.getCanvas().style.cursor = "pointer";
@@ -562,22 +764,6 @@ export function ListingMap({
           if (id) onSelectRef.current?.(id);
         });
       }
-
-      // Пульсация свежих точек: синус по радиусу/прозрачности. Уважаем
-      // prefers-reduced-motion — тогда пульс статичный, без анимации.
-      const reducedMotion =
-        typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      if (!reducedMotion) {
-        const animate = () => {
-          const phase = (Math.sin(Date.now() / 500) + 1) / 2; // 0..1
-          if (map.getLayer(LYR_DOT_PULSE)) {
-            map.setPaintProperty(LYR_DOT_PULSE, "circle-radius", 6 + phase * 12);
-            map.setPaintProperty(LYR_DOT_PULSE, "circle-opacity", 0.35 * (1 - phase) * dotFadeForZoom(map.getZoom()));
-          }
-          pulseFrame = requestAnimationFrame(animate);
-        };
-        pulseFrame = requestAnimationFrame(animate);
-      }
     };
 
     // styledata надёжно срабатывает после загрузки стиля; load оставляем как
@@ -589,8 +775,11 @@ export function ListingMap({
     map.on("moveend", emitBoundsIfUserMoved);
 
     return () => {
-      cancelAnimationFrame(pulseFrame);
       readyRef.current = false;
+      resizeObserver.disconnect();
+      for (const marker of Object.values(markersRef.current)) marker.remove();
+      markersRef.current = {};
+      markersOnScreenRef.current = {};
       map.remove();
       mapRef.current = null;
     };

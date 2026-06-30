@@ -183,6 +183,69 @@ export const BASEMAP_PAINT_OVERRIDES_BY_ID: Record<string, Record<string, unknow
   },
 };
 
+// ── Фирменная палитра подложки ─────────────────────────────────────────────
+// Светлая «почти белая» суша, серая (НЕ синяя) вода, приглушённый зелёный лес,
+// тёмные дороги с иерархией. Применяется поверх любого OpenMapTiles-стиля через
+// basemapPaletteOverrides (см. ниже) — поэтому одинаково красит и dev-positron,
+// и боевой self-host, не завися от конкретных id слоёв.
+export const BASEMAP_PALETTE = {
+  land: "#f6f5f2",
+  water: "#dbe0e6",
+  waterway: "#cdd3da",
+  wood: "#dce8d3",
+  grass: "#e7efe0",
+  ice: "#eef1f3",
+  roadMajor: "#3f444c",
+  roadSecondary: "#71777f",
+  roadMinor: "#aab0b8",
+} as const;
+
+type PaletteLayerLike = { id: string; type: string; "source-layer"?: string };
+
+const ROAD_COLOR_BY_CLASS: unknown = [
+  "match",
+  ["get", "class"],
+  ["motorway", "trunk", "primary"],
+  BASEMAP_PALETTE.roadMajor,
+  ["secondary", "tertiary"],
+  BASEMAP_PALETTE.roadSecondary,
+  BASEMAP_PALETTE.roadMinor,
+];
+
+const LANDCOVER_COLOR_BY_CLASS: unknown = [
+  "match",
+  ["get", "class"],
+  ["wood", "forest"],
+  BASEMAP_PALETTE.wood,
+  ["grass", "meadow", "park", "scrub", "heath"],
+  BASEMAP_PALETTE.grass,
+  ["ice", "glacier"],
+  BASEMAP_PALETTE.ice,
+  BASEMAP_PALETTE.grass,
+];
+
+// Универсальная перекраска слоя по OMT source-layer/типу. Имена source-layer в
+// OpenMapTiles стандартизированы (water/waterway/landcover/park/transportation),
+// в отличие от id слоёв (у positron и боевого стиля они разные) — поэтому красим
+// именно по ним. Возвращает paint-свойства для setPaintProperty или null.
+export function basemapPaletteOverrides(layer: PaletteLayerLike): Record<string, unknown> | null {
+  const sourceLayer = layer["source-layer"];
+  if (layer.type === "background") return { "background-color": BASEMAP_PALETTE.land };
+  if (sourceLayer === "water") return { "fill-color": BASEMAP_PALETTE.water };
+  if (sourceLayer === "waterway") return { "line-color": BASEMAP_PALETTE.waterway };
+  if (sourceLayer === "park") return { "fill-color": BASEMAP_PALETTE.wood };
+  if (sourceLayer === "landcover") return { "fill-color": LANDCOVER_COLOR_BY_CLASS };
+  if (sourceLayer === "transportation" && layer.type === "line") return { "line-color": ROAD_COLOR_BY_CLASS };
+  return null;
+}
+
+// Слои рельефа/hillshade боевого стиля: тянут DEM-тайлы Terrarium со стороннего
+// источника (AWS) и делают карту «атласной». Прячем — чище и без внешней
+// зависимости. На dev-positron таких слоёв нет, проверка безвредна.
+export function isBasemapTerrainLayer(layer: PaletteLayerLike): boolean {
+  return layer.type === "hillshade" || /hillshade|terrain|relief|dem/i.test(layer.id);
+}
+
 // Точечные переопределения layout-свойств (размеры подписей/иконок) отдельных
 // слоёв подложки.
 export const BASEMAP_LAYOUT_OVERRIDES_BY_ID: Record<string, Record<string, unknown>> = {
