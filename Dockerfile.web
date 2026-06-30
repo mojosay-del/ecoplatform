@@ -11,6 +11,9 @@ ARG IMAGE_REGISTRY=docker.io/library
 # ────────────────── Stage 1: deps ──────────────────
 FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS deps
 RUN sed -i 's#dl-cdn.alpinelinux.org/alpine#mirror.yandex.ru/mirrors/alpine#g' /etc/apk/repositories && apk add --no-cache libc6-compat
+# Corepack на VPS нестабилен с default registry.npmjs.org; зеркало проверено
+# с production-сервера перед деплоем.
+ENV COREPACK_NPM_REGISTRY=https://registry.yarnpkg.com
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /repo
 
@@ -30,6 +33,7 @@ RUN pnpm config set fetch-retries 8 && \
 # ────────────────── Stage 2: build ──────────────────
 FROM ${IMAGE_REGISTRY}/node:${NODE_VERSION}-alpine AS build
 RUN sed -i 's#dl-cdn.alpinelinux.org/alpine#mirror.yandex.ru/mirrors/alpine#g' /etc/apk/repositories && apk add --no-cache libc6-compat
+ENV COREPACK_NPM_REGISTRY=https://registry.yarnpkg.com
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /repo
 
