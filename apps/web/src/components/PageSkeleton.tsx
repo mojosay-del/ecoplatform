@@ -31,10 +31,9 @@ export function PageSkeleton({
           </div>
         </div>
         {[
-          { title: "Рынок", itemCount: 2 },
+          { title: "Рынок", itemCount: 3 },
           { title: "Базы знаний", itemCount: 3 },
           { title: "Инструменты", itemCount: 5 },
-          { title: "Сообщество", itemCount: 1 },
         ].map((section) => (
           <nav className="nav-section" key={section.title}>
             <p className="nav-title">{section.title}</p>

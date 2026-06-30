@@ -69,6 +69,7 @@ export const appNavSections: NavSection[] = [
     items: [
       { key: "news", href: "/news", label: "Новости", icon: "news" },
       { key: "indices", href: "/indices", label: "Индексы цен", icon: "indices" },
+      { key: "forum", href: "/forum", label: "Форум", icon: "forum" },
     ],
   },
   {
@@ -116,10 +117,6 @@ export const appNavSections: NavSection[] = [
         feature: "marketplace",
       },
     ],
-  },
-  {
-    title: "Сообщество",
-    items: [{ key: "forum", href: "/forum", label: "Форум", icon: "forum" }],
   },
   {
     title: "Служебное",

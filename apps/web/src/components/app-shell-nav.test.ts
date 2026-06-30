@@ -15,13 +15,8 @@ import {
 
 describe("AppShell future navigation teasers", () => {
   it("keeps the primary sidebar grouped in the requested order", () => {
-    expect(appNavSections.slice(0, 4).map((section) => section.title)).toEqual([
-      "Рынок",
-      "Базы знаний",
-      "Инструменты",
-      "Сообщество",
-    ]);
-    expect(appNavSections[0]?.items.map((item) => item.label)).toEqual(["Новости", "Индексы цен"]);
+    expect(appNavSections.slice(0, 3).map((section) => section.title)).toEqual(["Рынок", "Базы знаний", "Инструменты"]);
+    expect(appNavSections[0]?.items.map((item) => item.label)).toEqual(["Новости", "Индексы цен", "Форум"]);
     expect(appNavSections[1]?.items.map((item) => item.label)).toEqual(["Обучение", "Сырьё", "Документация"]);
     expect(appNavSections[2]?.items.map((item) => item.label)).toEqual([
       "Калькулятор",
@@ -30,7 +25,6 @@ describe("AppShell future navigation teasers", () => {
       "Карта участников",
       "Торговая площадка",
     ]);
-    expect(appNavSections[3]?.items.map((item) => item.label)).toEqual(["Форум"]);
   });
 
   it("keeps every disabled sidebar item documented as a roadmap teaser", () => {
