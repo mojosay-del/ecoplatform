@@ -268,6 +268,18 @@ export function useAdminKnowledge() {
           (item) => !isKnowledgeCategory(item) && item.parentId === parentId,
         ).length;
         startNewMaterial(parentId, nextPosition);
+      } else {
+        // Ре-базлайним черновик под каноничную серверную запись после ручного
+        // сохранения. Иначе dirty-check (draft vs перезагруженный original)
+        // мог остаться true из-за нормализации сервером (обложка/иконка/позиция/
+        // блоки) — и нижний бар ложно показывал «Есть несохранённые изменения»,
+        // хотя вверху уже «обновлён». Также усыновляет только что созданную
+        // категорию (id с сервера), чтобы её бар тоже стал «Сохранено».
+        const savedId = draft.id ?? result.saved?.id ?? null;
+        const canonical = savedId ? (result.items.find((item) => item.id === savedId) ?? null) : null;
+        if (canonical) {
+          startEdit(canonical);
+        }
       }
     } catch (error) {
       setMessage(errorText(error, "Не удалось сохранить базу знаний."));
