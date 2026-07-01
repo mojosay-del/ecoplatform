@@ -254,177 +254,182 @@ export function MarketplaceMobileFilters({
               role="dialog"
               aria-modal="true"
               aria-labelledby="mp-mobile-filter-title"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) setIsOpen(false);
+              }}
             >
-              <div className="mp-mobile-filter-header">
-                {screen === "main" ? (
-                  <button
-                    aria-label="Закрыть фильтры"
-                    className="mp-mobile-filter-icon"
-                    type="button"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <X aria-hidden="true" size={22} />
+              <div className="mp-mobile-filter-panel">
+                <div className="mp-mobile-filter-header">
+                  {screen === "main" ? (
+                    <button
+                      aria-label="Закрыть фильтры"
+                      className="mp-mobile-filter-icon"
+                      type="button"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <X aria-hidden="true" size={22} />
+                    </button>
+                  ) : (
+                    <button
+                      aria-label="Назад к фильтрам"
+                      className="mp-mobile-filter-icon"
+                      type="button"
+                      onClick={() => setScreen("main")}
+                    >
+                      <ArrowLeft aria-hidden="true" size={22} />
+                    </button>
+                  )}
+                  <strong id="mp-mobile-filter-title">{screenTitle(screen)}</strong>
+                  <button className="mp-mobile-filter-reset" type="button" onClick={resetDraft}>
+                    Сбросить
                   </button>
-                ) : (
-                  <button
-                    aria-label="Назад к фильтрам"
-                    className="mp-mobile-filter-icon"
-                    type="button"
-                    onClick={() => setScreen("main")}
-                  >
-                    <ArrowLeft aria-hidden="true" size={22} />
-                  </button>
-                )}
-                <strong id="mp-mobile-filter-title">{screenTitle(screen)}</strong>
-                <button className="mp-mobile-filter-reset" type="button" onClick={resetDraft}>
-                  Сбросить
-                </button>
-              </div>
+                </div>
 
-              <div className="mp-mobile-filter-body">
-                {screen === "main" ? (
-                  <div className="mp-mobile-filter-main">
-                    <section className="mp-mobile-filter-section">
-                      <h3>Что сдаём</h3>
-                      <MobileFilterRow
-                        label="Категории"
-                        value={categorySummary(nomenclatureGroups, draftNomenclature)}
-                        onClick={() => setScreen("category")}
-                      />
-                      <MobileFilterRow
-                        label="Сырьё"
-                        value={nomenclatureSummary(draftNomenclature)}
-                        onClick={() => setScreen("nomenclature")}
-                      />
-                    </section>
-                    <section className="mp-mobile-filter-section">
-                      <h3>Где искать</h3>
-                      <MobileFilterRow
-                        label="Регион"
-                        value={regionSummary(draftRegions, draftMapBbox)}
-                        onClick={() => setScreen("region")}
-                      />
-                    </section>
-                    <section className="mp-mobile-filter-section">
-                      <h3>Сортировка</h3>
-                      <MobileFilterRow
-                        label="Порядок"
-                        value={selectedDraftSort.label}
-                        onClick={() => setScreen("sort")}
-                      />
-                    </section>
-                  </div>
-                ) : null}
-
-                {screen === "category" ? (
-                  <div className="mp-mobile-filter-options">
-                    {nomenclatureGroups.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
-                    {nomenclatureGroups.map((group) => {
-                      const state = groupSelectionState(group, draftNomenclature);
-                      const color = materialColor(group.slug);
-                      const selectedCount = group.options.filter((option) =>
-                        draftNomenclature.includes(option.id),
-                      ).length;
-                      return (
-                        <button
-                          aria-pressed={state !== "none"}
-                          className={`mp-mobile-filter-option${state !== "none" ? " is-active" : ""}`}
-                          key={group.slug}
-                          type="button"
-                          onClick={() => setDraftNomenclature((prev) => toggleNomenclatureGroup(prev, group))}
-                        >
-                          <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
-                          <span>{group.name}</span>
-                          {state === "partial" ? (
-                            <span className="mp-material-chip-count" style={{ backgroundColor: color }}>
-                              {selectedCount}
-                            </span>
-                          ) : null}
-                          {state === "all" ? <Check aria-hidden="true" size={16} /> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-
-                {screen === "nomenclature" ? (
-                  <div className="mp-mobile-filter-groups">
-                    {nomenclatureGroups.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
-                    {nomenclatureGroups.map((group) => (
-                      <section className="mp-mobile-filter-option-group" key={group.slug}>
-                        <h3>
-                          <i
-                            aria-hidden="true"
-                            className="mp-material-dot"
-                            style={{ backgroundColor: materialColor(group.slug) }}
-                          />
-                          {group.name}
-                        </h3>
-                        {group.options.map((option) => (
-                          <label className="mp-mobile-filter-check" key={option.id}>
-                            <input
-                              type="checkbox"
-                              checked={draftNomenclature.includes(option.id)}
-                              onChange={() => setDraftNomenclature((prev) => toggle(prev, option.id))}
-                            />
-                            <span>{option.name}</span>
-                          </label>
-                        ))}
-                      </section>
-                    ))}
-                  </div>
-                ) : null}
-
-                {screen === "region" ? (
-                  <div className="mp-mobile-filter-options">
-                    {draftMapBbox ? (
-                      <button
-                        className="mp-mobile-filter-option is-active"
-                        type="button"
-                        onClick={() => setDraftMapBbox(null)}
-                      >
-                        <span>Область карты</span>
-                        <X aria-hidden="true" size={16} />
-                      </button>
-                    ) : null}
-                    {regions.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
-                    {regions.map((region) => (
-                      <label className="mp-mobile-filter-check" key={region}>
-                        <input
-                          type="checkbox"
-                          checked={draftRegions.includes(region)}
-                          onChange={() => setDraftRegions((prev) => toggle(prev, region))}
+                <div className="mp-mobile-filter-body">
+                  {screen === "main" ? (
+                    <div className="mp-mobile-filter-main">
+                      <section className="mp-mobile-filter-section">
+                        <h3>Что сдаём</h3>
+                        <MobileFilterRow
+                          label="Категории"
+                          value={categorySummary(nomenclatureGroups, draftNomenclature)}
+                          onClick={() => setScreen("category")}
                         />
-                        <span>{region}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : null}
+                        <MobileFilterRow
+                          label="Сырьё"
+                          value={nomenclatureSummary(draftNomenclature)}
+                          onClick={() => setScreen("nomenclature")}
+                        />
+                      </section>
+                      <section className="mp-mobile-filter-section">
+                        <h3>Где искать</h3>
+                        <MobileFilterRow
+                          label="Регион"
+                          value={regionSummary(draftRegions, draftMapBbox)}
+                          onClick={() => setScreen("region")}
+                        />
+                      </section>
+                      <section className="mp-mobile-filter-section">
+                        <h3>Сортировка</h3>
+                        <MobileFilterRow
+                          label="Порядок"
+                          value={selectedDraftSort.label}
+                          onClick={() => setScreen("sort")}
+                        />
+                      </section>
+                    </div>
+                  ) : null}
 
-                {screen === "sort" ? (
-                  <div className="mp-mobile-filter-options">
-                    {sortOptions.map((option) => (
-                      <button
-                        className={`mp-mobile-filter-sort${draftSortBy === option.value ? " is-active" : ""}`}
-                        key={option.value}
-                        type="button"
-                        onClick={() => setDraftSortBy(option.value)}
-                      >
-                        <span>
-                          <strong>{option.label}</strong>
-                          <small>{option.description}</small>
-                        </span>
-                        {draftSortBy === option.value ? <Check aria-hidden="true" size={17} /> : null}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+                  {screen === "category" ? (
+                    <div className="mp-mobile-filter-options">
+                      {nomenclatureGroups.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
+                      {nomenclatureGroups.map((group) => {
+                        const state = groupSelectionState(group, draftNomenclature);
+                        const color = materialColor(group.slug);
+                        const selectedCount = group.options.filter((option) =>
+                          draftNomenclature.includes(option.id),
+                        ).length;
+                        return (
+                          <button
+                            aria-pressed={state !== "none"}
+                            className={`mp-mobile-filter-option${state !== "none" ? " is-active" : ""}`}
+                            key={group.slug}
+                            type="button"
+                            onClick={() => setDraftNomenclature((prev) => toggleNomenclatureGroup(prev, group))}
+                          >
+                            <i aria-hidden="true" className="mp-material-dot" style={{ backgroundColor: color }} />
+                            <span>{group.name}</span>
+                            {state === "partial" ? (
+                              <span className="mp-material-chip-count" style={{ backgroundColor: color }}>
+                                {selectedCount}
+                              </span>
+                            ) : null}
+                            {state === "all" ? <Check aria-hidden="true" size={16} /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
 
-              <div className="mp-mobile-filter-footer">
-                <button className="mp-mobile-filter-apply" type="button" onClick={applyDraft}>
-                  {showButtonLabel(previewTotal)}
-                </button>
+                  {screen === "nomenclature" ? (
+                    <div className="mp-mobile-filter-groups">
+                      {nomenclatureGroups.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
+                      {nomenclatureGroups.map((group) => (
+                        <section className="mp-mobile-filter-option-group" key={group.slug}>
+                          <h3>
+                            <i
+                              aria-hidden="true"
+                              className="mp-material-dot"
+                              style={{ backgroundColor: materialColor(group.slug) }}
+                            />
+                            {group.name}
+                          </h3>
+                          {group.options.map((option) => (
+                            <label className="mp-mobile-filter-check" key={option.id}>
+                              <input
+                                type="checkbox"
+                                checked={draftNomenclature.includes(option.id)}
+                                onChange={() => setDraftNomenclature((prev) => toggle(prev, option.id))}
+                              />
+                              <span>{option.name}</span>
+                            </label>
+                          ))}
+                        </section>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {screen === "region" ? (
+                    <div className="mp-mobile-filter-options">
+                      {draftMapBbox ? (
+                        <button
+                          className="mp-mobile-filter-option is-active"
+                          type="button"
+                          onClick={() => setDraftMapBbox(null)}
+                        >
+                          <span>Область карты</span>
+                          <X aria-hidden="true" size={16} />
+                        </button>
+                      ) : null}
+                      {regions.length === 0 ? <span className="mp-filter-empty">Нет данных</span> : null}
+                      {regions.map((region) => (
+                        <label className="mp-mobile-filter-check" key={region}>
+                          <input
+                            type="checkbox"
+                            checked={draftRegions.includes(region)}
+                            onChange={() => setDraftRegions((prev) => toggle(prev, region))}
+                          />
+                          <span>{region}</span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {screen === "sort" ? (
+                    <div className="mp-mobile-filter-options">
+                      {sortOptions.map((option) => (
+                        <button
+                          className={`mp-mobile-filter-sort${draftSortBy === option.value ? " is-active" : ""}`}
+                          key={option.value}
+                          type="button"
+                          onClick={() => setDraftSortBy(option.value)}
+                        >
+                          <span>
+                            <strong>{option.label}</strong>
+                            <small>{option.description}</small>
+                          </span>
+                          {draftSortBy === option.value ? <Check aria-hidden="true" size={17} /> : null}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mp-mobile-filter-footer">
+                  <button className="mp-mobile-filter-apply" type="button" onClick={applyDraft}>
+                    {showButtonLabel(previewTotal)}
+                  </button>
+                </div>
               </div>
             </div>,
             portalRoot,
