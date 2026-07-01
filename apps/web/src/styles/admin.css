@@ -1282,7 +1282,7 @@
   display: inline-flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin: 16px 0 12px;
+  margin: 0;
   padding: 4px;
   background: var(--surface-soft);
   border: 1px solid var(--line);
@@ -1306,9 +1306,15 @@
   box-shadow: var(--shadow-sm);
 }
 
-.mod-search {
+/* .mod-search переиспользует .admin-filter-field (flex: 1 1 240px), но стоит
+   прямым ребёнком колоночного .page — из-за чего flex-basis 240px превращался
+   в 240px ВЫСОТЫ и рвал ритм. Селектор с двумя классами перебивает более
+   позднее правило .admin-filter-field: поле — в естественную высоту, а
+   вертикальный ритм задаёт row-gap самого .page. */
+.admin-filter-field.mod-search {
   max-width: 520px;
-  margin-bottom: 16px;
+  flex: 0 0 auto;
+  margin-bottom: 0;
 }
 
 .mod-case-list {
