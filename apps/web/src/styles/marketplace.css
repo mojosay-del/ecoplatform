@@ -3087,8 +3087,8 @@
   padding: 9px;
   box-sizing: border-box;
   border-radius: 10px;
-  background: #1f8a4c12;
-  color: var(--accent, #1f8a4c);
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--brand, #f5773e);
 }
 
 .mp-fact-stack dt {
@@ -3113,8 +3113,8 @@
 
 .mp-modal-spec-grid > div {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: 11px 12px;
+  grid-template-columns: 34px auto minmax(0, 1fr);
+  gap: 11px 10px;
   align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid #f1f5f9;
@@ -3131,12 +3131,13 @@
   padding: 9px;
   box-sizing: border-box;
   border-radius: 10px;
-  background: #1f8a4c12;
-  color: var(--accent, #1f8a4c);
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--brand, #f5773e);
 }
 
 .mp-modal-spec-grid dt {
   color: #94a3b8;
+  white-space: nowrap;
 }
 
 .mp-modal-spec-grid dd {
@@ -3144,6 +3145,7 @@
   text-align: right;
   font-weight: 600;
   color: #0f172a;
+  overflow-wrap: anywhere;
 }
 
 .mp-modal-about-inline {
@@ -3206,6 +3208,19 @@
 .mp-modal-reviews .mp-reviews {
   border-top: none;
   padding-top: 0;
+}
+
+/* Узкая колонка отзывов: заголовок и бейдж рейтинга — в столбик и слева, чтобы
+   пустое состояние («Новый участник») и реальный бейдж не наезжали на заголовок. */
+.mp-modal-reviews .mp-rating-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.mp-modal-reviews .mp-rating-empty {
+  align-items: flex-start;
+  text-align: left;
 }
 
 .mp-modal-action .mp-offer-form h3 {
