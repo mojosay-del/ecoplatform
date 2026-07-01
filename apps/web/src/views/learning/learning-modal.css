@@ -30,19 +30,14 @@
   text-align: center;
 }
 
-/* В модалке убираем верхний отступ у первого блока и стекаем hero в одну колонку
-   (узкая ширина), ограничивая высоту обложки. */
+/* В модалке убираем верхний отступ у первого блока. Hero теперь всегда
+   cover-on-top (см. learning.css), поэтому обложка занимает всю ширину. */
 .module-modal-body > :first-child {
   margin-top: 0;
 }
 
 .module-modal .module-hero {
-  grid-template-columns: 1fr;
-  gap: 20px;
-}
-
-.module-modal .module-hero-cover {
-  max-width: 420px;
+  gap: 18px;
 }
 
 .module-modal .module-hero-title {

@@ -5,7 +5,7 @@
 // (ModulePresentationModal) — чтобы оформление и логика доступа были едиными.
 
 import Link from "next/link";
-import type { LearningChapterDetail, LearningModuleDetail } from "@ecoplatform/shared";
+import type { LearningModuleDetail } from "@ecoplatform/shared";
 import { CoverImage } from "../../components/CoverImage";
 import { StatusPill } from "../../components/StatusPill";
 import { pluralizeRu } from "../shared";
@@ -26,10 +26,6 @@ export function ModulePresentationBody({
 }) {
   const isInDevelopment = !preview && Boolean(data.isInDevelopment);
   const hasAccess = preview || (!isInDevelopment && Boolean(data.hasAccess));
-  const totalLessons = (data.chapters ?? []).reduce(
-    (sum: number, chapter: LearningChapterDetail) => sum + (chapter.lessons?.length ?? 0),
-    0,
-  );
   const firstLessonHref = (() => {
     for (const chapter of data.chapters ?? []) {
       const first = chapter.lessons?.[0];
@@ -54,30 +50,23 @@ export function ModulePresentationBody({
       <header className={`module-hero${coverUrl ? "" : " no-cover"}`}>
         <div className="module-hero-cover">
           {coverUrl ? (
-            <CoverImage alt={data.title} src={coverUrl} sizes="(max-width: 1024px) 100vw, 600px" priority />
+            <CoverImage alt={data.title} src={coverUrl} sizes="(max-width: 1024px) 100vw, 820px" priority />
           ) : (
             <div className="module-hero-cover-fallback" />
           )}
-        </div>
-        <div className="module-hero-body">
+          {/* Капсула доступа — оверлеем слева сверху поверх обложки, как метка
+              на обложке новости. */}
           <span
             className={`module-hero-status${hasAccess ? " is-open" : " is-locked"}${isInDevelopment ? " is-development" : ""}`}
           >
             {isInDevelopment ? "В разработке" : hasAccess ? "Доступен" : "Нужна подписка"}
             <span className="module-hero-status-sub">· {accessLabel}</span>
           </span>
+        </div>
+        <div className="module-hero-body">
           <h1 className="module-hero-title">{data.title}</h1>
           <p className="module-hero-summary">{data.summary}</p>
           <p className="module-hero-description">{data.description}</p>
-          <div className="module-hero-meta">
-            <span>
-              {(data.chapters ?? []).length} {pluralizeRu((data.chapters ?? []).length, "глава", "главы", "глав")}
-            </span>
-            <span aria-hidden>·</span>
-            <span>
-              {totalLessons} {pluralizeRu(totalLessons, "урок", "урока", "уроков")}
-            </span>
-          </div>
           <div className="module-hero-actions">
             {hasAccess && firstLessonHref ? (
               <Link className="button" href={firstLessonHref}>
@@ -97,11 +86,19 @@ export function ModulePresentationBody({
         </div>
       </header>
 
-      {!hasAccess && !isInDevelopment && data.preview ? (
+      {!hasAccess && !isInDevelopment && data.preview?.promotionalDescription ? (
         <section className="module-preview-card">
           <h2>Что внутри курса</h2>
           <p>{data.preview.promotionalDescription}</p>
-          <ul className="module-preview-list">
+        </section>
+      ) : null}
+
+      {/* «Чему вы научитесь» — задаётся в CMS (preview.whatYouWillLearn) и теперь
+          виден всем (раньше показывался только при отсутствии доступа). */}
+      {data.preview?.whatYouWillLearn?.length ? (
+        <section className="module-outcomes">
+          <h2 className="module-outcomes-title">Чему вы научитесь</h2>
+          <ul className="module-outcomes-list">
             {data.preview.whatYouWillLearn.map((item: string, index: number) => (
               <li key={index}>{item}</li>
             ))}

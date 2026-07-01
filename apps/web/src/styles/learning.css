@@ -97,6 +97,9 @@
    сбрасываем дефолты button, layout/оформление задаёт сам класс ниже. */
 button.education-card-link {
   width: 100%;
+  /* Сброс дефолтного паддинга кнопки (1px 6px) — из-за него обложка была
+     вставлена внутрь и по бокам проступал белый фон плашки («кант»). */
+  padding: 0;
   text-align: left;
   font: inherit;
   appearance: none;
@@ -689,19 +692,15 @@ button.education-card-link {
 }
 
 .module-hero {
-  display: grid;
-  grid-template-columns: minmax(280px, 360px) 1fr;
-  gap: 32px;
-  align-items: start;
-}
-
-.module-hero.no-cover {
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
 .module-hero-cover {
   position: relative;
-  aspect-ratio: 4 / 3;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   border-radius: 18px;
   overflow: hidden;
   background: var(--panel-soft);
@@ -773,6 +772,30 @@ button.education-card-link {
   opacity: 0.85;
 }
 
+/* Капсула доступа — оверлеем слева сверху поверх обложки. Матовый белый фон
+   даёт читаемость на любой картинке, статус передаёт цветная точка слева. */
+.module-hero-cover .module-hero-status {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+}
+
+.module-hero-cover .module-hero-status,
+.module-hero-cover .module-hero-status.is-locked,
+.module-hero-cover .module-hero-status.is-development,
+.module-hero-cover .module-hero-status.is-open {
+  background: rgb(var(--white-rgb) / 0.92);
+  color: var(--text);
+  border: none;
+  box-shadow: 0 2px 10px rgb(15 23 42 / 0.14);
+  backdrop-filter: blur(6px);
+}
+
+.module-hero-status.is-open::before {
+  background: var(--accent, #1f8a4c);
+}
+
 .module-hero-title {
   margin: 0;
   font-size: var(--text-3xl);
@@ -794,14 +817,6 @@ button.education-card-link {
   margin: 0;
   font-size: 15px;
   line-height: 1.55;
-  color: var(--muted);
-}
-
-.module-hero-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
   color: var(--muted);
 }
 
@@ -838,6 +853,66 @@ button.education-card-link {
 
 .module-preview-list li {
   margin: 4px 0;
+}
+
+/* «Чему вы научитесь» — чеклист исходов курса (preview.whatYouWillLearn) */
+
+.module-outcomes {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.module-outcomes-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.module-outcomes-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.module-outcomes-list li {
+  position: relative;
+  padding-left: 30px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.module-outcomes-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green-soft, #e6f4ea);
+  color: var(--accent, #1f8a4c);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (min-width: 640px) {
+  .module-outcomes-list {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 28px;
+  }
 }
 
 /* Программа курса (главы) */
@@ -993,9 +1068,5 @@ button.education-card-link {
 
   .education-card-cover {
     height: 280px;
-  }
-
-  .module-hero {
-    grid-template-columns: 1fr;
   }
 }
