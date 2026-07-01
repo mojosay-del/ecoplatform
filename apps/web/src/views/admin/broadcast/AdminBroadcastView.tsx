@@ -9,6 +9,7 @@ import { Bell, Users } from "lucide-react";
 import { AppShell } from "../../../components/AppShell";
 import { SendActionIcon } from "../../../components/app-shell/nav-icons";
 import { AdminPageHeader } from "../../../components/admin";
+import { PopoverSelect, type PopoverSelectOption } from "../../../components/ui/PopoverSelect";
 import { errorText, api } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { COMPANY_TYPE_LABELS, SUBSCRIPTION_PLAN_LABELS, USER_GENDER_LABELS } from "../../../lib/display-labels";
@@ -25,6 +26,25 @@ const COMPANY_TYPE_OPTIONS = ["collector", "trader", "processor"] as const;
 const SUBSCRIPTION_OPTIONS = ["basic", "extended"] as const;
 const GENDER_OPTIONS = ["male", "female"] as const;
 const COMPANY_ROLE_LABELS: Record<string, string> = { owner: "Владелец", member: "Сотрудник" };
+
+// «Все» + конкретные значения — для поповер-селектов аудитории.
+const ALL_OPTION: PopoverSelectOption = { value: "", label: "Все" };
+const COMPANY_TYPE_SELECT: PopoverSelectOption[] = [
+  ALL_OPTION,
+  ...COMPANY_TYPE_OPTIONS.map((value) => ({ value, label: COMPANY_TYPE_LABELS[value] ?? value })),
+];
+const SUBSCRIPTION_SELECT: PopoverSelectOption[] = [
+  ALL_OPTION,
+  ...SUBSCRIPTION_OPTIONS.map((value) => ({ value, label: SUBSCRIPTION_PLAN_LABELS[value] ?? value })),
+];
+const GENDER_SELECT: PopoverSelectOption[] = [
+  ALL_OPTION,
+  ...GENDER_OPTIONS.map((value) => ({ value, label: USER_GENDER_LABELS[value] ?? value })),
+];
+const COMPANY_ROLE_SELECT: PopoverSelectOption[] = [
+  ALL_OPTION,
+  ...Object.entries(COMPANY_ROLE_LABELS).map(([value, label]) => ({ value, label })),
+];
 
 const MAX_TITLE = 160;
 const MAX_BODY = 2000;
@@ -168,69 +188,49 @@ export function AdminBroadcastView() {
             <div className="admin-broadcast-card">
               <h2 className="admin-broadcast-card-title">Аудитория</h2>
               <div className="form-grid-2">
-                <label className="form-field">
-                  <span>Тип компании</span>
-                  <select
-                    className="input"
+                <div className="form-field">
+                  <span id="broadcast-company-type">Тип компании</span>
+                  <PopoverSelect
+                    label="Тип компании"
+                    labelId="broadcast-company-type"
                     value={audience.companyType ?? ""}
-                    onChange={(event) => patchAudience({ companyType: event.target.value || undefined })}
-                  >
-                    <option value="">Все</option>
-                    {COMPANY_TYPE_OPTIONS.map((value) => (
-                      <option key={value} value={value}>
-                        {COMPANY_TYPE_LABELS[value] ?? value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={COMPANY_TYPE_SELECT}
+                    onChange={(value) => patchAudience({ companyType: value || undefined })}
+                  />
+                </div>
 
-                <label className="form-field">
-                  <span>Подписка</span>
-                  <select
-                    className="input"
+                <div className="form-field">
+                  <span id="broadcast-subscription">Подписка</span>
+                  <PopoverSelect
+                    label="Подписка"
+                    labelId="broadcast-subscription"
                     value={audience.subscriptionPlan ?? ""}
-                    onChange={(event) => patchAudience({ subscriptionPlan: event.target.value || undefined })}
-                  >
-                    <option value="">Все</option>
-                    {SUBSCRIPTION_OPTIONS.map((value) => (
-                      <option key={value} value={value}>
-                        {SUBSCRIPTION_PLAN_LABELS[value] ?? value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={SUBSCRIPTION_SELECT}
+                    onChange={(value) => patchAudience({ subscriptionPlan: value || undefined })}
+                  />
+                </div>
 
-                <label className="form-field">
-                  <span>Пол</span>
-                  <select
-                    className="input"
+                <div className="form-field">
+                  <span id="broadcast-gender">Пол</span>
+                  <PopoverSelect
+                    label="Пол"
+                    labelId="broadcast-gender"
                     value={audience.gender ?? ""}
-                    onChange={(event) => patchAudience({ gender: event.target.value || undefined })}
-                  >
-                    <option value="">Все</option>
-                    {GENDER_OPTIONS.map((value) => (
-                      <option key={value} value={value}>
-                        {USER_GENDER_LABELS[value] ?? value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={GENDER_SELECT}
+                    onChange={(value) => patchAudience({ gender: value || undefined })}
+                  />
+                </div>
 
-                <label className="form-field">
-                  <span>Роль в компании</span>
-                  <select
-                    className="input"
+                <div className="form-field">
+                  <span id="broadcast-company-role">Роль в компании</span>
+                  <PopoverSelect
+                    label="Роль в компании"
+                    labelId="broadcast-company-role"
                     value={audience.companyRole ?? ""}
-                    onChange={(event) => patchAudience({ companyRole: event.target.value || undefined })}
-                  >
-                    <option value="">Все</option>
-                    {Object.entries(COMPANY_ROLE_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={COMPANY_ROLE_SELECT}
+                    onChange={(value) => patchAudience({ companyRole: value || undefined })}
+                  />
+                </div>
               </div>
 
               <label className="consent-row u-mt-12">

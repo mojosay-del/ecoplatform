@@ -152,7 +152,9 @@ function SearchSnippet({ snippet }: { snippet: NonNullable<ForumQuestionListItem
 
 export function PinnedNewsCard({ item }: { item: ForumPinnedNews }) {
   return (
-    <Link href={`/news/${item.slug}`} className="forum-pinned">
+    // ?from=forum → страница новости открывается в стиле обсуждения форума с
+    // кнопкой «К форуму» (а не «Назад к новостям»).
+    <Link href={`/news/${item.slug}?from=forum`} className="forum-pinned">
       <div className="forum-tags">
         <span className="forum-badge forum-badge--pin">
           <Pin size={14} /> Закреплено

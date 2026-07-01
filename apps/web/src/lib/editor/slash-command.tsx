@@ -6,7 +6,7 @@ import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
-import { Heading2, Heading3, IndentIncrease, List, ListOrdered, Quote, Type } from "lucide-react";
+import { Heading2, Heading3, IndentIncrease, List, ListOrdered, Quote, Table as TableIcon, Type } from "lucide-react";
 import { ATOMIC_BLOCK_ICONS, ATOMIC_BLOCK_LABELS, atomicDefaultPayload } from "./atomic-block-metadata";
 import { ATOMIC_BLOCK_NODE_NAME, type AtomicBlockKind } from "./block-mapping";
 
@@ -78,6 +78,13 @@ const TEXT_ITEMS: SlashItem[] = [
     keywords: ["цитата", "quote", "blockquote"],
     icon: <Quote size={16} />,
     run: (editor, range) => editor.chain().focus().deleteRange(range).toggleBlockquote().run(),
+  },
+  {
+    title: "Таблица",
+    keywords: ["таблица", "table", "столбцы", "строки", "сетка"],
+    icon: <TableIcon size={16} />,
+    run: (editor, range) =>
+      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
   },
 ];
 

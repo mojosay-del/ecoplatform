@@ -93,6 +93,17 @@
   align-content: start;
 }
 
+/* Карточка-кнопка (открывает модалку презентации) выглядит как ссылка-карточка:
+   сбрасываем дефолты button, layout/оформление задаёт сам класс ниже. */
+button.education-card-link {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
 .education-card-link {
   position: relative;
   display: grid;

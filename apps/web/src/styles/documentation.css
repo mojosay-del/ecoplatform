@@ -249,6 +249,20 @@
   gap: 10px;
 }
 
+/* Нижняя строка: «Часто нужные» (слева) и «Недавно обновлено» (справа). */
+.doc-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .doc-bottom-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .doc-section-head {
   display: flex;
   align-items: center;

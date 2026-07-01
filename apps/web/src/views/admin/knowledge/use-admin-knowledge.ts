@@ -99,10 +99,8 @@ export function useAdminKnowledge() {
     if (draft.position !== original.position) return true;
     if (draft.displayIcon !== knowledgeDisplayIconNameForNode(original, draft.kind === "category" ? 0 : 1)) return true;
 
-    if (draft.kind === "category") {
-      return false;
-    }
-
+    // Раздел и подраздел проверяем одинаково: обложка + блоки + (для материала)
+    // родитель тоже учитываются.
     if ((draft.coverImageId || "") !== (original.coverImageId ?? "")) return true;
     if (draft.parentId !== original.parentId) return true;
     if (
@@ -148,12 +146,13 @@ export function useAdminKnowledge() {
       parentId: kind === "category" ? null : article.parentId,
       title: article.title,
       subtitle: article.subtitle ?? "",
-      coverImageId: kind === "category" ? "" : (article.coverImageId ?? ""),
+      // Раздел (категория) — тоже статья: у него есть обложка и контент-блоки,
+      // как и у подраздела (материала).
+      coverImageId: article.coverImageId ?? "",
       iconType: kind === "category" ? KNOWLEDGE_CATEGORY_ICON_TYPE : (article.iconType ?? ""),
       displayIcon: knowledgeDisplayIconNameForNode(article, kind === "category" ? 0 : 1),
       position: article.position,
-      blocks:
-        kind === "category" ? [] : article.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
+      blocks: article.blocks.map((block) => ({ type: block.type, payload: { ...block.payload } })),
     });
   }
 
@@ -194,15 +193,17 @@ export function useAdminKnowledge() {
 
   const buildSaveBody = useCallback(() => {
     if (draft.kind === "category") {
+      // Раздел — статья верхнего уровня: сохраняем обложку и блоки так же, как у
+      // материала (отличие лишь в parentId=null и иконке-типе раздела).
       return {
         parentId: null,
         title: draft.title.trim(),
         subtitle: draft.subtitle.trim() || undefined,
-        coverImageId: null,
+        coverImageId: draft.coverImageId.trim() || null,
         iconType: KNOWLEDGE_CATEGORY_ICON_TYPE,
         displayIcon: draft.displayIcon,
         position: draft.position,
-        blocks: [],
+        blocks: draft.blocks,
       };
     }
 

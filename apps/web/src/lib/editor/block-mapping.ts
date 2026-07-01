@@ -35,5 +35,12 @@ export function isAtomicBlockKind(kind: string): kind is AtomicBlockKind {
 
 // Узлы верхнего уровня TipTap, которые относятся к «текстовому» блоку:
 // при сохранении их непрерывный участок склеивается в один paragraph-блок
-// (HTML). Совпадает с тем, что разрешает санитайзер абзацев.
-export const RICH_TEXT_TOP_LEVEL_TYPES = new Set<string>(["paragraph", "bulletList", "orderedList", "blockquote"]);
+// (HTML). Совпадает с тем, что разрешает санитайзер абзацев. Таблица — тоже
+// top-level узел: её HTML (<table>…) хранится в том же paragraph-блоке.
+export const RICH_TEXT_TOP_LEVEL_TYPES = new Set<string>([
+  "paragraph",
+  "bulletList",
+  "orderedList",
+  "blockquote",
+  "table",
+]);

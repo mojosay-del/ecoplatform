@@ -214,7 +214,6 @@ export function DocumentationView() {
           </div>
         ) : (
           <>
-            <EssentialsStrip items={pinned.data} onDownload={onDownload} />
             <FormatFilter formats={formats} active={format} onChange={setFormat} />
             <div className="doc-workspace">
               <aside className="doc-nav-panel" aria-label="Навигация по документации">
@@ -250,7 +249,13 @@ export function DocumentationView() {
                 )}
               </main>
             </div>
-            {!searching ? <RecentlyUpdated items={recent.data} /> : null}
+            {!searching ? (
+              // «Часто нужные» (слева) и «Недавно обновлено» (справа) — в одну строку.
+              <div className="doc-bottom-row">
+                <EssentialsStrip items={pinned.data} onDownload={onDownload} />
+                <RecentlyUpdated items={recent.data} />
+              </div>
+            ) : null}
             {navOpen ? (
               <div
                 className="doc-nav-drawer-root"

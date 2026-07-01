@@ -2,7 +2,7 @@
 // расстоянию (клиентская, от адреса компании до отображаемого центра круга).
 // Алгоритмы провайдеро-независимы — см. docs/08-architecture/geo-logic.md.
 
-export const MARKETPLACE_CIRCLE_RADIUS_KM = 4;
+export const MARKETPLACE_CIRCLE_RADIUS_KM = 0.5;
 
 export type GeoPoint = { lat: number; lon: number };
 

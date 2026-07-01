@@ -1,0 +1,24 @@
+/* Появление content-блока при скролле: лёгкий подъём + проявление. Контейнер
+   .content-blocks — это grid, поэтому обёртка остаётся обычной ячейкой сетки и
+   вертикальные отступы (gap) сохраняются. */
+.reveal-block {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.55s ease,
+    transform 0.55s ease;
+  will-change: opacity, transform;
+}
+
+.reveal-block.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-block {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

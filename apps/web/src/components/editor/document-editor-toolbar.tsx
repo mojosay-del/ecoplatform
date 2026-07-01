@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
 import {
+  BetweenHorizontalEnd,
+  BetweenVerticalEnd,
   Bold,
+  Columns3,
   Heading2,
   Heading3,
   Italic,
@@ -14,6 +17,9 @@ import {
   Quote,
   Redo2,
   RemoveFormatting,
+  Rows3,
+  Table as TableIcon,
+  Trash2,
   Underline as UnderlineIcon,
   Undo2,
   Unlink,
@@ -172,6 +178,58 @@ export function DocumentEditorToolbar({
         >
           <Quote size={16} />
         </ToolbarButton>
+      </div>
+
+      <div className="rich-text-toolbar-divider" aria-hidden />
+
+      <div className="rich-text-toolbar-group">
+        <ToolbarButton
+          active={editor.isActive("table")}
+          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          title="Вставить таблицу"
+          ariaLabel="Вставить таблицу"
+        >
+          <TableIcon size={16} />
+        </ToolbarButton>
+        {editor.isActive("table") ? (
+          <>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().addRowAfter().run()}
+              title="Добавить строку ниже"
+              ariaLabel="Добавить строку ниже"
+            >
+              <BetweenHorizontalEnd size={16} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().addColumnAfter().run()}
+              title="Добавить столбец справа"
+              ariaLabel="Добавить столбец справа"
+            >
+              <BetweenVerticalEnd size={16} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().deleteRow().run()}
+              title="Удалить строку"
+              ariaLabel="Удалить строку"
+            >
+              <Rows3 size={16} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().deleteColumn().run()}
+              title="Удалить столбец"
+              ariaLabel="Удалить столбец"
+            >
+              <Columns3 size={16} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().deleteTable().run()}
+              title="Удалить таблицу"
+              ariaLabel="Удалить таблицу"
+            >
+              <Trash2 size={16} />
+            </ToolbarButton>
+          </>
+        ) : null}
       </div>
 
       <div className="rich-text-toolbar-divider" aria-hidden />

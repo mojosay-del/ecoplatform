@@ -554,13 +554,14 @@
   --checklist-icon-bg: rgb(var(--checklist-accent-rgb) / 0.12);
   display: grid;
   gap: 12px;
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 18px 20px 18px 22px;
-  background:
-    linear-gradient(135deg, rgb(var(--white-rgb) / 0.96), rgb(var(--checklist-accent-rgb) / 0.06)), var(--panel);
-  box-shadow:
-    inset 0 1px 0 rgb(var(--white-rgb) / 0.95),
-    0 10px 24px rgb(var(--shadow-rgb) / 0.07);
+  /* Белая плашка с тенью (как блок прохождения тестов), а не градиентный фон.
+     Цветовое обозначение остаётся: полоса слева (::before) + иконка-чип. */
+  background: var(--panel);
+  box-shadow: 0 10px 24px rgb(var(--shadow-rgb) / 0.07);
+  backdrop-filter: none;
 }
 
 .knowledge-page .checklist-knowledge.checklist-reject {
@@ -572,6 +573,7 @@
   width: 4px;
   border-radius: 999px;
   inset: 14px auto 14px 0;
+  background: rgb(var(--checklist-accent-rgb) / 0.9);
 }
 
 .knowledge-page .checklist-knowledge h3 {

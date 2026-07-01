@@ -74,7 +74,7 @@ function buildSignals(dashboard: AdminDashboardSummary): SignalDef[] {
       label: "Просрочка оплаты",
       hint: "Компании в статусе past due",
       icon: CalendarClock,
-      href: "/admin/billing",
+      href: "/admin/companies",
       tone: "warning",
     },
     {

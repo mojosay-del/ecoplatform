@@ -30,8 +30,17 @@ const PARAGRAPH_CONFIG: Parameters<typeof DOMPurify.sanitize>[1] = {
     "blockquote",
     "span",
     "code",
+    // Таблицы из rich-text редактора (TipTap). colspan/rowspan — для объединённых
+    // ячеек; ширины колонок намеренно не разрешаем (resizable выключен).
+    "table",
+    "thead",
+    "tbody",
+    "tfoot",
+    "tr",
+    "th",
+    "td",
   ],
-  ALLOWED_ATTR: ["href", "target", "rel", "style"],
+  ALLOWED_ATTR: ["href", "target", "rel", "style", "colspan", "rowspan"],
   ADD_URI_SAFE_ATTR: ["target", "rel"],
   ALLOWED_URI_REGEXP: /^(?:https?|mailto|tel):/i,
 };

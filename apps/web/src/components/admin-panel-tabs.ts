@@ -2,7 +2,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
   Building2,
-  CreditCard,
   FileText,
   Gauge,
   GraduationCap,
@@ -147,7 +146,7 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         label: "Компании",
         pathname: "/admin/companies",
         roles: ["admin"],
-        description: "Карточки компаний, статусы и подписки.",
+        description: "Карточки компаний, статусы, подписки и ручная активация тарифа.",
         icon: Building2,
       },
       {
@@ -157,14 +156,6 @@ const ADMIN_HOME_GROUPS: AdminHomeGroup[] = [
         roles: ["admin"],
         description: "Команда платформы и служебные роли.",
         icon: UserCog,
-      },
-      {
-        href: "/admin/billing",
-        label: "Подписки",
-        pathname: "/admin/billing",
-        roles: ["admin"],
-        description: "Тарифы, ручная активация и продления.",
-        icon: CreditCard,
       },
     ],
   },

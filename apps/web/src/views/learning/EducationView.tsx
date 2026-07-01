@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { LearningChapterSummary, LearningModuleListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
@@ -11,6 +10,7 @@ import { api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useCoverAssets } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, pluralizeRu, useApiQuery } from "../shared";
 import { shouldRenderCoveredCardSkeleton } from "../shared/covered-card-readiness";
+import { ModulePresentationModal } from "./ModulePresentationModal";
 
 export function EducationView() {
   const {
@@ -24,6 +24,8 @@ export function EducationView() {
   } as PaginatedResponse<LearningModuleListItem>);
   const data = page.items;
   const covers = useCoverAssets(data);
+  // Презентация модуля открывается модальным окном поверх витрины.
+  const [openModuleId, setOpenModuleId] = useState<string | null>(null);
   const lessonsCount = useMemo(
     () =>
       data.reduce(
@@ -79,16 +81,26 @@ export function EducationView() {
                 coverUrl={preferredFileAssetImageUrl(module.coverImageId ? covers.get(module.coverImageId) : null)}
                 key={module.id}
                 module={module}
+                onOpen={setOpenModuleId}
               />
             ))}
           </div>
         )}
       </section>
+      {openModuleId ? <ModulePresentationModal moduleId={openModuleId} onClose={() => setOpenModuleId(null)} /> : null}
     </AppShell>
   );
 }
 
-function EducationModuleCard({ coverUrl, module }: { coverUrl: string | null; module: LearningModuleListItem }) {
+function EducationModuleCard({
+  coverUrl,
+  module,
+  onOpen,
+}: {
+  coverUrl: string | null;
+  module: LearningModuleListItem;
+  onOpen: (moduleId: string) => void;
+}) {
   const [settledCoverUrl, setSettledCoverUrl] = useState<string | null>(null);
   const lessonsCount =
     module.chapters?.reduce(
@@ -104,10 +116,11 @@ function EducationModuleCard({ coverUrl, module }: { coverUrl: string | null; mo
 
   return (
     <article className={`education-card ${showSkeleton ? "is-awaiting-cover" : "is-cover-ready"}`}>
-      <Link
+      <button
+        type="button"
         aria-hidden={showSkeleton || undefined}
         className="education-card-link"
-        href={`/education/${module.id}`}
+        onClick={() => onOpen(module.id)}
         inert={showSkeleton ? true : undefined}
       >
         <div className="education-card-cover">
@@ -138,7 +151,7 @@ function EducationModuleCard({ coverUrl, module }: { coverUrl: string | null; mo
           <p>{module.summary}</p>
         </div>
         <span className="education-card-open-overlay" aria-hidden="true" />
-      </Link>
+      </button>
       {showSkeleton ? <EducationModuleCardSkeleton overlay /> : null}
     </article>
   );

@@ -2,6 +2,7 @@ import { Extension, type Extensions } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle, FontSize } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
+import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 
 // Величина абзацного отступа («красная строка»). Держим единственное значение
 // и согласуем его с whitelist санитайзера (packages/shared/sanitize-html.ts:
@@ -62,6 +63,14 @@ export function createRichTextExtensions(options: RichTextOptions = {}): Extensi
     FontSize,
     Color.configure({ types: [TextStyle.name] }),
     ParagraphIndent,
+    // Таблицы: resizable=false — без colgroup/col c width-стилями, которые всё
+    // равно вырезал бы санитайзер абзацев (ему разрешены только color/font-size/
+    // text-indent). Ширина колонок — авто, оформление читателю задаём через CSS.
+    // Теги table/thead/tbody/tr/th/td добавлены в whitelist sanitize-html.ts.
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableHeader,
+    TableCell,
   ];
 }
 

@@ -2125,7 +2125,7 @@
 }
 
 /* ── Маркеры объявлений: пины (капля с сырьём) и donut-кластеры ──────────────
-   4-км круг приватности по-прежнему рисует MapLibre fill/line-слоями; а вот пины
+   Круг приватности (500 м) по-прежнему рисует MapLibre fill/line-слоями; а вот пины
    и кластеры — это HTML-маркеры (maplibregl.Marker), стилизуем здесь. */
 /* Пин: тёмная круглая голова с цветным кольцом и цветным хвостом (цвет = сырьё),
    белый куб-кипа внутри. Свечение/пульс — в цвет категории (--marker-color). */
@@ -2148,11 +2148,11 @@
 .mp-pin .mk-pulse {
   display: none;
   position: absolute;
-  left: 23px;
-  top: 20px;
-  width: 34px;
-  height: 34px;
-  margin: -17px 0 0 -17px;
+  left: 20.5px;
+  top: 18px;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
   border-radius: 50%;
   background: var(--marker-color, #f5773e);
   z-index: 0;
@@ -2234,7 +2234,7 @@
 
 .mp-split-list .mp-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 /* Список выше карты по z-оси: фильтр-попапы не ныряют под контролы карты. */
@@ -2246,9 +2246,9 @@
   z-index: 8;
   display: flex;
   flex-direction: column;
-  width: min(560px, calc(100% - 32px));
+  width: min(480px, calc(100% - 32px));
   min-width: 0;
-  padding: 16px;
+  padding: 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid rgba(226, 232, 240, 0.92);
@@ -2260,7 +2260,7 @@
 }
 
 .mp-split-list .mp-toolbar {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .mp-split-list .page-header {
@@ -2294,7 +2294,7 @@
 }
 
 .mp-split-list .mp-mobile-filter-rail {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .mp-split-map {
@@ -2318,6 +2318,66 @@
   height: 100%;
   border: 0;
   border-radius: 24px 0 0 24px;
+}
+
+/* Управление картой — собственный оверлей справа по центру высоты: зум, поворот,
+   3D-перспектива. Сгруппирован в «таблетки» (зум отдельно от ориентации). */
+.mp-map-ctrl {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.mp-map-ctrl-group {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.92));
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.mp-map-ctrl-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary-strong, #334155);
+  cursor: pointer;
+  transition:
+    background-color 0.14s ease,
+    color 0.14s ease;
+}
+
+.mp-map-ctrl-btn + .mp-map-ctrl-btn {
+  border-top: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.92));
+}
+
+.mp-map-ctrl-btn:hover:not(:disabled) {
+  background: var(--panel-soft, #f1f5f9);
+  color: var(--text, #0f172a);
+}
+
+.mp-map-ctrl-btn.is-active {
+  background: var(--accent, #1f8a4c);
+  color: #fff;
+}
+
+.mp-map-ctrl-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* Легенда цветов сырья: верхний левый угол (зум-контрол 2ГИС — справа по
@@ -2390,7 +2450,7 @@
 .mp-page-map .mp-map-search-area {
   top: auto;
   bottom: 38px;
-  left: calc(16px + min(560px, calc(100% - 32px)) + (100% - 16px - min(560px, calc(100% - 32px))) / 2);
+  left: calc(16px + min(480px, calc(100% - 32px)) + (100% - 16px - min(480px, calc(100% - 32px))) / 2);
   transform: translateX(-50%);
 }
 

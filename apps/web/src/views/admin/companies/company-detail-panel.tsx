@@ -16,6 +16,7 @@ import {
   USER_STATUS_LABELS,
 } from "../../../lib/display-labels";
 import { CompanyStatusForm } from "./company-status-form";
+import { CompanySubscriptionActivationForm } from "./company-subscription-form";
 import type { CompanyStatusReason } from "./constants";
 import type { AdminCompanyDetail } from "./types";
 
@@ -28,6 +29,7 @@ type AdminCompanyDetailPanelProps = {
   onStatusReasonChange: (value: CompanyStatusReason) => void;
   onStatusCommentChange: (value: string) => void;
   onSubmitStatus: (event: FormEvent<HTMLFormElement>) => void;
+  onSubscriptionActivated: () => void;
 };
 
 export function AdminCompanyDetailPanel({
@@ -39,6 +41,7 @@ export function AdminCompanyDetailPanel({
   onStatusReasonChange,
   onStatusCommentChange,
   onSubmitStatus,
+  onSubscriptionActivated,
 }: AdminCompanyDetailPanelProps) {
   return (
     <div className="moderation-detail admin-user-detail">
@@ -68,6 +71,7 @@ export function AdminCompanyDetailPanel({
 
           <CompanyUsersSection company={selected} />
           <CompanySubscriptionsSection company={selected} />
+          <CompanySubscriptionActivationForm companyId={selected.id} onActivated={onSubscriptionActivated} />
           <CompanySupportTicketsSection company={selected} />
           <CompanyStatusForm
             nextStatus={nextStatus}

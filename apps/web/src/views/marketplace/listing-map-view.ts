@@ -16,7 +16,9 @@ export type ListingMapBasemapLayerLike = {
 export const LISTING_MAP_DEFAULT_CENTER: [number, number] = [37.64, 55.76];
 export const LISTING_MAP_DEFAULT_ZOOM = 5;
 export const LISTING_MAP_MIN_ZOOM = -2;
-export const LISTING_MAP_CIRCLE_ZOOM_THRESHOLD = 9;
+// Круг приватности теперь 500 м (а не 4 км) — чтобы он был читаемым пятном, а не
+// точкой, показываем его только на крупном масштабе квартала.
+export const LISTING_MAP_CIRCLE_ZOOM_THRESHOLD = 13;
 
 const HIDDEN_BASEMAP_LAYER_IDS = new Set(["label_state", "label_country_1", "label_country_2", "label_country_3"]);
 const HIDDEN_BASEMAP_SOURCE_LAYERS = new Set(["boundary", "poi", "aerodrome_label"]);
@@ -25,7 +27,7 @@ export function shouldHideBasemapLayer(layer: ListingMapBasemapLayerLike): boole
   return HIDDEN_BASEMAP_LAYER_IDS.has(layer.id) || HIDDEN_BASEMAP_SOURCE_LAYERS.has(layer["source-layer"] ?? "");
 }
 
-// Начиная с городского масштаба показываем круг 4 км; дальше — маленькая точка,
+// Начиная с крупного масштаба показываем круг приватности 500 м; дальше — маленькая точка,
 // чтобы не загромождать карту. В MapLibre переключение делает сам движок через
 // minzoom/maxzoom слоёв, но порог держим здесь единым источником.
 export function modeForZoom(zoom: number): ListingMapMode {
@@ -62,7 +64,7 @@ const EARTH_RADIUS_KM = 6371;
 // Кольцо круга заданного радиуса (км) вокруг центра [lon, lat] как координаты
 // полигона GeoJSON (один замкнутый ring: первая точка совпадает с последней).
 // MapLibre не имеет географического круга-примитива (circle-radius в пикселях),
-// поэтому 4-км круг объявления рисуем полигоном через fill/line-слои.
+// поэтому круг приватности объявления рисуем полигоном через fill/line-слои.
 export function circlePolygon(center: [number, number], radiusKm: number, steps = 64): number[][][] {
   const [lon, lat] = center;
   const latRad = (lat * Math.PI) / 180;

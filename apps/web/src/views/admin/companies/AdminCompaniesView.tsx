@@ -116,6 +116,10 @@ export function AdminCompaniesView() {
               onStatusReasonChange={view.setStatusReason}
               onStatusCommentChange={view.setStatusComment}
               onSubmitStatus={view.submitStatus}
+              onSubscriptionActivated={() => {
+                if (view.selected) void view.openCompany(view.selected.id);
+                companiesQuery.reload();
+              }}
             />
           </div>
         ) : null}

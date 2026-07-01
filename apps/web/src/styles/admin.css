@@ -1,5 +1,19 @@
 /* admin.css — извлечено из globals.css (route-scoped, импортируется в корне вью admin). */
 
+/* Единый вертикальный ритм страниц-разделов панели управления (Контент/Аудитория/
+   Обращения/Система). Раньше блоки опирались на разрозненные margin'ы соседей и то
+   «слипались», то расходились. Лаунчпад/аналитику (.admin-home — своя grid-сетка)
+   не трогаем. is-admin ставит AppShell на /admin*. */
+.page-surface.is-admin > .page:not(.admin-home) {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.page-surface.is-admin > .page:not(.admin-home) > * {
+  margin-block: 0;
+}
+
 .admin-home {
   display: grid;
   gap: 28px;
@@ -4256,7 +4270,7 @@ li.tree-add-row + li.tree-add-row,
 
 .support-inbox {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 380px 1fr;
   gap: 16px;
   min-height: 560px;
 }

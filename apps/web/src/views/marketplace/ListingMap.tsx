@@ -1,9 +1,9 @@
 "use client";
 
 // Карта ленты площадки на MapLibre GL (OSM). Цвет элемента — по сырью
-// (макулатура/плёнки/полимеры). Два масштаба для читаемости: близко — круг 4 км
-// (GeoJSON-полигон через fill/line, реальная точка скрыта), дальше — маленькая
-// точка (circle-слой; пульс у свежих объявлений через rAF, hover — feature-state).
+// (макулатура/плёнки/полимеры). Два масштаба для читаемости: близко — круг
+// приватности 500 м (GeoJSON-полигон через fill/line, реальная точка скрыта),
+// дальше — пин/точка (пульс у свежих объявлений, hover — feature-state).
 // Подложка — векторные тайлы, ОБРЕЗАННЫЕ по зоне Экоплатформы (РФ+новые
 // территории+РБ) ещё при генерации, поэтому вне зоны данных нет и госграницы не
 // рисуются вовсе. Базовый стиль векторный из NEXT_PUBLIC_MAP_STYLE_URL (self-host
@@ -20,6 +20,7 @@ import maplibregl, {
 import { Protocol as PmtilesProtocol } from "pmtiles";
 import Supercluster from "supercluster";
 import { useEffect, useRef, useState } from "react";
+import { Box, Compass, Minus, Plus, RotateCcw, RotateCw } from "lucide-react";
 import type { Feature, FeatureCollection, Point, Polygon } from "geojson";
 import type { MarketplaceListingListItem } from "@ecoplatform/shared";
 import { MARKETPLACE_CIRCLE_RADIUS_KM } from "@ecoplatform/shared";
@@ -32,7 +33,6 @@ import {
   LISTING_MAP_MIN_ZOOM,
   circlePolygon,
   getSinglePointFocusView,
-  listingIdFromMapFeature,
   shouldHideBasemapLayer,
 } from "./listing-map-view";
 import {
@@ -51,15 +51,16 @@ import {
 
 // Пины и donut-кластеры — HTML-маркеры (maplibregl.Marker), кластеризацию считаем
 // на клиенте через supercluster (надёжнее, чем querySourceFeatures на обрезанных
-// по зоне тайлах). Круг приватности 4 км — fill/line-слои MapLibre на отдельном
+// по зоне тайлах). Круг приватности 500 м — fill/line-слои MapLibre на отдельном
 // источнике.
 const SRC_CIRCLES = "listing-circles";
 const LYR_CIRCLE_FILL = "listing-circle-fill";
 const LYR_CIRCLE_LINE = "listing-circle-line";
-const HOVER_LAYERS = [LYR_CIRCLE_FILL];
-// До этого зума точки группируются в кластеры; на пороге круга (9) и ближе —
-// всегда отдельные пины + круг приватности.
-const CLUSTER_MAX_ZOOM = LISTING_MAP_CIRCLE_ZOOM_THRESHOLD - 1;
+// До этого зума точки группируются в кластеры, дальше — отдельные пины. Держим
+// независимо от порога круга приватности: пины должны разворачиваться уже на
+// городском масштабе (~8), а маленький круг 500 м появляется только вблизи (порог
+// круга 13), иначе на городском зуме всё было бы кластерами.
+const CLUSTER_MAX_ZOOM = 8;
 const CLUSTER_RADIUS_PX = 58;
 const LAYER_FADE_ZOOM_RANGE = 0.45;
 const BASEMAP_LAYER_FADE_ZOOM_RANGE = 0.9;
@@ -354,30 +355,30 @@ function svgElement(name: string, attrs: Record<string, string | number>): SVGEl
   return node;
 }
 
-// Белый куб-кипа (3D-блок прессованного сырья) на тёмной голове пина. Центр ~23,19.
-function appendCubeIcon(svg: SVGElement) {
-  const face = (d: string, opacity?: string) =>
-    svgElement("path", opacity ? { d, fill: "#fff", opacity } : { d, fill: "#fff" });
-  svg.append(
-    face("M23 8 L33 13.5 L23 19 L13 13.5 Z"), // верхняя грань
-    face("M13 13.5 L23 19 L23 30 L13 24.5 Z", "0.82"), // левая грань
-    face("M33 13.5 L23 19 L23 30 L33 24.5 Z", "0.6"), // правая грань
-    // Обвязка кипы — тонкие тёмные ремни поверх граней.
+// Белая иконка-коробка (контур) на тёмной голове пина. Исходный ассет — 24×25
+// (box.svg от владельца); масштабируем и центрируем в голову пина (~23,19.5).
+function appendBoxIcon(svg: SVGElement) {
+  const group = svgElement("g", {
+    transform: "translate(12 8.3) scale(0.92)",
+    fill: "#fff",
+    "fill-rule": "evenodd",
+  });
+  group.append(
     svgElement("path", {
-      d: "M13 18 L23 23.5 L33 18",
-      fill: "none",
-      stroke: "#0b1018",
-      "stroke-width": 1,
-      opacity: 0.32,
-      "stroke-linejoin": "round",
+      d: "M12 22.7105L1.5 18.0405V6.23055L12 1.56055L22.5 6.23055V18.0405L12 22.7105ZM3 17.0705L12 21.0705L21 17.0705V7.21055L12 3.21054L3 7.21055V17.0705Z",
     }),
-    svgElement("line", { x1: 23, y1: 19, x2: 23, y2: 30, stroke: "#0b1018", "stroke-width": 1, opacity: 0.28 }),
+    svgElement("path", { d: "M12.75 10.3105H11.25V22.3005H12.75V10.3105Z" }),
+    svgElement("path", {
+      d: "M12.0006 11.8805L1.89062 7.39051L2.50061 6.02051L12.0006 10.2405L21.5606 6.02051L22.1706 7.39051L12.0006 11.8805Z",
+    }),
   );
+  svg.append(group);
 }
 
 // Пин по образцу gdebenz: тёмная круглая голова с цветным кольцом + цветной хвост
-// (цвет = сырьё), белый куб-кипа внутри. Свечение/пульс — через CSS по
-// --marker-color. Строим через DOM (без innerHTML).
+// (цвет = сырьё), белая иконка-коробка внутри. Свечение/пульс — через CSS по
+// --marker-color. Строим через DOM (без innerHTML). viewBox 46×54 сохраняем (вся
+// геометрия в его координатах), а рендер-размер уменьшен на ~10% (41×49).
 function createPinElement(color: string, fresh: boolean): HTMLDivElement {
   const el = document.createElement("div");
   el.className = `mp-pin${fresh ? " is-fresh" : ""}`;
@@ -386,12 +387,12 @@ function createPinElement(color: string, fresh: boolean): HTMLDivElement {
   inner.className = "mk-inner";
   const pulse = document.createElement("div");
   pulse.className = "mk-pulse";
-  const svg = svgElement("svg", { width: 46, height: 54, viewBox: "0 0 46 54", "aria-hidden": "true" });
+  const svg = svgElement("svg", { width: 41, height: 49, viewBox: "0 0 46 54", "aria-hidden": "true" });
   svg.append(
     svgElement("path", { d: "M23 51 L15.5 35 L30.5 35 Z", fill: color }), // хвост-указатель
     svgElement("circle", { cx: 23, cy: 20, r: 17, fill: "rgba(9,14,22,0.92)", stroke: color, "stroke-width": 2.5 }),
   );
-  appendCubeIcon(svg);
+  appendBoxIcon(svg);
   inner.append(pulse, svg);
   el.append(inner);
   return el;
@@ -518,6 +519,9 @@ export function ListingMap({
   // Клиентский индекс кластеризации (supercluster) по текущему набору точек.
   const clusterIndexRef = useRef<Supercluster<PointProps, ClusterAccum> | null>(null);
   const [failed, setFailed] = useState(false);
+  // Карта создана (можно включать кнопки управления) и режим 3D-перспективы.
+  const [mapReady, setMapReady] = useState(false);
+  const [pitched, setPitched] = useState(false);
 
   const points = listingPoints(listings);
   const pointsKey = points.map((listing) => `${listing.id}:${listing.circleLat},${listing.circleLon}`).join("|");
@@ -527,7 +531,7 @@ export function ListingMap({
   const pointsRef = useRef(points);
   pointsRef.current = points;
 
-  // Подсветка объекта: круг 4 км — через feature-state, пин — через CSS-класс на
+  // Подсветка объекта: круг приватности — через feature-state, пин — через CSS-класс на
   // его HTML-маркере (если он сейчас на экране и не свёрнут в кластер).
   function setHover(id: string | null, on: boolean) {
     const map = mapRef.current;
@@ -687,7 +691,9 @@ export function ListingMap({
       return;
     }
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    // Зум/поворот/3D — собственный оверлей (см. JSX ниже), а не угловой
+    // NavigationControl: кнопки нужны по центру высоты + управление перспективой.
+    setMapReady(true);
 
     // MapLibre сам следит лишь за ресайзом окна, но не за тем, как меняется размер
     // самого контейнера (переключатель «Список/Карта» на узких экранах, сворачивание
@@ -708,10 +714,10 @@ export function ListingMap({
       applyRussianRfBasemap(map);
 
       // Точки кластеризуем на клиенте (supercluster) — индекс строит applyData;
-      // в MapLibre держим только источник 4-км круга приватности.
+      // в MapLibre держим только источник круга приватности.
       map.addSource(SRC_CIRCLES, { type: "geojson", data: circlesCollection(pointsRef.current), promoteId: "id" });
 
-      // Круг 4 км — на городском масштабе и ближе.
+      // Круг приватности 500 м — на крупном масштабе квартала.
       map.addLayer({
         id: LYR_CIRCLE_FILL,
         type: "fill",
@@ -741,29 +747,10 @@ export function ListingMap({
       map.on("move", updateMarkers);
       map.on("moveend", updateMarkers);
 
-      // Hover/курсор/клик на 4-км круге (одиночные пины обрабатывают свои DOM-события).
-      for (const layer of HOVER_LAYERS) {
-        map.on("mousemove", layer, (event) => {
-          map.getCanvas().style.cursor = "pointer";
-          const next = listingIdFromMapFeature(event.features?.[0]);
-          if (!next) return;
-          if (hoveredIdRef.current === next) return;
-          if (hoveredIdRef.current) setHover(hoveredIdRef.current, false);
-          hoveredIdRef.current = next;
-          setHover(next, true);
-          onHoverRef.current?.(next);
-        });
-        map.on("mouseleave", layer, () => {
-          map.getCanvas().style.cursor = "";
-          if (hoveredIdRef.current) setHover(hoveredIdRef.current, false);
-          hoveredIdRef.current = null;
-          onHoverRef.current?.(null);
-        });
-        map.on("click", layer, (event) => {
-          const id = listingIdFromMapFeature(event.features?.[0]);
-          if (id) onSelectRef.current?.(id);
-        });
-      }
+      // Намеренно НЕ вешаем mousemove/click на круг приватности: открыть объявление
+      // и подсветить его можно только наведением/кликом по самому пину (его DOM-
+      // события). Круг по-прежнему подсвечивается вместе с пином — setHover ставит
+      // feature-state hover на источник кругов по id.
     };
 
     // styledata надёжно срабатывает после загрузки стиля; load оставляем как
@@ -801,9 +788,102 @@ export function ListingMap({
     hoveredIdRef.current = next;
   }, [hoveredId]);
 
+  // ── Управление картой (собственный оверлей справа по центру высоты) ─────────
+  function rotateBy(delta: number) {
+    const map = mapRef.current;
+    if (!map) return;
+    map.easeTo({ bearing: map.getBearing() + delta, duration: 250 });
+  }
+
+  function togglePitch() {
+    const map = mapRef.current;
+    if (!map) return;
+    const next = !pitched;
+    map.easeTo({ pitch: next ? 55 : 0, duration: 350 });
+    setPitched(next);
+  }
+
+  function resetNorth() {
+    const map = mapRef.current;
+    if (!map) return;
+    map.easeTo({ bearing: 0, pitch: 0, duration: 350 });
+    setPitched(false);
+  }
+
   if (failed) {
     return <div className="mp-map-placeholder">Карта временно недоступна. Объявления показаны списком ниже.</div>;
   }
 
-  return <div ref={containerRef} className="mp-map" role="region" aria-label="Карта объявлений" />;
+  return (
+    <>
+      <div ref={containerRef} className="mp-map" role="region" aria-label="Карта объявлений" />
+      <div className="mp-map-ctrl" role="group" aria-label="Управление картой">
+        <div className="mp-map-ctrl-group">
+          <button
+            type="button"
+            className="mp-map-ctrl-btn"
+            onClick={() => mapRef.current?.zoomIn()}
+            disabled={!mapReady}
+            aria-label="Приблизить"
+            title="Приблизить"
+          >
+            <Plus size={18} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="mp-map-ctrl-btn"
+            onClick={() => mapRef.current?.zoomOut()}
+            disabled={!mapReady}
+            aria-label="Отдалить"
+            title="Отдалить"
+          >
+            <Minus size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="mp-map-ctrl-group">
+          <button
+            type="button"
+            className={`mp-map-ctrl-btn${pitched ? " is-active" : ""}`}
+            onClick={togglePitch}
+            disabled={!mapReady}
+            aria-pressed={pitched}
+            aria-label={pitched ? "Выключить 3D-перспективу" : "Включить 3D-перспективу"}
+            title="Режим 3D"
+          >
+            <Box size={17} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="mp-map-ctrl-btn"
+            onClick={() => rotateBy(-30)}
+            disabled={!mapReady}
+            aria-label="Повернуть против часовой"
+            title="Повернуть влево"
+          >
+            <RotateCcw size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="mp-map-ctrl-btn"
+            onClick={() => rotateBy(30)}
+            disabled={!mapReady}
+            aria-label="Повернуть по часовой"
+            title="Повернуть вправо"
+          >
+            <RotateCw size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="mp-map-ctrl-btn"
+            onClick={resetNorth}
+            disabled={!mapReady}
+            aria-label="Сбросить ориентацию: север и без наклона"
+            title="На север / сбросить наклон"
+          >
+            <Compass size={17} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    </>
+  );
 }

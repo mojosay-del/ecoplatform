@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import "../content-blocks/content-article.css";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageCircle } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import type { NewsPostDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { StatusPill } from "../../components/StatusPill";
@@ -130,6 +130,77 @@ export function NewsPostView({ slug }: { slug: string }) {
   }
 
   const publishedDate = post?.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
+  // Новость, открытая как закреплённое обсуждение форума (?from=forum): возвращаем
+  // на форум и оформляем в стиле обычного обсуждения (контейнер .forum-detail).
+  const fromForum = searchParams.get("from") === "forum";
+
+  const body = (
+    <>
+      {preview ? (
+        <StatusPill as="p" className="cms-preview-banner" variant="warning">
+          Предпросмотр новости: комментарии и реакции отключены.
+        </StatusPill>
+      ) : null}
+      {state === "loading" || !post ? (
+        <p className="page-subtitle">Загрузка…</p>
+      ) : (
+        <>
+          <header className="page-header">
+            <h1 className="page-title">{post.title}</h1>
+            <p className="page-subtitle">{post.lead}</p>
+          </header>
+          <article className="content-article">
+            <ContentBlocks blocks={post.blocks ?? []} />
+          </article>
+          <div className="news-article-meta news-article-meta-page">
+            {publishedDate ? (
+              <time dateTime={publishedDate.toISOString()}>{formatNewsDate(publishedDate)}</time>
+            ) : preview ? (
+              <span>Черновик ещё не опубликован</span>
+            ) : null}
+            {!preview ? (
+              <>
+                <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
+                <NewsLikeButton post={post} pending={likePending} onToggle={togglePostLike} />
+              </>
+            ) : null}
+          </div>
+          {!preview ? (
+            <CommentsSection
+              comments={post.comments ?? []}
+              commentText={commentText}
+              onCommentTextChange={setCommentText}
+              onSubmitComment={submitComment}
+              reportingCommentId={reportingCommentId}
+              setReportingCommentId={setReportingCommentId}
+              reportReason={reportReason}
+              setReportReason={setReportReason}
+              reportComment={reportComment}
+              setReportComment={setReportComment}
+              onSubmitComplaint={submitComplaint}
+              onToggleCommentLike={toggleCommentLike}
+              commentLikePendingId={commentLikePendingId}
+            />
+          ) : null}
+        </>
+      )}
+    </>
+  );
+
+  if (fromForum) {
+    return (
+      <AppShell>
+        <section className="page forum-page">
+          <div className="forum-detail">
+            <Link className="forum-back" href="/forum">
+              <ArrowLeft size={16} /> К форуму
+            </Link>
+            {body}
+          </div>
+        </section>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
@@ -137,54 +208,7 @@ export function NewsPostView({ slug }: { slug: string }) {
         <Link className="button secondary page-back" href="/news">
           ← Назад к новостям
         </Link>
-        {preview ? (
-          <StatusPill as="p" className="cms-preview-banner" variant="warning">
-            Предпросмотр новости: комментарии и реакции отключены.
-          </StatusPill>
-        ) : null}
-        {state === "loading" || !post ? (
-          <p className="page-subtitle">Загрузка…</p>
-        ) : (
-          <>
-            <header className="page-header">
-              <h1 className="page-title">{post.title}</h1>
-              <p className="page-subtitle">{post.lead}</p>
-            </header>
-            <article className="content-article">
-              <ContentBlocks blocks={post.blocks ?? []} />
-            </article>
-            <div className="news-article-meta news-article-meta-page">
-              {publishedDate ? (
-                <time dateTime={publishedDate.toISOString()}>{formatNewsDate(publishedDate)}</time>
-              ) : preview ? (
-                <span>Черновик ещё не опубликован</span>
-              ) : null}
-              {!preview ? (
-                <>
-                  <NewsMetaItem count={post._count?.comments ?? 0} icon={MessageCircle} label="Комментарии" />
-                  <NewsLikeButton post={post} pending={likePending} onToggle={togglePostLike} />
-                </>
-              ) : null}
-            </div>
-            {!preview ? (
-              <CommentsSection
-                comments={post.comments ?? []}
-                commentText={commentText}
-                onCommentTextChange={setCommentText}
-                onSubmitComment={submitComment}
-                reportingCommentId={reportingCommentId}
-                setReportingCommentId={setReportingCommentId}
-                reportReason={reportReason}
-                setReportReason={setReportReason}
-                reportComment={reportComment}
-                setReportComment={setReportComment}
-                onSubmitComplaint={submitComplaint}
-                onToggleCommentLike={toggleCommentLike}
-                commentLikePendingId={commentLikePendingId}
-              />
-            ) : null}
-          </>
-        )}
+        {body}
       </section>
     </AppShell>
   );

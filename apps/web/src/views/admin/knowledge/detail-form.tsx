@@ -82,6 +82,29 @@ export function KnowledgeDetailForm({
               onChange={(displayIcon) => setDraft((prev) => ({ ...prev, displayIcon }))}
             />
           </div>
+
+          <div className="form-field news-content-field news-form-preview">
+            <span>Обложка раздела</span>
+            <FileUploadField
+              accept="image/*"
+              buttonLabel={draft.coverImageId ? "Заменить обложку" : "Загрузить обложку"}
+              hideLabel
+              imagePreset="cover"
+              label="Обложка раздела"
+              value={draft.coverImageId}
+              onChange={(fileId) => setDraft((prev) => ({ ...prev, coverImageId: fileId }))}
+            />
+          </div>
+
+          <div className="form-field news-content-field">
+            <span>Содержание раздела</span>
+            <DocumentEditor
+              blocks={draft.blocks}
+              onChange={(blocks) => setDraft((prev) => ({ ...prev, blocks: blocks as Block[] }))}
+              allowedAtomicKinds={KNOWLEDGE_ATOMIC_KINDS}
+              placeholder="Текст раздела — пишите или нажмите «/» для вставки блока..."
+            />
+          </div>
         </>
       ) : (
         <>

@@ -97,7 +97,9 @@ export class KnowledgeBaseService {
 
   async createKnowledgeArticle(input: KnowledgeArticleInput, user: RequestUser) {
     const isCategory = isKnowledgeCategory(input.iconType);
-    const blocks = isCategory ? [] : input.blocks;
+    // Раздел (категория) — тоже статья: у него могут быть обложка и контент-блоки,
+    // как у подраздела. Блоки больше не обнуляем для категорий.
+    const blocks = input.blocks;
     const check = this.validateDraftableKnowledgeBlocks(blocks);
 
     if (!check.ok) {
@@ -162,7 +164,8 @@ export class KnowledgeBaseService {
     }
 
     const isCategory = isKnowledgeCategory(input.iconType);
-    const blocks = isCategory ? [] : input.blocks;
+    // Раздел — тоже статья: блоки сохраняем и для категорий (см. createKnowledgeArticle).
+    const blocks = input.blocks;
     const check = this.validateDraftableKnowledgeBlocks(blocks);
 
     if (!check.ok) {

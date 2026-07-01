@@ -46,7 +46,6 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
   const [blockReason, setBlockReason] = useState<string>("policy_violation");
   const [blockComment, setBlockComment] = useState("");
 
-  const [rolesDraft, setRolesDraft] = useState<string[]>([]);
   const filteredUsers = useMemo(() => {
     if (!filters.role) return usersQuery.items;
     return usersQuery.items.filter(
@@ -74,7 +73,6 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       const data = await api.admin.users.get(id, { token });
       setSessionsOpen(false);
       setSelected(data);
-      setRolesDraft(data.platformStaff?.roles ?? []);
     } catch (error) {
       setErrorMessage(errorText(error, "Не удалось загрузить пользователя"));
     }
@@ -105,21 +103,6 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
       usersQuery.reload();
     } catch (error) {
       setErrorMessage(errorText(error, "Не удалось разблокировать пользователя"));
-    }
-  }
-
-  async function saveRoles() {
-    if (!token || !selected) return;
-    try {
-      const data = await api.admin.users.setPlatformRoles(
-        selected.id,
-        { roles: rolesDraft, isActive: rolesDraft.length > 0 },
-        { token },
-      );
-      setSelected(data);
-      usersQuery.reload();
-    } catch (error) {
-      setErrorMessage(errorText(error, "Не удалось обновить роли"));
     }
   }
 
@@ -227,15 +210,12 @@ export function AdminUsersView({ embedded = false }: AdminUsersViewProps) {
 
           <AdminUserDetailPanel
             selected={selected}
-            rolesDraft={rolesDraft}
             blockReason={blockReason}
             blockComment={blockComment}
             onBlockCommentChange={setBlockComment}
             onBlockReasonChange={setBlockReason}
             onBlockUser={blockUser}
             onOpenSessions={() => setSessionsOpen(true)}
-            onRolesDraftChange={setRolesDraft}
-            onSaveRoles={saveRoles}
             onUnblockUser={unblockUser}
           />
         </div>

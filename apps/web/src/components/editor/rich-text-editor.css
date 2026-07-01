@@ -364,6 +364,45 @@
 .rich-text-content u {
   text-decoration: underline;
 }
+/* Таблицы в редакторе: видимая сетка для редактирования + белая плашка. */
+.rich-text-content table {
+  width: 100%;
+  margin: 0.6em 0;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  table-layout: fixed;
+}
+.rich-text-content th,
+.rich-text-content td {
+  min-width: 64px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  vertical-align: top;
+  text-align: left;
+}
+.rich-text-content th {
+  background: var(--panel-soft);
+  font-weight: 700;
+}
+.rich-text-content td > p,
+.rich-text-content th > p {
+  margin: 0;
+}
+/* Подсветка выделенных ячеек (CellSelection от TipTap). */
+.rich-text-content .selectedCell {
+  position: relative;
+}
+.rich-text-content .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--primary-soft);
+  opacity: 0.5;
+  pointer-events: none;
+}
 /* Плейсхолдер от TipTap. */
 .rich-text-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

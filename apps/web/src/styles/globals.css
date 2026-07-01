@@ -3048,6 +3048,16 @@ input[type="checkbox"]:focus-visible {
 
 .app-shell[data-collapsed="true"] .sidebar-collapse {
   margin: 0;
+  /* В свёрнутом виде кнопка-подсказка: оранжевая плашка с белой иконкой
+     (currentColor управляет stroke/fill лотти-иконки). При разворачивании
+     правило снимается и кнопка возвращается к исходному виду. */
+  background: var(--brand-orange, #f5773e);
+  color: #fff;
+}
+
+.app-shell[data-collapsed="true"] .sidebar-collapse:hover {
+  background: var(--brand-orange-strong, #e2632c);
+  color: #fff;
 }
 
 .mobile-menu-button {
@@ -3605,6 +3615,54 @@ input[type="checkbox"]:focus-visible {
 
 .rendered-html u {
   text-decoration: underline;
+}
+
+/* Таблицы из rich-text (TipTap) — «красивая таблица под белой плашкой»:
+   белая карточка с тенью и скруглением, выделенная строка заголовков, зебра. */
+.rendered-html table {
+  width: 100%;
+  margin: 0.7em 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border: 1px solid var(--line, #e5e7eb);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  font-size: 14px;
+}
+
+.rendered-html th,
+.rendered-html td {
+  padding: 10px 14px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line, #eef1f5);
+  border-right: 1px solid var(--line, #eef1f5);
+}
+
+.rendered-html th:last-child,
+.rendered-html td:last-child {
+  border-right: 0;
+}
+
+.rendered-html tr:last-child td {
+  border-bottom: 0;
+}
+
+.rendered-html th {
+  background: var(--panel-soft, #f6f8fa);
+  font-weight: 700;
+  color: var(--text, #0f172a);
+}
+
+.rendered-html tbody tr:nth-child(even) td {
+  background: rgba(15, 23, 42, 0.018);
+}
+
+.rendered-html td > p,
+.rendered-html th > p {
+  margin: 0;
 }
 
 /* Группа полей формы — секция с заголовком и пояснением, чтобы пользователь

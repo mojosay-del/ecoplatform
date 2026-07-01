@@ -63,6 +63,9 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
   const showNotifications = chrome.notifications !== false;
   const showDemoBanner = chrome.demoBanner !== false;
   const showAdminPanelBackLink = chrome.adminBackLink !== false && pathname.startsWith("/admin/");
+  // Единый вертикальный ритм для всех страниц панели управления (см. admin.css):
+  // блоки разделов «Контент/Аудитория/Обращения/Система» не липнут и не разъезжаются.
+  const isAdminArea = pathname === "/admin" || pathname.startsWith("/admin/");
   const subscriptionGateRequired = !isAdminUser && isSubscriptionSelectionRequired(user?.company);
   const {
     data: subscriptionGateBilling,
@@ -124,6 +127,31 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
       // ignore (private mode)
     }
   }, []);
+
+  // Площадке нужно максимум места под карту — при входе автоматически сворачиваем
+  // меню (как подсказка), запоминая прежнее состояние из localStorage (источник
+  // правды, без гонки с эффектом выше), и возвращаем его при уходе. Свёртка здесь
+  // транзиентная — localStorage НЕ трогаем, чтобы не перетереть выбор пользователя.
+  const marketplaceAutoCollapseRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const onMarketplace = pathname.startsWith("/marketplace");
+    if (onMarketplace) {
+      if (marketplaceAutoCollapseRef.current === null) {
+        let prior = false;
+        try {
+          prior = localStorage.getItem("eco_sidebar_collapsed") === "1";
+        } catch {
+          // ignore (private mode)
+        }
+        marketplaceAutoCollapseRef.current = prior;
+        if (!prior) setCollapsed(true);
+      }
+    } else if (marketplaceAutoCollapseRef.current !== null) {
+      const prior = marketplaceAutoCollapseRef.current;
+      marketplaceAutoCollapseRef.current = null;
+      setCollapsed(prior);
+    }
+  }, [pathname]);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -221,7 +249,7 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
             user={user}
           />
         </header>
-        <div className="page-surface">
+        <div className={`page-surface${isAdminArea ? " is-admin" : ""}`}>
           {showAdminPanelBackLink ? (
             <Link className="button ghost admin-panel-back-link" href="/admin">
               ← Панель управления
