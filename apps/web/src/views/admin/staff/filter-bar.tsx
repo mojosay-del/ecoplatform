@@ -1,8 +1,20 @@
 import type { FormEvent } from "react";
 import { RotateCcw, Search } from "lucide-react";
+import { PopoverSelect, type PopoverSelectOption } from "../../../components/ui/PopoverSelect";
 import { PLATFORM_ROLE_SHORT_LABELS } from "../../../lib/display-labels";
 import { allStaffRoles } from "./constants";
 import type { StaffRoleFilter, StaffStatusFilter } from "./types";
+
+const STATUS_OPTIONS: PopoverSelectOption[] = [
+  { value: "", label: "Все статусы" },
+  { value: "active", label: "Активные" },
+  { value: "inactive", label: "Деактивированные" },
+];
+
+const ROLE_OPTIONS: PopoverSelectOption[] = [
+  { value: "", label: "Все роли" },
+  ...allStaffRoles.map((role) => ({ value: role, label: PLATFORM_ROLE_SHORT_LABELS[role] ?? role })),
+];
 
 type AdminStaffFilterBarProps = {
   search: string;
@@ -38,27 +50,18 @@ export function AdminStaffFilterBar({
           value={search}
         />
       </label>
-      <select
-        className="select"
-        onChange={(event) => onStatusChange(event.target.value as StaffStatusFilter)}
+      <PopoverSelect
+        label="Статус"
         value={statusFilter}
-      >
-        <option value="">Все статусы</option>
-        <option value="active">Активные</option>
-        <option value="inactive">Деактивированные</option>
-      </select>
-      <select
-        className="select"
-        onChange={(event) => onRoleChange(event.target.value as StaffRoleFilter)}
+        options={STATUS_OPTIONS}
+        onChange={(value) => onStatusChange(value as StaffStatusFilter)}
+      />
+      <PopoverSelect
+        label="Роль"
         value={roleFilter}
-      >
-        <option value="">Все роли</option>
-        {allStaffRoles.map((role) => (
-          <option key={role} value={role}>
-            {PLATFORM_ROLE_SHORT_LABELS[role]}
-          </option>
-        ))}
-      </select>
+        options={ROLE_OPTIONS}
+        onChange={(value) => onRoleChange(value as StaffRoleFilter)}
+      />
       <div className="admin-filter-actions">
         <button className="button" type="submit">
           Применить

@@ -1,8 +1,19 @@
 import type { FormEvent } from "react";
 import { RotateCcw, Search } from "lucide-react";
+import { PopoverSelect, type PopoverSelectOption } from "../../../components/ui/PopoverSelect";
 import { COMPANY_STATUS_LABELS, SUBSCRIPTION_PLAN_LABELS } from "../../../lib/display-labels";
 import { COMPANY_STATUS_OPTIONS, SUBSCRIPTION_PLAN_OPTIONS } from "./constants";
 import type { CompanyPlanFilter, CompanyStatusFilter } from "./types";
+
+const STATUS_OPTIONS: PopoverSelectOption[] = [
+  { value: "", label: "Все статусы" },
+  ...COMPANY_STATUS_OPTIONS.map((status) => ({ value: status, label: COMPANY_STATUS_LABELS[status] ?? status })),
+];
+
+const PLAN_OPTIONS: PopoverSelectOption[] = [
+  { value: "", label: "Все тарифы" },
+  ...SUBSCRIPTION_PLAN_OPTIONS.map((plan) => ({ value: plan, label: SUBSCRIPTION_PLAN_LABELS[plan] ?? plan })),
+];
 
 type AdminCompaniesFilterBarProps = {
   search: string;
@@ -38,30 +49,18 @@ export function AdminCompaniesFilterBar({
           value={search}
         />
       </label>
-      <select
-        className="select"
-        onChange={(event) => onStatusChange(event.target.value as CompanyStatusFilter)}
+      <PopoverSelect
+        label="Статус"
         value={statusFilter}
-      >
-        <option value="">Все статусы</option>
-        {COMPANY_STATUS_OPTIONS.map((status) => (
-          <option key={status} value={status}>
-            {COMPANY_STATUS_LABELS[status] ?? status}
-          </option>
-        ))}
-      </select>
-      <select
-        className="select"
-        onChange={(event) => onPlanChange(event.target.value as CompanyPlanFilter)}
+        options={STATUS_OPTIONS}
+        onChange={(value) => onStatusChange(value as CompanyStatusFilter)}
+      />
+      <PopoverSelect
+        label="Тариф"
         value={planFilter}
-      >
-        <option value="">Все тарифы</option>
-        {SUBSCRIPTION_PLAN_OPTIONS.map((plan) => (
-          <option key={plan} value={plan}>
-            {SUBSCRIPTION_PLAN_LABELS[plan] ?? plan}
-          </option>
-        ))}
-      </select>
+        options={PLAN_OPTIONS}
+        onChange={(value) => onPlanChange(value as CompanyPlanFilter)}
+      />
       <div className="admin-filter-actions">
         <button className="button" type="submit">
           Применить

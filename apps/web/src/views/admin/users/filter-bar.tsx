@@ -1,7 +1,19 @@
 import type { FormEvent } from "react";
 import { RotateCcw, Search } from "lucide-react";
+import { PopoverSelect, type PopoverSelectOption } from "../../../components/ui/PopoverSelect";
 import { PLATFORM_ROLE_SHORT_LABELS } from "../../../lib/display-labels";
 import { allRoles, type PlatformRole } from "./constants";
+
+const STATUS_OPTIONS: PopoverSelectOption[] = [
+  { value: "", label: "Все статусы" },
+  { value: "active", label: "Активен" },
+  { value: "blocked", label: "Заблокирован" },
+];
+
+const ROLE_OPTIONS: PopoverSelectOption[] = [
+  { value: "", label: "Все роли" },
+  ...allRoles.map((role) => ({ value: role, label: PLATFORM_ROLE_SHORT_LABELS[role] ?? role })),
+];
 
 type AdminUsersFilterBarProps = {
   search: string;
@@ -37,27 +49,18 @@ export function AdminUsersFilterBar({
           value={search}
         />
       </label>
-      <select
-        className="select"
-        onChange={(event) => onStatusChange(event.target.value as "" | "active" | "blocked")}
+      <PopoverSelect
+        label="Статус"
         value={statusFilter}
-      >
-        <option value="">Все статусы</option>
-        <option value="active">Активен</option>
-        <option value="blocked">Заблокирован</option>
-      </select>
-      <select
-        className="select"
-        onChange={(event) => onRoleChange(event.target.value as "" | PlatformRole)}
+        options={STATUS_OPTIONS}
+        onChange={(value) => onStatusChange(value as "" | "active" | "blocked")}
+      />
+      <PopoverSelect
+        label="Роль"
         value={roleFilter}
-      >
-        <option value="">Все роли</option>
-        {allRoles.map((role) => (
-          <option key={role} value={role}>
-            {PLATFORM_ROLE_SHORT_LABELS[role]}
-          </option>
-        ))}
-      </select>
+        options={ROLE_OPTIONS}
+        onChange={(value) => onRoleChange(value as "" | PlatformRole)}
+      />
       <div className="admin-filter-actions">
         <button className="button" type="submit">
           Применить

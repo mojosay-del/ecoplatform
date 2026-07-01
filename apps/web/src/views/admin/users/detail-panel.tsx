@@ -1,8 +1,14 @@
 import type { FormEvent } from "react";
 import { Ban, Building2, ShieldAlert, Smartphone } from "lucide-react";
+import { PopoverSelect, type PopoverSelectOption } from "../../../components/ui/PopoverSelect";
 import { StatusPill, companyStatusPillVariant, userStatusPillVariant } from "../../../components/StatusPill";
 import { COMPANY_STATUS_LABELS, MODERATION_REASON_LABELS, USER_STATUS_LABELS } from "../../../lib/display-labels";
 import { blockReasonCodes } from "./constants";
+
+const BLOCK_REASON_OPTIONS: PopoverSelectOption[] = blockReasonCodes.map((value) => ({
+  value,
+  label: MODERATION_REASON_LABELS[value] ?? value,
+}));
 import { formatLatestSession, formatSessionsCount } from "./format";
 import type { AdminUserDetail } from "./types";
 
@@ -120,17 +126,12 @@ export function AdminUserDetailPanel({
                 <ShieldAlert aria-hidden size={15} />
                 <span>Заблокировать</span>
               </div>
-              <select
-                className="select"
-                onChange={(event) => onBlockReasonChange(event.target.value)}
+              <PopoverSelect
+                label="Причина блокировки"
                 value={blockReason}
-              >
-                {blockReasonCodes.map((value) => (
-                  <option key={value} value={value}>
-                    {MODERATION_REASON_LABELS[value] ?? value}
-                  </option>
-                ))}
-              </select>
+                options={BLOCK_REASON_OPTIONS}
+                onChange={onBlockReasonChange}
+              />
               <textarea
                 className="textarea small"
                 onChange={(event) => onBlockCommentChange(event.target.value)}

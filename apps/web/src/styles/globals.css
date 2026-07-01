@@ -2823,7 +2823,8 @@ input[type="checkbox"]:focus-visible {
   min-width: 0;
 }
 
-.admin-filter-bar .select {
+.admin-filter-bar .select,
+.admin-filter-bar .ui-select {
   flex: 0 1 180px;
 }
 
