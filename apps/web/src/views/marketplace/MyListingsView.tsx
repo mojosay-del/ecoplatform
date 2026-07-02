@@ -5,8 +5,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Mail } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { MyMarketplaceListingItem } from "@ecoplatform/shared";
+import { pluralizeRu } from "../../lib/ru-plural";
 import { AppShell } from "../../components/AppShell";
 import { ApiError, api, preferredFileAssetImageUrl } from "../../lib/api";
 import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
@@ -96,6 +98,12 @@ export function MyListingsView() {
                     </Link>
                     <span className="mp-row-sub">
                       {listing.city} · {formatWeight(totalWeightKg(listing.positions))} · {listing.photoCount} фото
+                    </span>
+                    <span className={`mp-mylist-offers${listing.offerCount > 0 ? " is-active" : ""}`}>
+                      <Mail aria-hidden="true" size={13} />
+                      {listing.offerCount > 0
+                        ? `${listing.offerCount} ${pluralizeRu(listing.offerCount, "предложение", "предложения", "предложений")}`
+                        : "Пока нет предложений"}
                     </span>
                   </div>
                   <div className="mp-row-actions">

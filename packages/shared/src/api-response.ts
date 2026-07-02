@@ -1050,6 +1050,7 @@ export type MyMarketplaceListingItem = {
   archiveReason: string | null;
   photoCount: number;
   coverFileId: string | null;
+  offerCount: number;
   positions: MarketplaceListingPositionSummary[];
 };
 

@@ -115,6 +115,7 @@ export function mapToMyItem(listing: ListingWithRelations): MyMarketplaceListing
     archiveReason: listing.archiveReason,
     photoCount: photoCount(listing.media),
     coverFileId: coverFileId(listing.media),
+    offerCount: listing._count.offers,
     positions: positionSummaries(listing),
   };
 }

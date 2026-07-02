@@ -230,9 +230,15 @@ export async function republishListing(
   const addressData = addressCreateDataFromSource(source.address);
   const geo = await resolveStoredOrFreshListingAddressGeo(deps.geocoder, addressData, source.address);
 
+  // Истёкшее по сроку объявление при переподаче удаляем, чтобы не копить «мусор»
+  // в кабинете заготовителя. У истёкшего нет состоявшейся сделки → отзывы не
+  // теряются; каскад снимает позиции, медиа и «мёртвые» ставки. Проданные и
+  // снятые вручную объявления НЕ трогаем — это история сделок компании.
+  const removeSource = source.archiveReason === "expired";
+
   const created = await deps.prisma.$transaction(async (tx) => {
     const address = await tx.address.create({ data: { ...addressData, ...geo.coords } });
-    return tx.marketplaceListing.create({
+    const draft = await tx.marketplaceListing.create({
       data: {
         sellerCompanyId: input.companyId,
         createdById: input.userId,
@@ -263,6 +269,11 @@ export async function republishListing(
       },
       include: listingInclude,
     });
+    if (removeSource) {
+      await tx.marketplaceListing.delete({ where: { id: source.id } });
+      await tx.address.delete({ where: { id: source.addressId } });
+    }
+    return draft;
   });
 
   await deps.files.replaceFileReferences(
@@ -270,5 +281,10 @@ export async function republishListing(
     created.id,
     created.media.map((item) => item.fileId),
   );
+  // Файловые ссылки удалённого истёкшего объявления снимаем отдельно: медиа-строки
+  // ушли каскадом, но учёт ссылок ведётся вне FK.
+  if (removeSource) {
+    await deps.files.replaceFileReferences(LISTING_FILE_ENTITY, source.id, []);
+  }
   return created;
 }

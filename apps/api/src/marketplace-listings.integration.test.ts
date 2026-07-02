@@ -196,6 +196,37 @@ describe("Marketplace — объявления (фаза 1)", () => {
     expect(republished.body.status).toBe("draft");
     expect(republished.body.id).not.toBe(draft.body.id);
     expect(republished.body.positions).toHaveLength(1);
+
+    // Снятое вручную (withdrawn) объявление — история, остаётся в архиве.
+    const withdrawnSource = await ctx.prisma.marketplaceListing.findUnique({ where: { id: draft.body.id } });
+    expect(withdrawnSource?.status).toBe("archived");
+  });
+
+  it("переподача истёкшего объявления удаляет исходное (не копит мусор)", async () => {
+    const { token } = await registerCompany("0009108");
+    const nomenclatureId = await seedNomenclature();
+    const photos = await seedPhotos(4);
+    const draft = await ctx.http
+      .post("/api/marketplace/listings")
+      .set(bearer(token))
+      .send(listingPayload(nomenclatureId, photos));
+    await ctx.http.post(`/api/marketplace/listings/${draft.body.id}/publish`).set(bearer(token));
+
+    // Эмулируем истечение срока (обычно переводит hourly-cron).
+    await ctx.prisma.marketplaceListing.update({
+      where: { id: draft.body.id },
+      data: { status: "archived", archiveReason: "expired", archivedAt: new Date() },
+    });
+
+    const republished = await ctx.http.post(`/api/marketplace/listings/${draft.body.id}/republish`).set(bearer(token));
+    expect(republished.status).toBe(201);
+    expect(republished.body.id).not.toBe(draft.body.id);
+
+    // Истёкший источник удалён, новый черновик остаётся.
+    const source = await ctx.prisma.marketplaceListing.findUnique({ where: { id: draft.body.id } });
+    expect(source).toBeNull();
+    const created = await ctx.prisma.marketplaceListing.findUnique({ where: { id: republished.body.id } });
+    expect(created?.status).toBe("draft");
   });
 
   it("переподача заново геокодит адрес, если у исходного объявления нет координат", async () => {

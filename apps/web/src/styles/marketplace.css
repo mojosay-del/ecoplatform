@@ -351,6 +351,49 @@
   white-space: nowrap;
 }
 
+/* «Мои объявления»: более крупная обложка, ховер-подсветка и счётчик
+   предложений (виден всегда, в т.ч. при 0). */
+.mp-mylist .mp-row {
+  grid-template-columns: 72px 1fr auto;
+  padding: 14px 16px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.mp-mylist .mp-row:hover {
+  border-color: rgb(var(--brand-rgb) / 0.3);
+  box-shadow: var(--shadow-card);
+}
+
+.mp-mylist .mp-row-cover {
+  width: 72px;
+  height: 72px;
+}
+
+.mp-mylist-offers {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--text-secondary, #64748b);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mp-mylist-offers.is-active {
+  background: var(--brand-soft, #fee9dc);
+  color: var(--brand, #f5773e);
+}
+
+.mp-mylist-offers svg {
+  flex: none;
+}
+
 /* ── Детальная карточка ──────────────────────────────────────────────────── */
 .mp-detail {
   display: grid;
