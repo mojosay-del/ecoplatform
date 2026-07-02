@@ -176,6 +176,7 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
         roles: user?.platformRoles ?? [],
         companyType: user?.company?.type ?? null,
         features: user?.features,
+        memberSections: user?.memberSections ?? null,
       }),
     }))
     // Если в секции не осталось ни одного пункта (например, «Служебное»

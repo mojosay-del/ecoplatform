@@ -8,6 +8,7 @@
 // в доменном endpoint-модуле, а не 42 в views.
 
 import { adminApi } from "./admin-endpoints";
+import { companyMembersApi } from "./company-members-endpoints";
 import { documentationApi, indicesApi, knowledgeBaseApi, learningApi, newsApi } from "./content-endpoints";
 import { forumApi } from "./forum-endpoints";
 import { marketplaceApi } from "./marketplace-endpoints";
@@ -29,6 +30,7 @@ export type { AccountDeletionStatus, NotificationItem } from "./user-endpoints";
 export const api = {
   news: newsApi,
   account: accountApi,
+  companyMembers: companyMembersApi,
   indices: indicesApi,
   marketplace: marketplaceApi,
   learning: learningApi,
