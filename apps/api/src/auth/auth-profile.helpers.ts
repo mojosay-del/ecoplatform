@@ -58,7 +58,11 @@ export async function getAuthMeUser(deps: AuthProfileDeps, userId: string): Prom
     companyId: user.companyId,
     companyRole: user.companyRole,
     // member → его набор разделов; owner → null (полный доступ, нав не режется).
-    memberSections: user.companyRole === "member" ? user.allowedSections : null,
+    // companyRole='member' — дефолт схемы, поэтому он стоит и у аккаунтов без
+    // компании (платформенный staff): гейт разделов сотрудника к ним не
+    // относится, иначе CMS-админ упирался бы в «Раздел недоступен».
+    memberSections:
+      user.companyRole === "member" && user.companyId && platformRoles.length === 0 ? user.allowedSections : null,
     company: user.company
       ? {
           id: user.company.id,
