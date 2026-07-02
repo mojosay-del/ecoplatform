@@ -43,6 +43,28 @@ export const registerDtoSchema = z.object({
 
 export type RegisterDto = z.infer<typeof registerDtoSchema>;
 
+// ── Сотрудники компании ───────────────────────────────────────────────────
+export const companyInviteDtoSchema = z.object({
+  email: z.string().trim().email("Некорректный email"),
+  // Ключи разделов из MEMBER_SECTIONS; сервер санитизирует по типу компании.
+  allowedSections: z.array(z.string().trim().min(1)).max(30).default([]),
+});
+export type CompanyInviteDto = z.infer<typeof companyInviteDtoSchema>;
+
+export const companyMemberSectionsDtoSchema = z.object({
+  allowedSections: z.array(z.string().trim().min(1)).max(30).default([]),
+});
+export type CompanyMemberSectionsDto = z.infer<typeof companyMemberSectionsDtoSchema>;
+
+export const acceptCompanyInvitationDtoSchema = z.object({
+  firstName: z.string().trim().min(1),
+  lastName: z.string().trim().min(1),
+  phone: internationalPhoneSchema,
+  password: passwordSchema,
+  acceptedDocumentIds: z.array(z.string().min(1)).default([]),
+});
+export type AcceptCompanyInvitationDto = z.infer<typeof acceptCompanyInvitationDtoSchema>;
+
 export const accountProfileUpdateDtoSchema = z
   .object({
     firstName: z.string().trim().min(1).optional(),

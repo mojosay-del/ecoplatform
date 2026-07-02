@@ -141,6 +141,52 @@ export class EmailService {
     }
   }
 
+  // Приглашение сотрудника в компанию: ссылка с токеном на страницу принятия.
+  async sendCompanyInvitation(input: {
+    to: string;
+    companyName: string;
+    inviterName: string;
+    acceptUrl: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    if (this.deliveryDisabled()) {
+      return;
+    }
+
+    const config = this.smtpConfig();
+    const transporter = this.getTransporter(config);
+    const expiresAt = input.expiresAt.toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "long",
+      timeZone: "Europe/Moscow",
+    });
+    const intro = `${input.inviterName} приглашает вас в компанию «${input.companyName}» на ЭкоПлатформе.`;
+    const lines = [
+      intro,
+      `Чтобы принять приглашение и создать аккаунт, перейдите по ссылке: ${input.acceptUrl}`,
+      `Ссылка действует до ${expiresAt}.`,
+      "Если вы не ожидали этого приглашения, просто проигнорируйте письмо.",
+    ];
+
+    try {
+      await this.sendMailWithTimeout(transporter, config.sendTimeoutMs, {
+        from: config.from,
+        to: input.to,
+        subject: `Приглашение в компанию «${input.companyName}» на ЭкоПлатформе`,
+        text: lines.join("\n"),
+        html: [
+          `<p>${intro}</p>`,
+          `<p><a href="${input.acceptUrl}">Принять приглашение</a></p>`,
+          `<p>Ссылка действует до ${expiresAt}.</p>`,
+          `<p>Если вы не ожидали этого приглашения, просто проигнорируйте письмо.</p>`,
+        ].join(""),
+      });
+    } catch (error) {
+      this.logger.warn(`SMTP company invitation failed: ${smtpErrorCode(error)}`);
+      throw new ServiceUnavailableException("Не удалось отправить приглашение. Попробуйте ещё раз через минуту.");
+    }
+  }
+
   private async sendVerificationCode(
     input: RegistrationCodeEmail & {
       subject: string;
