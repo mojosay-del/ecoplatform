@@ -27,6 +27,33 @@ export type MarketplaceListingWorkflowDeps = {
   moduleAccess: ModuleAccessService;
 };
 
+function listingLoadCreateData(dto: CreateListingDto) {
+  const legacyKg = dto.typicalLoadKg ?? null;
+  const minKg = dto.typicalLoadMinKg ?? legacyKg;
+  const maxKg = dto.typicalLoadMaxKg ?? legacyKg;
+  return {
+    typicalLoadKg: maxKg,
+    typicalLoadMinKg: minKg,
+    typicalLoadMaxKg: maxKg,
+  };
+}
+
+function listingLoadPatchData(dto: UpdateListingDto) {
+  if (dto.typicalLoadKg !== undefined) {
+    const legacyKg = dto.typicalLoadKg ?? null;
+    return {
+      typicalLoadKg: legacyKg,
+      typicalLoadMinKg: legacyKg,
+      typicalLoadMaxKg: legacyKg,
+    };
+  }
+  return {
+    typicalLoadKg: dto.typicalLoadMaxKg === undefined ? undefined : (dto.typicalLoadMaxKg ?? null),
+    typicalLoadMinKg: dto.typicalLoadMinKg === undefined ? undefined : (dto.typicalLoadMinKg ?? null),
+    typicalLoadMaxKg: dto.typicalLoadMaxKg === undefined ? undefined : (dto.typicalLoadMaxKg ?? null),
+  };
+}
+
 export async function findOwnedListingOrThrow(
   prisma: PrismaService,
   companyId: string,
@@ -69,7 +96,7 @@ export async function createListingDraft(
         contactPhone: input.dto.contactPhone.trim(),
         description: listingOptionalText(input.dto.description),
         paymentTerms: listingOptionalText(input.dto.paymentTerms),
-        typicalLoadKg: input.dto.typicalLoadKg ?? null,
+        ...listingLoadCreateData(input.dto),
         readyNow: input.dto.readyNow,
         readinessDate: input.dto.readinessDate ? new Date(input.dto.readinessDate) : null,
         positions: { create: listingPositionCreateData(input.dto.positions) },
@@ -130,7 +157,7 @@ export async function updateListingDraft(
         contactPhone: input.dto.contactPhone?.trim(),
         description: listingPatchOptionalText(input.dto.description),
         paymentTerms: listingPatchOptionalText(input.dto.paymentTerms),
-        typicalLoadKg: input.dto.typicalLoadKg === undefined ? undefined : (input.dto.typicalLoadKg ?? null),
+        ...listingLoadPatchData(input.dto),
         readyNow: input.dto.readyNow,
         readinessDate:
           input.dto.readinessDate === undefined
@@ -250,6 +277,8 @@ export async function republishListing(
         description: source.description,
         paymentTerms: source.paymentTerms,
         typicalLoadKg: source.typicalLoadKg,
+        typicalLoadMinKg: source.typicalLoadMinKg,
+        typicalLoadMaxKg: source.typicalLoadMaxKg,
         readyNow: source.readyNow,
         readinessDate: source.readinessDate,
         positions: {

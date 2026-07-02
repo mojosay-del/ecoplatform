@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Check, ChevronRight, List, Map as MapIcon, SlidersHorizontal, X } from "lucide-react";
 import { api } from "../../lib/api";
@@ -16,6 +16,14 @@ import {
 } from "./marketplace-feed";
 
 type MobileFilterScreen = "main" | "category" | "nomenclature" | "region" | "sort";
+type DesktopFilterPanelStyle = CSSProperties & {
+  "--mp-filter-panel-left"?: string;
+  "--mp-filter-panel-top"?: string;
+  "--mp-filter-panel-width"?: string;
+  "--mp-filter-panel-max-height"?: string;
+};
+
+const DESKTOP_FILTER_QUERY = "(min-width: 1025px)";
 
 type MarketplaceMobileFiltersProps = {
   nomenclatureGroups: NomenclatureGroup[];
@@ -121,6 +129,8 @@ export function MarketplaceMobileFilters({
   const [draftMapBbox, setDraftMapBbox] = useState<string | null>(mapBbox);
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [previewTotal, setPreviewTotal] = useState(total);
+  const [isDesktopPanel, setIsDesktopPanel] = useState(false);
+  const [desktopPanelStyle, setDesktopPanelStyle] = useState<DesktopFilterPanelStyle | undefined>();
 
   const activeCount = activeFilterCount(selectedNomenclature, selectedRegions, sortBy, mapBbox);
   const selectedCategoryCount = categoryCount(
@@ -139,18 +149,61 @@ export function MarketplaceMobileFilters({
   }, [isOpen, mapBbox, selectedNomenclature, selectedRegions, sortBy]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setIsDesktopPanel(false);
+      setDesktopPanelStyle(undefined);
+      return;
+    }
+
     const previousOverflow = document.body.style.overflow;
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") setIsOpen(false);
     }
 
-    document.body.style.overflow = "hidden";
+    function syncDesktopPanel() {
+      const desktop = window.matchMedia(DESKTOP_FILTER_QUERY).matches;
+      setIsDesktopPanel(desktop);
+
+      if (!desktop) {
+        document.body.style.overflow = "hidden";
+        setDesktopPanelStyle(undefined);
+        return;
+      }
+
+      document.body.style.overflow = previousOverflow;
+      const anchor = document.querySelector<HTMLElement>(".mp-split-list");
+      if (!anchor) {
+        setDesktopPanelStyle(undefined);
+        return;
+      }
+
+      const rect = anchor.getBoundingClientRect();
+      const viewportGap = 16;
+      const panelGap = 12;
+      const top = Math.max(rect.top, viewportGap);
+      let left = rect.right + panelGap;
+      const width = Math.min(400, Math.max(240, window.innerWidth - left - viewportGap));
+      if (left + width + viewportGap > window.innerWidth) {
+        left = Math.max(viewportGap, window.innerWidth - width - viewportGap);
+      }
+      const maxHeight = Math.max(320, Math.min(rect.height, window.innerHeight - top - viewportGap));
+
+      setDesktopPanelStyle({
+        "--mp-filter-panel-left": `${left}px`,
+        "--mp-filter-panel-top": `${top}px`,
+        "--mp-filter-panel-width": `${width}px`,
+        "--mp-filter-panel-max-height": `${maxHeight}px`,
+      });
+    }
+
+    syncDesktopPanel();
     document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", syncDesktopPanel);
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", syncDesktopPanel);
     };
   }, [isOpen]);
 
@@ -250,12 +303,13 @@ export function MarketplaceMobileFilters({
       {isOpen && portalRoot
         ? createPortal(
             <div
-              className="mp-mobile-filter-overlay"
+              className={`mp-mobile-filter-overlay${isDesktopPanel ? " is-desktop-tool" : ""}`}
               role="dialog"
-              aria-modal="true"
+              aria-modal={!isDesktopPanel}
               aria-labelledby="mp-mobile-filter-title"
+              style={desktopPanelStyle}
               onClick={(event) => {
-                if (event.target === event.currentTarget) setIsOpen(false);
+                if (!isDesktopPanel && event.target === event.currentTarget) setIsOpen(false);
               }}
             >
               <div className="mp-mobile-filter-panel">

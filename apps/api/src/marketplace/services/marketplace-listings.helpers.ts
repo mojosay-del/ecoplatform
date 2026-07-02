@@ -147,6 +147,10 @@ export function mapToDetail(
   listing: ListingWithRelations,
   options: { canSeeContacts: boolean; isOwner: boolean; sellerAvatarUrl?: string | null; dealsCompleted?: number },
 ): MarketplaceListingDetail {
+  const typicalLoadKg = decimalToNumberOrNull(listing.typicalLoadKg);
+  const typicalLoadMinKg = decimalToNumberOrNull(listing.typicalLoadMinKg) ?? typicalLoadKg;
+  const typicalLoadMaxKg = decimalToNumberOrNull(listing.typicalLoadMaxKg) ?? typicalLoadKg;
+
   return {
     id: listing.id,
     status: listing.status,
@@ -168,7 +172,9 @@ export function mapToDetail(
     description: listing.description,
     packaging: aggregatePositionPackaging(listing.positions),
     paymentTerms: listing.paymentTerms,
-    typicalLoadKg: decimalToNumberOrNull(listing.typicalLoadKg),
+    typicalLoadKg,
+    typicalLoadMinKg,
+    typicalLoadMaxKg,
     readyNow: listing.readyNow,
     readinessDate: listing.readinessDate?.toISOString() ?? null,
     publishedAt: listing.publishedAt?.toISOString() ?? null,

@@ -1386,9 +1386,11 @@ model MarketplaceListing {
   contactPhone  String
   description   String?
   paymentTerms  String?
-  // Типичный объём отгрузки в одну машину. Храним в кг (как weightKg позиций),
-  // фронт вводит/показывает в тоннах. Опционально.
-  typicalLoadKg Decimal?  @db.Decimal(12, 2)
+  // Типичный объём отгрузки в одну машину. Старое одиночное поле оставлено для
+  // совместимости; новый UI хранит диапазон min/max в кг.
+  typicalLoadKg    Decimal? @db.Decimal(12, 2)
+  typicalLoadMinKg Decimal? @db.Decimal(12, 2)
+  typicalLoadMaxKg Decimal? @db.Decimal(12, 2)
   // Готовность к отгрузке: «готово сейчас» либо дата в пределах 14 дней.
   readyNow      Boolean   @default(true)
   readinessDate DateTime?

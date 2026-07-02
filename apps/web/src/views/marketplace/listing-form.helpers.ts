@@ -3,7 +3,7 @@
 // unit-тестами (listing-form.helpers.test.ts). UI-части — в listing-form-*.tsx.
 
 import type { CreateListingDto, ListingContaminationCondition, ListingMoistureCondition } from "@ecoplatform/shared";
-import { LISTING_MIN_WEIGHT_KG } from "@ecoplatform/shared";
+import { LISTING_MIN_WEIGHT_KG, LISTING_TYPICAL_LOAD_MAX_KG, LISTING_TYPICAL_LOAD_MIN_KG } from "@ecoplatform/shared";
 import { PHONE_COUNTRIES } from "../../components/auth/constants";
 import type { PhoneCountryId } from "../../components/auth/types";
 import { formatPhoneFull, getPhoneCountry, normalizePhoneDigits } from "../../components/auth/utils";
@@ -65,7 +65,8 @@ export type ListingFormValues = {
   readinessDate: string;
   description: string;
   paymentTerms: string;
-  typicalLoadTons: string;
+  typicalLoadMinTons: string;
+  typicalLoadMaxTons: string;
   media: MediaItem[];
 };
 
@@ -130,7 +131,15 @@ export function totalPositionWeightKg(positions: PositionForm[]): number {
   return positions.reduce((sum, position) => sum + positionWeightKg(position), 0);
 }
 
+function loadTonsToKg(value: string): number | null {
+  const tons = Number(value);
+  return Number.isFinite(tons) && tons > 0 ? tons * 1000 : null;
+}
+
 export function buildListingDto(values: ListingFormValues): CreateListingDto {
+  const typicalLoadMinKg = loadTonsToKg(values.typicalLoadMinTons);
+  const typicalLoadMaxKg = loadTonsToKg(values.typicalLoadMaxTons);
+
   return {
     positions: values.positions.map((position) => ({
       nomenclatureId: position.nomenclatureId,
@@ -151,11 +160,29 @@ export function buildListingDto(values: ListingFormValues): CreateListingDto {
     contactPhone: formatPhoneFull(getPhoneCountry(values.phoneCountry), values.phoneDigits),
     description: values.description.trim() || null,
     paymentTerms: values.paymentTerms.trim() || null,
-    typicalLoadKg: values.typicalLoadTons.trim() === "" ? null : (Number(values.typicalLoadTons) || 0) * 1000,
+    typicalLoadKg: typicalLoadMaxKg,
+    typicalLoadMinKg,
+    typicalLoadMaxKg,
     readyNow: values.readyNow,
     readinessDate: values.readyNow ? null : values.readinessDate ? new Date(values.readinessDate).toISOString() : null,
     media: values.media,
   };
+}
+
+function typicalLoadRangeValidationError(values: ListingFormValues): string | null {
+  const hasMin = values.typicalLoadMinTons.trim() !== "";
+  const hasMax = values.typicalLoadMaxTons.trim() !== "";
+  if (!hasMin && !hasMax) return null;
+  if (hasMin !== hasMax) return "Укажите диапазон загрузки в машину полностью.";
+
+  const minKg = loadTonsToKg(values.typicalLoadMinTons);
+  const maxKg = loadTonsToKg(values.typicalLoadMaxTons);
+  if (minKg == null || maxKg == null) return "Выберите загрузку в машину из списка.";
+  if (minKg < LISTING_TYPICAL_LOAD_MIN_KG || maxKg > LISTING_TYPICAL_LOAD_MAX_KG) {
+    return "Загрузка в машину должна быть от 1 до 25 тонн.";
+  }
+  if (minKg > maxKg) return "Загрузка «до» должна быть не меньше значения «от».";
+  return null;
 }
 
 export function clientValidationError(values: ListingFormValues, publish: boolean): string | null {
@@ -170,5 +197,7 @@ export function clientValidationError(values: ListingFormValues, publish: boolea
   if (publish && totalPositionWeightKg(values.positions) < LISTING_MIN_WEIGHT_KG) {
     return `Суммарный вес объявления — минимум ${formatWeight(LISTING_MIN_WEIGHT_KG)} для публикации.`;
   }
+  const typicalLoadError = typicalLoadRangeValidationError(values);
+  if (typicalLoadError) return typicalLoadError;
   return null;
 }

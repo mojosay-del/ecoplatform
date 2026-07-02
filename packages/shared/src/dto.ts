@@ -309,6 +309,8 @@ export const LISTING_MIN_PHOTOS = 4;
 export const LISTING_MAX_PHOTOS = 10;
 export const LISTING_MAX_VIDEOS = 2;
 export const LISTING_MAX_POSITIONS = 50;
+export const LISTING_TYPICAL_LOAD_MIN_KG = 1_000;
+export const LISTING_TYPICAL_LOAD_MAX_KG = 25_000;
 
 export const listingPositionInputSchema = z.object({
   nomenclatureId: z.string().min(1),
@@ -329,7 +331,42 @@ export const listingMediaInputSchema = z.object({
 
 export type ListingMediaInput = z.infer<typeof listingMediaInputSchema>;
 
-export const createListingDtoSchema = z.object({
+const listingTypicalLoadKgSchema = z
+  .number()
+  .min(LISTING_TYPICAL_LOAD_MIN_KG)
+  .max(LISTING_TYPICAL_LOAD_MAX_KG)
+  .nullish();
+
+type ListingTypicalLoadRangeInput = {
+  typicalLoadMinKg?: number | null;
+  typicalLoadMaxKg?: number | null;
+};
+
+function validateListingTypicalLoadRange(
+  input: ListingTypicalLoadRangeInput,
+  context: { addIssue: (issue: { code: "custom"; path: string[]; message: string }) => void },
+) {
+  const hasMin = input.typicalLoadMinKg != null;
+  const hasMax = input.typicalLoadMaxKg != null;
+  if (hasMin !== hasMax) {
+    context.addIssue({
+      code: "custom",
+      path: hasMin ? ["typicalLoadMaxKg"] : ["typicalLoadMinKg"],
+      message: "Укажите диапазон загрузки полностью.",
+    });
+  }
+  if (input.typicalLoadMinKg != null && input.typicalLoadMaxKg != null) {
+    if (input.typicalLoadMinKg > input.typicalLoadMaxKg) {
+      context.addIssue({
+        code: "custom",
+        path: ["typicalLoadMaxKg"],
+        message: "Верхняя граница загрузки должна быть не меньше нижней.",
+      });
+    }
+  }
+}
+
+const createListingDtoBaseSchema = z.object({
   positions: z
     .array(listingPositionInputSchema)
     .min(1, "Добавьте хотя бы одну позицию")
@@ -341,8 +378,11 @@ export const createListingDtoSchema = z.object({
     .regex(/^\+?\d[\d\s()-]{6,30}$/, "Телефон в формате +7XXXXXXXXXX"),
   description: z.string().trim().max(2000).nullish(),
   paymentTerms: z.string().trim().max(500).nullish(),
-  // Типичный объём отгрузки в одну машину, в кг (фронт вводит тонны → ×1000).
+  // Старое одиночное поле оставляем для обратной совместимости старых клиентов.
   typicalLoadKg: z.number().positive().max(100000).nullish(),
+  // Диапазон типичной загрузки в одну машину, в кг (фронт выбирает 1–25 тонн).
+  typicalLoadMinKg: listingTypicalLoadKgSchema,
+  typicalLoadMaxKg: listingTypicalLoadKgSchema,
   // Готовность: «готово сейчас» или конкретная дата (валидируется в сервисе ≤14 дней).
   readyNow: z.boolean().default(true),
   readinessDate: z.string().datetime().nullish(),
@@ -352,9 +392,11 @@ export const createListingDtoSchema = z.object({
     .default([]),
 });
 
+export const createListingDtoSchema = createListingDtoBaseSchema.superRefine(validateListingTypicalLoadRange);
+
 export type CreateListingDto = z.infer<typeof createListingDtoSchema>;
 
-export const updateListingDtoSchema = createListingDtoSchema.partial();
+export const updateListingDtoSchema = createListingDtoBaseSchema.partial().superRefine(validateListingTypicalLoadRange);
 
 export type UpdateListingDto = z.infer<typeof updateListingDtoSchema>;
 

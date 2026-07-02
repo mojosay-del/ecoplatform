@@ -19,12 +19,132 @@ import {
   Truck,
   X,
 } from "lucide-react";
-import type { ListingContaminationCondition, ListingMoistureCondition } from "@ecoplatform/shared";
+import {
+  LISTING_TYPICAL_LOAD_MAX_KG,
+  LISTING_TYPICAL_LOAD_MIN_KG,
+  type ListingContaminationCondition,
+  type ListingMoistureCondition,
+} from "@ecoplatform/shared";
 import { PhoneInput } from "../../components/auth/phone-input";
 import { FormSelect, PackagingSelect, sectionTitle } from "./listing-form-fields";
 import { MediaUploader } from "./listing-form-media";
 import { ADDRESS_SEARCH_ID, CONTAMINATION_OPTIONS, MOISTURE_OPTIONS, fieldClass } from "./listing-form.helpers";
 import type { ListingFormController } from "./use-listing-form";
+
+const TYPICAL_LOAD_MIN_TONS = LISTING_TYPICAL_LOAD_MIN_KG / 1000;
+const TYPICAL_LOAD_MAX_TONS = LISTING_TYPICAL_LOAD_MAX_KG / 1000;
+const TYPICAL_LOAD_OPTIONS = Array.from({ length: TYPICAL_LOAD_MAX_TONS - TYPICAL_LOAD_MIN_TONS + 1 }, (_, index) => {
+  const tons = TYPICAL_LOAD_MIN_TONS + index;
+  return { value: String(tons), label: `${tons} т` };
+});
+const PAYMENT_TERMS_OPTIONS = [
+  { value: "С места", label: "С места" },
+  { value: "Постоплата", label: "Постоплата" },
+  { value: "Предоплата", label: "Предоплата" },
+];
+
+function tonsNoun(value: number): string {
+  const mod10 = value % 10;
+  const mod100 = value % 100;
+  if (mod10 === 1 && mod100 !== 11) return "тонну";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "тонны";
+  return "тонн";
+}
+
+function typicalLoadSummary(minTons: string, maxTons: string): string {
+  if (!minTons || !maxTons) return "Обычно гружу в машину";
+  if (minTons === maxTons) {
+    const tons = Number(minTons);
+    return `Обычно гружу ${tons} ${tonsNoun(tons)}`;
+  }
+  return `Обычно гружу от ${minTons} до ${maxTons} тонн`;
+}
+
+function TypicalLoadRangeField({ form }: { form: ListingFormController }) {
+  function setMin(value: string) {
+    form.setTypicalLoadMinTons(value);
+    if (form.typicalLoadMaxTons && Number(value) > Number(form.typicalLoadMaxTons)) {
+      form.setTypicalLoadMaxTons(value);
+    }
+  }
+
+  function setMax(value: string) {
+    form.setTypicalLoadMaxTons(value);
+    if (form.typicalLoadMinTons && Number(value) < Number(form.typicalLoadMinTons)) {
+      form.setTypicalLoadMinTons(value);
+    }
+  }
+
+  const isFilled = form.typicalLoadMinTons && form.typicalLoadMaxTons;
+
+  return (
+    <div
+      className={`${fieldClass(isFilled)} mp-typical-load-field`}
+      role="group"
+      aria-labelledby="mp-typical-load-title"
+    >
+      <div className="mp-typical-load-summary">
+        <Truck size={16} strokeWidth={2.2} aria-hidden="true" />
+        <span id="mp-typical-load-title">{typicalLoadSummary(form.typicalLoadMinTons, form.typicalLoadMaxTons)}</span>
+      </div>
+      <div className="mp-typical-load-controls">
+        <div>
+          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол FormSelect самоозначивается через проп label */}
+          <label>От</label>
+          <FormSelect
+            icon={Scale}
+            label="Минимальная загрузка в машину"
+            value={form.typicalLoadMinTons}
+            placeholder={`${TYPICAL_LOAD_MIN_TONS} т`}
+            options={TYPICAL_LOAD_OPTIONS}
+            onChange={setMin}
+          />
+        </div>
+        <div>
+          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол FormSelect самоозначивается через проп label */}
+          <label>До</label>
+          <FormSelect
+            icon={Scale}
+            label="Максимальная загрузка в машину"
+            value={form.typicalLoadMaxTons}
+            placeholder={`${TYPICAL_LOAD_MAX_TONS} т`}
+            options={TYPICAL_LOAD_OPTIONS}
+            onChange={setMax}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaymentTermsField({ form }: { form: ListingFormController }) {
+  return (
+    <div className={fieldClass(form.paymentTerms)}>
+      {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол FormSelect самоозначивается через prop label */}
+      <label>
+        <CreditCard size={14} strokeWidth={2.1} aria-hidden="true" />
+        Условия оплаты
+      </label>
+      <FormSelect
+        icon={CreditCard}
+        label="Условия оплаты"
+        value={form.paymentTerms}
+        placeholder="Выберите условия"
+        options={PAYMENT_TERMS_OPTIONS}
+        onChange={form.setPaymentTerms}
+      />
+    </div>
+  );
+}
+
+function ListingPositionTermsFields({ form }: { form: ListingFormController }) {
+  return (
+    <div className="mp-position-details mp-position-listing-terms">
+      <PaymentTermsField form={form} />
+      <TypicalLoadRangeField form={form} />
+    </div>
+  );
+}
 
 export function MediaSection({ form }: { form: ListingFormController }) {
   return (
@@ -178,6 +298,7 @@ export function PositionsSection({ form }: { form: ListingFormController }) {
                 />
               </div>
             </div>
+            {index === 0 ? <ListingPositionTermsFields form={form} /> : null}
           </div>
         );
       })}
@@ -329,35 +450,6 @@ export function ExtraSection({ form }: { form: ListingFormController }) {
           value={form.description}
           onChange={(event) => form.setDescription(event.target.value)}
         />
-      </div>
-      <div className="mp-grid-2">
-        <div className={fieldClass(form.paymentTerms)}>
-          <label htmlFor="mp-payment-terms">
-            <CreditCard size={14} strokeWidth={2.1} aria-hidden="true" />
-            Условия оплаты
-          </label>
-          <input
-            id="mp-payment-terms"
-            className="mp-input"
-            value={form.paymentTerms}
-            onChange={(event) => form.setPaymentTerms(event.target.value)}
-          />
-        </div>
-        <div className={fieldClass(form.typicalLoadTons)}>
-          <label htmlFor="mp-typical-load">
-            <Truck size={14} strokeWidth={2.1} aria-hidden="true" />
-            Обычно гружу в машину, т
-          </label>
-          <input
-            id="mp-typical-load"
-            className="mp-input"
-            type="number"
-            min="0"
-            step="0.1"
-            value={form.typicalLoadTons}
-            onChange={(event) => form.setTypicalLoadTons(event.target.value)}
-          />
-        </div>
       </div>
     </div>
   );

@@ -33,6 +33,10 @@ import {
   uniqueOptions,
 } from "./listing-form.helpers";
 
+function kgToTonsInput(kg: number | null | undefined): string {
+  return kg == null ? "" : String(kg / 1000);
+}
+
 export function useListingForm(listingId?: string) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -58,7 +62,8 @@ export function useListingForm(listingId?: string) {
   const [readinessDate, setReadinessDate] = useState("");
   const [description, setDescription] = useState("");
   const [paymentTerms, setPaymentTerms] = useState("");
-  const [typicalLoadTons, setTypicalLoadTons] = useState("");
+  const [typicalLoadMinTons, setTypicalLoadMinTons] = useState("");
+  const [typicalLoadMaxTons, setTypicalLoadMaxTons] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [prefilled, setPrefilled] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -183,7 +188,8 @@ export function useListingForm(listingId?: string) {
     setReadinessDate(existing.readinessDate ? existing.readinessDate.slice(0, 10) : "");
     setDescription(existing.description ?? "");
     setPaymentTerms(existing.paymentTerms ?? "");
-    setTypicalLoadTons(existing.typicalLoadKg == null ? "" : String(existing.typicalLoadKg / 1000));
+    setTypicalLoadMinTons(kgToTonsInput(existing.typicalLoadMinKg ?? existing.typicalLoadKg));
+    setTypicalLoadMaxTons(kgToTonsInput(existing.typicalLoadMaxKg ?? existing.typicalLoadKg));
     setMedia(existing.media.map((item) => ({ fileId: item.fileId, kind: item.kind === "video" ? "video" : "photo" })));
     setPrefilled(true);
   }, [existing, prefilled]);
@@ -258,7 +264,8 @@ export function useListingForm(listingId?: string) {
       readinessDate,
       description,
       paymentTerms,
-      typicalLoadTons,
+      typicalLoadMinTons,
+      typicalLoadMaxTons,
       media,
     };
   }
@@ -335,8 +342,10 @@ export function useListingForm(listingId?: string) {
     setDescription,
     paymentTerms,
     setPaymentTerms,
-    typicalLoadTons,
-    setTypicalLoadTons,
+    typicalLoadMinTons,
+    setTypicalLoadMinTons,
+    typicalLoadMaxTons,
+    setTypicalLoadMaxTons,
     // Медиа
     media,
     setMedia,

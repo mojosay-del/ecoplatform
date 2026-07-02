@@ -32,6 +32,19 @@ export function tons(kg: number | null): string {
   return `${Number.isInteger(value) ? value : value.toFixed(1)} т`;
 }
 
+function tonsNumber(kg: number): string {
+  const value = kg / 1000;
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function typicalLoadRange(listing: MarketplaceListingDetail): string | null {
+  const minKg = listing.typicalLoadMinKg ?? listing.typicalLoadKg;
+  const maxKg = listing.typicalLoadMaxKg ?? listing.typicalLoadKg;
+  if (minKg == null || maxKg == null) return null;
+  if (minKg === maxKg) return tons(minKg);
+  return `от ${tonsNumber(minKg)} до ${tonsNumber(maxKg)} тонн`;
+}
+
 export function listingModalMediaItems(listing: MarketplaceListingDetail): ListingModalMediaItem[] {
   return listing.media.filter((item): item is ListingModalMediaItem => item.kind === "photo" || item.kind === "video");
 }
@@ -75,12 +88,11 @@ export function listingForms(listing: MarketplaceListingDetail): string {
 export function listingProductFacts(listing: MarketplaceListingDetail): ListingModalProductFact[] {
   const moisture = moistureLabel(listing.positions.find((position) => position.moistureCondition));
   const contamination = contaminationLabel(listing.positions.find((position) => position.contaminationCondition));
+  const loadRange = typicalLoadRange(listing);
   return [
     moisture ? { icon: Droplets, label: "Влажность", value: moisture } : null,
     contamination ? { icon: Filter, label: "Иные включения", value: contamination } : null,
     listing.paymentTerms ? { icon: CreditCard, label: "Оплата", value: listing.paymentTerms } : null,
-    listing.typicalLoadKg != null
-      ? { icon: Weight, label: "Обычно гружу в машину", value: tons(listing.typicalLoadKg) }
-      : null,
+    loadRange ? { icon: Weight, label: "Обычно гружу в машину", value: loadRange } : null,
   ].filter((item): item is ListingModalProductFact => Boolean(item));
 }

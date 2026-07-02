@@ -1016,8 +1016,11 @@ export type MarketplaceListingDetail = {
   description: string | null;
   packaging: string | null;
   paymentTerms: string | null;
-  // Типичный объём отгрузки в одну машину, в кг (фронт показывает в тоннах).
+  // Старое одиночное поле типичной загрузки, в кг. Оставлено для совместимости.
   typicalLoadKg: number | null;
+  // Диапазон типичной загрузки в одну машину, в кг (фронт показывает в тоннах).
+  typicalLoadMinKg: number | null;
+  typicalLoadMaxKg: number | null;
   readyNow: boolean;
   readinessDate: IsoDateString | null;
   publishedAt: IsoDateString | null;

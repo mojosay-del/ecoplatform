@@ -108,6 +108,7 @@ export function ListingCard({
   const expiry = isExpiringSoon(listing.expiresAt) ? expiryLabel(listing.expiresAt) : null;
   const distanceText = distanceKm != null ? formatDistanceKm(distanceKm) : "";
   const totalWeight = formatWeight(totalWeightKg(listing.positions));
+  const locationText = `${listing.city}${distanceText ? ` · ${distanceText}` : ""}`;
   const hasFooterMeta = listing.offerCount > 0 || listing.sellerRating != null;
 
   return (
@@ -127,7 +128,19 @@ export function ListingCard({
     >
       <div className="mp-card-cover">
         {coverUrl ? <img alt="" src={coverUrl} /> : <div className="mp-card-cover-empty">Нет фото</div>}
-        {expiry ? <span className="mp-card-expiry">{expiry}</span> : null}
+        <div className="mp-card-cover-stack mp-card-cover-stack-left">
+          <span className="mp-card-pill mp-card-pill-weight mp-card-cover-badge">{totalWeight}</span>
+          {expiry ? <span className="mp-card-expiry">{expiry}</span> : null}
+        </div>
+        {forms.length ? (
+          <div className="mp-card-cover-stack mp-card-cover-stack-right">
+            {forms.map((form) => (
+              <span className="mp-card-pill mp-card-cover-badge" key={form}>
+                {form}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {listing.photoCount > 1 ? <span className="mp-card-photos">{listing.photoCount} фото</span> : null}
       </div>
       <div className="mp-card-body">
@@ -138,18 +151,7 @@ export function ListingCard({
             ))}
           </span>
           <span className="mp-card-title-text">{positionsSummaryText(listing.positions)}</span>
-          {forms.map((form) => (
-            <span className="mp-card-pill" key={form}>
-              {form}
-            </span>
-          ))}
-          <span className="mp-card-pill mp-card-pill-weight">{totalWeight}</span>
-        </div>
-        <div className="mp-card-meta mp-card-location">
-          <span>
-            {listing.city}
-            {distanceText ? ` · ${distanceText}` : ""}
-          </span>
+          <span className="mp-card-location-inline">{locationText}</span>
         </div>
         {hasFooterMeta ? (
           <div className="mp-card-meta mp-card-footer-meta">

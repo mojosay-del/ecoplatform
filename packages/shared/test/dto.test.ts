@@ -99,6 +99,42 @@ describe("DTO size limits", () => {
     ).toBe(false);
   });
 
+  it("validates listing typical load range", () => {
+    const baseListing = {
+      positions: listingPositions(1),
+      address: { city: "Moscow", formatted: "Moscow" },
+      contactPhone: "+79991234567",
+    };
+
+    expect(
+      createListingDtoSchema.safeParse({
+        ...baseListing,
+        typicalLoadMinKg: 12_000,
+        typicalLoadMaxKg: 17_000,
+      }).success,
+    ).toBe(true);
+    expect(
+      createListingDtoSchema.safeParse({
+        ...baseListing,
+        typicalLoadMinKg: 17_000,
+        typicalLoadMaxKg: 12_000,
+      }).success,
+    ).toBe(false);
+    expect(
+      createListingDtoSchema.safeParse({
+        ...baseListing,
+        typicalLoadMinKg: 12_000,
+      }).success,
+    ).toBe(false);
+    expect(
+      createListingDtoSchema.safeParse({
+        ...baseListing,
+        typicalLoadMinKg: 500,
+        typicalLoadMaxKg: 1_000,
+      }).success,
+    ).toBe(false);
+  });
+
   it("limits offer positions to the configured maximum", () => {
     const baseOffer = {
       priceCondition: "from_place",

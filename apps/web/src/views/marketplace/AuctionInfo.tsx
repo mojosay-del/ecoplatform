@@ -1,8 +1,7 @@
 "use client";
 
-// Кнопка-подсказка на карте площадки + маленькая модалка «Как работает закрытый
-// аукцион». Вынесена из карточки объявления, чтобы объяснение не мозолило глаза
-// в каждом объявлении, но было доступно с главной карты рядом с легендой.
+// Кнопка-подсказка в ленте площадки + маленькая модалка «Как работает закрытый
+// аукцион». Объяснение доступно рядом с заголовком ленты и не занимает место на карте.
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -30,12 +29,12 @@ export function AuctionInfo() {
     <>
       <button
         type="button"
-        className="mp-map-info-btn"
+        className="mp-auction-info-btn"
         onClick={() => setOpen(true)}
         aria-label="Как работает закрытый аукцион"
+        title="Как работает закрытый аукцион"
       >
         <HelpCircle aria-hidden="true" size={16} />
-        <span>Как это работает</span>
       </button>
 
       {open && typeof document !== "undefined"

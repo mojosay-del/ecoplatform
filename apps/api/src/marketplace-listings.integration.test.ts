@@ -68,14 +68,16 @@ describe("Marketplace — объявления (фаза 1)", () => {
     expect(mine.body.items[0].status).toBe("active");
   });
 
-  it("categorySlug в ленте + объём в машину в детали (UI-батч)", async () => {
+  it("categorySlug в ленте + диапазон загрузки в детали (UI-батч)", async () => {
     const seller = await registerCompany("0009110");
     const nomenclatureId = await seedNomenclature();
     const { listingId } = await createPublishedListing(seller.token, nomenclatureId);
 
     const detail = await ctx.http.get(`/api/marketplace/listings/${listingId}`).set(bearer(seller.token));
     expect(detail.status).toBe(200);
-    expect(detail.body.typicalLoadKg).toBe(20000);
+    expect(detail.body.typicalLoadKg).toBe(17000);
+    expect(detail.body.typicalLoadMinKg).toBe(12000);
+    expect(detail.body.typicalLoadMaxKg).toBe(17000);
     expect(detail.body.positions[0].categorySlug).toBe("makulatura");
 
     const feed = await ctx.http.get("/api/marketplace/listings").set(bearer(seller.token));

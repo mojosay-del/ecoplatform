@@ -27,7 +27,8 @@ function validValues(overrides: Partial<ListingFormValues> = {}): ListingFormVal
     readinessDate: "",
     description: "  Описание  ",
     paymentTerms: "",
-    typicalLoadTons: "",
+    typicalLoadMinTons: "",
+    typicalLoadMaxTons: "",
     media: [{ fileId: "f1", kind: "photo" }],
     ...overrides,
   };
@@ -86,19 +87,25 @@ describe("listing form helpers: разное", () => {
 
 describe("listing form helpers: сборка DTO", () => {
   it("переводит тонны в кг, тримит адрес, проставляет null-поля", () => {
-    const dto = buildListingDto(validValues({ typicalLoadTons: "20", paymentTerms: "  нал  " }));
+    const dto = buildListingDto(
+      validValues({ typicalLoadMinTons: "12", typicalLoadMaxTons: "17", paymentTerms: "  нал  " }),
+    );
     expect(dto.positions[0]?.weightKg).toBe(1500);
     expect(dto.address.city).toBe("Казань");
-    expect(dto.typicalLoadKg).toBe(20000);
+    expect(dto.typicalLoadKg).toBe(17000);
+    expect(dto.typicalLoadMinKg).toBe(12000);
+    expect(dto.typicalLoadMaxKg).toBe(17000);
     expect(dto.paymentTerms).toBe("нал");
     expect(dto.description).toBe("Описание");
     expect(dto.readinessDate).toBeNull();
     expect(dto.contactPhone).toMatch(/^\+7/);
   });
 
-  it("typicalLoadKg = null при пустом поле; readinessDate из даты при readyNow=false", () => {
+  it("typicalLoadKg и диапазон = null при пустом поле; readinessDate из даты при readyNow=false", () => {
     const dto = buildListingDto(validValues({ readyNow: false, readinessDate: "2026-07-01" }));
     expect(dto.typicalLoadKg).toBeNull();
+    expect(dto.typicalLoadMinKg).toBeNull();
+    expect(dto.typicalLoadMaxKg).toBeNull();
     expect(dto.readinessDate).not.toBeNull();
   });
 });
@@ -125,5 +132,18 @@ describe("listing form helpers: валидация", () => {
 
   it("валидная форма → null", () => {
     expect(clientValidationError(validValues(), true)).toBeNull();
+  });
+
+  it("проверяет диапазон загрузки в машину", () => {
+    expect(
+      clientValidationError(validValues({ typicalLoadMinTons: "12", typicalLoadMaxTons: "17" }), false),
+    ).toBeNull();
+    expect(clientValidationError(validValues({ typicalLoadMinTons: "12" }), false)).toMatch(/диапазон/i);
+    expect(clientValidationError(validValues({ typicalLoadMinTons: "17", typicalLoadMaxTons: "12" }), false)).toMatch(
+      /до/i,
+    );
+    expect(clientValidationError(validValues({ typicalLoadMinTons: "0", typicalLoadMaxTons: "12" }), false)).toMatch(
+      /списка/i,
+    );
   });
 });

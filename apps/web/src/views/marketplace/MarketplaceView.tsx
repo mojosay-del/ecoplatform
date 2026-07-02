@@ -14,7 +14,7 @@ import { useAuth } from "../../lib/auth";
 import { queryKeys } from "../../lib/query";
 import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
 import { useFileAssetsByIds } from "../../lib/use-cover-assets";
-import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
+import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
 import { useNomenclatureOptions } from "./listing-ui";
 import { ListingModal } from "./ListingModal";
 import { MATERIAL_LEGEND } from "./materials";
@@ -133,7 +133,13 @@ export function MarketplaceView() {
         <div className="mp-split">
           <div className={`mp-split-list${mobileView === "map" ? " is-mobile-hidden" : ""}`}>
             <div className="mp-toolbar">
-              <PageHeader title="Торговая площадка" subtitle="Объявления о продаже вторсырья от заготовителей." />
+              <header className="page-header mp-feed-header">
+                <div className="mp-feed-title-row">
+                  <h1 className="page-title">Торговая площадка</h1>
+                  <AuctionInfo />
+                </div>
+                <p className="page-subtitle">Объявления о продаже вторсырья от заготовителей.</p>
+              </header>
               {isCollector ? (
                 <div className="mp-toolbar-actions">
                   <Link className="button secondary" href="/marketplace/my">
@@ -246,8 +252,6 @@ export function MarketplaceView() {
                   Искать в этой области
                 </button>
               ) : null}
-              {/* Кнопка-подсказка «Как работает закрытый аукцион» — перед легендой. */}
-              <AuctionInfo />
               {/* Легенда цветов сырья — обычный DOM-оверлей поверх карты. */}
               <div className="mp-map-legend">
                 {MATERIAL_LEGEND.map((item) => (
