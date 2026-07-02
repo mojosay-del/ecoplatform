@@ -20,7 +20,10 @@ describe("marketplace geo", () => {
       const center = generateCircleCenter(lat, lon);
       return haversineKm({ lat, lon }, { lat: center.lat, lon: center.lon });
     });
-    expect(Math.max(...distances)).toBeGreaterThan(2);
+    // Смещение не вырождается в ноль: за 500 сэмплов максимум покрывает заметную
+    // долю радиуса. Порог привязан к самому радиусу (а не к «4 км»), чтобы тест
+    // переживал изменение MARKETPLACE_CIRCLE_RADIUS_KM (сейчас 500 м).
+    expect(Math.max(...distances)).toBeGreaterThan(MARKETPLACE_CIRCLE_RADIUS_KM * 0.5);
   });
 
   it("haversine соответствует известному расстоянию (Москва–СПб ≈ 633 км)", () => {
