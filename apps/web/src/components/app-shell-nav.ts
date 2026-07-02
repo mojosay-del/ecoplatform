@@ -9,6 +9,7 @@ export type NavIconKey =
   | "data-privacy"
   | "docs"
   | "education"
+  | "employees"
   | "forum"
   | "indices"
   | "knowledge"

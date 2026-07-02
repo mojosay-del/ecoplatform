@@ -20,6 +20,7 @@ export function AccountProfileSection({
   isPlatformStaff,
   onBillingSaved,
   onOpenDataPrivacy,
+  onOpenMembers,
   onOpenNotifications,
   onOpenPassword,
   onOpenPayment,
@@ -34,6 +35,7 @@ export function AccountProfileSection({
   isPlatformStaff: boolean;
   onBillingSaved: (updated: BillingStatus) => void;
   onOpenDataPrivacy: () => void;
+  onOpenMembers: () => void;
   onOpenNotifications: () => void;
   onOpenPassword: () => void;
   onOpenPayment: () => void;
@@ -173,6 +175,16 @@ export function AccountProfileSection({
             label="Приватность"
             onClick={onOpenDataPrivacy}
           />
+          {/* Управление сотрудниками — только владельцу компании. */}
+          {user?.companyRole === "owner" ? (
+            <AccountStatButton
+              ariaLabel="Открыть сотрудников"
+              iconClassName="account-stat-info"
+              iconName="employees"
+              label="Сотрудники"
+              onClick={onOpenMembers}
+            />
+          ) : null}
         </div>
       ) : null}
 

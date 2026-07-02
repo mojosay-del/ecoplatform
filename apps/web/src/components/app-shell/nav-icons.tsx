@@ -54,6 +54,7 @@ const LOTTIE_NAV_ICON_KEYS: ReadonlySet<string> = new Set<LottieNavIconKey>([
   "data-privacy",
   "docs",
   "education",
+  "employees",
   "forum",
   "hide-menu",
   "indices",

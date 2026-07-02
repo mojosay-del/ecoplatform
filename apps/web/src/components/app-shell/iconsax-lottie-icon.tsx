@@ -11,6 +11,7 @@ export type LottieNavIconKey =
   | "data-privacy"
   | "docs"
   | "education"
+  | "employees"
   | "forum"
   | "hide-menu"
   | "indices"
@@ -65,6 +66,7 @@ const LOTTIE_NAV_ICONS: Record<LottieNavIconKey, LottieNavIconConfig> = {
   "data-privacy": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/data-privacy.json")) },
   docs: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/docs.json")) },
   education: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/education.json")) },
+  employees: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/employees.json")) },
   forum: { loadAnimationData: loadLottieAnimation(() => import("./iconsax/forum.json")) },
   "hide-menu": { loadAnimationData: loadLottieAnimation(() => import("./iconsax/hide-menu.json")) },
   indices: {

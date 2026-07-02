@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { AppShell } from "../../components/AppShell";
 import type { AccountSectionId } from "../../components/app-shell-nav";
 import { useAuth } from "../../lib/auth";
 import { accountNotificationRowsForRoles } from "../account-notification-rows";
 import { AccountProfileSection } from "./AccountProfileSection";
+import { CompanyMembersDialog } from "./CompanyMembersDialog";
 import { DataPrivacyDialog } from "./DataPrivacyDialog";
 import { NotificationsDialog } from "./NotificationsDialog";
 import { PasswordDialog } from "./PasswordDialog";
@@ -70,6 +72,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     setNotificationPreferences,
     token,
   });
+  const [membersOpen, setMembersOpen] = useState(false);
   const targetLayoutKey = `${billingState}|${sessionsState}|${notificationPreferencesState}`;
   const notificationRows = accountNotificationRowsForRoles(user?.platformRoles ?? []);
 
@@ -88,6 +91,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           onOpenNotifications={openNotificationsDialog}
           onOpenPassword={openPasswordDialog}
           onOpenPayment={openPaymentDialog}
+          onOpenMembers={() => setMembersOpen(true)}
           onOpenSessions={openSessionsDialog}
           onOpenSubscription={openSubscriptionDialog}
           onProfileSaved={refreshMe}
@@ -95,6 +99,7 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           user={user}
         />
       </section>
+      {membersOpen ? <CompanyMembersDialog onClose={() => setMembersOpen(false)} /> : null}
       {subscriptionDialogOpen ? (
         <SubscriptionDialog
           billing={billing}
