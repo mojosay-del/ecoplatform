@@ -15,6 +15,8 @@ const authMeUserSelect = {
   gender: true,
   status: true,
   companyId: true,
+  companyRole: true,
+  allowedSections: true,
   deletionRequestedAt: true,
   avatarFile: { select: { storageKey: true, accessLevel: true } },
   company: {
@@ -54,6 +56,9 @@ export async function getAuthMeUser(deps: AuthProfileDeps, userId: string): Prom
     status: user.status,
     avatarUrl: user.avatarFile ? publicUrl(user.avatarFile.storageKey, user.avatarFile.accessLevel) : null,
     companyId: user.companyId,
+    companyRole: user.companyRole,
+    // member → его набор разделов; owner → null (полный доступ, нав не режется).
+    memberSections: user.companyRole === "member" ? user.allowedSections : null,
     company: user.company
       ? {
           id: user.company.id,

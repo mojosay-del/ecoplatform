@@ -13,6 +13,8 @@ function demoUser(demoEndsAt: string): AuthMeUser {
     status: "active",
     avatarUrl: null,
     companyId: "company-1",
+    companyRole: "owner",
+    memberSections: null,
     company: {
       id: "company-1",
       organizationName: "Демо ООО",

@@ -28,6 +28,10 @@ export type UserStatus = (typeof userStatuses)[number];
 
 export const platformRoles = ["admin", "moderator", "content_manager"] as const;
 
+export const companyRoles = ["owner", "member"] as const;
+
+export type CompanyRole = (typeof companyRoles)[number];
+
 export type PlatformRole = (typeof platformRoles)[number];
 
 export const contentStatuses = ["draft", "published"] as const;

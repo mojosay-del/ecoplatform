@@ -1,5 +1,6 @@
 export * from "./access";
 export * from "./api-response";
+export * from "./company-members";
 export * from "./content-blocks";
 export * from "./documentation-icons";
 export * from "./domain";

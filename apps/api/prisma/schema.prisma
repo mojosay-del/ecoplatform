@@ -283,6 +283,9 @@ model User {
   // пользователи переведены в `owner` бэкфиллом в миграции (каждый из них —
   // единственный пользователь своей компании).
   companyRole                CompanyRole                     @default(member)
+  // Разрешённые сотруднику (member) разделы платформы — ключи из MEMBER_SECTIONS
+  // (app-shell-nav). У владельца (owner) не используется: доступ полный.
+  allowedSections            String[]                        @default([])
   platformStaff              PlatformStaff?
   sessions                   Session[]
   newsLikes                  NewsLike[]
@@ -583,6 +586,8 @@ model CompanyInvitation {
   email          String
   invitedById    String
   role           CompanyRole             @default(member)
+  // Разделы, выбранные владельцем при приглашении — переносятся в User при принятии.
+  allowedSections String[]               @default([])
   status         CompanyInvitationStatus @default(pending)
   tokenHash      String                  @unique
   expiresAt      DateTime

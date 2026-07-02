@@ -8,6 +8,7 @@
 // progress и т.п.). Дата приходит строкой (JSON.stringify Date → string).
 
 import type {
+  CompanyRole,
   CompanyStatus,
   CompanyType,
   ConsentSource,
@@ -472,6 +473,11 @@ export type AuthMeUser = {
   avatarUrl: string | null;
   companyId: string | null;
   company: AuthMeCompany | null;
+  // Роль в компании (owner создаёт компанию/управляет сотрудниками; member —
+  // приглашённый сотрудник). memberSections — разрешённые разделы для member
+  // (null у владельца = полный доступ, фильтрация навигации по разделам не идёт).
+  companyRole: CompanyRole;
+  memberSections: string[] | null;
   platformRoles: PlatformRole[];
   features: AuthMeFeatures;
   requiresReConsent: boolean;
