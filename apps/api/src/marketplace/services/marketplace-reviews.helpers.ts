@@ -33,7 +33,10 @@ export function toReviewItem(
     id: review.id,
     offerId: review.offerId,
     direction: review.direction,
-    fromCompanyName: review.fromCompany.organizationName,
+    // Публичная лента никогда не получает реальное имя анонимного автора —
+    // подменяем его на сервере (админам автор виден через сущность модерации).
+    fromCompanyName: review.isAnonymous ? "Анонимный отзыв" : review.fromCompany.organizationName,
+    isAnonymous: review.isAnonymous,
     toCompanyId: review.toCompanyId,
     comment: review.comment,
     status: review.status,

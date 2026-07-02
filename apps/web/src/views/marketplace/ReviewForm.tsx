@@ -22,6 +22,7 @@ export function ReviewForm({
   const criteria = REVIEW_CRITERIA_BY_DIRECTION[direction];
   const [scores, setScores] = useState<Record<string, number>>({});
   const [comment, setComment] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +37,7 @@ export function ReviewForm({
       const dto: CreateReviewDto = {
         scores: criteria.map((criterion) => ({ criterion, score: scores[criterion]! })),
         comment: comment.trim() || null,
+        isAnonymous: anonymous,
       };
       await api.marketplace.reviews.create(offerId, dto);
       onDone();
@@ -64,6 +66,10 @@ export function ReviewForm({
         value={comment}
         onChange={(event) => setComment(event.target.value)}
       />
+      <label className="mp-review-anon">
+        <input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} />
+        <span>Оставить анонимно — компания и имя не видны на площадке (админам при жалобах видно)</span>
+      </label>
       {error ? <p className="mp-error">{error}</p> : null}
       <button className="button" type="button" disabled={saving} onClick={submit}>
         <SendActionIcon size={18} />

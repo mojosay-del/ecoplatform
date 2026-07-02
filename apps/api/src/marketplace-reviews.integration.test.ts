@@ -188,4 +188,24 @@ describe("Marketplace — отзывы и рейтинг (фаза 4)", () => {
     const after = await ctx.http.get("/api/marketplace/my/offers").set(bearer(deal.buyerToken));
     expect(after.body.items[0].canReview).toBe(false);
   });
+
+  it("анонимный отзыв скрывает автора в публичной ленте", async () => {
+    const deal = await agreedDeal("0009309", "0009309");
+
+    const review = await ctx.http
+      .post(`/api/marketplace/offers/${deal.offerId}/reviews`)
+      .set(bearer(deal.buyerToken))
+      .send({ scores: buyerScores(5), comment: "ок", isAnonymous: true });
+    expect(review.status).toBe(201);
+    expect(review.body.isAnonymous).toBe(true);
+    expect(review.body.fromCompanyName).toBe("Анонимный отзыв");
+
+    // Публичная лента отзывов о продавце — автор скрыт для стороннего зрителя.
+    const stranger = await registerTrader("0009319");
+    const list = await ctx.http.get(`/api/marketplace/companies/${deal.sellerCompanyId}/reviews`).set(bearer(stranger));
+    expect(list.status).toBe(200);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].isAnonymous).toBe(true);
+    expect(list.body[0].fromCompanyName).toBe("Анонимный отзыв");
+  });
 });

@@ -1560,6 +1560,9 @@ model MarketplaceReview {
   createdById   String
   comment       String?
   status        ReviewStatus               @default(published)
+  // Анонимный отзыв: компания и ФИО автора скрыты в публичной ленте площадки,
+  // но видны админам при разборе жалоб (через сущность модерации).
+  isAnonymous   Boolean                    @default(false)
   // Окно правки/удаления автором — 3 минуты с создания (проверяется в сервисе).
   editableUntil DateTime
   scores        MarketplaceReviewScore[]

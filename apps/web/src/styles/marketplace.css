@@ -1812,6 +1812,24 @@
   font-size: 15px;
 }
 
+.mp-review-anon {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+}
+
+.mp-review-anon input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--brand, #f5773e);
+}
+
 .mp-review-criterion {
   display: flex;
   align-items: center;

@@ -380,6 +380,8 @@ export const reviewScoreInputSchema = z.object({
 export const createReviewDtoSchema = z.object({
   scores: z.array(reviewScoreInputSchema).min(1, "Оцените хотя бы по одному критерию"),
   comment: z.string().trim().max(2000).nullish(),
+  // Скрыть компанию и ФИО автора в публичной ленте (админам видно при модерации).
+  isAnonymous: z.boolean().optional(),
 });
 
 export type CreateReviewDto = z.infer<typeof createReviewDtoSchema>;

@@ -82,6 +82,7 @@ export class MarketplaceReviewsService {
         toCompanyId,
         createdById: user.id,
         comment: dto.comment?.trim() || null,
+        isAnonymous: dto.isAnonymous ?? false,
         status: "published",
         editableUntil: new Date(now.getTime() + EDIT_WINDOW_MS),
         scores: { create: dto.scores.map((score) => ({ criterion: score.criterion, score: score.score })) },

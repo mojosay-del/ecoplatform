@@ -1117,6 +1117,7 @@ export type ReviewItem = {
   offerId: string;
   direction: ReviewDirection;
   fromCompanyName: string;
+  isAnonymous: boolean;
   toCompanyId: string;
   comment: string | null;
   status: ReviewStatus;
