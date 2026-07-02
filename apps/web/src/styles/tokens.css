@@ -98,6 +98,13 @@
   --education-gradient-start: #dcefe2;
   --education-gradient-mid: #8ebc95;
   --education-gradient-end: #4b7f57;
+  /* Кинематографичные тёмные зоны раздела «Обучение»: тёплый почти-чёрный,
+     гармонирующий с --surface/#f5773e (а не холодный slate). */
+  --learning-hero-bg: #201812;
+  --learning-hero-bg-rgb: 32 24 18;
+  --learning-hero-text: #fdf9f4;
+  --learning-hero-text-muted: rgb(253 249 244 / 0.72);
+  --learning-hero-line: rgb(253 249 244 / 0.16);
   --knowledge-gradient-start: #f6c89e;
   --knowledge-gradient-end: #b9743b;
   --lesson-upgrade-text: #6e5742;

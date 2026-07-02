@@ -1,16 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { LearningChapterSummary, LearningModuleListItem, PaginatedResponse } from "@ecoplatform/shared";
+import { useMemo } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import type { LearningModuleListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
-import { CoverImage } from "../../components/CoverImage";
 import "../../components/cover.css";
-import { StatusPill } from "../../components/StatusPill";
 import { api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useCoverAssets } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, pluralizeRu, useApiQuery } from "../shared";
-import { shouldRenderCoveredCardSkeleton } from "../shared/covered-card-readiness";
-import { ModulePresentationModal } from "./ModulePresentationModal";
+import { ContinueLearningCard } from "./ContinueLearningCard";
+import { EducationModuleCard, EducationModuleCardSkeleton } from "./EducationModuleCard";
+import { pickResumeModule } from "./learning-format";
+
+const gridVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const } },
+};
 
 export function EducationView() {
   const {
@@ -24,21 +34,9 @@ export function EducationView() {
   } as PaginatedResponse<LearningModuleListItem>);
   const data = page.items;
   const covers = useCoverAssets(data);
-  // Презентация модуля открывается модальным окном поверх витрины.
-  const [openModuleId, setOpenModuleId] = useState<string | null>(null);
-  const lessonsCount = useMemo(
-    () =>
-      data.reduce(
-        (sum, module) =>
-          sum +
-          (module.chapters?.reduce(
-            (chapterSum: number, chapter: LearningChapterSummary) => chapterSum + (chapter.lessons?.length ?? 0),
-            0,
-          ) ?? 0),
-        0,
-      ),
-    [data],
-  );
+  const reducedMotion = useReducedMotion();
+  const resumeModule = useMemo(() => pickResumeModule(data), [data]);
+  const lessonsCount = useMemo(() => data.reduce((sum, module) => sum + module.totalLessons, 0), [data]);
   const lessonsLabel = `${lessonsCount} ${pluralizeRu(
     lessonsCount,
     "урок добавлен",
@@ -58,10 +56,14 @@ export function EducationView() {
     return <ErrorState title="Обучение" message={errorMessage} />;
   }
 
+  const coverUrlFor = (module: LearningModuleListItem) =>
+    preferredFileAssetImageUrl(module.coverImageId ? covers.get(module.coverImageId) : null);
+
   return (
     <AppShell>
       <section className="page">
         <header className="education-header">
+          <p className="education-eyebrow">Академия ЭкоПлатформы</p>
           <h1 className="education-title">Обучение</h1>
           <p className="education-subtitle">Практические материалы для закупки, склада и работы с качеством сырья.</p>
           <p className="education-header-metric">{lessonsLabel}</p>
@@ -75,99 +77,23 @@ export function EducationView() {
             ))}
           </div>
         ) : (
-          <div className="education-grid">
-            {data.map((module) => (
-              <EducationModuleCard
-                coverUrl={preferredFileAssetImageUrl(module.coverImageId ? covers.get(module.coverImageId) : null)}
-                key={module.id}
-                module={module}
-                onOpen={setOpenModuleId}
-              />
-            ))}
-          </div>
+          <>
+            {resumeModule ? <ContinueLearningCard coverUrl={coverUrlFor(resumeModule)} module={resumeModule} /> : null}
+            <motion.div
+              animate="visible"
+              className="education-grid"
+              initial={reducedMotion ? false : "hidden"}
+              variants={gridVariants}
+            >
+              {data.map((module) => (
+                <motion.div className="education-grid-cell" key={module.id} variants={cardVariants}>
+                  <EducationModuleCard coverUrl={coverUrlFor(module)} module={module} />
+                </motion.div>
+              ))}
+            </motion.div>
+          </>
         )}
       </section>
-      {openModuleId ? <ModulePresentationModal moduleId={openModuleId} onClose={() => setOpenModuleId(null)} /> : null}
     </AppShell>
-  );
-}
-
-function EducationModuleCard({
-  coverUrl,
-  module,
-  onOpen,
-}: {
-  coverUrl: string | null;
-  module: LearningModuleListItem;
-  onOpen: (moduleId: string) => void;
-}) {
-  const [settledCoverUrl, setSettledCoverUrl] = useState<string | null>(null);
-  const lessonsCount =
-    module.chapters?.reduce(
-      (sum: number, chapter: LearningChapterSummary) => sum + (chapter.lessons?.length ?? 0),
-      0,
-    ) ?? 0;
-  const isInDevelopment = Boolean(module.isInDevelopment);
-  const showSkeleton = shouldRenderCoveredCardSkeleton({
-    coverImageId: module.coverImageId,
-    coverUrl,
-    settledCoverUrl,
-  });
-
-  return (
-    <article className={`education-card ${showSkeleton ? "is-awaiting-cover" : "is-cover-ready"}`}>
-      <button
-        type="button"
-        aria-hidden={showSkeleton || undefined}
-        className="education-card-link"
-        onClick={() => onOpen(module.id)}
-        inert={showSkeleton ? true : undefined}
-      >
-        <div className="education-card-cover">
-          {coverUrl ? (
-            <CoverImage
-              alt=""
-              src={coverUrl}
-              onLoadSettled={() => setSettledCoverUrl(coverUrl)}
-              sizes="(max-width: 880px) 100vw, (max-width: 1180px) 35vw, (max-width: 1500px) 25vw, 480px"
-            />
-          ) : module.coverImageId ? (
-            <span className="cover-skeleton" aria-hidden="true" />
-          ) : (
-            <div className="education-card-cover-fallback" />
-          )}
-          <div className="education-card-cover-meta">
-            <h2 className="education-card-title-badge">{module.title}</h2>
-            <span className="education-card-lessons-badge">Уроков: {lessonsCount}</span>
-          </div>
-        </div>
-        <StatusPill
-          className="education-card-status"
-          variant={isInDevelopment ? "warning" : module.hasAccess ? "success" : "brand"}
-        >
-          {isInDevelopment ? "В разработке" : module.hasAccess ? "Доступен" : "Нужна подписка"}
-        </StatusPill>
-        <div className="education-card-panel">
-          <p>{module.summary}</p>
-        </div>
-        <span className="education-card-open-overlay" aria-hidden="true" />
-      </button>
-      {showSkeleton ? <EducationModuleCardSkeleton overlay /> : null}
-    </article>
-  );
-}
-
-function EducationModuleCardSkeleton({ overlay = false }: { overlay?: boolean }) {
-  return (
-    <div className={`education-card-skeleton${overlay ? " is-overlay" : ""}`} aria-hidden="true">
-      <div className="education-card-cover">
-        <span className="cover-skeleton" />
-      </div>
-      <div className="education-card-panel">
-        <div className="page-skeleton-bar w-3-4" />
-        <div className="page-skeleton-bar w-full" />
-        <div className="page-skeleton-bar w-1-2" />
-      </div>
-    </div>
   );
 }
