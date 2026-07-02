@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Check, ChevronDown, MailCheck } from "lucide-react";
+import { Check, ChevronDown, Info, MailCheck } from "lucide-react";
 import type { CreateOfferDto, MarketplaceListingDetail, PriceCondition } from "@ecoplatform/shared";
 import { SendActionIcon } from "../../components/app-shell/nav-icons";
 import { DEFAULT_PHONE_COUNTRY } from "../../components/auth/constants";
@@ -19,9 +19,21 @@ import { buildOfferSummary, formatPricePerTonInput } from "./offer-summary";
 import { formatPrice } from "./offer-ui";
 
 const PRICE_CONDITION_OPTIONS: Array<{ value: PriceCondition; label: string }> = [
-  { value: "from_place", label: "Цена с места (вывожу сам)" },
-  { value: "at_gate", label: "Цена на воротах (доставка ко мне)" },
+  { value: "from_place", label: "Цена с места" },
+  { value: "at_gate", label: "Цена на воротах" },
 ];
+
+const PRICE_CONDITION_HINT =
+  "«Цена с места» — вы забираете сырьё сами. «Цена на воротах» — заготовитель доставляет вам (укажите город доставки).";
+
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="mp-info-tip" tabIndex={0} role="note" aria-label={text}>
+      <Info size={14} aria-hidden="true" />
+      <span className="mp-info-tip-bubble">{text}</span>
+    </span>
+  );
+}
 
 function formatRubles(value: number): string {
   return `${value.toLocaleString("ru-RU")} ₽`;
@@ -161,20 +173,12 @@ export function MakeOfferForm({
       <div className="mp-grid-2">
         <div className="mp-field">
           {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; контрол PriceConditionSelect самоозначивается */}
-          <label>Условие цены</label>
+          <label>
+            Условие цены
+            <InfoTip text={PRICE_CONDITION_HINT} />
+          </label>
           <PriceConditionSelect value={priceCondition} onChange={setPriceCondition} />
         </div>
-        {priceCondition === "at_gate" ? (
-          <div className="mp-field">
-            <label htmlFor="mp-offer-city">Город доставки</label>
-            <input
-              id="mp-offer-city"
-              className="mp-input"
-              value={city}
-              onChange={(event) => setCity(event.target.value)}
-            />
-          </div>
-        ) : null}
         <div className="mp-field">
           {/* eslint-disable-next-line jsx-a11y/label-has-associated-control -- подпись поля; PhoneInput самоозначивает свои поля */}
           <label>Контактный телефон</label>
@@ -187,6 +191,19 @@ export function MakeOfferForm({
           />
         </div>
       </div>
+      {/* Город доставки — отдельной строкой ниже, чтобы выбор «на воротах» не
+          перестраивал ряд с условием цены и телефоном. */}
+      {priceCondition === "at_gate" ? (
+        <div className="mp-field">
+          <label htmlFor="mp-offer-city">Город доставки</label>
+          <input
+            id="mp-offer-city"
+            className="mp-input"
+            value={city}
+            onChange={(event) => setCity(event.target.value)}
+          />
+        </div>
+      ) : null}
       {error ? (
         <p className="mp-error">
           {error}

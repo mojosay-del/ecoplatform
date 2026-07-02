@@ -32,6 +32,7 @@ import {
 } from "./marketplace-feed";
 import { MarketplaceFeedList } from "./marketplace-feed-list";
 import { MarketplaceMobileFilters } from "./marketplace-mobile-filters";
+import { AuctionInfo } from "./AuctionInfo";
 
 const ListingMap = dynamic<ListingMapProps>(() => import("./ListingMap").then((module) => module.ListingMap), {
   ssr: false,
@@ -245,6 +246,8 @@ export function MarketplaceView() {
                   Искать в этой области
                 </button>
               ) : null}
+              {/* Кнопка-подсказка «Как работает закрытый аукцион» — перед легендой. */}
+              <AuctionInfo />
               {/* Легенда цветов сырья — обычный DOM-оверлей поверх карты. */}
               <div className="mp-map-legend">
                 {MATERIAL_LEGEND.map((item) => (

@@ -1365,14 +1365,12 @@
   color: #64748b;
 }
 
+/* Форма ставки живёт внутри карточки действия (.mp-modal-action) — своей рамки
+   и фона не имеет, чтобы не было «плашки в плашке». */
 .mp-offer-form {
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 12px;
-  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: var(--surface, #fff);
   max-width: 760px;
 }
 
@@ -2442,6 +2440,7 @@
 .mp-page-map .mp-map-legend {
   right: 58px;
   left: auto;
+  top: 52px;
 }
 
 /* «Искать в этой области» — плашка по центру, строкой ниже легенды (первая
@@ -2824,32 +2823,161 @@
   flex: none;
 }
 
-.mp-auction-explainer {
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--surface-elevated);
-  font-size: 13px;
-  color: var(--text-secondary);
+/* Инфо-тултип у подписи поля (например, «Условие цены»). */
+.mp-info-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-subtle, #94a3b8);
+  cursor: help;
 }
 
-.mp-auction-explainer summary {
-  padding: 10px 12px;
-  font-weight: 600;
-  color: var(--text-secondary-strong);
-  cursor: pointer;
-  user-select: none;
-  list-style-position: inside;
+.mp-info-tip:hover,
+.mp-info-tip:focus-visible {
+  color: var(--brand, #f5773e);
+  outline: none;
 }
 
-.mp-auction-explainer summary:hover {
-  color: var(--accent, #1f8a4c);
+.mp-info-tip-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 140ms ease;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.24);
 }
 
-.mp-auction-explainer ul {
-  margin: 0;
-  padding: 0 14px 12px 28px;
-  display: grid;
+.mp-info-tip:hover .mp-info-tip-bubble,
+.mp-info-tip:focus-visible .mp-info-tip-bubble {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Кнопка «Как это работает» на карте + модалка закрытого аукциона. */
+.mp-map-info-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-card);
+  color: var(--text-secondary-strong, #334155);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease;
+}
+
+.mp-map-info-btn:hover {
+  color: var(--brand, #f5773e);
+  border-color: rgb(var(--brand-rgb) / 0.4);
+}
+
+.mp-page-map .mp-map-info-btn {
+  right: 58px;
+}
+
+.mp-auction-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(15 23 42 / 0.5);
+}
+
+.mp-auction-modal {
+  width: min(440px, 100%);
+  padding: 22px 24px 24px;
+  border-radius: 16px;
+  background: var(--surface, #fff);
+  box-shadow: 0 24px 60px rgb(15 23 42 / 0.3);
+}
+
+.mp-auction-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mp-auction-modal-head h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text, #0f172a);
+}
+
+.mp-auction-modal-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.mp-auction-modal-close:hover {
+  background: var(--border-subtle, #e5e7eb);
+  color: var(--text, #0f172a);
+}
+
+.mp-auction-modal-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.mp-auction-modal-list li {
+  position: relative;
+  padding-left: 26px;
+  color: var(--text-secondary-strong, #334155);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.mp-auction-modal-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand, #f5773e);
 }
 
 /* «Ставка запечатана» — конверт «защёлкивается» (scale c лёгким овершутом). */

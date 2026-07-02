@@ -49,15 +49,6 @@ export function ListingModalActions({
               </p>
             )}
 
-            <details className="mp-auction-explainer">
-              <summary>Как работает закрытый аукцион</summary>
-              <ul>
-                <li>Ставки других покупателей скрыты — каждый предлагает свою цену вслепую.</li>
-                <li>Продавец видит цены без названий компаний и выбирает лучшее предложение.</li>
-                <li>Контакты сторон раскрываются только после принятия предложения.</li>
-              </ul>
-            </details>
-
             {listing.status === "active" ? (
               <ReportControl
                 entityType="marketplace_listing"
