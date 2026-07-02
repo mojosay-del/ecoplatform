@@ -187,6 +187,9 @@ export type LearningLessonSummary = {
   coverSubtitle: string | null;
   position: number;
   status: string;
+  // Оценка «≈ N мин» по контент-блокам; заполняется в detail-ответе модуля
+  // (в списке модулей per-lesson длительностей нет — только сумма по модулю).
+  estimatedMinutes?: number;
 };
 
 export type LearningChapterSummary = {
@@ -209,6 +212,15 @@ export type LearningModuleListItem = {
   status: string;
   hasAccess: boolean;
   chapters: LearningChapterSummary[];
+  totalLessons: number;
+  // Суммарная оценка длительности опубликованных уроков модуля в минутах.
+  totalEstimatedMinutes: number;
+  // Прогресс текущего пользователя; null без доступа (зеркалит detail).
+  progress: LearningModuleProgress | null;
+  // Первый незавершённый урок — для CTA «Продолжить»; null при 100% или без доступа.
+  nextLessonId: string | null;
+  // Последняя активность (max completedAt) — для выбора модуля в «Продолжить обучение».
+  lastActivityAt: IsoDateString | null;
 };
 
 export type LessonAttachment = {

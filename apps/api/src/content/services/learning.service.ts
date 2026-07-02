@@ -41,6 +41,8 @@ import {
   updateLearningModule as updateLearningModuleWorkflow,
 } from "./learning-module-workflow.helpers";
 import { sanitizeContentBlocksForResponse } from "./content-block-response.helpers";
+import { estimateLessonMinutes } from "./learning-duration.helpers";
+import { buildModuleProgressIndex } from "./learning-progress.helpers";
 
 type LearningModuleInput = z.infer<typeof learningModuleInputSchema>;
 type LearningModuleUpdateInput = z.infer<typeof learningModuleUpdateInputSchema>;
@@ -89,10 +91,60 @@ export class LearningService {
       }),
     ]);
 
-    const items = modules.map((module) => ({
-      ...module,
-      hasAccess: canAccessPublishedLearningModule(user, module),
-    }));
+    // Длительности и прогресс для витрины: два grouped-запроса по всем
+    // модулям страницы (без N+1). Запрос блоков тянет payload'ы уроков —
+    // приемлемо при курируемом объёме контента; если каталог сильно вырастет,
+    // перейти на подсчёт только в detail или SQL-агрегацию.
+    const moduleIds = modules.map((module) => module.id);
+    const publishedLessonScope = {
+      status: ContentStatus.published,
+      chapter: { moduleId: { in: moduleIds } },
+    };
+    const [blockRows, progressRows] = await Promise.all([
+      this.prisma.lessonContentBlock.findMany({
+        where: { lesson: publishedLessonScope },
+        select: { lessonId: true, type: true, payload: true },
+      }),
+      this.prisma.lessonProgress.findMany({
+        where: { userId: user.id, lesson: publishedLessonScope },
+        select: { lessonId: true, completedAt: true },
+      }),
+    ]);
+    const blocksByLessonId = new Map<string, Array<{ type: string; payload: unknown }>>();
+    for (const row of blockRows) {
+      const list = blocksByLessonId.get(row.lessonId);
+      if (list) {
+        list.push(row);
+      } else {
+        blocksByLessonId.set(row.lessonId, [row]);
+      }
+    }
+    const progressIndex = buildModuleProgressIndex(modules, progressRows);
+
+    const items = modules.map((module) => {
+      const hasAccess = canAccessPublishedLearningModule(user, module);
+      const moduleProgress = progressIndex.get(module.id);
+      const totalEstimatedMinutes = module.chapters.reduce(
+        (moduleSum, chapter) =>
+          moduleSum +
+          chapter.lessons.reduce(
+            (chapterSum, lesson) => chapterSum + estimateLessonMinutes(blocksByLessonId.get(lesson.id) ?? []),
+            0,
+          ),
+        0,
+      );
+
+      return {
+        ...module,
+        hasAccess,
+        totalLessons: moduleProgress?.progress.totalLessons ?? 0,
+        totalEstimatedMinutes,
+        // Прогресс отдаём только при доступе — зеркалит detail-эндпоинт.
+        progress: hasAccess ? (moduleProgress?.progress ?? null) : null,
+        nextLessonId: hasAccess ? (moduleProgress?.nextLessonId ?? null) : null,
+        lastActivityAt: hasAccess ? (moduleProgress?.lastActivityAt ?? null) : null,
+      };
+    });
 
     return paginatedResponse(items, total, pagination);
   }
@@ -140,16 +192,24 @@ export class LearningService {
       ? await resolveLearningAttachmentMeta(this.prisma, this.files, visibleChapters)
       : new Map();
     let completedLessons = 0;
+    let totalEstimatedMinutes = 0;
+    let nextLessonId: string | null = null;
     const totalLessons = visibleChapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0);
     const chapters = visibleChapters.map((chapter) => ({
       ...chapter,
       lessons: chapter.lessons.map((lesson) => {
         const { progress, ...lessonWithoutProgress } = lesson;
         const completedAt = progress[0]?.completedAt ?? null;
+        // Оценка длительности считается по блокам до их отрезания в публичной
+        // ветке — «≈ N мин» видно и без доступа (как и названия уроков).
+        const estimatedMinutes = estimateLessonMinutes(lessonWithoutProgress.blocks);
+        totalEstimatedMinutes += estimatedMinutes;
 
         if (hasAccess) {
           if (completedAt) {
             completedLessons += 1;
+          } else if (!nextLessonId) {
+            nextLessonId = lesson.id;
           }
           return {
             ...lessonWithoutProgress,
@@ -158,11 +218,12 @@ export class LearningService {
               mapLessonAttachment(attachment, attachmentMeta.get(attachment.fileId)),
             ),
             completedAt,
+            estimatedMinutes,
           };
         }
 
         const { blocks: _blocks, attachments: _attachments, ...publicLesson } = lessonWithoutProgress;
-        return publicLesson;
+        return { ...publicLesson, estimatedMinutes };
       }),
     }));
     const progressPercent = totalLessons === 0 ? 0 : Math.round((completedLessons / totalLessons) * 100);
@@ -171,7 +232,10 @@ export class LearningService {
       ...module,
       chapters,
       hasAccess,
+      totalLessons,
+      totalEstimatedMinutes,
       progress: hasAccess ? { completedLessons, totalLessons, percent: progressPercent } : null,
+      nextLessonId: hasAccess ? nextLessonId : null,
     };
   }
 

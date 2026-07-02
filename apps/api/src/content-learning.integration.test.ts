@@ -157,6 +157,146 @@ describe("Content lifecycle: learning modules", () => {
     }
   });
 
+  it("список отдаёт длительности и прогресс, complete сдвигает nextLessonId", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800015");
+
+    const moduleRes = await ctx.http
+      .post("/api/admin/content/education/modules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Модуль с прогрессом",
+        summary: "Краткое",
+        description: "Полное",
+        accessLevel: "basic",
+        preview: { promotionalDescription: "Превью", whatYouWillLearn: [] },
+        chapters: [],
+      });
+    expect(moduleRes.status).toBe(201);
+    const moduleId = moduleRes.body.id as string;
+
+    // 360 слов при 180 wpm = 2 минуты чтения.
+    const longHtml = `<p>${Array.from({ length: 360 }, (_, index) => `слово${index}`).join(" ")}</p>`;
+    const lessonIds: string[] = [];
+    for (const [chapterIndex, lessons] of [
+      [
+        { title: "Длинный урок", blocks: [{ type: "paragraph", payload: { html: longHtml } }] },
+        { title: "Короткий урок", blocks: [{ type: "paragraph", payload: { html: "<p>Пара слов.</p>" } }] },
+      ],
+      [
+        {
+          title: "Квиз",
+          blocks: [
+            {
+              type: "quiz",
+              payload: {
+                question: "Вопрос?",
+                multiple: false,
+                options: [
+                  { text: "Да", correct: true },
+                  { text: "Нет", correct: false },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    ].entries()) {
+      const chapterRes = await ctx.http
+        .post(`/api/admin/content/education/modules/${moduleId}/chapters`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ title: `Глава ${chapterIndex + 1}`, position: chapterIndex });
+      expect(chapterRes.status).toBe(201);
+      for (const [lessonIndex, lesson] of lessons.entries()) {
+        const lessonRes = await ctx.http
+          .post(`/api/admin/content/education/chapters/${chapterRes.body.id}/lessons`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send({ title: lesson.title, position: lessonIndex, blocks: lesson.blocks, attachments: [] });
+        expect(lessonRes.status).toBe(201);
+        lessonIds.push(lessonRes.body.id as string);
+      }
+    }
+
+    const publish = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleId}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publish.status).toBe(201);
+
+    // Свежий прогресс: 0 из 3, «продолжить» указывает на первый урок.
+    const listBefore = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
+    const itemBefore = listBefore.body.items.find((item: { id: string }) => item.id === moduleId);
+    expect(itemBefore).toMatchObject({
+      totalLessons: 3,
+      // 2 мин (длинный) + 1 мин (короткий) + ceil(45+2*10=65с)=2 мин (квиз).
+      totalEstimatedMinutes: 5,
+      progress: { completedLessons: 0, totalLessons: 3, percent: 0 },
+      nextLessonId: lessonIds[0],
+      lastActivityAt: null,
+    });
+
+    const complete = await ctx.http
+      .post(`/api/education/lessons/${lessonIds[0]}/complete`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(complete.status).toBe(201);
+
+    const listAfter = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
+    const itemAfter = listAfter.body.items.find((item: { id: string }) => item.id === moduleId);
+    expect(itemAfter).toMatchObject({
+      progress: { completedLessons: 1, totalLessons: 3, percent: 33 },
+      nextLessonId: lessonIds[1],
+    });
+    expect(itemAfter.lastActivityAt).toBeTruthy();
+
+    const detail = await ctx.http
+      .get(`/api/education/modules/${moduleId}`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.totalEstimatedMinutes).toBe(5);
+    expect(detail.body.nextLessonId).toBe(lessonIds[1]);
+    expect(detail.body.chapters[0].lessons[0].estimatedMinutes).toBe(2);
+    expect(detail.body.chapters[1].lessons[0].estimatedMinutes).toBe(2);
+  });
+
+  it("без доступа список не отдаёт прогресс, но длительности и программа видны", async () => {
+    const adminToken = await loginAdmin();
+    const reader = await registerCompany("0800016");
+    const { moduleId } = await createLearningModuleWithLesson(adminToken, "locked-durations");
+
+    const markExtended = await ctx.http
+      .patch(`/api/admin/content/education/modules/${moduleId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ accessLevel: "extended" });
+    expect(markExtended.status).toBe(200);
+
+    const publish = await ctx.http
+      .post(`/api/admin/content/education/modules/${moduleId}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(publish.status).toBe(201);
+
+    const list = await ctx.http.get("/api/education/modules").set("Authorization", `Bearer ${reader.token}`);
+    const item = list.body.items.find((module: { id: string }) => module.id === moduleId);
+    expect(item).toMatchObject({
+      hasAccess: false,
+      totalLessons: 1,
+      progress: null,
+      nextLessonId: null,
+      lastActivityAt: null,
+    });
+    expect(item.totalEstimatedMinutes).toBeGreaterThanOrEqual(1);
+
+    // Программа (названия уроков + оценка времени) доступна и без подписки —
+    // контент-блоки при этом по-прежнему отрезаны.
+    const detail = await ctx.http
+      .get(`/api/education/modules/${moduleId}`)
+      .set("Authorization", `Bearer ${reader.token}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.hasAccess).toBe(false);
+    expect(detail.body.progress).toBeNull();
+    expect(detail.body.chapters[0].lessons[0].title).toBe("Урок 1");
+    expect(detail.body.chapters[0].lessons[0].estimatedMinutes).toBeGreaterThanOrEqual(1);
+    expect(detail.body.chapters[0].lessons[0].blocks).toBeUndefined();
+  });
+
   it("publish модуля без уроков отбивается 403", async () => {
     const adminToken = await loginAdmin();
 
