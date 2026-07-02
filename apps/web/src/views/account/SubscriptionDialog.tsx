@@ -44,6 +44,9 @@ export function SubscriptionDialog({
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const currentCompany: SubscriptionCompanySnapshot | null = billing ?? user?.company ?? null;
+  // Сотрудник (member) не управляет подпиской — вместо тарифов показываем ему
+  // понятное окно «обратитесь к владельцу».
+  const isMember = user?.companyRole === "member";
   const dialogCloseDisabled = closeDisabled || busyPlan !== null;
 
   useAccountDialogBodyLock(true, onClose, dialogCloseDisabled);
@@ -142,13 +145,24 @@ export function SubscriptionDialog({
           <div>
             <span className="account-password-modal-kicker">{closeDisabled ? "Доступ к продукту" : "Подписка"}</span>
             <h2 className={closeDisabled ? undefined : "account-modal-sr-title"} id="account-subscription-dialog-title">
-              {closeDisabled ? "Выберите доступ, чтобы продолжить" : "Подписка"}
+              {closeDisabled
+                ? isMember
+                  ? "Подписка компании неактивна"
+                  : "Выберите доступ, чтобы продолжить"
+                : "Подписка"}
             </h2>
             {closeDisabled ? (
-              <p>
-                Продукт уже открыт на фоне. Активируйте пробный доступ или тестовую подписку, и мы сразу разблокируем
-                работу.
-              </p>
+              isMember ? (
+                <p>
+                  Подписка вашей компании неактивна. Продлить её может только владелец компании — обратитесь к нему,
+                  чтобы продолжить работу.
+                </p>
+              ) : (
+                <p>
+                  Продукт уже открыт на фоне. Активируйте пробный доступ или тестовую подписку, и мы сразу разблокируем
+                  работу.
+                </p>
+              )
             ) : null}
           </div>
           {closeDisabled ? null : (
@@ -188,17 +202,27 @@ export function SubscriptionDialog({
               <span>{errorMessage}</span>
             </div>
           ) : null}
-          <SubscriptionPlans
-            billingPeriod={billingPeriod}
-            busyPlan={busyPlan}
-            canChoosePlan={canChoosePlan}
-            currentCompany={currentCompany}
-            currentPlanKey={currentPlanKey}
-            currentPlanRank={currentPlanRank}
-            onActivateChoice={activateChoice}
-            setBillingPeriod={setBillingPeriod}
-            trialAlreadyUsed={trialAlreadyUsed}
-          />
+          {isMember ? (
+            <div className="account-state-banner status-suspended account-member-billing-note">
+              <strong>Подпиской управляет владелец компании</strong>
+              <span>
+                Продлить или изменить подписку может только владелец. Как только он это сделает, доступные вам разделы
+                снова откроются.
+              </span>
+            </div>
+          ) : (
+            <SubscriptionPlans
+              billingPeriod={billingPeriod}
+              busyPlan={busyPlan}
+              canChoosePlan={canChoosePlan}
+              currentCompany={currentCompany}
+              currentPlanKey={currentPlanKey}
+              currentPlanRank={currentPlanRank}
+              onActivateChoice={activateChoice}
+              setBillingPeriod={setBillingPeriod}
+              trialAlreadyUsed={trialAlreadyUsed}
+            />
+          )}
           <div className="account-subscription-help">
             <span>Нужна помощь с доступом?</span>
             <button className="button ghost" onClick={onOpenSupport} type="button">

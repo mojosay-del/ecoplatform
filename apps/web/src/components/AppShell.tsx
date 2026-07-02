@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
-import { Menu } from "lucide-react";
+import { Lock, Menu } from "lucide-react";
 import type { BillingStatus } from "@ecoplatform/shared";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
@@ -17,6 +17,7 @@ import {
   AppSidebar,
   Breadcrumb,
   filterVisibleItems,
+  isMemberSectionBlocked,
   type AppShellChrome,
 } from "./app-shell";
 import {
@@ -183,6 +184,9 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
     // для обычного пользователя без админских ролей) — секцию не показываем.
     .filter((section) => section.items.length > 0);
   const visibleNav = visibleAppNav;
+  // Сотрудник зашёл по прямой ссылке в неразрешённый раздел — не пускаем на
+  // страницу (скрытие в меню только визуальное).
+  const memberSectionBlocked = isMemberSectionBlocked(appNavSections, pathname, user?.memberSections);
 
   return (
     <div
@@ -256,7 +260,7 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
               ← Панель управления
             </Link>
           ) : null}
-          {children}
+          {memberSectionBlocked ? <MemberSectionDenied /> : children}
         </div>
       </main>
       <AppShellFooter />
@@ -275,5 +279,23 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
         />
       ) : null}
     </div>
+  );
+}
+
+// Заглушка для сотрудника, попавшего в неразрешённый раздел по прямой ссылке.
+function MemberSectionDenied() {
+  return (
+    <section className="page member-section-denied">
+      <span className="member-section-denied-icon" aria-hidden="true">
+        <Lock size={30} />
+      </span>
+      <h1>Раздел недоступен</h1>
+      <p className="page-subtitle">
+        Владелец компании не открыл вам доступ к этому разделу. Обратитесь к нему, если он нужен для работы.
+      </p>
+      <Link className="button" href="/news">
+        На главную
+      </Link>
+    </section>
   );
 }

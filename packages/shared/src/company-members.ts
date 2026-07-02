@@ -53,8 +53,8 @@ export function sanitizeMemberSections(
 // нет; используется только для расчёта «+10% за каждого доп. сотрудника» в
 // кабинете. Значения-плейсхолдеры, владелец скорректирует.
 export const PLAN_BASE_PRICE_RUB: Record<SubscriptionPlan, number> = {
-  basic: 9900,
-  extended: 19900,
+  basic: 890,
+  extended: 2890,
 };
 
 export const MEMBER_SURCHARGE_RATE = 0.1; // +10% от базы за каждого доп. сотрудника

@@ -1,5 +1,5 @@
 import { isMemberSectionKey, type AuthMeFeatures, type CompanyType } from "@ecoplatform/shared";
-import type { NavItem } from "../app-shell-nav";
+import type { NavItem, NavSection } from "../app-shell-nav";
 
 export type NavAccessContext = {
   roles: readonly string[];
@@ -43,4 +43,24 @@ function isNavItemVisible(item: NavItem, access: NavAccessContext): boolean {
   }
 
   return true;
+}
+
+// Заблокирован ли текущий путь для сотрудника (member): переход по прямой ссылке
+// в раздел, который владелец ему не открыл. Скрытие в меню (filterVisibleItems)
+// — только визуальное; этот guard в AppShell не пускает member'а на страницу.
+// memberSections null/undefined = владелец: доступ полный, не блокируем.
+export function isMemberSectionBlocked(
+  sections: NavSection[],
+  pathname: string,
+  memberSections: string[] | null | undefined,
+): boolean {
+  if (!memberSections) return false;
+  for (const section of sections) {
+    for (const item of section.items) {
+      if (item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`))) {
+        return Boolean(item.key && isMemberSectionKey(item.key) && !memberSections.includes(item.key));
+      }
+    }
+  }
+  return false;
 }
