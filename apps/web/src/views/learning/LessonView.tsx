@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { GraduationCap } from "lucide-react";
 import type { LearningChapterDetail, LearningModuleDetail, LessonDetail } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
@@ -14,7 +14,10 @@ import { useCoverAssets } from "../../lib/use-cover-assets";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, resolveUpgradeCta, useApiQuery } from "../shared";
 import { ContentBlocks } from "../content-blocks";
 import { extractLessonTasks } from "./lesson-tasks";
+import { lessonNavigation } from "./lesson-sequence";
 import { LessonAttachments } from "./LessonAttachments";
+import { LessonOutline } from "./LessonOutline";
+import { ModuleCompletionCelebration } from "./ModuleCompletionCelebration";
 
 export function LessonView({
   moduleId,
@@ -40,31 +43,30 @@ export function LessonView({
   // Пока не загрузятся ВСЕ изображения урока — держим статью серой и пульсирующей,
   // затем показываем её разом с мягким появлением. Так нет ощущения «догрузки на ходу».
   const [articleReady, setArticleReady] = useState(false);
-  const chapters: LearningChapterDetail[] = data?.chapters ?? [];
-  const chapter = chapters.find((c) => (c.lessons ?? []).some((l) => l.id === lessonId));
-  const lesson: LessonDetail | null = chapter ? ((chapter.lessons ?? []).find((l) => l.id === lessonId) ?? null) : null;
-  const lessonSequence = chapters.flatMap((sequenceChapter, chapterIndex) =>
-    (sequenceChapter.lessons ?? []).map((sequenceLesson, lessonIndex) => ({
-      chapter: sequenceChapter,
-      chapterIndex,
-      lesson: sequenceLesson,
-      lessonIndex,
-    })),
-  );
-  const currentLessonIndex = lessonSequence.findIndex((item) => item.lesson.id === lessonId);
-  const previousLessonEntry = currentLessonIndex > 0 ? (lessonSequence[currentLessonIndex - 1] ?? null) : null;
-  const nextLessonEntry = currentLessonIndex >= 0 ? (lessonSequence[currentLessonIndex + 1] ?? null) : null;
+  const [celebrating, setCelebrating] = useState(false);
+  const chapters: LearningChapterDetail[] = useMemo(() => data?.chapters ?? [], [data?.chapters]);
+  const navigation = lessonNavigation(chapters, lessonId);
+  const chapter = navigation.current?.chapter ?? null;
+  const lesson: LessonDetail | null = navigation.current?.lesson ?? null;
   const previewSuffix = preview ? "?preview=1" : "";
   const moduleHref = `/education/${moduleId}${previewSuffix}`;
-  const previousLessonHref = previousLessonEntry
-    ? `/education/${moduleId}/${previousLessonEntry.lesson.id}${previewSuffix}`
+  const previousLessonHref = navigation.previous
+    ? `/education/${moduleId}/${navigation.previous.lesson.id}${previewSuffix}`
     : null;
-  const nextLessonHref = nextLessonEntry ? `/education/${moduleId}/${nextLessonEntry.lesson.id}${previewSuffix}` : null;
-  const nextLessonLabel = nextLessonEntry
-    ? nextLessonEntry.chapter.id !== chapter?.id
-      ? `Следующая глава: урок ${nextLessonEntry.lessonIndex + 1}`
-      : "Следующий урок"
-    : null;
+  const nextLessonHref = navigation.next ? `/education/${moduleId}/${navigation.next.lesson.id}${previewSuffix}` : null;
+  const nextLessonLabel = navigation.nextLabel;
+  // Пройденные уроки для оглавления: серверные отметки + локальная (текущий
+  // урок, отмеченный в этой сессии до рефетча).
+  const completedLessonIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const outlineChapter of chapters) {
+      for (const outlineLesson of outlineChapter.lessons ?? []) {
+        if (outlineLesson.completedAt) ids.add(outlineLesson.id);
+      }
+    }
+    if (completed) ids.add(lessonId);
+    return ids;
+  }, [chapters, completed, lessonId]);
   const covers = useCoverAssets(lesson ? [lesson] : []);
   const lessonCover = lesson?.coverImageId ? (covers.get(lesson.coverImageId) ?? null) : null;
   const lessonCoverUrl = preferredFileAssetImageUrl(lessonCover);
@@ -73,6 +75,7 @@ export function LessonView({
     setCompleting(false);
     setAdvancing(false);
     setCompletionError(null);
+    setCelebrating(false);
   }, [lesson?.completedAt, lessonId]);
 
   useEffect(() => {
@@ -175,22 +178,31 @@ export function LessonView({
 
   const lessonAlreadyCompleted = Boolean(lesson.completedAt) || completed;
 
+  // true — если именно эта отметка довела модуль до 100% (тогда празднуем).
+  function completionFinishesModule() {
+    const total = data?.progress?.totalLessons ?? 0;
+    const alreadyCompleted = data?.progress?.completedLessons ?? 0;
+    return total > 0 && !lesson?.completedAt && alreadyCompleted + 1 >= total;
+  }
+
   async function completeCurrentLesson() {
-    if (lessonAlreadyCompleted) return true;
+    if (lessonAlreadyCompleted) return { saved: true, finishedModule: false };
     if (!token) {
       setCompletionError("Не удалось сохранить прохождение. Обновите страницу и попробуйте снова.");
-      return false;
+      return { saved: false, finishedModule: false };
     }
 
     try {
+      const finishedModule = completionFinishesModule();
       await api.learning.completeLesson(lessonId);
       setCompleted(true);
-      return true;
+      if (finishedModule) setCelebrating(true);
+      return { saved: true, finishedModule };
     } catch (error) {
       setCompletionError(
         error instanceof ApiError ? error.message : "Не удалось сохранить прохождение. Попробуйте ещё раз.",
       );
-      return false;
+      return { saved: false, finishedModule: false };
     }
   }
 
@@ -206,8 +218,13 @@ export function LessonView({
     if (!nextLessonHref || advancing || completing) return;
     setAdvancing(true);
     setCompletionError(null);
-    const saved = await completeCurrentLesson();
+    const { saved, finishedModule } = await completeCurrentLesson();
     if (!saved) {
+      setAdvancing(false);
+      return;
+    }
+    // Модуль закрыт этой отметкой — вместо перехода показываем празднование.
+    if (finishedModule) {
       setAdvancing(false);
       return;
     }
@@ -250,6 +267,22 @@ export function LessonView({
             <Link className="button" href="/account">
               {upgradeCta.buttonLabel}
             </Link>
+          </div>
+        ) : null}
+
+        {chapter ? (
+          <div className="lesson-context">
+            <Link className="lesson-context-module" href={moduleHref}>
+              {data.title}
+            </Link>
+            <span className="lesson-context-position">
+              Глава {(navigation.current?.chapterIndex ?? 0) + 1} · Урок {navigation.position} из {navigation.total}
+            </span>
+            {!preview ? (
+              <div aria-hidden="true" className="lesson-context-progress">
+                <span style={{ width: `${progressPercent}%` }} />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -348,6 +381,14 @@ export function LessonView({
               </div>
             ) : null}
 
+            <LessonOutline
+              chapters={chapters}
+              completedLessonIds={completedLessonIds}
+              currentLessonId={lessonId}
+              moduleId={moduleId}
+              previewSuffix={previewSuffix}
+            />
+
             {lessonTasks.length > 0 ? (
               <div className="lesson-side-card">
                 <div className="lesson-side-card-header">Задания урока</div>
@@ -373,6 +414,14 @@ export function LessonView({
             ) : null}
           </aside>
         </div>
+
+        {celebrating && !preview ? (
+          <ModuleCompletionCelebration
+            moduleHref={moduleHref}
+            moduleTitle={data.title}
+            onClose={() => setCelebrating(false)}
+          />
+        ) : null}
       </section>
     </AppShell>
   );
