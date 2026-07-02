@@ -86,6 +86,14 @@
   object-fit: cover;
   filter: blur(26px) saturate(1.1);
   transform: scale(1.25);
+}
+
+/* Декоративная подложка: без шиммер-скелетона, полупрозрачность — после загрузки. */
+.education-resume-backdrop .cover-skeleton {
+  display: none;
+}
+
+.education-resume-backdrop img.cover-image.is-loaded {
   opacity: 0.55;
 }
 

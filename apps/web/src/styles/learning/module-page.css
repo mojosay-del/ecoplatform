@@ -1,56 +1,111 @@
-/* Страница модуля (course landing): hero, превью, «Чему вы научитесь», программа.
-   Route-scoped: импортируется из views/learning/index.ts. */
+/* Страница модуля (course landing): кинематографичный тёмный hero, тизер,
+   «Чему вы научитесь», программа курса. Route-scoped: импортируется из
+   views/learning/index.ts. */
+
 .module-page {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 28px;
 }
 
-.module-hero {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-.module-hero-cover {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 18px;
+.learning-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
-  background: var(--panel-soft);
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.module-hero-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+/* --- Hero: тёмная тёплая зона с размытой обложкой-подложкой --- */
+
+.module-hero-cinematic {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--learning-hero-bg);
+  color: var(--learning-hero-text);
+  box-shadow: 0 24px 54px rgb(var(--shadow-rgb) / 0.2);
 }
 
-.module-hero-cover-fallback {
+.module-hero-backdrop {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, var(--primary-soft), var(--green-soft));
+  z-index: 0;
 }
 
-.module-hero-body {
+.module-hero-backdrop img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  filter: blur(28px) saturate(1.1);
+  transform: scale(1.2);
+}
+
+/* Декоративная подложка: без шиммер-скелетона, картинка полупрозрачна и после
+   загрузки (перебиваем .cover-image.is-loaded). */
+.module-hero-backdrop .cover-skeleton {
+  display: none;
+}
+
+.module-hero-backdrop img.cover-image.is-loaded {
+  opacity: 0.5;
+}
+
+.module-hero-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgb(var(--learning-hero-bg-rgb) / 0.95),
+      rgb(var(--learning-hero-bg-rgb) / 0.78) 52%,
+      rgb(var(--learning-hero-bg-rgb) / 0.4)
+    ),
+    linear-gradient(180deg, rgb(var(--learning-hero-bg-rgb) / 0.25), rgb(var(--learning-hero-bg-rgb) / 0.55));
+}
+
+.module-hero-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 36px;
+  align-items: center;
+  padding: clamp(28px, 4.5vw, 48px);
+}
+
+.module-hero-inner.no-cover {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.module-hero-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
 }
 
 .module-hero-status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  align-self: flex-start;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: var(--radius-chip);
+  background: rgb(var(--white-rgb) / 0.12);
+  color: var(--learning-hero-text);
+  border: 1px solid var(--learning-hero-line);
+  backdrop-filter: blur(6px);
 }
 
 .module-hero-status::before {
@@ -60,19 +115,12 @@
   border-radius: 50%;
 }
 
-.module-hero-status.is-locked {
-  background: var(--primary-soft);
-  color: var(--primary-hover);
+.module-hero-status.is-open::before {
+  background: var(--accent, #1f8a4c);
 }
 
 .module-hero-status.is-locked::before {
   background: var(--primary);
-}
-
-.module-hero-status.is-development {
-  color: var(--warning-text);
-  background: var(--warning-soft);
-  border: 1px solid var(--warning-border);
 }
 
 .module-hero-status.is-development::before {
@@ -83,67 +131,147 @@
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
-  color: inherit;
-  opacity: 0.85;
-}
-
-/* Капсула доступа — оверлеем слева сверху поверх обложки. Матовый белый фон
-   даёт читаемость на любой картинке, статус передаёт цветная точка слева. */
-.module-hero-cover .module-hero-status {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 2;
-}
-
-.module-hero-cover .module-hero-status,
-.module-hero-cover .module-hero-status.is-locked,
-.module-hero-cover .module-hero-status.is-development,
-.module-hero-cover .module-hero-status.is-open {
-  background: rgb(var(--white-rgb) / 0.92);
-  color: var(--text);
-  border: none;
-  box-shadow: 0 2px 10px rgb(15 23 42 / 0.14);
-  backdrop-filter: blur(6px);
-}
-
-.module-hero-status.is-open::before {
-  background: var(--accent, #1f8a4c);
+  color: var(--learning-hero-text-muted);
 }
 
 .module-hero-title {
   margin: 0;
-  font-size: var(--text-3xl);
-  line-height: 1.15;
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1.08;
   font-weight: 700;
-  letter-spacing: 0;
-  text-align: left;
-  color: var(--text);
+  letter-spacing: -0.015em;
+  color: var(--learning-hero-text);
+  overflow-wrap: anywhere;
 }
 
 .module-hero-summary {
   margin: 0;
-  font-size: 16px;
-  color: var(--text);
+  font-size: 17px;
+  line-height: 1.45;
   font-weight: 500;
+  color: var(--learning-hero-text);
 }
 
 .module-hero-description {
   margin: 0;
+  max-width: 62ch;
   font-size: 15px;
   line-height: 1.55;
-  color: var(--muted);
+  color: var(--learning-hero-text-muted);
+}
+
+.module-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.module-hero-chips li {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--learning-hero-line);
+  background: rgb(var(--white-rgb) / 0.08);
+  color: var(--learning-hero-text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .module-hero-actions {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 8px;
   flex-wrap: wrap;
 }
 
-/* Preview-карточка (когда нет доступа) */
+/* Secondary-кнопка на тёмном фоне — «призрачная» с белой рамкой. */
+.module-hero-actions .button.secondary.module-hero-back {
+  background: transparent;
+  border-color: var(--learning-hero-line);
+  color: var(--learning-hero-text);
+}
+
+.module-hero-actions .button.secondary.module-hero-back:hover {
+  background: rgb(var(--white-rgb) / 0.1);
+  border-color: rgb(var(--white-rgb) / 0.36);
+  color: var(--learning-hero-text);
+}
+
+.module-hero-progress {
+  display: grid;
+  gap: 7px;
+  width: min(440px, 100%);
+  margin-top: 6px;
+}
+
+.module-hero-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--learning-hero-line);
+  overflow: hidden;
+}
+
+.module-hero-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.module-hero-progress-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--learning-hero-text-muted);
+}
+
+.module-hero-art {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: calc(var(--radius-card) - 6px);
+  overflow: hidden;
+  background: rgb(var(--white-rgb) / 0.06);
+  box-shadow: 0 24px 48px rgb(0 0 0 / 0.35);
+}
+
+.module-hero-art img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+/* --- Скелетон загрузки страницы --- */
+
+.module-hero-skeleton {
+  display: grid;
+  gap: 14px;
+  padding: clamp(28px, 4.5vw, 48px);
+  border-radius: var(--radius-card);
+  background: var(--learning-hero-bg);
+  min-height: 280px;
+  align-content: center;
+}
+
+.module-hero-skeleton .page-skeleton-bar {
+  background: rgb(var(--white-rgb) / 0.1);
+}
+
+.module-chapter-skeleton {
+  display: grid;
+  gap: 12px;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--panel);
+}
+
+/* --- Preview-карточка (когда нет доступа) --- */
 
 .module-preview-card {
   background: var(--panel-soft);
@@ -160,17 +288,13 @@
   font-size: 18px;
 }
 
-.module-preview-list {
+.module-preview-card p {
   margin: 0;
-  padding-left: 1.2em;
+  line-height: 1.55;
   color: var(--text);
 }
 
-.module-preview-list li {
-  margin: 4px 0;
-}
-
-/* «Чему вы научитесь» — чеклист исходов курса (preview.whatYouWillLearn) */
+/* --- «Чему вы научитесь» --- */
 
 .module-outcomes {
   background: var(--panel-soft);
@@ -230,7 +354,7 @@
   }
 }
 
-/* Программа курса (главы) */
+/* --- Программа курса (главы-таймлайн) --- */
 
 .module-chapters {
   display: flex;
@@ -327,7 +451,7 @@
 
 .lesson-item-link {
   display: grid;
-  grid-template-columns: 60px 1fr 24px;
+  grid-template-columns: 52px minmax(0, 1fr) auto 24px;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
@@ -339,7 +463,7 @@
     color 120ms ease;
 }
 
-.lesson-item-link:hover {
+a.lesson-item-link:hover {
   background: var(--primary-soft);
   color: var(--primary-hover);
 }
@@ -350,24 +474,88 @@
   font-size: 13px;
 }
 
-.lesson-item-link:hover .lesson-item-index {
+a.lesson-item-link:hover .lesson-item-index {
   color: var(--primary);
 }
 
 .lesson-item-title {
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
-.lesson-item-arrow {
+.lesson-item-duration {
   color: var(--muted);
-  font-size: 16px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lesson-item-state {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
   transition:
     transform 120ms ease,
     color 120ms ease;
-  text-align: right;
 }
 
-.lesson-item-link:hover .lesson-item-arrow {
+.lesson-item-state.is-completed {
+  color: var(--accent, #1f8a4c);
+}
+
+a.lesson-item-link:hover .lesson-item-state {
   color: var(--primary);
   transform: translateX(2px);
+}
+
+a.lesson-item-link:hover .lesson-item-state.is-completed {
+  transform: none;
+}
+
+.lesson-item-link.is-locked {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.lesson-item-link.is-locked .lesson-item-title {
+  font-weight: 400;
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 1024px) {
+  .module-hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .module-hero-art {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .module-hero-chips li {
+    font-size: 12px;
+    padding: 4px 10px;
+  }
+
+  .lesson-item-link {
+    grid-template-columns: 40px minmax(0, 1fr) 24px;
+  }
+
+  .lesson-item-duration {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chapter-card,
+  .lesson-item-link,
+  .lesson-item-state {
+    transition: none;
+  }
+
+  a.lesson-item-link:hover .lesson-item-state {
+    transform: none;
+  }
 }

@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import type { LearningModuleListItem } from "@ecoplatform/shared";
+import { CoverImage } from "../../components/CoverImage";
 import { pluralizeRu } from "../shared";
 
 export function ContinueLearningCard({
@@ -33,9 +34,9 @@ export function ContinueLearningCard({
     >
       {coverUrl ? (
         <div aria-hidden="true" className="education-resume-backdrop">
-          {/* Обычный <img>: фон декоративный, скрыт скримом — CoverImage с
-              скелетоном здесь не нужен. */}
-          <img alt="" src={coverUrl} />
+          {/* Декоративная размытая подложка: CoverImage ради next/image-прокси,
+              скелетон в этом контексте скрыт стилями. */}
+          <CoverImage alt="" src={coverUrl} sizes="100vw" />
         </div>
       ) : null}
       <div className="education-resume-body">

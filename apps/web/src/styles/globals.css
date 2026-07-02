@@ -3354,14 +3354,7 @@ input[type="checkbox"]:focus-visible {
   font-weight: 500;
 }
 
-.module-hero-status.is-open {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.module-hero-status.is-open::before {
-  background: var(--green);
-}
+/* Капсула статуса модуля обучения — в styles/learning/module-page.css. */
 
 .tree,
 .tree-children {
