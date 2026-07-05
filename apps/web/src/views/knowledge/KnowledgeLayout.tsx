@@ -9,8 +9,9 @@ import { pluralizeRu } from "../shared";
 import { KnowledgeArticlePanel } from "./KnowledgeArticle";
 import { KnowledgeNavigationDrawer } from "./KnowledgeDrawer";
 import { KnowledgeNavigation } from "./KnowledgeNavigation";
+import { useCoverAssets } from "../../lib/use-cover-assets";
 import { KnowledgePickEmptyState, KnowledgeSearchResults } from "./SearchResults";
-import { countKnowledgeNodes } from "./knowledge-utils";
+import { countKnowledgeNodes, flattenKnowledgeNodes } from "./knowledge-utils";
 import { KNOWLEDGE_SEARCH_EXAMPLES, useKnowledgeBaseSearch } from "./use-knowledge-search";
 import { useKnowledgeMobileNav } from "./use-knowledge-mobile-nav";
 
@@ -30,6 +31,8 @@ export function KnowledgeBaseLayout({
   const active = activeArticle ?? null;
   const activeNavSlug = activeSlug ?? active?.slug;
   const materialCount = useMemo(() => countKnowledgeNodes(tree), [tree]);
+  const flatNodes = useMemo(() => flattenKnowledgeNodes(tree), [tree]);
+  const covers = useCoverAssets(flatNodes);
   const search = useKnowledgeBaseSearch();
   const nav = useKnowledgeMobileNav();
   const mobileTopbarAction =
@@ -93,10 +96,12 @@ export function KnowledgeBaseLayout({
             <main className="knowledge-content-panel">
               {search.searching ? (
                 <KnowledgeSearchResults
+                  covers={covers}
                   loading={search.searchLoading}
                   results={search.searchResults ?? []}
                   query={search.debouncedQuery}
                   onResetSearch={search.resetSearch}
+                  tree={tree}
                 />
               ) : !active ? (
                 <KnowledgePickEmptyState />

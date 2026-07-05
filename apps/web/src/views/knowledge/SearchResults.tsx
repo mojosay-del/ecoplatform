@@ -1,7 +1,25 @@
 "use client";
 
-import Link from "next/link";
+// Результаты поиска по базе знаний: карточки-образцы с подсветкой совпадения
+// и категорией-кикером (путь из дерева) вместо статичного «Материал».
+
+import { motion, useReducedMotion } from "motion/react";
 import type { KnowledgeNode } from "@ecoplatform/shared";
+import { preferredFileAssetImageUrl, type FileAsset } from "../../lib/api";
+import { MaterialCard, MaterialCardSkeleton } from "./catalog/MaterialCard";
+import { buildKnowledgeBreadcrumbs, buildKnowledgeIndexCodes } from "./knowledge-utils";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const gridVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.05 } },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 14 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE } },
+};
 
 export function KnowledgePickEmptyState() {
   return (
@@ -12,57 +30,67 @@ export function KnowledgePickEmptyState() {
 }
 
 export function KnowledgeSearchResults({
+  covers,
   loading,
   onResetSearch,
   query,
   results,
+  tree,
 }: {
+  covers: Map<string, FileAsset>;
   loading: boolean;
   onResetSearch: () => void;
   query: string;
   results: KnowledgeNode[];
+  tree: KnowledgeNode[];
 }) {
+  const reducedMotion = useReducedMotion();
+  const codes = buildKnowledgeIndexCodes(tree);
+
   return (
     <section className="knowledge-search-results" aria-live="polite">
-      <div className="knowledge-content-head">
-        <div>
-          <p className="knowledge-breadcrumbs">Поиск по сырью</p>
-          <h1>Результаты поиска</h1>
-        </div>
-      </div>
+      <header className="knowledge-search-results-head">
+        <p className="knowledge-search-results-kicker">Поиск по архиву</p>
+        <h2 className="knowledge-search-results-title">{loading ? "Ищем материалы…" : `Найдено: ${results.length}`}</h2>
+      </header>
       {loading ? (
-        <div className="knowledge-search-grid" aria-busy="true">
-          <div className="knowledge-search-skeleton">
-            <div className="page-skeleton-bar w-2-3" />
-            <div className="page-skeleton-bar w-full" />
-          </div>
-          <div className="knowledge-search-skeleton">
-            <div className="page-skeleton-bar w-3-4" />
-            <div className="page-skeleton-bar w-full" />
-          </div>
+        <div className="knowledge-catalog-grid" aria-busy="true">
+          <MaterialCardSkeleton />
+          <MaterialCardSkeleton />
+          <MaterialCardSkeleton />
         </div>
       ) : results.length === 0 ? (
         <div className="knowledge-empty-state">
-          <p>По запросу «{query}» материалов не нашлось. Попробуйте другое слово или откройте раздел слева.</p>
+          <p>По запросу «{query}» материалов не нашлось. Попробуйте другое слово — например, из подсказок поиска.</p>
           <button type="button" className="knowledge-empty-action" onClick={onResetSearch}>
-            Сбросить поиск
+            Вернуться в каталог
           </button>
         </div>
       ) : (
-        <div className="knowledge-search-grid">
-          {results.map((node) => (
-            <Link
-              className="knowledge-search-card"
-              href={`/knowledge-base/${node.slug}`}
-              key={node.id}
-              onClick={onResetSearch}
-            >
-              <span className="knowledge-search-card-kicker">Материал</span>
-              <strong>{node.title}</strong>
-              {node.subtitle ? <span>{node.subtitle}</span> : null}
-            </Link>
-          ))}
-        </div>
+        <motion.div
+          animate="visible"
+          className="knowledge-catalog-grid"
+          initial={reducedMotion ? false : "hidden"}
+          variants={gridVariants}
+        >
+          {results.map((node) => {
+            const breadcrumbs = buildKnowledgeBreadcrumbs(tree, node);
+            const kicker =
+              breadcrumbs.length > 0 ? breadcrumbs.map((crumb) => crumb.title).join(" / ") : "Раздел каталога";
+            return (
+              <motion.div key={node.id} variants={cardVariants}>
+                <MaterialCard
+                  coverUrl={node.coverImageId ? preferredFileAssetImageUrl(covers.get(node.coverImageId)) : null}
+                  highlightQuery={query}
+                  indexCode={codes.get(node.slug)}
+                  kicker={kicker}
+                  node={node}
+                  onNavigate={onResetSearch}
+                />
+              </motion.div>
+            );
+          })}
+        </motion.div>
       )}
     </section>
   );

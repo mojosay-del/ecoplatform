@@ -6,7 +6,9 @@ import type { KnowledgeNode } from "@ecoplatform/shared";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query";
 
-const SEARCH_DEBOUNCE_MS = 2000;
+// Быстрый живой поиск: короткий дебаунс вместо прежних 2 секунд,
+// Enter форсирует запрос сразу.
+const SEARCH_DEBOUNCE_MS = 300;
 
 export const KNOWLEDGE_SEARCH_EXAMPLES = [
   "Нюансы по ПВД",
@@ -16,6 +18,8 @@ export const KNOWLEDGE_SEARCH_EXAMPLES = [
   "Архив",
   "Канистра",
 ];
+
+export type KnowledgeSearchController = ReturnType<typeof useKnowledgeBaseSearch>;
 
 export function useKnowledgeBaseSearch() {
   const [query, setQuery] = useState("");

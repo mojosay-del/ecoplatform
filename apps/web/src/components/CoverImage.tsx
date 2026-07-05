@@ -23,7 +23,9 @@ export function CoverImage({
   sizes?: string;
   eager?: boolean;
   priority?: boolean;
-  onLoadSettled?: () => void;
+  // ok=false, когда изображение завершилось ошибкой (битая ссылка/403) —
+  // вызывающая сторона может показать свой фолбэк вместо сломанного img.
+  onLoadSettled?: (ok: boolean) => void;
 }) {
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const ref = useRef<HTMLImageElement>(null);
@@ -35,19 +37,22 @@ export function CoverImage({
     onLoadSettledRef.current = onLoadSettled;
   }, [onLoadSettled]);
 
-  const settleImage = useCallback(() => {
-    setLoadedSrc(src);
-    if (settledSrcRef.current === src) return;
-    settledSrcRef.current = src;
-    onLoadSettledRef.current?.();
-  }, [src]);
+  const settleImage = useCallback(
+    (ok: boolean) => {
+      setLoadedSrc(src);
+      if (settledSrcRef.current === src) return;
+      settledSrcRef.current = src;
+      onLoadSettledRef.current?.(ok);
+    },
+    [src],
+  );
 
   // Картинка из кеша могла догрузиться ещё до навешивания onLoad (особенно при
   // гидрации) — тогда событие не сработает и обложка осталась бы скрытой.
   // Проверяем complete на маунте, чтобы такой случай не «завис» на скелетоне.
   useEffect(() => {
     if (ref.current?.complete) {
-      settleImage();
+      settleImage(ref.current.naturalWidth > 0);
     }
   }, [settleImage]);
 
@@ -62,8 +67,8 @@ export function CoverImage({
         sizes={sizes}
         // priority и loading взаимоисключающие в next/image.
         {...(priority ? { priority: true } : { loading: eager ? "eager" : "lazy" })}
-        onLoad={settleImage}
-        onError={settleImage}
+        onLoad={() => settleImage(true)}
+        onError={() => settleImage(false)}
         className={`cover-image u-object-cover${loaded ? " is-loaded" : ""}`}
       />
     </>

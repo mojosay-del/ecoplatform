@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query";
 import { KnowledgeArticleLoadingState } from "./KnowledgeArticle";
 import { KnowledgeBaseLayout } from "./KnowledgeLayout";
+import { KnowledgeCatalog } from "./catalog/KnowledgeCatalog";
 import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
 
 export function KnowledgeBaseView() {
@@ -24,7 +25,7 @@ export function KnowledgeBaseView() {
     return <ErrorState title="База знаний" message={errorMessage} />;
   }
 
-  return <KnowledgeBaseLayout tree={data} activeArticle={null} activeSlug={undefined} />;
+  return <KnowledgeCatalog tree={data} />;
 }
 
 export function KnowledgeArticleView({ slug }: { slug: string }) {

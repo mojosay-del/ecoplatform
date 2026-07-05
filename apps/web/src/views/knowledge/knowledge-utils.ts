@@ -12,6 +12,10 @@ export function countKnowledgeNodes(nodes: KnowledgeNode[]): number {
   return nodes.reduce((count, node) => count + 1 + countKnowledgeNodes(node.children ?? []), 0);
 }
 
+export function flattenKnowledgeNodes(nodes: KnowledgeNode[]): KnowledgeNode[] {
+  return nodes.flatMap((node) => [node, ...flattenKnowledgeNodes(node.children ?? [])]);
+}
+
 export function findFirstReadableKnowledgeNode(nodes: KnowledgeNode[]): KnowledgeNode | null {
   for (const node of nodes) {
     if ((node.blocks ?? []).length > 0 || (node.children ?? []).length === 0) {
