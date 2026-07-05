@@ -24,24 +24,29 @@ type BlockRenderContext = {
   isLoading: boolean;
   variant: ContentBlocksVariant;
   onImageLoadSettled?: (fileId: string) => void;
+  headingAnchorPrefix?: string;
 };
 
 export function ContentBlocks({
   blocks,
+  headingAnchorPrefix,
   onImageLoadSettled,
   variant = "default",
 }: {
   blocks: RenderableBlock[];
+  // Если задан, heading/subheading получают id `{prefix}-{index}` — для оглавления
+  // со скроллом к разделу (используется в базе знаний).
+  headingAnchorPrefix?: string;
   onImageLoadSettled?: (fileId: string) => void;
   variant?: ContentBlocksVariant;
 }) {
   const { assets, isLoading } = useFileAssets(blocks);
-  const ctx: BlockRenderContext = { assets, isLoading, variant, onImageLoadSettled };
+  const ctx: BlockRenderContext = { assets, isLoading, variant, onImageLoadSettled, headingAnchorPrefix };
 
   return (
     <div className={`content-blocks${variant === "knowledge" ? " content-blocks-knowledge" : ""}`}>
       {blocks.map((block, index) => {
-        const content = renderBlock(block, ctx);
+        const content = renderBlock(block, ctx, index);
         // Каждый блок проявляется при скролле (см. RevealBlock). Обёртка остаётся
         // ячейкой grid-контейнера .content-blocks, поэтому отступы не плывут.
         return content ? <RevealBlock key={index}>{content}</RevealBlock> : null;
@@ -50,12 +55,13 @@ export function ContentBlocks({
   );
 }
 
-function renderBlock(block: RenderableBlock, ctx: BlockRenderContext): ReactNode {
+function renderBlock(block: RenderableBlock, ctx: BlockRenderContext, index: number): ReactNode {
   const { assets, isLoading, variant, onImageLoadSettled } = ctx;
+  const anchorId = ctx.headingAnchorPrefix ? `${ctx.headingAnchorPrefix}-${index}` : undefined;
 
   if (block.type === "heading") {
     return (
-      <h2 className="content-block-heading">
+      <h2 className="content-block-heading" id={anchorId}>
         <HeadingIcon kind="heading" />
         <span>{(block.payload as { text: string }).text}</span>
       </h2>
@@ -63,7 +69,7 @@ function renderBlock(block: RenderableBlock, ctx: BlockRenderContext): ReactNode
   }
   if (block.type === "subheading") {
     return (
-      <h3 className="content-block-heading is-subheading">
+      <h3 className="content-block-heading is-subheading" id={anchorId}>
         <HeadingIcon kind="subheading" />
         <span>{(block.payload as { text: string }).text}</span>
       </h3>

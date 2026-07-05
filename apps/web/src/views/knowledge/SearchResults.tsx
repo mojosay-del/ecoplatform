@@ -21,14 +21,6 @@ const cardVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE } },
 };
 
-export function KnowledgePickEmptyState() {
-  return (
-    <article className="knowledge-selection-empty" aria-label="Нужно выбрать группу или номенклатуру">
-      <p>Нужно выбрать группу или номенклатуру</p>
-    </article>
-  );
-}
-
 export function KnowledgeSearchResults({
   covers,
   loading,

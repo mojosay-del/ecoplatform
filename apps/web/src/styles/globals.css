@@ -2822,7 +2822,6 @@ input[type="checkbox"]:focus-visible {
 
 @media (max-width: 1180px) {
   .knowledge-layout,
-  .knowledge-workspace,
   .cms-layout,
   .account-layout,
   .indices-admin-layout,
@@ -3217,10 +3216,6 @@ input[type="checkbox"]:focus-visible {
 
   .card-grid {
     grid-template-columns: 1fr;
-  }
-
-  .knowledge-content-head h1 {
-    font-size: 24px;
   }
 
   .solutions-grid {

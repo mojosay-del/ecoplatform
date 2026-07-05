@@ -1,12 +1,12 @@
 "use client";
 
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
+import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query";
-import { KnowledgeArticleLoadingState } from "./KnowledgeArticle";
-import { KnowledgeBaseLayout } from "./KnowledgeLayout";
+import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
+import { KnowledgeArticlePage } from "./article/KnowledgeArticlePage";
 import { KnowledgeCatalog } from "./catalog/KnowledgeCatalog";
-import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
 
 export function KnowledgeBaseView() {
   const { data, state, errorMessage } = useApiQuery(
@@ -49,5 +49,22 @@ export function KnowledgeArticleView({ slug }: { slug: string }) {
     return <KnowledgeArticleLoadingState />;
   }
 
-  return <KnowledgeBaseLayout tree={tree.data} activeArticle={article.data} activeSlug={slug} />;
+  return <KnowledgeArticlePage active={article.data} tree={tree.data} />;
+}
+
+export function KnowledgeArticleLoadingState() {
+  return (
+    <AppShell>
+      <section className="page">
+        <PageHeader title="База знаний" />
+        <div className="page-skeleton-body page-skeleton-article" aria-busy="true">
+          <div className="page-skeleton-bar w-3-4" />
+          <div className="page-skeleton-bar w-2-3" />
+          <div className="page-skeleton-bar w-full" />
+          <div className="page-skeleton-bar w-full" />
+          <div className="page-skeleton-bar w-1-2" />
+        </div>
+      </section>
+    </AppShell>
+  );
 }

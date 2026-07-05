@@ -1,17 +1,6 @@
 /* knowledge/nav.css — левая навигация по дереву сырья и мобильный drawer.
    Извлечено из styles/knowledge.css (сплит по паттерну styles/learning). */
 
-.knowledge-nav-panel {
-  position: sticky;
-  top: 18px;
-  display: grid;
-  gap: 18px;
-  max-height: calc(100vh - 110px);
-  overflow: auto;
-  border-right: 1px solid var(--line);
-  padding: 0 16px 24px 0;
-}
-
 .knowledge-nav-heading {
   display: grid;
   margin-top: -6px;
@@ -114,38 +103,6 @@
   line-height: 1.25;
 }
 
-.knowledge-mobile-tools {
-  display: none;
-}
-
-.knowledge-mobile-nav-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0 14px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 750;
-  cursor: pointer;
-  box-shadow: var(--shadow-card);
-  transition:
-    border-color 120ms ease,
-    color 120ms ease,
-    background 120ms ease;
-}
-
-.knowledge-mobile-nav-trigger:hover {
-  border-color: var(--primary-soft-strong);
-  color: var(--primary-hover);
-  background: var(--primary-soft);
-}
-
-.knowledge-mobile-nav-trigger:focus-visible,
 .knowledge-nav-drawer-close:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -247,18 +204,6 @@
 }
 
 @media (max-width: 1180px) {
-  .knowledge-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .knowledge-nav-panel {
-    display: none;
-  }
-
-  .knowledge-mobile-tools {
-    display: flex;
-  }
-
   .knowledge-nav-drawer-root {
     display: flex;
   }
