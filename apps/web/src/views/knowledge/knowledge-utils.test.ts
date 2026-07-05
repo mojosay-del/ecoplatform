@@ -2,9 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { KnowledgeNode } from "@ecoplatform/shared";
 import {
   buildKnowledgeBreadcrumbs,
+  buildKnowledgeIndexCodes,
   countKnowledgeNodes,
+  estimateKnowledgeReadingMinutes,
+  extractKnowledgeToc,
+  findKnowledgeNeighbors,
   findKnowledgePath,
   findPreferredKnowledgeNode,
+  KNOWLEDGE_FALLBACK_COVER_VARIANTS,
+  knowledgeFallbackCoverVariant,
   knowledgeNodeContainsSlug,
 } from "./knowledge-utils";
 
@@ -109,5 +115,102 @@ describe("knowledge tree helpers", () => {
     expect(knowledgeNodeContainsSlug(tree[0]!, "gofrokarton")).toBe(true);
     expect(knowledgeNodeContainsSlug(tree[1]!, "gofrokarton")).toBe(false);
     expect(knowledgeNodeContainsSlug(tree[0]!, undefined)).toBe(false);
+  });
+});
+
+describe("buildKnowledgeIndexCodes", () => {
+  it("нумерует категории и вложенные материалы архивными кодами 01 / 01.02 / 01.02.01", () => {
+    const tree = [
+      knowledgeNode("makulatura", {
+        children: [knowledgeNode("karton"), knowledgeNode("bumaga", { children: [knowledgeNode("arhiv")] })],
+      }),
+      knowledgeNode("plenki"),
+    ];
+
+    const codes = buildKnowledgeIndexCodes(tree);
+    expect(codes.get("makulatura")).toBe("01");
+    expect(codes.get("karton")).toBe("01.01");
+    expect(codes.get("bumaga")).toBe("01.02");
+    expect(codes.get("arhiv")).toBe("01.02.01");
+    expect(codes.get("plenki")).toBe("02");
+  });
+});
+
+describe("findKnowledgeNeighbors", () => {
+  const tree = [
+    knowledgeNode("makulatura", {
+      children: [knowledgeNode("karton"), knowledgeNode("bumaga"), knowledgeNode("arhiv")],
+    }),
+    knowledgeNode("plenki"),
+  ];
+
+  it("находит соседей среди материалов одного родителя", () => {
+    const { prev, next } = findKnowledgeNeighbors(tree, "bumaga");
+    expect(prev?.slug).toBe("karton");
+    expect(next?.slug).toBe("arhiv");
+  });
+
+  it("у первого материала нет prev, у последнего нет next", () => {
+    expect(findKnowledgeNeighbors(tree, "karton").prev).toBeNull();
+    expect(findKnowledgeNeighbors(tree, "arhiv").next).toBeNull();
+  });
+
+  it("для корневых разделов соседи — другие корневые разделы", () => {
+    const { prev, next } = findKnowledgeNeighbors(tree, "makulatura");
+    expect(prev).toBeNull();
+    expect(next?.slug).toBe("plenki");
+  });
+
+  it("для неизвестного slug возвращает пустых соседей", () => {
+    expect(findKnowledgeNeighbors(tree, "unknown")).toEqual({ prev: null, next: null });
+    expect(findKnowledgeNeighbors(tree, undefined)).toEqual({ prev: null, next: null });
+  });
+});
+
+describe("extractKnowledgeToc", () => {
+  it("собирает оглавление из heading/subheading, пропуская пустые и прочие блоки", () => {
+    const blocks = [
+      { id: "b1", position: 0, type: "paragraph", payload: { html: "<p>Вступление</p>" } },
+      { id: "b2", position: 1, type: "heading", payload: { text: "Качество" } },
+      { id: "b3", position: 2, type: "subheading", payload: { text: "Влажность" } },
+      { id: "b4", position: 3, type: "heading", payload: { text: "   " } },
+      { id: "b5", position: 4, type: "image", payload: { fileId: "f1" } },
+    ];
+
+    expect(extractKnowledgeToc(blocks)).toEqual([
+      { blockIndex: 1, text: "Качество", level: 2 },
+      { blockIndex: 2, text: "Влажность", level: 3 },
+    ]);
+  });
+
+  it("для пустых блоков возвращает пустое оглавление", () => {
+    expect(extractKnowledgeToc(undefined)).toEqual([]);
+    expect(extractKnowledgeToc([])).toEqual([]);
+  });
+});
+
+describe("estimateKnowledgeReadingMinutes", () => {
+  it("считает минуты по словам параграфов (HTML-теги не считаются словами)", () => {
+    const words = Array.from({ length: 360 }, (_, index) => `слово${index}`).join(" ");
+    const blocks = [{ id: "b1", position: 0, type: "paragraph", payload: { html: `<p>${words}</p>` } }];
+
+    expect(estimateKnowledgeReadingMinutes(blocks)).toBe(2);
+  });
+
+  it("короткий текст округляется минимум до 1 минуты, пустой — 0", () => {
+    const blocks = [{ id: "b1", position: 0, type: "heading", payload: { text: "Требования" } }];
+    expect(estimateKnowledgeReadingMinutes(blocks)).toBe(1);
+    expect(estimateKnowledgeReadingMinutes([])).toBe(0);
+  });
+});
+
+describe("knowledgeFallbackCoverVariant", () => {
+  it("детерминирован и укладывается в диапазон вариантов", () => {
+    for (const slug of ["makulatura", "plenki", "pet-butylka", "kanistra"]) {
+      const variant = knowledgeFallbackCoverVariant(slug);
+      expect(variant).toBe(knowledgeFallbackCoverVariant(slug));
+      expect(variant).toBeGreaterThanOrEqual(0);
+      expect(variant).toBeLessThan(KNOWLEDGE_FALLBACK_COVER_VARIANTS);
+    }
   });
 });
