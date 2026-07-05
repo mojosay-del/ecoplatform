@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createDynamicSeoMetadata, staticParamsForType } from "../../../src/lib/seo";
-import { KnowledgeArticleView } from "../../../src/views/knowledge-base-view";
+import { KnowledgeArticleView } from "../../../src/views/knowledge";
 
 type KnowledgeArticlePageProps = { params: Promise<{ slug: string }> };
 

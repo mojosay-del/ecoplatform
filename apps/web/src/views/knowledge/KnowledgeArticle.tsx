@@ -2,16 +2,16 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import "./content-blocks/content-article.css";
+import "../content-blocks/content-article.css";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
-import { CoverImage } from "../components/CoverImage";
-import "../components/cover.css";
-import { AppShell } from "../components/AppShell";
-import { preferredFileAssetImageUrl } from "../lib/api";
-import { useCoverAssets } from "../lib/use-cover-assets";
-import { collectContentBlockImageFileIds, ContentBlocks } from "./content-blocks";
-import { buildKnowledgeBreadcrumbs } from "./knowledge-base-utils";
-import { PageHeader } from "./shared";
+import { CoverImage } from "../../components/CoverImage";
+import "../../components/cover.css";
+import { AppShell } from "../../components/AppShell";
+import { preferredFileAssetImageUrl } from "../../lib/api";
+import { useCoverAssets } from "../../lib/use-cover-assets";
+import { collectContentBlockImageFileIds, ContentBlocks } from "../content-blocks";
+import { buildKnowledgeBreadcrumbs } from "./knowledge-utils";
+import { PageHeader } from "../shared";
 
 type KnowledgeArticleLike = KnowledgeNode | KnowledgeArticleDetail;
 

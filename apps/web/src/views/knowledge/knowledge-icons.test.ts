@@ -4,7 +4,7 @@ import {
   KNOWLEDGE_ICON_OPTIONS,
   knowledgeDisplayIconNameForNode,
   knowledgeDisplayIconOptionByName,
-} from "./knowledge-base-icons";
+} from "./knowledge-icons";
 
 describe("knowledge-base-icons", () => {
   it("показывает в пикере сырьевые варианты вместо служебных иконок", () => {

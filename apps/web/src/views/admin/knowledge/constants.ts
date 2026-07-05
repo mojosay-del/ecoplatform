@@ -1,6 +1,6 @@
 import type { AtomicBlockKind } from "../../../lib/editor/block-mapping";
 import type { DraftState } from "./types";
-import { defaultKnowledgeDisplayIconName } from "../../knowledge-base-icons";
+import { defaultKnowledgeDisplayIconName } from "../../knowledge/knowledge-icons";
 
 export const KNOWLEDGE_CATEGORY_ICON_TYPE = "category";
 export const UNCATEGORIZED_GROUP_ID = "__knowledge_uncategorized__";

@@ -7,7 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ChevronRight, GripVertical, Plus, type LucideIcon } from "lucide-react";
 import { CONTENT_STATUS_LABELS } from "../../../lib/display-labels";
 import { pluralizeRu } from "../../../lib/ru-plural";
-import { knowledgeDisplayIconForNode } from "../../knowledge-base-icons";
+import { knowledgeDisplayIconForNode } from "../../knowledge/knowledge-icons";
 import type { Article } from "./types";
 
 export function KnowledgeCategoryNode({

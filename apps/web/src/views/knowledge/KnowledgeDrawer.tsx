@@ -3,8 +3,8 @@
 import { useRef } from "react";
 import { X } from "lucide-react";
 import type { KnowledgeNode } from "@ecoplatform/shared";
-import { useDialogA11y } from "../lib/use-dialog-a11y";
-import { KnowledgeNavigation } from "./knowledge-base-navigation";
+import { useDialogA11y } from "../../lib/use-dialog-a11y";
+import { KnowledgeNavigation } from "./KnowledgeNavigation";
 
 export function KnowledgeNavigationDrawer({
   activeSlug,

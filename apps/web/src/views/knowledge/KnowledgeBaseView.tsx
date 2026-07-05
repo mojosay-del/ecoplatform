@@ -1,13 +1,11 @@
 "use client";
 
-import "../styles/knowledge.css";
-
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
-import { api } from "../lib/api";
-import { queryKeys } from "../lib/query";
-import { KnowledgeArticleLoadingState } from "./knowledge-base-article";
-import { KnowledgeBaseLayout } from "./knowledge-base-layout";
-import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "./shared";
+import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/query";
+import { KnowledgeArticleLoadingState } from "./KnowledgeArticle";
+import { KnowledgeBaseLayout } from "./KnowledgeLayout";
+import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
 
 export function KnowledgeBaseView() {
   const { data, state, errorMessage } = useApiQuery(

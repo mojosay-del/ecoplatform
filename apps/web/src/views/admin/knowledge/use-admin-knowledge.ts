@@ -10,7 +10,7 @@ import { canAutosaveDraft, useCmsAutosave, useUnsavedChangesWarning } from "../.
 import { canonicalizeBlocks } from "../../../lib/editor/serializer";
 import { queryKeys } from "../../../lib/query/keys";
 import { useApiQuery } from "../../shared";
-import { knowledgeDisplayIconNameForNode } from "../../knowledge-base-icons";
+import { knowledgeDisplayIconNameForNode } from "../../knowledge/knowledge-icons";
 import { EMPTY_CATEGORY_DRAFT, EMPTY_MATERIAL_DRAFT, KNOWLEDGE_CATEGORY_ICON_TYPE } from "./constants";
 import type { Article, DraftKind, DraftState } from "./types";
 import { isKnowledgeCategory, sortByPosition } from "./utils";

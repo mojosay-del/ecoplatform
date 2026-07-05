@@ -6,7 +6,7 @@ import {
   findKnowledgePath,
   findPreferredKnowledgeNode,
   knowledgeNodeContainsSlug,
-} from "./knowledge-base-utils";
+} from "./knowledge-utils";
 
 function knowledgeNode(slug: string, overrides: Partial<KnowledgeNode> = {}): KnowledgeNode {
   return {

@@ -3,15 +3,15 @@
 import { useMemo } from "react";
 import { PanelRightOpen, X } from "lucide-react";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
-import { AnimatedSearchPlaceholder } from "../components/AnimatedSearchPlaceholder";
-import { AppShell } from "../components/AppShell";
-import { pluralizeRu } from "./shared";
-import { KnowledgeArticlePanel } from "./knowledge-base-article";
-import { KnowledgeNavigationDrawer } from "./knowledge-base-drawer";
-import { KnowledgeNavigation } from "./knowledge-base-navigation";
-import { KnowledgePickEmptyState, KnowledgeSearchResults } from "./knowledge-base-search";
-import { countKnowledgeNodes } from "./knowledge-base-utils";
-import { KNOWLEDGE_SEARCH_EXAMPLES, useKnowledgeBaseSearch } from "./use-knowledge-base-search";
+import { AnimatedSearchPlaceholder } from "../../components/AnimatedSearchPlaceholder";
+import { AppShell } from "../../components/AppShell";
+import { pluralizeRu } from "../shared";
+import { KnowledgeArticlePanel } from "./KnowledgeArticle";
+import { KnowledgeNavigationDrawer } from "./KnowledgeDrawer";
+import { KnowledgeNavigation } from "./KnowledgeNavigation";
+import { KnowledgePickEmptyState, KnowledgeSearchResults } from "./SearchResults";
+import { countKnowledgeNodes } from "./knowledge-utils";
+import { KNOWLEDGE_SEARCH_EXAMPLES, useKnowledgeBaseSearch } from "./use-knowledge-search";
 import { useKnowledgeMobileNav } from "./use-knowledge-mobile-nav";
 
 function materialsAddedLabel(count: number): string {

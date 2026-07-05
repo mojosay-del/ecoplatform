@@ -3,8 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { KnowledgeNode } from "@ecoplatform/shared";
-import { api } from "../lib/api";
-import { queryKeys } from "../lib/query";
+import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/query";
 
 const SEARCH_DEBOUNCE_MS = 2000;
 

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import type { KnowledgeNode } from "@ecoplatform/shared";
-import { knowledgeDisplayIconForNode } from "./knowledge-base-icons";
-import { knowledgeNodeContainsSlug } from "./knowledge-base-utils";
+import { knowledgeDisplayIconForNode } from "./knowledge-icons";
+import { knowledgeNodeContainsSlug } from "./knowledge-utils";
 
 export function KnowledgeNavigation({
   tree,

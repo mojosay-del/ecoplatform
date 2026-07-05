@@ -1,7 +1,7 @@
 "use client";
 
 import { AdminIconPicker } from "../icon-picker";
-import { KNOWLEDGE_ICON_OPTIONS, knowledgeDisplayIconOptionByName } from "../../knowledge-base-icons";
+import { KNOWLEDGE_ICON_OPTIONS, knowledgeDisplayIconOptionByName } from "../../knowledge/knowledge-icons";
 
 export function KnowledgeIconPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (

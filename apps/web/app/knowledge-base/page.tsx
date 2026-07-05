@@ -1,5 +1,5 @@
 import { createPageMetadata } from "../../src/lib/seo";
-import { KnowledgeBaseView } from "../../src/views/knowledge-base-view";
+import { KnowledgeBaseView } from "../../src/views/knowledge";
 
 export const metadata = createPageMetadata({
   title: "База знаний",

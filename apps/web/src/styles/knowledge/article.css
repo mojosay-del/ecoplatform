@@ -1,0 +1,220 @@
+/* knowledge/article.css — статья материала: заголовок, обложка, контент, скелетоны.
+   Извлечено из styles/knowledge.css (сплит по паттерну styles/learning). */
+
+/* Плавное появление готового контента (статья/урок) после загрузки. */
+
+.content-fade-in {
+  animation: content-fade-in 320ms ease both;
+}
+
+.knowledge-content-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.knowledge-title-row {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.knowledge-breadcrumbs {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.knowledge-breadcrumbs a:hover {
+  color: var(--primary-hover);
+}
+
+.knowledge-page .knowledge-content-head h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.18;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.knowledge-content-head h1 span {
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: 650;
+}
+
+.knowledge-content-head p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.knowledge-article-shell {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgb(var(--white-rgb) / 0.96);
+  box-shadow: var(--shadow-card);
+}
+
+.knowledge-article-loader {
+  position: relative;
+  min-width: 0;
+}
+
+.knowledge-article-ready-content {
+  transition: opacity 160ms ease;
+}
+
+.knowledge-article-loader.is-loading .knowledge-article-ready-content {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.knowledge-article-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgb(var(--white-rgb) / 0.96);
+  box-shadow: var(--shadow-card);
+}
+
+.knowledge-article-skeleton .knowledge-cover,
+.knowledge-article-skeleton .knowledge-article-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.knowledge-article-skeleton .knowledge-article-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.knowledge-cover {
+  position: relative;
+  margin: 0;
+  height: clamp(180px, 26vw, 320px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  box-shadow: var(--shadow-card);
+}
+
+.knowledge-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.knowledge-article-shell .knowledge-cover,
+.knowledge-article-shell .knowledge-article-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.knowledge-article-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgb(var(--white-rgb) / 0.96);
+  box-shadow: var(--shadow-card);
+  padding: 22px;
+}
+
+.knowledge-page .checklist-knowledge {
+  --checklist-icon-bg: rgb(var(--checklist-accent-rgb) / 0.12);
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px 18px 22px;
+  /* Белая плашка с тенью (как блок прохождения тестов), а не градиентный фон.
+     Цветовое обозначение остаётся: полоса слева (::before) + иконка-чип. */
+  background: var(--panel);
+  box-shadow: 0 10px 24px rgb(var(--shadow-rgb) / 0.07);
+  backdrop-filter: none;
+}
+
+.knowledge-page .checklist-knowledge.checklist-reject {
+  --checklist-accent-rgb: var(--danger-rgb);
+  --checklist-accent-text: var(--danger-text-strong);
+}
+
+.knowledge-page .checklist-knowledge::before {
+  width: 4px;
+  border-radius: 999px;
+  inset: 14px auto 14px 0;
+  background: rgb(var(--checklist-accent-rgb) / 0.9);
+}
+
+.knowledge-page .checklist-knowledge h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.knowledge-page .checklist-title-icon {
+  display: inline-grid;
+  flex: 0 0 30px;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--checklist-icon-bg);
+  color: var(--checklist-accent-text);
+}
+
+.knowledge-page .checklist-knowledge ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 24px;
+}
+
+.knowledge-page .checklist-knowledge li {
+  padding-left: 2px;
+  color: var(--text-secondary);
+  line-height: 1.48;
+}
+
+.knowledge-page .checklist-knowledge li::marker {
+  color: rgb(var(--checklist-accent-rgb) / 0.9);
+  font-size: 0.9em;
+}
+
+@media (max-width: 640px) {
+  .knowledge-page .knowledge-content-head h1 {
+    font-size: 24px;
+  }
+
+  .knowledge-article-card {
+    padding: 16px;
+  }
+
+  .knowledge-cover {
+    height: clamp(170px, 56vw, 260px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-fade-in {
+    animation: none !important;
+  }
+}
