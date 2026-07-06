@@ -998,7 +998,6 @@ body.account-password-modal-open {
 
 .account-welcome {
   position: relative;
-  overflow: hidden;
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 24px;
@@ -1014,7 +1013,23 @@ body.account-password-modal-open {
   box-shadow: 0 18px 40px -20px rgb(var(--brand-shadow-rgb) / 0.55);
 }
 
-.account-welcome::after {
+/* Декоративные слои живут в отдельном обрезаемом контейнере, чтобы сам hero
+   мог оставаться overflow: visible ради поповера-чек-листа у кольца. */
+.account-welcome-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.account-welcome > :not(.account-welcome-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+.account-welcome-bg::after {
   content: "";
   position: absolute;
   right: -60px;
@@ -1023,7 +1038,43 @@ body.account-password-modal-open {
   height: 260px;
   border-radius: 50%;
   background: radial-gradient(circle, rgb(var(--white-rgb) / 0.18), transparent 70%);
-  pointer-events: none;
+}
+
+/* «Живой» градиент: мягкое световое пятно медленно дрейфует по плашке.
+   Только transform/opacity (GPU); при reduced-motion слой статичен. */
+.account-welcome-bg::before {
+  content: "";
+  position: absolute;
+  top: -140px;
+  left: 12%;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(var(--white-rgb) / 0.14), transparent 62%);
+  animation: account-welcome-drift 16s ease-in-out infinite alternate;
+}
+
+@keyframes account-welcome-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.75;
+  }
+
+  50% {
+    transform: translate3d(140px, 34px, 0) scale(1.12);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate3d(300px, -8px, 0) scale(0.94);
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-welcome-bg::before {
+    animation: none;
+  }
 }
 
 .account-welcome-avatar {
@@ -1186,8 +1237,203 @@ body.account-password-modal-open {
   z-index: 1;
   display: grid;
   place-items: center;
-  gap: 8px;
   text-align: center;
+}
+
+/* Кольцо — кнопка: клик открывает чек-лист «что осталось заполнить». */
+.account-welcome-ring-button {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 4px;
+  margin: -4px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 180ms ease;
+}
+
+.account-welcome-ring-button:hover {
+  transform: scale(1.04);
+}
+
+.account-welcome-ring-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(var(--white-rgb) / 0.55);
+}
+
+.account-ring-checklist {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 40;
+  width: min(300px, 78vw);
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  box-shadow: var(--shadow-lg, 0 12px 32px rgb(15 23 42 / 0.12));
+}
+
+.account-ring-checklist-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.account-ring-checklist ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-ring-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.account-ring-checklist li.is-done {
+  color: var(--text);
+}
+
+.account-ring-checklist-mark {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: -1px;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-subtle);
+}
+
+.account-ring-checklist li.is-done .account-ring-checklist-mark {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.account-ring-checklist-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-ring-checklist-text small {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-subtle);
+}
+
+.account-ring-checklist-action {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: var(--brand-soft);
+  color: var(--brand-active);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.account-ring-checklist-action:hover {
+  background: var(--brand-soft-strong, var(--brand-soft));
+}
+
+/* Празднование 100% заполнения профиля — тот же характер, что празднование
+   пройденного модуля в «Обучении» (lesson.css, .module-complete-*). */
+.account-complete-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(var(--shadow-rgb) / 0.5);
+  backdrop-filter: blur(6px);
+}
+
+.account-complete-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(420px, 100%);
+  padding: 40px 32px 32px;
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: 0 32px 80px rgb(0 0 0 / 0.4);
+  text-align: center;
+}
+
+.account-complete-burst {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 8px;
+}
+
+.account-complete-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+}
+
+.account-complete-particle.is-brand {
+  background: var(--brand);
+}
+
+.account-complete-particle.is-soft {
+  background: var(--brand-soft-strong, var(--brand-soft));
+}
+
+.account-complete-check {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.account-complete-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.account-complete-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.account-complete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .account-ring-progress {
