@@ -1207,6 +1207,10 @@ body.account-password-modal-open {
   .account-stat:hover {
     transform: none;
   }
+
+  .account-stat-status-skeleton {
+    animation: none;
+  }
 }
 
 .account-welcome-ring-label {
@@ -1217,11 +1221,12 @@ body.account-password-modal-open {
   opacity: 0.95;
 }
 
-/* Мини-статистика */
+/* Живые плитки: иконка + название + статус-строка с реальными данными.
+   Сетка 3×N — без «сироты» шестой плитки и без переносов слов в названиях. */
 
 .account-stats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   min-width: 0;
 }
@@ -1230,10 +1235,10 @@ body.account-password-modal-open {
   position: relative;
   overflow: hidden;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  min-height: 78px;
-  padding: 14px;
+  align-items: center;
+  gap: 14px;
+  min-height: 74px;
+  padding: 14px 16px;
   min-width: 0;
   text-align: left;
   font-family: inherit;
@@ -1261,12 +1266,126 @@ body.account-password-modal-open {
 }
 
 .account-stat-icon {
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  margin-bottom: 10px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+}
+
+.account-stat-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.account-stat-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.account-stat-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: var(--radius-chip);
+  background: var(--brand-soft);
+  color: var(--brand-active);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.account-stat-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.account-stat-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-subtle);
+}
+
+.account-stat-status.is-ok .account-stat-dot {
+  background: var(--success);
+}
+
+.account-stat-status.is-info .account-stat-dot {
+  background: var(--info);
+}
+
+.account-stat-status.is-warn {
+  color: var(--warning-text);
+}
+
+.account-stat-status.is-warn .account-stat-dot {
+  background: var(--warning);
+}
+
+.account-stat-status.is-danger {
+  color: var(--danger);
+}
+
+.account-stat-status.is-danger .account-stat-dot {
+  background: var(--danger);
+}
+
+.account-stat-status-skeleton {
+  display: block;
+  width: 118px;
+  max-width: 80%;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--line) 25%, var(--bg) 50%, var(--line) 75%);
+  background-size: 200% 100%;
+  animation: account-stat-shimmer 1.4s ease infinite;
+}
+
+@keyframes account-stat-shimmer {
+  0% {
+    background-position: 160% 0;
+  }
+
+  100% {
+    background-position: -60% 0;
+  }
+}
+
+.account-stat-chevron {
+  flex: 0 0 auto;
+  color: var(--text-subtle);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.account-stat:hover .account-stat-chevron,
+.account-stat:focus-visible .account-stat-chevron {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .account-stat-brand {
@@ -1292,41 +1411,6 @@ body.account-password-modal-open {
 .account-stat-privacy {
   background: rgb(var(--brand-rgb) / 0.09);
   color: var(--brand-active);
-}
-
-.account-stat-value {
-  font-size: 21px;
-  font-weight: 800;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
-}
-
-.account-stat-value-single {
-  font-size: 16px;
-  line-height: 1.15;
-}
-
-.account-stat-label {
-  margin-top: 4px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.account-stat-arrow {
-  position: absolute;
-  top: 18px;
-  right: 16px;
-  color: var(--text-subtle);
-  opacity: 0;
-  transition:
-    opacity 160ms ease,
-    transform 160ms ease;
-}
-
-.account-stat:hover .account-stat-arrow {
-  opacity: 1;
-  transform: translateX(2px);
 }
 
 .account-gender-modal {
@@ -1895,11 +1979,14 @@ body.account-password-modal-open {
   cursor: progress;
 }
 
-@media (max-width: 980px) {
+/* Три живые плитки в ряд требуют простора: ниже 1280px — по две. */
+@media (max-width: 1280px) {
   .account-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
+@media (max-width: 980px) {
   .account-plans {
     grid-template-columns: 1fr;
   }
@@ -1990,48 +2077,30 @@ body.account-password-modal-open {
   }
 
   .account-scroll-section .account-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 8px;
   }
 
   .account-scroll-section .account-stat {
-    min-height: 86px;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 8px;
+    min-height: 62px;
+    padding: 11px 14px;
     border-radius: 14px;
-    text-align: center;
   }
 
   .account-stat-icon {
-    width: 32px;
-    height: 32px;
-    margin-bottom: 0;
-    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
   }
 
-  .account-stat-value {
-    width: 100%;
-    font-size: 13px;
-    line-height: 1.12;
-    text-align: center;
+  .account-stat-title {
+    font-size: 14px;
   }
 
-  .account-stat-value-single {
-    font-size: 12px;
-    white-space: normal;
-  }
-
-  .account-stat-label {
-    width: 100%;
-    margin-top: 3px;
-    font-size: 10.5px;
-    line-height: 1.15;
-    text-align: center;
-  }
-
-  .account-stat-arrow {
-    display: none;
+  /* На тач-экране hover-состояния нет — шеврон виден всегда. */
+  .account-stat-chevron {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -2347,10 +2416,6 @@ body.account-password-modal-open {
   }
 }
 @media (max-width: 540px) {
-  .account-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .account-welcome {
     padding: 16px 14px;
   }

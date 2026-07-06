@@ -1,23 +1,23 @@
-import { useRef } from "react";
 import type { BillingStatus } from "@ecoplatform/shared";
-import type { NavIconKey } from "../../components/app-shell-nav";
-import {
-  AnimatedNavIcon,
-  type AnimatedNavIconHandle,
-  useAnimatedNavIconPlayback,
-} from "../../components/app-shell/nav-icons";
 import type { User } from "../../lib/auth";
 import { COMPANY_TYPE_LABELS, PLATFORM_ROLE_LABELS } from "../../lib/display-labels";
 import { AccountAvatarEditor } from "./AccountAvatarEditor";
 import { AccountDetailList, AccountPasswordValue, AccountScrollSection } from "./shared";
+import { AccountStatTiles } from "./AccountStatTiles";
 import { CompanyProfileForm } from "./CompanyProfileForm";
 import { AccountContactValue, AccountGenderValue, AccountNameValue } from "./PersonalProfileFields";
+import type { NotificationPreferences } from "./types";
+import type { AccountMembersSummary } from "./use-account-members-summary";
 
 export function AccountProfileSection({
   billing,
   billingState,
   greeting,
   isPlatformStaff,
+  membersSummary,
+  membersSummaryState,
+  notificationPreferences,
+  notificationPreferencesState,
   onBillingSaved,
   onOpenDataPrivacy,
   onOpenMembers,
@@ -27,12 +27,18 @@ export function AccountProfileSection({
   onOpenSessions,
   onOpenSubscription,
   onProfileSaved,
+  sessionsCount,
+  sessionsState,
   user,
 }: {
   billing: BillingStatus | null;
   billingState: string;
   greeting: string;
   isPlatformStaff: boolean;
+  membersSummary: AccountMembersSummary | null;
+  membersSummaryState: string;
+  notificationPreferences: NotificationPreferences | null;
+  notificationPreferencesState: string;
   onBillingSaved: (updated: BillingStatus) => void;
   onOpenDataPrivacy: () => void;
   onOpenMembers: () => void;
@@ -43,6 +49,7 @@ export function AccountProfileSection({
   onOpenSubscription: () => void;
   onProfileSaved: () => Promise<void>;
   sessionsCount: number;
+  sessionsState: string;
   user: User | null;
 }) {
   const fullName = user ? `${user.firstName} ${user.lastName}` : "Не авторизован";
@@ -143,49 +150,23 @@ export function AccountProfileSection({
       </header>
 
       {!isPlatformStaff ? (
-        <div className="account-stats">
-          <AccountStatButton
-            iconClassName="account-stat-warn"
-            iconName="subscription"
-            label="Подписка"
-            onClick={onOpenSubscription}
-          />
-          <AccountStatButton
-            iconClassName="account-stat-brand"
-            iconName="docs"
-            label="Оплата"
-            onClick={onOpenPayment}
-          />
-          <AccountStatButton
-            iconClassName="account-stat-info"
-            iconName="sessions"
-            label="Сессии"
-            onClick={onOpenSessions}
-          />
-          <AccountStatButton
-            iconClassName="account-stat-green"
-            iconName="notifications"
-            label="Уведомления"
-            onClick={onOpenNotifications}
-          />
-          <AccountStatButton
-            ariaLabel="Открыть данные и приватность"
-            iconClassName="account-stat-privacy"
-            iconName="data-privacy"
-            label="Приватность"
-            onClick={onOpenDataPrivacy}
-          />
-          {/* Управление сотрудниками — только владельцу компании. */}
-          {user?.companyRole === "owner" ? (
-            <AccountStatButton
-              ariaLabel="Открыть сотрудников"
-              iconClassName="account-stat-info"
-              iconName="employees"
-              label="Сотрудники"
-              onClick={onOpenMembers}
-            />
-          ) : null}
-        </div>
+        <AccountStatTiles
+          billing={billing}
+          billingState={billingState}
+          membersSummary={membersSummary}
+          membersSummaryState={membersSummaryState}
+          notificationPreferences={notificationPreferences}
+          notificationPreferencesState={notificationPreferencesState}
+          onOpenDataPrivacy={onOpenDataPrivacy}
+          onOpenMembers={onOpenMembers}
+          onOpenNotifications={onOpenNotifications}
+          onOpenPayment={onOpenPayment}
+          onOpenSessions={onOpenSessions}
+          onOpenSubscription={onOpenSubscription}
+          sessionsCount={sessionsCount}
+          sessionsState={sessionsState}
+          user={user}
+        />
       ) : null}
 
       <div className="account-section-grid">
@@ -225,31 +206,5 @@ export function AccountProfileSection({
         ) : null}
       </div>
     </AccountScrollSection>
-  );
-}
-
-function AccountStatButton({
-  ariaLabel,
-  iconClassName,
-  iconName,
-  label,
-  onClick,
-}: {
-  ariaLabel?: string;
-  iconClassName: string;
-  iconName: NavIconKey;
-  label: string;
-  onClick: () => void;
-}) {
-  const iconRef = useRef<AnimatedNavIconHandle | null>(null);
-  const iconPlayback = useAnimatedNavIconPlayback(iconRef);
-
-  return (
-    <button aria-label={ariaLabel} className="account-stat" type="button" onClick={onClick} {...iconPlayback}>
-      <span className={`account-stat-icon ${iconClassName}`}>
-        <AnimatedNavIcon name={iconName} ref={iconRef} size={24} />
-      </span>
-      <span className="account-stat-value account-stat-value-single">{label}</span>
-    </button>
   );
 }

@@ -14,6 +14,7 @@ import { PaymentDialog, SubscriptionDialog } from "./SubscriptionDialog";
 import { SessionsDialog } from "./SessionsDialog";
 import { useAccountDataPrivacyActions } from "./use-account-data-privacy-actions";
 import { useAccountDialogRouting } from "./use-account-dialog-routing";
+import { useAccountMembersSummary } from "./use-account-members-summary";
 import { useAccountNotificationPreferences } from "./use-account-notification-preferences";
 import { useAccountSectionNavigation } from "./use-account-section-navigation";
 import { useAccountSecurityActions } from "./use-account-security-actions";
@@ -73,6 +74,11 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     token,
   });
   const [membersOpen, setMembersOpen] = useState(false);
+  const {
+    reload: reloadMembersSummary,
+    state: membersSummaryState,
+    summary: membersSummary,
+  } = useAccountMembersSummary(!isPlatformStaff && user?.companyRole === "owner");
   const targetLayoutKey = `${billingState}|${sessionsState}|${notificationPreferencesState}`;
   const notificationRows = accountNotificationRowsForRoles(user?.platformRoles ?? []);
 
@@ -86,6 +92,10 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           billingState={billingState}
           greeting={greeting}
           isPlatformStaff={isPlatformStaff}
+          membersSummary={membersSummary}
+          membersSummaryState={membersSummaryState}
+          notificationPreferences={notificationPreferences}
+          notificationPreferencesState={notificationPreferencesState}
           onBillingSaved={(updated) => setBilling(updated)}
           onOpenDataPrivacy={openDataPrivacyDialog}
           onOpenNotifications={openNotificationsDialog}
@@ -96,10 +106,19 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           onOpenSubscription={openSubscriptionDialog}
           onProfileSaved={refreshMe}
           sessionsCount={sessions.length}
+          sessionsState={sessionsState}
           user={user}
         />
       </section>
-      {membersOpen ? <CompanyMembersDialog onClose={() => setMembersOpen(false)} /> : null}
+      {membersOpen ? (
+        <CompanyMembersDialog
+          onClose={() => {
+            setMembersOpen(false);
+            // Обновляем сводку на плитке — состав команды мог измениться.
+            reloadMembersSummary();
+          }}
+        />
+      ) : null}
       {subscriptionDialogOpen ? (
         <SubscriptionDialog
           billing={billing}
