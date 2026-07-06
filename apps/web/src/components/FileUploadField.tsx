@@ -71,6 +71,11 @@ export function FileUploadField({
   const uploaded: FileAsset | null = value ? (hasLocalForValue ? uploadedLocal : (metaQuery.data?.[0] ?? null)) : null;
 
   useEffect(() => {
+    // В dev-StrictMode React делает mount→unmount→remount: cleanup ставит
+    // mountedRef=false, поэтому его нужно вернуть в true в теле эффекта — иначе
+    // после remount все setProgress/onChange из upload() глушатся и прогресс
+    // загрузки навсегда «застывает» на 0% (на проде StrictMode выключен).
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       uploadAbortRef.current?.abort();
