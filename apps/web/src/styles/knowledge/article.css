@@ -488,6 +488,46 @@
   line-height: 1.25;
 }
 
+/* --- «Материал не найден» (несуществующий slug) --- */
+
+.knowledge-not-found {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  max-width: 460px;
+  margin: clamp(40px, 12vh, 110px) auto 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-card);
+  padding: 36px 28px;
+  background: rgb(var(--white-rgb) / 0.72);
+  text-align: center;
+}
+
+.knowledge-not-found-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--brand-soft-strong);
+  border-radius: 16px;
+  background: var(--brand-soft);
+  color: var(--brand-active);
+}
+
+.knowledge-not-found-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 750;
+}
+
+.knowledge-not-found-text {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
 /* --- Чек-листы в тексте статьи (были в globals/knowledge.css) --- */
 
 .knowledge-page .checklist-knowledge {

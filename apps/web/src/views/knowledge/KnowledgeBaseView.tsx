@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { ArchiveX, ArrowLeft } from "lucide-react";
 import type { KnowledgeArticleDetail, KnowledgeNode } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
@@ -42,6 +44,9 @@ export function KnowledgeArticleView({ slug }: { slug: string }) {
   if (tree.state === "forbidden" || article.state === "forbidden") {
     return <AccessClosed title="База знаний" />;
   }
+  if (article.state === "error" && article.errorStatus === 404) {
+    return <KnowledgeArticleNotFound />;
+  }
   if (tree.state === "error" || article.state === "error") {
     return <ErrorState title="База знаний" message={tree.errorMessage ?? article.errorMessage} />;
   }
@@ -50,6 +55,28 @@ export function KnowledgeArticleView({ slug }: { slug: string }) {
   }
 
   return <KnowledgeArticlePage active={article.data} tree={tree.data} />;
+}
+
+function KnowledgeArticleNotFound() {
+  return (
+    <AppShell>
+      <section className="page knowledge-page">
+        <div className="knowledge-not-found">
+          <span aria-hidden="true" className="knowledge-not-found-icon">
+            <ArchiveX size={30} strokeWidth={1.8} />
+          </span>
+          <h1 className="knowledge-not-found-title">Материал не найден</h1>
+          <p className="knowledge-not-found-text">
+            Такого листа в архиве нет — возможно, материал переименовали или убрали из каталога.
+          </p>
+          <Link className="button" href="/knowledge-base">
+            <ArrowLeft aria-hidden="true" size={16} strokeWidth={2.4} />
+            Весь каталог
+          </Link>
+        </div>
+      </section>
+    </AppShell>
+  );
 }
 
 export function KnowledgeArticleLoadingState() {

@@ -51,6 +51,7 @@ export function useApiQuery<T>(key: ApiQueryKey, fetcher: () => Promise<T>, init
       setData,
       state: "unauthenticated" as ApiState,
       errorMessage: null,
+      errorStatus: null,
       refetch: query.refetch,
     };
   }
@@ -61,6 +62,7 @@ export function useApiQuery<T>(key: ApiQueryKey, fetcher: () => Promise<T>, init
       setData,
       state: "ready" as ApiState,
       errorMessage: null,
+      errorStatus: null,
       refetch: query.refetch,
     };
   }
@@ -71,6 +73,7 @@ export function useApiQuery<T>(key: ApiQueryKey, fetcher: () => Promise<T>, init
       setData,
       state: "unauthenticated" as ApiState,
       errorMessage: null,
+      errorStatus: null,
       refetch: query.refetch,
     };
   }
@@ -81,6 +84,7 @@ export function useApiQuery<T>(key: ApiQueryKey, fetcher: () => Promise<T>, init
       setData,
       state: "forbidden" as ApiState,
       errorMessage: null,
+      errorStatus: null,
       refetch: query.refetch,
     };
   }
@@ -91,6 +95,9 @@ export function useApiQuery<T>(key: ApiQueryKey, fetcher: () => Promise<T>, init
       setData,
       state: "error" as ApiState,
       errorMessage: errorText(query.error, "Не удалось загрузить данные"),
+      // HTTP-статус ошибки — чтобы вью могли отличать 404 («не найдено»)
+      // от прочих сбоев и показывать своё состояние.
+      errorStatus: query.error instanceof ApiError ? query.error.status : null,
       refetch: query.refetch,
     };
   }
@@ -100,6 +107,7 @@ export function useApiQuery<T>(key: ApiQueryKey, fetcher: () => Promise<T>, init
     setData,
     state: query.isPending ? ("loading" as ApiState) : ("ready" as ApiState),
     errorMessage: null,
+    errorStatus: null,
     refetch: query.refetch,
   };
 }
