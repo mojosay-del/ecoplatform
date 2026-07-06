@@ -1187,6 +1187,12 @@ body.account-password-modal-open {
   gap: 8px;
 }
 
+/* Обёртка вокруг аватара: позиционный контекст для бейджей камеры и корзинки. */
+.account-avatar-frame-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
 .account-avatar-trigger {
   position: relative;
   padding: 0;
@@ -1232,18 +1238,34 @@ body.account-password-modal-open {
   }
 }
 
-.account-avatar-remove {
+/* Корзинка удаления фото — такой же круглый бейдж, как камера, слева от неё.
+   Появляется только при загруженном фото; красный акцент — на hover. */
+.account-avatar-delete {
+  position: absolute;
+  right: 27px;
+  bottom: -3px;
   padding: 0;
   border: none;
-  background: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgb(var(--white-rgb) / 0.92);
-  text-decoration: underline;
+  color: var(--text-subtle);
   cursor: pointer;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
 }
 
-.account-avatar-remove:disabled {
+.account-avatar-delete:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--white);
+  transform: translateY(-1px);
+}
+
+.account-avatar-delete:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(var(--white-rgb) / 0.55);
+}
+
+.account-avatar-delete:disabled {
   opacity: 0.6;
   cursor: progress;
 }
@@ -2334,6 +2356,10 @@ body.account-password-modal-open {
   .account-avatar-badge {
     width: 22px;
     height: 22px;
+  }
+
+  .account-avatar-delete {
+    right: 23px;
   }
 
   .account-welcome-info {

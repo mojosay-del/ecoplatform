@@ -7,7 +7,7 @@
 // аватар появился во всех местах (шапка, кабинет, лента, комментарии).
 
 import Image from "next/image";
-import { Camera, UserRound } from "lucide-react";
+import { Camera, Trash2, UserRound } from "lucide-react";
 import { useRef, useState } from "react";
 import { errorText, api, apiUploadFileWithProgress } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -51,25 +51,39 @@ export function AccountAvatarEditor() {
 
   return (
     <div className="account-avatar-edit">
-      <button
-        type="button"
-        className={`account-welcome-avatar account-avatar-trigger ${user?.avatarUrl ? "has-image" : ""}`}
-        onClick={() => inputRef.current?.click()}
-        disabled={busy}
-        title="Загрузить фото профиля"
-        aria-label="Загрузить фото профиля"
-      >
-        {user?.avatarUrl ? (
-          <span className="account-avatar-image-frame">
-            <Image alt="" src={user.avatarUrl} width={84} height={84} />
+      <span className="account-avatar-frame-wrap">
+        <button
+          type="button"
+          className={`account-welcome-avatar account-avatar-trigger ${user?.avatarUrl ? "has-image" : ""}`}
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+          title="Загрузить фото профиля"
+          aria-label="Загрузить фото профиля"
+        >
+          {user?.avatarUrl ? (
+            <span className="account-avatar-image-frame">
+              <Image alt="" src={user.avatarUrl} width={84} height={84} />
+            </span>
+          ) : (
+            <UserRound size={38} aria-hidden="true" />
+          )}
+          <span className="account-avatar-badge" aria-hidden="true">
+            {busy ? <span className="account-avatar-spinner" /> : <Camera size={15} />}
           </span>
-        ) : (
-          <UserRound size={38} aria-hidden="true" />
-        )}
-        <span className="account-avatar-badge" aria-hidden="true">
-          {busy ? <span className="account-avatar-spinner" /> : <Camera size={15} />}
-        </span>
-      </button>
+        </button>
+        {user?.avatarUrl ? (
+          <button
+            type="button"
+            className="account-avatar-badge account-avatar-delete"
+            onClick={() => void removeAvatar()}
+            disabled={busy}
+            title="Удалить фото"
+            aria-label="Удалить фото профиля"
+          >
+            <Trash2 aria-hidden="true" size={13} />
+          </button>
+        ) : null}
+      </span>
       <input
         ref={inputRef}
         type="file"
@@ -81,11 +95,6 @@ export function AccountAvatarEditor() {
           if (file) void uploadFile(file);
         }}
       />
-      {user?.avatarUrl ? (
-        <button type="button" className="account-avatar-remove" onClick={() => void removeAvatar()} disabled={busy}>
-          Удалить фото
-        </button>
-      ) : null}
       {error ? <span className="account-avatar-error">{error}</span> : null}
     </div>
   );
