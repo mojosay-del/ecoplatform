@@ -2955,6 +2955,29 @@ body.account-password-modal-open {
   color: var(--text-secondary, #64748b);
 }
 
+/* Мини-статистика команды в сводке стоимости. */
+.account-members-pricing-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.account-members-stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-chip);
+  background: rgb(var(--white-rgb) / 0.65);
+  border: 1px solid rgb(var(--brand-rgb) / 0.22);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .account-members-invite {
   display: flex;
   flex-direction: column;
@@ -2984,10 +3007,10 @@ body.account-password-modal-open {
   margin-bottom: 8px;
 }
 
-.account-members-sections-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 8px 14px;
+.account-members-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .account-members-sections-edit {
@@ -2996,19 +3019,75 @@ body.account-password-modal-open {
   border-top: 1px solid var(--line);
 }
 
-.account-members-check {
-  display: flex;
+/* Чип-переключатель раздела: заметное включённое состояние вместо мелкого
+   чекбокса; сам input скрыт визуально, но остаётся для клавиатуры/скринридера. */
+.account-members-chip {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-chip);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
   cursor: pointer;
+  user-select: none;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
 
-.account-members-check input {
-  width: 16px;
-  height: 16px;
+.account-members-chip:hover {
+  border-color: rgb(var(--brand-rgb) / 0.45);
+  color: var(--text);
+}
+
+.account-members-chip input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.account-members-chip svg {
   flex: none;
-  accent-color: var(--brand, #f5773e);
+  width: 0;
+  opacity: 0;
+  transition:
+    width 150ms ease,
+    opacity 150ms ease;
+}
+
+.account-members-chip.is-on {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-active);
+  box-shadow: 0 4px 12px -6px rgb(var(--brand-rgb) / 0.5);
+}
+
+.account-members-chip.is-on svg {
+  width: 12px;
+  opacity: 1;
+}
+
+.account-members-chip:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+.account-members-chip:has(input:disabled) {
+  opacity: 0.55;
+  cursor: progress;
 }
 
 .account-members-list {
@@ -3036,15 +3115,16 @@ body.account-password-modal-open {
 .account-members-avatar {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   flex: none;
-  border-radius: 50%;
-  background: var(--surface-muted, #f1f5f9);
-  color: var(--text-secondary, #4b5363);
+  border-radius: 13px;
+  background: linear-gradient(135deg, var(--avatar-gradient-start), var(--avatar-gradient-end));
+  color: var(--white);
   font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
+  box-shadow: 0 6px 14px -7px rgb(var(--brand-shadow-rgb) / 0.55);
 }
 
 .account-members-item-info {

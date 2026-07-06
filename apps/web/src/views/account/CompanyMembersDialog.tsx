@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Mail, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
+import { Check, Mail, ShieldCheck, Trash2, UserPlus, Users, X } from "lucide-react";
 import type { CompanyMembersView, MemberSection } from "@ecoplatform/shared";
 import { AnimatedNavIcon } from "../../components/app-shell/nav-icons";
 import { ApiError, api } from "../../lib/api";
 import { formatRub } from "../../lib/formatters";
+import { pluralizeRu } from "../../lib/ru-plural";
 import { useAccountDialogBodyLock } from "./hooks";
 
 export function CompanyMembersDialog({ onClose }: { onClose: () => void }) {
@@ -89,6 +90,7 @@ export function CompanyMembersDialog({ onClose }: { onClose: () => void }) {
   }
 
   const pricing = view?.pricing;
+  const pendingInvitesCount = view?.invitations.filter((invitation) => invitation.status === "pending").length ?? 0;
 
   return (
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону закрывает; клавиатурный паритет — Escape (useAccountDialogBodyLock) + кнопка
@@ -138,9 +140,23 @@ export function CompanyMembersDialog({ onClose }: { onClose: () => void }) {
                   </div>
                   <p className="account-members-pricing-note">
                     {pricing.plan
-                      ? `Тариф ${formatRub(pricing.base)} + ${formatRub(pricing.surchargePerSeat)} за каждого сотрудника (сейчас доп. мест: ${pricing.extraSeats}). Расчёт информационный — списаний нет.`
+                      ? `Тариф ${formatRub(pricing.base)} + ${formatRub(pricing.surchargePerSeat)} за каждого сотрудника. Расчёт информационный — списаний нет.`
                       : "Активируйте подписку компании, чтобы увидеть расчёт стоимости мест."}
                   </p>
+                  <div className="account-members-pricing-stats">
+                    <span className="account-members-stat-chip">
+                      <Users aria-hidden="true" size={13} />
+                      {view.members.length} {pluralizeRu(view.members.length, "участник", "участника", "участников")}
+                    </span>
+                    {pendingInvitesCount > 0 ? (
+                      <span className="account-members-stat-chip">
+                        <Mail aria-hidden="true" size={13} />
+                        {pendingInvitesCount}{" "}
+                        {pluralizeRu(pendingInvitesCount, "приглашение", "приглашения", "приглашений")}
+                      </span>
+                    ) : null}
+                    <span className="account-members-stat-chip">Доп. мест: {pricing.extraSeats}</span>
+                  </div>
                 </div>
               ) : null}
 
@@ -162,14 +178,18 @@ export function CompanyMembersDialog({ onClose }: { onClose: () => void }) {
                 {available.length > 0 ? (
                   <div className="account-members-sections">
                     <span className="account-members-sections-label">Доступ к разделам</span>
-                    <div className="account-members-sections-grid">
+                    <div className="account-members-chips">
                       {available.map((section) => (
-                        <label className="account-members-check" key={section.key}>
+                        <label
+                          className={`account-members-chip${inviteSections.includes(section.key) ? " is-on" : ""}`}
+                          key={section.key}
+                        >
                           <input
                             type="checkbox"
                             checked={inviteSections.includes(section.key)}
                             onChange={() => toggleInviteSection(section.key)}
                           />
+                          <Check aria-hidden="true" size={12} strokeWidth={3} />
                           <span>{section.label}</span>
                         </label>
                       ))}
@@ -236,15 +256,19 @@ export function CompanyMembersDialog({ onClose }: { onClose: () => void }) {
                         </div>
                       ) : null}
                       {!isOwner && expanded ? (
-                        <div className="account-members-sections-grid account-members-sections-edit">
+                        <div className="account-members-chips account-members-sections-edit">
                           {available.map((section) => (
-                            <label className="account-members-check" key={section.key}>
+                            <label
+                              className={`account-members-chip${member.allowedSections.includes(section.key) ? " is-on" : ""}`}
+                              key={section.key}
+                            >
                               <input
                                 type="checkbox"
                                 checked={member.allowedSections.includes(section.key)}
                                 disabled={busyId === member.userId}
                                 onChange={() => toggleMemberSection(member.userId, member.allowedSections, section.key)}
                               />
+                              <Check aria-hidden="true" size={12} strokeWidth={3} />
                               <span>{section.label}</span>
                             </label>
                           ))}
