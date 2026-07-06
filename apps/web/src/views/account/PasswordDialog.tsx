@@ -29,6 +29,9 @@ export function PasswordDialog({
     >
       <section className="account-password-modal">
         <header className="account-password-modal-head">
+          <span aria-hidden="true" className="account-modal-icon account-stat-brand">
+            <KeyRound aria-hidden="true" size={20} />
+          </span>
           <div>
             <span className="account-password-modal-kicker">Безопасность</span>
             <h2 id="account-password-dialog-title">Смена пароля</h2>

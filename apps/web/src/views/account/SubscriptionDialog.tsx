@@ -2,6 +2,7 @@ import "../../styles/account.css";
 import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { BillingStatus, SubscriptionPlan } from "@ecoplatform/shared";
+import { AnimatedNavIcon } from "../../components/app-shell/nav-icons";
 import { errorText, api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import type { SubscriptionPlanTier } from "../../lib/subscription-plans";
@@ -142,6 +143,9 @@ export function SubscriptionDialog({
     >
       <section className="account-password-modal account-subscription-modal" ref={dialogRef}>
         <header className="account-password-modal-head">
+          <span aria-hidden="true" className="account-modal-icon account-stat-warn">
+            <AnimatedNavIcon name="subscription" size={22} />
+          </span>
           <div>
             <span className="account-password-modal-kicker">{closeDisabled ? "Доступ к продукту" : "Подписка"}</span>
             <h2 className={closeDisabled ? undefined : "account-modal-sr-title"} id="account-subscription-dialog-title">

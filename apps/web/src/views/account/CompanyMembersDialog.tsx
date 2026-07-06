@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Mail, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
 import type { CompanyMembersView, MemberSection } from "@ecoplatform/shared";
+import { AnimatedNavIcon } from "../../components/app-shell/nav-icons";
 import { ApiError, api } from "../../lib/api";
 import { formatRub } from "../../lib/formatters";
 import { useAccountDialogBodyLock } from "./hooks";
@@ -102,6 +103,9 @@ export function CompanyMembersDialog({ onClose }: { onClose: () => void }) {
     >
       <section className="account-password-modal account-members-modal">
         <header className="account-password-modal-head">
+          <span aria-hidden="true" className="account-modal-icon account-stat-info">
+            <AnimatedNavIcon name="employees" size={22} />
+          </span>
           <div>
             <span className="account-password-modal-kicker">Команда</span>
             <h2 id="account-members-dialog-title">Сотрудники</h2>

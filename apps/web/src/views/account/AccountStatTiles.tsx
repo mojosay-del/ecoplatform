@@ -51,6 +51,7 @@ function sessionsStatus(sessionsCount: number, sessionsState: string): StatStatu
   };
 }
 
+// Сводка по каналу «в кабинете» — только им управляет диалог уведомлений.
 function notificationsStatus(
   preferences: NotificationPreferences | null,
   preferencesState: string,
@@ -58,12 +59,10 @@ function notificationsStatus(
 ): StatStatus {
   if (!preferences) return preferencesState === "loading" ? "loading" : { text: "Нет данных", tone: "muted" };
   const categories = accountNotificationRowsForRoles(user?.platformRoles ?? []).map((row) => row.category);
-  const inAppActive = categories.some((category) => !preferences.inAppMutedCategories.includes(category));
-  const emailActive = categories.some((category) => !preferences.emailMutedCategories.includes(category));
-  if (inAppActive && emailActive) return { text: "Email и в приложении", tone: "ok" };
-  if (inAppActive) return { text: "Только в приложении", tone: "info" };
-  if (emailActive) return { text: "Только email", tone: "info" };
-  return { text: "Все выключены", tone: "warn" };
+  const activeCount = categories.filter((category) => !preferences.inAppMutedCategories.includes(category)).length;
+  if (activeCount === 0) return { text: "Все выключены", tone: "warn" };
+  if (activeCount === categories.length) return { text: "Все категории включены", tone: "ok" };
+  return { text: `Включены ${activeCount} из ${categories.length}`, tone: "info" };
 }
 
 function privacyStatus(user: User | null): StatStatus {

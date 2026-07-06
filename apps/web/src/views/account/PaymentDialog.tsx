@@ -1,5 +1,6 @@
 import { CreditCard, FileText, X } from "lucide-react";
 import type { BillingStatus, BillingSubscription } from "@ecoplatform/shared";
+import { AnimatedNavIcon } from "../../components/app-shell/nav-icons";
 import { StatusPill, subscriptionStatusPillVariant } from "../../components/StatusPill";
 import { SUBSCRIPTION_PLAN_TITLE_LABELS, SUBSCRIPTION_STATUS_LABELS } from "../../lib/display-labels";
 import type { ApiState } from "../shared/use-api-query";
@@ -30,6 +31,9 @@ export function PaymentDialog({
     >
       <section className="account-password-modal account-payment-modal">
         <header className="account-password-modal-head">
+          <span aria-hidden="true" className="account-modal-icon account-stat-brand">
+            <AnimatedNavIcon name="docs" size={22} />
+          </span>
           <div>
             <span className="account-password-modal-kicker">Оплата</span>
             <h2 id="account-payment-dialog-title">Платежные данные</h2>

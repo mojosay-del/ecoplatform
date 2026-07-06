@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Download, RotateCcw, ShieldCheck, Trash2, X } from "lucide-react";
+import { AnimatedNavIcon } from "../../components/app-shell/nav-icons";
 import type { User } from "../../lib/auth";
 import { formatAccountDate } from "./format";
 import { useAccountDialogBodyLock } from "./hooks";
@@ -49,6 +50,9 @@ export function DataPrivacyDialog({
     >
       <section className="account-password-modal account-data-privacy-modal">
         <header className="account-password-modal-head">
+          <span aria-hidden="true" className="account-modal-icon account-stat-privacy">
+            <AnimatedNavIcon name="data-privacy" size={22} />
+          </span>
           <div>
             <span className="account-password-modal-kicker">Приватность</span>
             <h2 id="account-data-privacy-dialog-title">Данные и приватность</h2>

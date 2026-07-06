@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { AnimatedNavIcon } from "../../components/app-shell/nav-icons";
 import { useAccountDialogBodyLock } from "./hooks";
 import "../../components/notifications.css";
 
@@ -38,6 +39,9 @@ export function NotificationsDialog({
     >
       <section className="account-password-modal account-notifications-modal">
         <header className="account-password-modal-head">
+          <span aria-hidden="true" className="account-modal-icon account-stat-green">
+            <AnimatedNavIcon name="notifications" size={22} />
+          </span>
           <div>
             <span className="account-password-modal-kicker">Настройки</span>
             <h2 id="account-notifications-dialog-title">Уведомления</h2>

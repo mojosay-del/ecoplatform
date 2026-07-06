@@ -1,4 +1,5 @@
 import { ChevronDown, Monitor, Smartphone, X } from "lucide-react";
+import { AnimatedNavIcon } from "../../components/app-shell/nav-icons";
 import { StatusPill } from "../../components/StatusPill";
 import { describeSessionDevice, formatAccountDateTime } from "./format";
 import { useAccountDialogBodyLock } from "./hooks";
@@ -38,6 +39,9 @@ export function SessionsDialog({
     >
       <section className="account-password-modal account-sessions-modal">
         <header className="account-password-modal-head">
+          <span aria-hidden="true" className="account-modal-icon account-stat-info">
+            <AnimatedNavIcon name="sessions" size={22} />
+          </span>
           <div>
             <span className="account-password-modal-kicker">Доступ</span>
             <h2 id="account-sessions-dialog-title">Сессии</h2>
