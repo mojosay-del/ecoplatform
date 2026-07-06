@@ -2,11 +2,8 @@ import { useEffect, useState } from "react";
 import { Mail, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
 import type { CompanyMembersView, MemberSection } from "@ecoplatform/shared";
 import { ApiError, api } from "../../lib/api";
+import { formatRub } from "../../lib/formatters";
 import { useAccountDialogBodyLock } from "./hooks";
-
-function formatRub(value: number): string {
-  return `${value.toLocaleString("ru-RU")} ₽`;
-}
 
 export function CompanyMembersDialog({ onClose }: { onClose: () => void }) {
   const [view, setView] = useState<CompanyMembersView | null>(null);

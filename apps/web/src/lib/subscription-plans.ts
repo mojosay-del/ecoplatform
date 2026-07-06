@@ -1,10 +1,13 @@
-import type { SubscriptionPlan } from "@ecoplatform/shared";
+import { PLAN_BASE_PRICE_RUB, type SubscriptionPlan } from "@ecoplatform/shared";
 
 export type SubscriptionPlanTier = {
   key: "demo" | SubscriptionPlan;
   name: string;
   description: string;
-  price: string | null;
+  // Месячная цена в рублях. Единый источник — PLAN_BASE_PRICE_RUB в shared
+  // (та же база, что в расчёте мест «Сотрудников»). Годовая цена выводится
+  // из месячной со скидкой YEARLY_DISCOUNT_RATE в subscription-dialog-utils.
+  monthlyPriceRub: number;
   pricePeriod?: string;
   features: Array<{ label: string; included: boolean }>;
   accent: "brand" | "green";
@@ -18,7 +21,7 @@ export const SUBSCRIPTION_PLAN_TIERS: SubscriptionPlanTier[] = [
     key: "demo",
     name: "Пробный",
     description: "Один день, чтобы спокойно осмотреть платформу перед выбором тарифа.",
-    price: "0 ₽",
+    monthlyPriceRub: 0,
     pricePeriod: "/ 24 часа",
     accent: "green",
     features: [
@@ -32,8 +35,7 @@ export const SUBSCRIPTION_PLAN_TIERS: SubscriptionPlanTier[] = [
     key: "basic",
     name: "Базовая",
     description: "Для постоянной работы на рынке вторсырья.",
-    price: "0 ₽",
-    pricePeriod: "/ месяц",
+    monthlyPriceRub: PLAN_BASE_PRICE_RUB.basic,
     accent: "brand",
     badge: "Рекомендуем",
     features: [
@@ -48,8 +50,7 @@ export const SUBSCRIPTION_PLAN_TIERS: SubscriptionPlanTier[] = [
     key: "extended",
     name: "Расширенная",
     description: "Максимум возможностей для крупных игроков.",
-    price: "0 ₽",
-    pricePeriod: "/ месяц",
+    monthlyPriceRub: PLAN_BASE_PRICE_RUB.extended,
     accent: "green",
     features: [
       { label: "Больше обучающих модулей", included: true },

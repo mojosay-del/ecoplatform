@@ -8,8 +8,11 @@ import {
   isActivePaidSubscription,
   isActiveTrial,
   planButtonLabel,
+  planPriceLabel,
+  planPriceNote,
   planPricePeriodLabel,
   subscriptionChoiceRank,
+  YEARLY_DISCOUNT_RATE,
 } from "./subscription-dialog-utils";
 
 const NOW = new Date("2026-06-19T12:00:00.000Z").getTime();
@@ -95,9 +98,19 @@ describe("subscription dialog utils", () => {
   });
 
   it("returns period labels without changing trial copy", () => {
-    expect(planPricePeriodLabel(demoTier, "year")).toBe("/ 24 часа");
-    expect(planPricePeriodLabel(basicTier, "month")).toBe("/ месяц");
-    expect(planPricePeriodLabel(basicTier, "year")).toBe("/ год");
+    expect(planPricePeriodLabel(demoTier)).toBe("/ 24 часа");
+    expect(planPricePeriodLabel(basicTier)).toBe("/ месяц");
+  });
+
+  it("shows real monthly prices and the discounted yearly equivalent", () => {
+    expect(planPriceLabel(demoTier, "month")).toBe("0 ₽");
+    expect(planPriceLabel(basicTier, "month")).toBe(`${basicTier.monthlyPriceRub.toLocaleString("ru-RU")} ₽`);
+    const discountedBasic = Math.round(basicTier.monthlyPriceRub * (1 - YEARLY_DISCOUNT_RATE));
+    expect(planPriceLabel(basicTier, "year")).toBe(`${discountedBasic.toLocaleString("ru-RU")} ₽`);
+    expect(planPriceNote(basicTier, "month")).toBeUndefined();
+    expect(planPriceNote(demoTier, "year")).toBeUndefined();
+    const yearlyTotal = Math.round(basicTier.monthlyPriceRub * 12 * (1 - YEARLY_DISCOUNT_RATE));
+    expect(planPriceNote(basicTier, "year")).toBe(`${yearlyTotal.toLocaleString("ru-RU")} ₽ при оплате за год`);
   });
 
   it("creates idempotency keys with stable prefixes", () => {

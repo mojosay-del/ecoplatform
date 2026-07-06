@@ -1,4 +1,5 @@
 import type { SubscriptionPlan } from "@ecoplatform/shared";
+import { formatRub } from "../../lib/formatters";
 import type { SubscriptionPlanTier } from "../../lib/subscription-plans";
 import { formatAccountDate } from "./format";
 import type { BillingPeriod, SubscriptionChoiceKey, SubscriptionCompanySnapshot } from "./subscription-dialog-types";
@@ -44,13 +45,32 @@ export function planButtonLabel({
   return tier.key === "basic" ? "Выбрать базовую" : "Выбрать расширенную";
 }
 
-export function planPriceLabel(tier: SubscriptionPlanTier): string {
-  return tier.price ?? "0 ₽";
+// Скидка при оплате за год. Платёжной системы пока нет — значение
+// презентационное и обязано совпадать с бейджем на переключателе периода.
+export const YEARLY_DISCOUNT_RATE = 0.27;
+
+export function yearlyDiscountBadge(): string {
+  return `-${Math.round(YEARLY_DISCOUNT_RATE * 100)}%`;
 }
 
-export function planPricePeriodLabel(tier: SubscriptionPlanTier, billingPeriod: BillingPeriod): string | undefined {
+// Цена всегда показывается «за месяц»: в годовом режиме — месячная цена со
+// скидкой (паттерн большинства SaaS), пояснение даёт planPriceNote.
+export function planPriceLabel(tier: SubscriptionPlanTier, billingPeriod: BillingPeriod): string {
+  if (tier.key === "demo" || tier.monthlyPriceRub === 0) return formatRub(0);
+  if (billingPeriod === "year") return formatRub(Math.round(tier.monthlyPriceRub * (1 - YEARLY_DISCOUNT_RATE)));
+  return formatRub(tier.monthlyPriceRub);
+}
+
+export function planPricePeriodLabel(tier: SubscriptionPlanTier): string | undefined {
   if (tier.key === "demo") return tier.pricePeriod;
-  return billingPeriod === "month" ? "/ месяц" : "/ год";
+  return "/ месяц";
+}
+
+// Подпись под ценой в годовом режиме: полная стоимость года со скидкой.
+export function planPriceNote(tier: SubscriptionPlanTier, billingPeriod: BillingPeriod): string | undefined {
+  if (tier.key === "demo" || billingPeriod !== "year" || tier.monthlyPriceRub === 0) return undefined;
+  const yearlyTotal = Math.round(tier.monthlyPriceRub * 12 * (1 - YEARLY_DISCOUNT_RATE));
+  return `${formatRub(yearlyTotal)} при оплате за год`;
 }
 
 export function subscriptionChoiceRank(plan: SubscriptionChoiceKey | string | null | undefined): number {

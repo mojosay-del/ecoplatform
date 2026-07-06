@@ -7,12 +7,19 @@
 // «N мин назад» дашборда, полнолетние даты (DD.MM.YYYY) — у них свой формат.
 
 const decimal1Format = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
+const rubFormat = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 });
 const dateTimeFormat = new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" });
 
 // Число с одним знаком после запятой (ru-RU). Используется для значений ценовых
 // индексов в публичном и админском разделах (был дубль formatIndexPrice ×2).
 export function formatDecimal1(value: string | number): string {
   return decimal1Format.format(Number(value));
+}
+
+// «2 890 ₽» — целые рубли с ru-RU разрядами. Общий формат для тарифов кабинета
+// и расчёта мест сотрудников (был локальный дубль в CompanyMembersDialog).
+export function formatRub(value: number): string {
+  return `${rubFormat.format(value)} ₽`;
 }
 
 // «12.06.26, 14:30» — короткие дата и время ru-RU. null/невалидное → «—».

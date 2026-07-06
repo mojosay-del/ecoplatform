@@ -7,8 +7,10 @@ import {
   isActiveTrial,
   planButtonLabel,
   planPriceLabel,
+  planPriceNote,
   planPricePeriodLabel,
   subscriptionChoiceRank,
+  yearlyDiscountBadge,
 } from "./subscription-dialog-utils";
 
 export function SubscriptionPlans({
@@ -63,15 +65,18 @@ export function SubscriptionPlans({
             <p className="account-plan-desc">{tier.description}</p>
             <div className={`account-plan-price${isTrial ? "" : " is-switchable"}`}>
               <span className="account-plan-price-value">
-                <span className="account-plan-amount">{planPriceLabel(tier)}</span>
-                {planPricePeriodLabel(tier, billingPeriod) ? (
-                  <span className="account-plan-period">{planPricePeriodLabel(tier, billingPeriod)}</span>
+                <span className="account-plan-amount">{planPriceLabel(tier, billingPeriod)}</span>
+                {planPricePeriodLabel(tier) ? (
+                  <span className="account-plan-period">{planPricePeriodLabel(tier)}</span>
                 ) : null}
               </span>
               {isTrial ? null : (
                 <BillingPeriodToggle billingPeriod={billingPeriod} setBillingPeriod={setBillingPeriod} />
               )}
             </div>
+            {planPriceNote(tier, billingPeriod) ? (
+              <p className="account-plan-price-note">{planPriceNote(tier, billingPeriod)}</p>
+            ) : null}
             <ul className="account-plan-features">
               {tier.features.map((feature) => (
                 <li className={feature.included ? undefined : "is-off"} key={feature.label}>
@@ -123,7 +128,7 @@ function BillingPeriodToggle({
         type="button"
       >
         <span>Год</span>
-        <span className="account-billing-period-discount">-27%</span>
+        <span className="account-billing-period-discount">{yearlyDiscountBadge()}</span>
       </button>
     </div>
   );
