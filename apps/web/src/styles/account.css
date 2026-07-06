@@ -1911,9 +1911,10 @@ body.account-password-modal-open {
   grid-template-columns: 48px 74px;
   gap: 3px;
   padding: 3px;
-  border: 1px solid var(--line);
+  border: 1px solid rgb(var(--shadow-rgb) / 0.12);
   border-radius: 999px;
-  background: var(--surface-soft);
+  background: #f3f6fb;
+  box-shadow: inset 0 1px 2px rgb(var(--shadow-rgb) / 0.04);
 }
 
 .account-billing-period-toggle button {
@@ -1926,7 +1927,7 @@ body.account-password-modal-open {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text);
   font: inherit;
   font-size: 12px;
   font-weight: 800;
@@ -1940,28 +1941,32 @@ body.account-password-modal-open {
 .account-billing-period-toggle button.is-active {
   background: var(--panel);
   color: var(--text);
-  box-shadow: 0 6px 18px rgb(var(--shadow-rgb) / 0.08);
+  box-shadow:
+    0 7px 18px rgb(var(--shadow-rgb) / 0.1),
+    inset 0 0 0 1px rgb(var(--white-rgb) / 0.9);
 }
 
 .account-billing-period-toggle button:first-child:not(.is-active) {
-  background: var(--panel);
+  background: transparent;
   color: var(--text-secondary);
   box-shadow: inset 0 0 0 1px rgb(var(--shadow-rgb) / 0.04);
 }
 
 .account-billing-period-toggle button:last-child {
-  color: var(--success-text);
+  color: var(--success-text-strong, var(--success-text));
 }
 
 .account-billing-period-toggle button:last-child:not(.is-active) {
-  background: var(--success-soft);
-  box-shadow: inset 0 0 0 1px rgb(var(--success-rgb) / 0.12);
+  background: rgb(var(--success-rgb) / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(var(--success-rgb) / 0.16);
 }
 
 .account-billing-period-toggle button:last-child.is-active {
-  background: var(--success-soft);
-  color: var(--success-text);
-  box-shadow: 0 7px 18px rgb(var(--success-rgb) / 0.18);
+  background: #ecfdf3;
+  color: var(--success-text-strong, var(--success-text));
+  box-shadow:
+    0 7px 18px rgb(var(--success-rgb) / 0.2),
+    inset 0 0 0 1px rgb(var(--success-rgb) / 0.16);
 }
 
 .account-billing-period-toggle button:focus-visible {
@@ -1975,7 +1980,7 @@ body.account-password-modal-open {
   padding: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--success-text);
+  color: var(--success-text-strong, var(--success-text));
   font-size: 9px;
   font-weight: 800;
   line-height: 1;
@@ -2016,7 +2021,7 @@ body.account-password-modal-open {
 
 .account-plan.is-popular {
   border: 2px solid var(--brand);
-  background: linear-gradient(180deg, #fff6ef, var(--panel) 62%);
+  background: var(--panel);
   box-shadow: 0 20px 44px -22px rgb(var(--brand-rgb) / 0.5);
 }
 
@@ -2542,7 +2547,7 @@ body.account-password-modal-open {
 }
 .account-plan.is-current {
   border-color: var(--brand-muted);
-  background: linear-gradient(180deg, #fff8f3, var(--panel));
+  background: var(--panel);
 }
 .account-plan .button {
   width: 100%;
@@ -2832,7 +2837,7 @@ body.account-password-modal-open {
 }
 .account-plan.is-current {
   border-color: var(--brand-muted);
-  background: linear-gradient(180deg, #fff8f3, var(--panel));
+  background: var(--panel);
 }
 .account-plan .button {
   margin-top: auto;

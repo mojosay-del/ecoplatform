@@ -32,7 +32,6 @@ export function DemoBanner({ user, pathname }: { user: AuthMeUser | null; pathna
     <Link
       aria-label={accessibleText}
       className={`demo-banner demo-banner-${state.mode}`}
-      data-tooltip="Активировать подписку"
       href={accountProfileModalHref("subscription")}
       title="Активировать подписку"
     >
@@ -41,6 +40,9 @@ export function DemoBanner({ user, pathname }: { user: AuthMeUser | null; pathna
       </span>
       <span className="demo-banner-currency" aria-hidden="true">
         ₽
+      </span>
+      <span className="demo-banner-label" aria-hidden="true">
+        Подписка
       </span>
     </Link>
   );

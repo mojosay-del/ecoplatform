@@ -727,6 +727,8 @@ input[type="checkbox"]:focus-visible {
 }
 
 .demo-banner {
+  --demo-banner-currency-shift: -103px;
+
   position: relative;
   z-index: 20;
   display: inline-flex;
@@ -734,78 +736,111 @@ input[type="checkbox"]:focus-visible {
   justify-content: center;
   gap: 8px;
   box-sizing: border-box;
-  height: 36px;
-  min-width: 0;
-  padding: 4px 4px 4px 12px;
-  border: 1px solid var(--warning-border);
+  height: 30px;
+  width: 132px;
+  min-width: 132px;
+  overflow: hidden;
+  padding: 3px 32px 3px 10px;
+  border: 1px solid rgb(var(--brand-rgb) / 0.34);
   border-radius: 999px;
-  background: var(--warning-soft);
-  color: var(--warning-text);
-  box-shadow: var(--shadow-sm);
-  font-size: 12px;
+  background: var(--panel);
+  color: var(--brand);
+  box-shadow:
+    0 8px 18px -14px rgb(var(--brand-rgb) / 0.55),
+    inset 0 1px 0 rgb(var(--white-rgb) / 0.9);
+  font-size: 11px;
   font-weight: 800;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
   transition:
+    background-color 180ms ease,
     border-color 120ms ease,
+    color 140ms ease,
     box-shadow 120ms ease,
     transform 120ms ease;
 }
 
 .demo-banner-time {
+  position: relative;
+  z-index: 1;
   min-width: 0;
-  max-width: 104px;
+  max-width: 86px;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--brand-active);
+  font-variant-numeric: tabular-nums;
+  transition:
+    opacity 160ms ease,
+    transform 180ms ease;
 }
 
 .demo-banner-currency {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 2;
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--brand);
   color: var(--white);
-  font-size: 15px;
-  font-weight: 900;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 5px 12px -8px rgb(var(--brand-rgb) / 0.85);
+  transition:
+    background 180ms ease,
+    color 120ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.demo-banner::after {
-  content: attr(data-tooltip);
+.demo-banner-label {
   position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  padding: 7px 9px;
-  border-radius: var(--radius-sm);
-  background: var(--text);
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
   color: var(--white);
-  box-shadow: var(--shadow-md);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 900;
   line-height: 1.2;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-4px);
+  transform: translateY(4px);
   transition:
-    opacity 120ms ease,
-    transform 120ms ease;
-  visibility: hidden;
+    opacity 150ms ease,
+    transform 180ms ease;
 }
 
 .demo-banner:hover,
 .demo-banner:focus-visible {
-  border-color: var(--brand-muted-border);
-  box-shadow: var(--focus-ring);
+  border-color: var(--brand);
+  background: var(--brand);
+  box-shadow:
+    0 10px 20px -14px rgb(var(--brand-rgb) / 0.75),
+    var(--focus-ring);
   transform: translateY(-1px);
 }
 
-.demo-banner:hover::after,
-.demo-banner:focus-visible::after {
+.demo-banner:hover .demo-banner-time,
+.demo-banner:focus-visible .demo-banner-time {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.demo-banner:hover .demo-banner-currency,
+.demo-banner:focus-visible .demo-banner-currency {
+  color: transparent;
+  background: rgb(var(--white-rgb) / 0.24);
+  transform: translateX(var(--demo-banner-currency-shift));
+}
+
+.demo-banner:hover .demo-banner-label,
+.demo-banner:focus-visible .demo-banner-label {
   opacity: 1;
   transform: translateY(0);
-  visibility: visible;
 }
 
 .demo-banner:focus-visible {
@@ -813,13 +848,29 @@ input[type="checkbox"]:focus-visible {
 }
 
 .demo-banner-critical {
-  background: var(--danger-soft);
-  border-color: var(--danger-border);
+  background: var(--panel);
+  border-color: rgb(var(--danger-rgb) / 0.28);
+  color: var(--danger-text-strong);
+}
+
+.demo-banner-critical .demo-banner-time,
+.demo-banner-critical .demo-banner-label {
   color: var(--danger-text-strong);
 }
 
 .demo-banner-critical .demo-banner-currency {
   background: var(--danger);
+}
+
+.demo-banner-critical:hover,
+.demo-banner-critical:focus-visible {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.demo-banner-critical:hover .demo-banner-currency,
+.demo-banner-critical:focus-visible .demo-banner-currency {
+  background: rgb(var(--white-rgb) / 0.24);
 }
 
 .page-surface {
@@ -3197,12 +3248,16 @@ input[type="checkbox"]:focus-visible {
   }
 
   .demo-banner {
-    height: 34px;
-    padding: 3px 3px 3px 10px;
+    --demo-banner-currency-shift: -91px;
+
+    width: 118px;
+    min-width: 118px;
+    height: 30px;
+    padding: 3px 31px 3px 9px;
   }
 
   .demo-banner-time {
-    max-width: 82px;
+    max-width: 74px;
   }
 
   .demo-banner-critical {
@@ -3210,8 +3265,8 @@ input[type="checkbox"]:focus-visible {
   }
 
   .demo-banner-currency {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
   }
 
   .card-grid {
