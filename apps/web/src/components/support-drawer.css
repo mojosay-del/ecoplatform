@@ -27,7 +27,9 @@
 .support-drawer-root {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  /* Выше модалок кабинета (1200) и subscription-gate (1500): drawer,
+     открытый поверх модального окна, должен оставаться кликабельным. */
+  z-index: 1700;
   display: flex;
   justify-content: flex-end;
 }

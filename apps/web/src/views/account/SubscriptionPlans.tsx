@@ -42,6 +42,9 @@ export function SubscriptionPlans({
         const isCurrent = tier.key === currentPlanKey;
         const popular = tier.key === "basic";
         const isTrial = tier.key === "demo";
+        // «Расширенная» оформлена как премиум-карта: тёмная тёплая тема в
+        // характере hero «Обучения» — максимум возможностей выглядит дороже.
+        const isPremium = tier.key === "extended";
         const pending = busyPlan === tier.key;
         const isUpgrade = activePaidSubscription && subscriptionChoiceRank(tier.key) > currentPlanRank;
         const disabled = isTrial
@@ -57,7 +60,7 @@ export function SubscriptionPlans({
 
         return (
           <article
-            className={`account-plan${isCurrent ? " is-current" : ""}${popular ? " is-popular" : ""}`}
+            className={`account-plan${isCurrent ? " is-current" : ""}${popular ? " is-popular" : ""}${isPremium ? " is-premium" : ""}`}
             key={tier.key}
           >
             {popular ? <span className="account-plan-badge">Рекомендуем</span> : null}

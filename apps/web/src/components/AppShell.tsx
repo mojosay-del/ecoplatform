@@ -275,7 +275,6 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
           onBillingUpdated={setSubscriptionGateBilling}
           onClose={() => undefined}
           onGateSatisfied={() => undefined}
-          onOpenSupport={() => setSupportOpen(true)}
         />
       ) : null}
     </div>

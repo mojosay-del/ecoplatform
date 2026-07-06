@@ -10,6 +10,7 @@ import type { ApiState } from "../shared/use-api-query";
 import { describeSubscription } from "./format";
 import { useAccountDialogBodyLock, useAccountDialogFocusTrap } from "./hooks";
 import { SubscriptionPlans } from "./SubscriptionPlans";
+import { SubscriptionSupportForm } from "./SubscriptionSupportForm";
 import type { BillingPeriod, SubscriptionChoiceKey, SubscriptionCompanySnapshot } from "./subscription-dialog-types";
 import {
   createSubscriptionIdempotencyKey,
@@ -28,7 +29,6 @@ export function SubscriptionDialog({
   onBillingUpdated,
   onClose,
   onGateSatisfied,
-  onOpenSupport,
 }: {
   billing: BillingStatus | null;
   billingState?: ApiState;
@@ -36,7 +36,6 @@ export function SubscriptionDialog({
   onBillingUpdated?: (billing: BillingStatus) => void;
   onClose: () => void;
   onGateSatisfied?: () => void;
-  onOpenSupport: () => void;
 }) {
   const { token, user, refreshMe } = useAuth();
   const dialogRef = useRef<HTMLElement | null>(null);
@@ -44,6 +43,9 @@ export function SubscriptionDialog({
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("month");
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Форма поддержки живёт внутри модалки: в gate-режиме внешний drawer
+  // недоступен (он открывается под этим окном).
+  const [supportOpen, setSupportOpen] = useState(false);
   const currentCompany: SubscriptionCompanySnapshot | null = billing ?? user?.company ?? null;
   // Сотрудник (member) не управляет подпиской — вместо тарифов показываем ему
   // понятное окно «обратитесь к владельцу».
@@ -229,10 +231,16 @@ export function SubscriptionDialog({
           )}
           <div className="account-subscription-help">
             <span>Нужна помощь с доступом?</span>
-            <button className="button ghost" onClick={onOpenSupport} type="button">
-              Написать в поддержку
+            <button
+              aria-expanded={supportOpen}
+              className="button ghost"
+              onClick={() => setSupportOpen((open) => !open)}
+              type="button"
+            >
+              {supportOpen ? "Скрыть форму" : "Написать в поддержку"}
             </button>
           </div>
+          {supportOpen ? <SubscriptionSupportForm /> : null}
         </div>
       </section>
     </div>

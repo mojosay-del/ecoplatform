@@ -49,10 +49,6 @@ export function useAccountDialogRouting({ isPlatformStaff, user }: { isPlatformS
     }
   }
 
-  function openSupport() {
-    window.dispatchEvent(new Event("support:open"));
-  }
-
   function openProfileModal(modal: AccountProfileModalId) {
     setSubscriptionDialogOpen(modal === "subscription");
     setSessionsDialogOpen(modal === "sessions");
@@ -94,7 +90,6 @@ export function useAccountDialogRouting({ isPlatformStaff, user }: { isPlatformS
     openPaymentDialog: () => setPaymentDialogOpen(true),
     openSessionsDialog: () => openProfileModal("sessions"),
     openSubscriptionDialog: () => openProfileModal("subscription"),
-    openSupport,
     paymentDialogOpen,
     sessionsDialogOpen,
     subscriptionDialogOpen,

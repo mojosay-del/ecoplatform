@@ -48,7 +48,6 @@ export function AccountView({ section }: { section: AccountSectionId }) {
     openPaymentDialog,
     openSessionsDialog,
     openSubscriptionDialog,
-    openSupport,
     paymentDialogOpen,
     sessionsDialogOpen,
     subscriptionDialogOpen,
@@ -125,7 +124,6 @@ export function AccountView({ section }: { section: AccountSectionId }) {
           billingState={billingState}
           onBillingUpdated={setBilling}
           onClose={closeSubscriptionDialog}
-          onOpenSupport={openSupport}
         />
       ) : null}
       {paymentDialogOpen ? (
