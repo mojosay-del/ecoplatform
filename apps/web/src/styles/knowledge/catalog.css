@@ -99,16 +99,17 @@
 
 .knowledge-index-rail {
   position: sticky;
-  top: 0;
+  top: 8px;
   z-index: 6;
   display: flex;
   gap: 8px;
-  margin: 0 -2px;
-  padding: 10px 2px;
+  /* Белая плашка-карточка с чипами внутри (без тёплого бежевого фона). */
+  padding: 9px 12px;
   overflow-x: auto;
-  border-block: 1px solid var(--line);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-chip);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-card);
   scrollbar-width: none;
 }
 
@@ -119,47 +120,54 @@
 .knowledge-index-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   flex: 0 0 auto;
   min-height: 38px;
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   border-radius: var(--radius-chip);
-  padding: 7px 15px 7px 11px;
-  background: var(--panel);
+  padding: 7px 16px 7px 12px;
+  background: transparent;
   color: var(--text-secondary);
   font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
   transition:
-    border-color 140ms ease,
-    background 140ms ease,
-    color 140ms ease;
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .knowledge-index-chip-code {
-  color: var(--muted);
+  color: var(--brand-active);
   font-size: 11px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.08em;
-  transition: color 140ms ease;
+  opacity: 0.7;
+  transition:
+    color 160ms ease,
+    opacity 160ms ease;
 }
 
 .knowledge-index-chip:hover {
-  border-color: var(--brand-soft-strong);
   background: var(--brand-soft);
   color: var(--brand-active);
 }
 
 .knowledge-index-chip.is-active {
-  border-color: rgb(var(--brand-rgb) / 0.5);
   background: var(--brand);
   color: var(--text-inverse);
+  box-shadow: 0 6px 16px rgb(var(--brand-rgb) / 0.28);
 }
 
-.knowledge-index-chip.is-active .knowledge-index-chip-code,
-.knowledge-index-chip:hover .knowledge-index-chip-code {
+.knowledge-index-chip.is-active .knowledge-index-chip-code {
   color: inherit;
+  opacity: 0.8;
+}
+
+.knowledge-index-chip:hover .knowledge-index-chip-code {
+  opacity: 1;
 }
 
 .knowledge-index-chip:focus-visible {
