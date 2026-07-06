@@ -4,7 +4,7 @@
 // остальные категории свёрнуты, сверху ссылка «Весь каталог».
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FolderOpen, type LucideIcon } from "lucide-react";
 import type { KnowledgeNode } from "@ecoplatform/shared";
 import { knowledgeDisplayIconForNode } from "../knowledge-icons";
 import { knowledgeNodeContainsSlug } from "../knowledge-utils";
@@ -53,7 +53,8 @@ function SidebarCategory({
         <span className="knowledge-sidebar-summary-title">{category.title}</span>
       </summary>
       <div className="knowledge-sidebar-links">
-        <SidebarLink activeSlug={activeSlug} depth={0} node={category} label="Обзор раздела" />
+        {/* У «Обзора раздела» своя иконка, чтобы не сливаться с материалами. */}
+        <SidebarLink activeSlug={activeSlug} depth={0} icon={FolderOpen} node={category} label="Обзор раздела" />
         {(category.children ?? []).map((node) => (
           <SidebarNode activeSlug={activeSlug} depth={1} key={node.id} node={node} />
         ))}
@@ -76,15 +77,17 @@ function SidebarNode({ activeSlug, depth, node }: { activeSlug?: string; depth: 
 function SidebarLink({
   activeSlug,
   depth,
+  icon,
   label,
   node,
 }: {
   activeSlug?: string;
   depth: number;
+  icon?: LucideIcon;
   label?: string;
   node: KnowledgeNode;
 }) {
-  const Icon = knowledgeDisplayIconForNode(node, depth);
+  const Icon = icon ?? knowledgeDisplayIconForNode(node, depth);
   const isActive = node.slug === activeSlug;
 
   return (
