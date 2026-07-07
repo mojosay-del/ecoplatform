@@ -63,7 +63,7 @@ export function EducationView() {
     <AppShell>
       <section className="page">
         <header className="education-header">
-          <p className="education-eyebrow">Академия ЭкоПлатформы</p>
+          <p className="page-hero-eyebrow">Академия ЭкоПлатформы</p>
           <h1 className="education-title">Обучение</h1>
           <p className="education-subtitle">Практические материалы для закупки, склада и работы с качеством сырья.</p>
           <p className="education-header-metric">{lessonsLabel}</p>

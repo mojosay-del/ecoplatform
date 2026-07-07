@@ -610,19 +610,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  width: min(100%, 680px);
-  max-width: 680px;
+  gap: var(--content-hero-gap);
+  width: min(100%, var(--content-hero-width));
+  max-width: var(--content-hero-width);
   margin: 0 auto 24px;
+  padding-top: var(--content-hero-top-offset);
   text-align: center;
 }
 
 .indices-title {
   margin: 0;
   color: var(--text);
-  font-size: 32px;
-  line-height: 1.1;
-  font-weight: 700;
+  font-size: var(--content-hero-title-size);
+  line-height: var(--content-hero-title-line-height);
+  font-weight: var(--content-hero-title-weight);
   letter-spacing: 0;
   text-align: center;
 }
@@ -630,8 +631,8 @@
 .indices-subtitle {
   margin: 0;
   color: var(--text-muted);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: var(--content-hero-subtitle-size);
+  line-height: var(--content-hero-subtitle-line-height);
   text-align: center;
 }
 
@@ -810,16 +811,7 @@
 
 @media (max-width: 720px) {
   .indices-header {
-    gap: 9px;
     margin-bottom: 20px;
-  }
-  .indices-title {
-    font-size: 28px;
-    line-height: 1.1;
-  }
-  .indices-subtitle {
-    font-size: 14px;
-    line-height: 1.45;
   }
   .index-movement-summary {
     display: none;

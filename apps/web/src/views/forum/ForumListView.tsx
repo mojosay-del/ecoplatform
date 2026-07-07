@@ -257,6 +257,7 @@ export function ForumListView() {
     <AppShell>
       <section className="page forum-page">
         <div className="forum-hero">
+          <p className="page-hero-eyebrow">Отраслевая память</p>
           <h1 className="forum-title">Найдите готовый ответ — или спросите тех, кто уже сталкивался</h1>
           <form className="forum-search" onSubmit={handleSearch} role="search">
             <input

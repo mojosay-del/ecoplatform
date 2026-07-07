@@ -48,7 +48,8 @@ export function IndicesView() {
   return (
     <AppShell>
       <section className="page">
-        <div className="indices-header">
+        <header className="indices-header">
+          <p className="page-hero-eyebrow">Пульс рынка</p>
           <h1 className="indices-title">Индексы цен на вторсырьё</h1>
           <p className="indices-subtitle">Актуальные ценовые индексы по основным видам сырья.</p>
           {lastUpdated ? (
@@ -67,7 +68,7 @@ export function IndicesView() {
               обновлено {lastUpdated}
             </span>
           ) : null}
-        </div>
+        </header>
         {state === "loading" ? (
           <IndicesLoadingShell />
         ) : data.length === 0 ? (

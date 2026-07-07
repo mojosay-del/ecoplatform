@@ -182,6 +182,7 @@ export function DocumentationView() {
     <AppShell chrome={{ mobileTopbarAction }}>
       <section className="page doc-page">
         <header className="doc-header">
+          <p className="page-hero-eyebrow">Библиотека документов</p>
           <h1 className="doc-title">Документация</h1>
           <p className="doc-subtitle">Шаблоны, регламенты и отраслевые справки для работы с вторсырьём</p>
           <form className="doc-search" onSubmit={handleSearch} role="search">

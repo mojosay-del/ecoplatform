@@ -31,10 +31,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  width: min(100%, 720px);
+  gap: var(--content-hero-gap);
+  width: min(100%, var(--content-hero-width));
   margin: 0 auto;
-  padding-top: clamp(8px, 2.4vw, 26px);
+  padding-top: var(--content-hero-top-offset);
   text-align: center;
 }
 
@@ -46,7 +46,7 @@
   color: var(--brand-active);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -61,22 +61,22 @@
 .knowledge-hero-title {
   margin: 0;
   color: var(--text);
-  font-size: clamp(34px, 4.6vw, 50px);
-  line-height: 1.05;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: var(--content-hero-title-size);
+  line-height: var(--content-hero-title-line-height);
+  font-weight: var(--content-hero-title-weight);
+  letter-spacing: 0;
 }
 
 .knowledge-hero-subtitle {
   margin: 0;
   max-width: 54ch;
   color: var(--text-muted);
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: var(--content-hero-subtitle-size);
+  line-height: var(--content-hero-subtitle-line-height);
 }
 
 .knowledge-hero .knowledge-search {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .knowledge-hero-stamp {
@@ -535,14 +535,6 @@
 
   .knowledge-catalog-page {
     gap: 20px;
-  }
-
-  .knowledge-hero-title {
-    font-size: 32px;
-  }
-
-  .knowledge-hero-subtitle {
-    font-size: 14.5px;
   }
 
   .knowledge-catalog-section-icon {

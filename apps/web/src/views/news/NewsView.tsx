@@ -146,8 +146,9 @@ export function NewsView() {
     <AppShell>
       <section className="page">
         <header className="news-feed-header">
+          <p className="page-hero-eyebrow">Сигналы рынка</p>
           <h1>Новости</h1>
-          <p>Сигналы рынка, решения компаний и события, которые двигают вторсырьё.</p>
+          <p className="news-feed-subtitle">События и решения компаний, которые двигают вторсырьё.</p>
           <form className="news-feed-search" onSubmit={handleSearch} role="search">
             <input
               aria-label="Поиск по новостям"

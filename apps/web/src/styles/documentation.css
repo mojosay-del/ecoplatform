@@ -27,26 +27,27 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 9px;
-  width: min(100%, 640px);
-  max-width: 640px;
+  gap: var(--content-hero-gap);
+  width: min(100%, var(--content-hero-width));
+  max-width: var(--content-hero-width);
   margin: 0 auto;
+  padding-top: var(--content-hero-top-offset);
   text-align: center;
 }
 
 .doc-title {
   margin: 0;
   color: var(--text);
-  font-size: 32px;
-  line-height: 1.1;
-  font-weight: 700;
+  font-size: var(--content-hero-title-size);
+  line-height: var(--content-hero-title-line-height);
+  font-weight: var(--content-hero-title-weight);
 }
 
 .doc-subtitle {
   margin: 0;
   color: var(--text-muted);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: var(--content-hero-subtitle-size);
+  line-height: var(--content-hero-subtitle-line-height);
 }
 
 .doc-search {
@@ -54,11 +55,11 @@
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 50px;
-  padding: 0 52px;
+  min-height: var(--content-hero-search-height);
+  padding: 0 var(--content-hero-search-inline-padding);
   overflow: hidden;
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: var(--content-hero-search-radius);
   background: var(--surface-elevated);
   color: var(--text-muted);
   box-shadow: var(--shadow-card);
@@ -82,19 +83,19 @@
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 16px;
+  font-size: var(--content-hero-search-font-size);
   text-align: center;
 }
 
 .doc-search-placeholder {
   position: absolute;
-  inset: 0 52px;
+  inset: 0 var(--content-hero-search-inline-padding);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 0;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: var(--content-hero-search-font-size);
   line-height: 1.2;
   pointer-events: none;
 }
@@ -995,33 +996,8 @@
     max-width: none;
   }
 
-  .doc-title {
-    font-size: 28px;
-    line-height: 1.1;
-  }
-
-  .doc-subtitle {
-    font-size: 14px;
-  }
-
-  .doc-search {
-    width: 100%;
-    min-height: 46px;
-    padding: 0 40px;
-    border-radius: 15px;
-  }
-
   .doc-grid {
     grid-template-columns: 1fr;
-  }
-
-  .doc-search input,
-  .doc-search-placeholder {
-    font-size: 14px;
-  }
-
-  .doc-search-placeholder {
-    inset: 0 40px;
   }
 
   .doc-recent-item {
