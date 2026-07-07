@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { CompanyAddress, MarketplaceAddressSuggestion } from "@ecoplatform/shared";
+import { addressDraftToDto, addressSuggestionToDraft, companyAddressToDraft } from "../../lib/company-address";
 import {
   buildListingDto,
   clientValidationError,
@@ -16,6 +18,7 @@ import {
 function validValues(overrides: Partial<ListingFormValues> = {}): ListingFormValues {
   return {
     positions: [{ ...emptyPosition(), nomenclatureId: "nom-1", weightTons: "1.5" }],
+    addressCountry: "RU",
     city: "Казань",
     region: "Татарстан",
     street: "Баумана",
@@ -101,12 +104,61 @@ describe("listing form helpers: сборка DTO", () => {
     expect(dto.contactPhone).toMatch(/^\+7/);
   });
 
+  it("сохраняет выбранную страну адреса", () => {
+    const dto = buildListingDto(validValues({ addressCountry: "BY", city: "Минск", region: "Минская область" }));
+    expect(dto.address.country).toBe("Беларусь");
+    expect(dto.address.city).toBe("Минск");
+  });
+
   it("typicalLoadKg и диапазон = null при пустом поле; readinessDate из даты при readyNow=false", () => {
     const dto = buildListingDto(validValues({ readyNow: false, readinessDate: "2026-07-01" }));
     expect(dto.typicalLoadKg).toBeNull();
     expect(dto.typicalLoadMinKg).toBeNull();
     expect(dto.typicalLoadMaxKg).toBeNull();
     expect(dto.readinessDate).not.toBeNull();
+  });
+});
+
+describe("company address helpers", () => {
+  const companyAddress: CompanyAddress = {
+    id: "addr-1",
+    country: "Беларусь",
+    region: "Минская область",
+    city: "Минск",
+    street: "Немига",
+    building: "5",
+    apartment: null,
+    postcode: "220000",
+    latitude: "53.9023000",
+    longitude: "27.5619000",
+    formatted: "Беларусь, Минск, Немига, 5",
+    source: "dadata",
+  };
+
+  it("переводит адрес компании в черновик формы", () => {
+    expect(companyAddressToDraft(companyAddress)).toEqual({
+      countryCode: "BY",
+      query: "Беларусь, Минск, Немига, 5",
+      city: "Минск",
+      region: "Минская область",
+      street: "Немига",
+      building: "5",
+      postcode: "220000",
+    });
+  });
+
+  it("переводит выбранную подсказку в DTO адреса", () => {
+    const suggestion: MarketplaceAddressSuggestion = {
+      value: "Беларусь, Минск, Немига, 5",
+      address: companyAddress,
+    };
+    expect(addressDraftToDto(addressSuggestionToDraft(suggestion))).toMatchObject({
+      country: "Беларусь",
+      city: "Минск",
+      street: "Немига",
+      building: "5",
+      formatted: "Беларусь, Минск, Немига, 5",
+    });
   });
 });
 

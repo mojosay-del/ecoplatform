@@ -79,14 +79,18 @@ export function MaterialCard({
         </div>
         <div className="knowledge-card-label">
           {kicker ? <span className="knowledge-card-kicker">{kicker}</span> : null}
-          <strong className="knowledge-card-title">{highlightMatch(node.title, highlightQuery)}</strong>
+          <div className="knowledge-card-title-row">
+            <strong className="knowledge-card-title">{highlightMatch(node.title, highlightQuery)}</strong>
+            <span className="knowledge-card-meta">
+              {childCount > 0
+                ? `${childCount} ${pluralizeRu(childCount, "подвид", "подвида", "подвидов")}`
+                : "Материал"}
+              <ArrowUpRight aria-hidden="true" className="knowledge-card-meta-arrow" size={14} strokeWidth={2.4} />
+            </span>
+          </div>
           {node.subtitle ? (
             <span className="knowledge-card-subtitle">{highlightMatch(node.subtitle, highlightQuery)}</span>
           ) : null}
-          <span className="knowledge-card-meta">
-            {childCount > 0 ? `${childCount} ${pluralizeRu(childCount, "подвид", "подвида", "подвидов")}` : "Материал"}
-            <ArrowUpRight aria-hidden="true" className="knowledge-card-meta-arrow" size={14} strokeWidth={2.4} />
-          </span>
         </div>
       </Link>
     </article>

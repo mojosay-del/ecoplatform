@@ -6,6 +6,7 @@ import type { CreateListingDto, ListingContaminationCondition, ListingMoistureCo
 import { LISTING_MIN_WEIGHT_KG, LISTING_TYPICAL_LOAD_MAX_KG, LISTING_TYPICAL_LOAD_MIN_KG } from "@ecoplatform/shared";
 import { PHONE_COUNTRIES } from "../../components/auth/constants";
 import type { PhoneCountryId } from "../../components/auth/types";
+import { addressCountryName, type AddressCountryCode } from "../../lib/company-address";
 import { formatPhoneFull, getPhoneCountry, normalizePhoneDigits } from "../../components/auth/utils";
 import { formatWeight } from "./listing-format";
 
@@ -54,6 +55,7 @@ export type MediaUploadProgress = {
 // Значения полей формы — то, что нужно для сборки DTO и валидации.
 export type ListingFormValues = {
   positions: PositionForm[];
+  addressCountry: AddressCountryCode;
   city: string;
   region: string;
   street: string;
@@ -150,7 +152,7 @@ export function buildListingDto(values: ListingFormValues): CreateListingDto {
       packaging: serializePackaging(position.packaging),
     })),
     address: {
-      country: "Россия",
+      country: addressCountryName(values.addressCountry),
       city: values.city.trim(),
       region: values.region.trim() || null,
       street: values.street.trim() || null,

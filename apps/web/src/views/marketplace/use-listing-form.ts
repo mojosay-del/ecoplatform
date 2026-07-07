@@ -7,11 +7,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import type { MarketplaceAddressSuggestion, MarketplaceListingDetail } from "@ecoplatform/shared";
+import type { BillingStatus, MarketplaceAddressSuggestion, MarketplaceListingDetail } from "@ecoplatform/shared";
 import { LISTING_MIN_WEIGHT_KG } from "@ecoplatform/shared";
 import type { PhoneCountryId } from "../../components/auth/types";
 import { ApiError, api, apiDeleteFile } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { addressCountryCodeFromName, companyAddressToDraft } from "../../lib/company-address";
 import { invalidateQueryFamilies, queryKeys } from "../../lib/query";
 import { useApiQuery } from "../shared";
 import { formatWeight, useNomenclatureOptions } from "./listing-ui";
@@ -48,6 +49,11 @@ export function useListingForm(listingId?: string) {
     listingId ? queryKeys.marketplace.detail(listingId) : null,
     () => api.marketplace.get(listingId as string),
     null as MarketplaceListingDetail | null,
+  );
+  const { data: billingStatus } = useApiQuery<BillingStatus | null>(
+    listingId ? null : queryKeys.billing.status(),
+    () => api.billing.status(),
+    null,
   );
 
   const [positions, setPositions] = useState<PositionForm[]>([emptyPosition()]);
@@ -152,6 +158,7 @@ export function useListingForm(listingId?: string) {
     setAddressQuery(suggestion.value);
     setAddressSuggestions([]);
     setAddressSuggestState("idle");
+    setAddressCountry(addressCountryCodeFromName(suggestion.address.country));
     setRegion(suggestion.address.region ?? "");
     setCity(suggestion.address.city);
     setStreet(suggestion.address.street ?? "");
@@ -180,6 +187,7 @@ export function useListingForm(listingId?: string) {
     setStreet(existing.address?.street ?? "");
     setBuilding(existing.address?.building ?? "");
     setPostcode(existing.address?.postcode ?? "");
+    setAddressCountry(addressCountryCodeFromName(existing.address?.country));
     setAddressQuery(existing.address?.formatted ?? "");
     const parsedPhone = parsePhone(existing.contactPhone ?? "");
     setPhoneCountry(parsedPhone.countryId);
@@ -193,6 +201,22 @@ export function useListingForm(listingId?: string) {
     setMedia(existing.media.map((item) => ({ fileId: item.fileId, kind: item.kind === "video" ? "video" : "photo" })));
     setPrefilled(true);
   }, [existing, prefilled]);
+
+  // Новое объявление получает адрес компании как стартовое значение, но только
+  // пока пользователь сам не начал вводить адрес отгрузки.
+  useEffect(() => {
+    if (listingId || prefilled || city.trim() || addressQuery.trim()) return;
+    const draft = companyAddressToDraft(billingStatus?.factualAddress);
+    if (!draft.city.trim()) return;
+    setAddressCountry(draft.countryCode);
+    setAddressQuery(draft.query);
+    setRegion(draft.region);
+    setCity(draft.city);
+    setStreet(draft.street);
+    setBuilding(draft.building);
+    setPostcode(draft.postcode);
+    setPrefilled(true);
+  }, [addressQuery, billingStatus?.factualAddress, city, listingId, prefilled]);
 
   function updatePosition(index: number, patch: Partial<PositionForm>) {
     setPositions((prev) => prev.map((position, i) => (i === index ? { ...position, ...patch } : position)));
@@ -253,6 +277,7 @@ export function useListingForm(listingId?: string) {
   function currentValues(): ListingFormValues {
     return {
       positions,
+      addressCountry,
       city,
       region,
       street,
