@@ -1,0 +1,143 @@
+/* documentation/nav.css — мобильный drawer навигации по реестру и топбар-триггер. */
+
+.doc-topbar-nav-trigger {
+  border-color: rgb(var(--brand-rgb) / 0.42);
+  background: var(--brand);
+  color: var(--text-inverse);
+  box-shadow: 0 10px 22px rgb(var(--brand-rgb) / 0.18);
+}
+
+.doc-topbar-nav-trigger:hover {
+  border-color: var(--brand-hover);
+  background: var(--brand-hover);
+  color: var(--text-inverse);
+}
+
+.doc-nav-kicker {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.doc-nav-drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 980;
+  display: none;
+  justify-content: flex-end;
+}
+
+.doc-nav-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgb(var(--shadow-deep-rgb) / 0.38);
+  cursor: pointer;
+  animation: doc-nav-fade-in 160ms ease;
+}
+
+.doc-nav-drawer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 42px));
+  height: 100dvh;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: -20px 0 42px -22px rgb(var(--black-rgb) / 0.28);
+  animation: doc-nav-slide-in 210ms ease;
+  overscroll-behavior: contain;
+}
+
+.doc-nav-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(18px + env(safe-area-inset-top)) 16px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.doc-nav-drawer-head h2 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.doc-nav-drawer-close {
+  display: inline-grid;
+  flex: 0 0 44px;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.doc-nav-drawer-close:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+  background: var(--panel-soft);
+}
+
+.doc-nav-drawer-close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.doc-nav-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 14px calc(24px + env(safe-area-inset-bottom));
+}
+
+/* В drawer сайдбар растягивается на всю ширину, без липкости и правой линии. */
+.doc-nav-drawer-body .doc-sidebar {
+  position: static;
+  max-height: none;
+  overflow: visible;
+  border-right: 0;
+  padding: 0;
+}
+
+@keyframes doc-nav-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes doc-nav-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 1180px) {
+  .doc-nav-drawer-root {
+    display: flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc-nav-drawer-backdrop,
+  .doc-nav-drawer {
+    animation: none !important;
+  }
+}

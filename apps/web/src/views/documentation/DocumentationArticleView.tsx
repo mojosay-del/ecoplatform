@@ -1,104 +1,77 @@
 "use client";
-import "../../styles/documentation.css";
 
-// Страница документа: описание (блоки) + панель скачивания с форматом, версией и
-// датой «действует с». Фокусный вид для чтения и скачивания.
+// Тонкий вход страницы документа: грузит дерево реестра и сам документ, разбирает
+// состояния доступа/ошибок (включая 404 → «Документ не найден») и делегирует «Делу».
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
-import { ArrowLeft, Download } from "lucide-react";
-import type { DocumentationDetail } from "@ecoplatform/shared";
+import { ArchiveX, ArrowLeft } from "lucide-react";
+import type { DocumentationDetail, DocumentationNode } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
 import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/query";
 import { AccessClosed, AuthRequired, ErrorState, PageHeader, useApiQuery } from "../shared";
-import { ContentBlocks } from "../content-blocks";
-import { FormatBadge } from "./components";
-import { formatBytes, formatRuDate } from "./doc-helpers";
-import { triggerDocumentDownload } from "./download";
+import { DocumentPage } from "./document/DocumentPage";
 
 export function DocumentationArticleView({ slug }: { slug: string }) {
-  const [downloadError, setDownloadError] = useState<string | null>(null);
-  const { data, state, errorMessage } = useApiQuery<DocumentationDetail | null>(
-    `doc:${slug}`,
+  const tree = useApiQuery(queryKeys.documentation.tree(), () => api.documentation.tree(), [] as DocumentationNode[]);
+  const document = useApiQuery<DocumentationDetail | null>(
+    queryKeys.documentation.document(slug),
     () => api.documentation.getDocument(slug),
     null,
   );
 
-  const onDownload = useCallback(async () => {
-    if (!data) return;
-    setDownloadError(null);
-    const message = await triggerDocumentDownload(data);
-    if (message) setDownloadError(message);
-  }, [data]);
-
-  if (state === "unauthenticated") return <AuthRequired title="Документация" />;
-  if (state === "forbidden") return <AccessClosed title="Документация" />;
-  if (state === "error") return <ErrorState title="Документация" message={errorMessage} />;
-  if (!data) {
-    return (
-      <AppShell>
-        <section className="page">
-          <PageHeader title="Документация" />
-          <div className="page-skeleton-body page-skeleton-article" aria-busy="true">
-            <div className="page-skeleton-bar w-3-4" />
-            <div className="page-skeleton-bar w-2-3" />
-            <div className="page-skeleton-bar w-full" />
-            <div className="page-skeleton-bar w-1-2" />
-          </div>
-        </section>
-      </AppShell>
-    );
+  if (tree.state === "unauthenticated" || document.state === "unauthenticated") {
+    return <AuthRequired title="Документация" />;
+  }
+  if (tree.state === "forbidden" || document.state === "forbidden") {
+    return <AccessClosed title="Документация" />;
+  }
+  if (document.state === "error" && document.errorStatus === 404) {
+    return <DocumentNotFound />;
+  }
+  if (tree.state === "error" || document.state === "error") {
+    return <ErrorState title="Документация" message={tree.errorMessage ?? document.errorMessage} />;
+  }
+  if (!document.data) {
+    return <DocumentLoadingState />;
   }
 
-  const effective = formatRuDate(data.effectiveDate);
+  return <DocumentPage active={document.data} tree={tree.data} />;
+}
+
+function DocumentNotFound() {
   return (
     <AppShell>
-      <section className="page doc-detail-page">
-        <Link className="doc-back" href="/documentation">
-          <ArrowLeft size={15} aria-hidden="true" />
-          Вся документация
-        </Link>
-        <header className="doc-detail-head">
-          {data.breadcrumbs.length > 0 ? (
-            <p className="doc-detail-crumbs">{data.breadcrumbs.map((crumb) => crumb.title).join(" / ")}</p>
-          ) : null}
-          <h1>{data.title}</h1>
-          {data.subtitle ? <p className="doc-detail-sub">{data.subtitle}</p> : null}
-          {data.version || effective ? (
-            <div className="doc-detail-pills">
-              {data.version ? <span className="doc-pill">Версия {data.version}</span> : null}
-              {effective ? <span className="doc-pill doc-pill-date">Действует с {effective}</span> : null}
-            </div>
-          ) : null}
-        </header>
-        <div className="doc-detail-body">
-          <article className="doc-detail-content">
-            {data.blocks.length > 0 ? (
-              <ContentBlocks blocks={data.blocks} />
-            ) : (
-              <p className="page-subtitle">Описание появится после наполнения документа.</p>
-            )}
-          </article>
-          <aside className="doc-download-panel" aria-label="Файл документа">
-            {data.file ? (
-              <>
-                <FormatBadge format={data.file.format} />
-                <p className="doc-file-name">{data.file.fileName}</p>
-                <p className="doc-file-size">{formatBytes(data.file.sizeBytes)}</p>
-                <button type="button" className="doc-dl is-block" onClick={onDownload}>
-                  <Download size={15} aria-hidden="true" />
-                  Скачать
-                </button>
-                {downloadError ? (
-                  <p className="doc-download-error is-panel" role="alert">
-                    {downloadError}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className="page-subtitle">Файл не прикреплён.</p>
-            )}
-          </aside>
+      <section className="page doc-page">
+        <div className="doc-not-found">
+          <span aria-hidden="true" className="doc-not-found-icon">
+            <ArchiveX size={30} strokeWidth={1.8} />
+          </span>
+          <h1 className="doc-not-found-title">Документ не найден</h1>
+          <p className="doc-not-found-text">
+            Такого дела в реестре нет — возможно, документ переименовали или сняли с публикации.
+          </p>
+          <Link className="button" href="/documentation">
+            <ArrowLeft aria-hidden="true" size={16} strokeWidth={2.4} />
+            Весь реестр
+          </Link>
+        </div>
+      </section>
+    </AppShell>
+  );
+}
+
+function DocumentLoadingState() {
+  return (
+    <AppShell>
+      <section className="page">
+        <PageHeader title="Документация" />
+        <div className="page-skeleton-body page-skeleton-article" aria-busy="true">
+          <div className="page-skeleton-bar w-3-4" />
+          <div className="page-skeleton-bar w-2-3" />
+          <div className="page-skeleton-bar w-full" />
+          <div className="page-skeleton-bar w-full" />
+          <div className="page-skeleton-bar w-1-2" />
         </div>
       </section>
     </AppShell>

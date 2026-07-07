@@ -1,0 +1,90 @@
+/* documentation/search.css — строка поиска реестра (общий примитив
+   AnimatedSearchPlaceholder завязан на .doc-search в globals.css). */
+
+.doc-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--content-hero-search-height);
+  padding: 0 var(--content-hero-search-inline-padding);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--content-hero-search-radius);
+  background: var(--surface-elevated);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-card);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.doc-search:focus-within {
+  border-color: var(--brand);
+  box-shadow: var(--focus-ring);
+}
+
+.doc-search input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 13px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--content-hero-search-font-size);
+  text-align: center;
+}
+
+.doc-search-placeholder {
+  position: absolute;
+  inset: 0 var(--content-hero-search-inline-padding);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--content-hero-search-font-size);
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.doc-search input::-webkit-search-cancel-button,
+.doc-search input::-webkit-search-decoration {
+  appearance: none;
+}
+
+.doc-search-reset {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.doc-search-reset:hover {
+  background: var(--surface-muted-strong);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.doc-search-reset:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
