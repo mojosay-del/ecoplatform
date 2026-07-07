@@ -104,6 +104,14 @@ export const queryKeys = {
     article: (slug: string) => ["knowledge-base", "article", slug] as const,
     search: (q: string) => ["knowledge-base", "search", q.trim()] as const,
   },
+  documentation: {
+    all: ["documentation"] as const,
+    tree: () => ["documentation", "tree"] as const,
+    pinned: () => ["documentation", "pinned"] as const,
+    recent: (limit: number) => ["documentation", "recent", limit] as const,
+    document: (slug: string) => ["documentation", "document", slug] as const,
+    search: (q: string) => ["documentation", "search", q.trim()] as const,
+  },
   marketplace: {
     all: ["marketplace"] as const,
     listings: (input: MarketplaceFeedInput = {}) =>
