@@ -1,6 +1,6 @@
 import { NotFoundException } from "@nestjs/common";
 import { CompanyStatus, NotificationCategory, SubscriptionStatus } from "@prisma/client";
-import type { ManualSubscriptionDto } from "@ecoplatform/shared";
+import { subscriptionPlanLabel, type ManualSubscriptionDto } from "@ecoplatform/shared";
 import { computeDiff } from "../common/admin-action-log.service";
 import { toPrismaJson } from "../common/prisma-json";
 import { swallowAndLog } from "../common/silent-catch";
@@ -147,7 +147,7 @@ export async function notifyManualActivation(
           sourceId: result.subscription.id,
           category: NotificationCategory.billing,
           title: "Подписка активирована",
-          body: `Активирован тариф ${input.plan} до ${formatBillingNotificationDateTime(result.subscription.endsAt)}.`,
+          body: `Активирован тариф «${subscriptionPlanLabel(input.plan)}» до ${formatBillingNotificationDateTime(result.subscription.endsAt)}.`,
           link: "/account",
           payload: { plan: input.plan, endsAt: result.subscription.endsAt },
         })

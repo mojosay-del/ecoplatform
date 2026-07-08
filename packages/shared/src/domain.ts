@@ -14,6 +14,18 @@ export const subscriptionPlans = ["basic", "extended"] as const;
 
 export type SubscriptionPlan = (typeof subscriptionPlans)[number];
 
+// Русские названия тарифов для уведомлений/писем. Единый источник, чтобы ручная
+// и самостоятельная активация не расходились (раньше ручная выводила сырой код
+// «extended» вместо «Расширенная»).
+export const SUBSCRIPTION_PLAN_LABELS: Record<SubscriptionPlan, string> = {
+  basic: "Базовая",
+  extended: "Расширенная",
+};
+
+export function subscriptionPlanLabel(plan: string): string {
+  return SUBSCRIPTION_PLAN_LABELS[plan as SubscriptionPlan] ?? plan;
+}
+
 export const companyTypes = ["collector", "trader", "processor"] as const;
 
 export type CompanyType = (typeof companyTypes)[number];

@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { CompanyStatus, NotificationCategory, SubscriptionStatus } from "@prisma/client";
-import type { SelfSubscriptionDto } from "@ecoplatform/shared";
+import { subscriptionPlanLabel, type SelfSubscriptionDto } from "@ecoplatform/shared";
 import { computeDiff } from "../common/admin-action-log.service";
 import { toPrismaJson } from "../common/prisma-json";
 import { swallowAndLog } from "../common/silent-catch";
@@ -158,7 +158,7 @@ export async function notifySelfActivation(
     where: { companyId: result.company.id },
     select: { id: true },
   });
-  const planLabel = input.plan === "basic" ? "Базовая" : "Расширенная";
+  const planLabel = subscriptionPlanLabel(input.plan);
   await Promise.all(
     users.map((user) =>
       notifications
