@@ -11,6 +11,7 @@ import { adminApi } from "./admin-endpoints";
 import { companyMembersApi } from "./company-members-endpoints";
 import { documentationApi, indicesApi, knowledgeBaseApi, learningApi, newsApi } from "./content-endpoints";
 import { forumApi } from "./forum-endpoints";
+import { geoApi } from "./geo-endpoints";
 import { marketplaceApi } from "./marketplace-endpoints";
 import {
   accountApi,
@@ -32,6 +33,7 @@ export const api = {
   account: accountApi,
   companyMembers: companyMembersApi,
   indices: indicesApi,
+  geo: geoApi,
   marketplace: marketplaceApi,
   learning: learningApi,
   knowledgeBase: knowledgeBaseApi,
