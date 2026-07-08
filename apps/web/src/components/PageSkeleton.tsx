@@ -65,8 +65,6 @@ export function PageSkeleton({
         </div>
       </main>
       <footer className="app-shell-footer app-shell-loading-footer" aria-hidden="true">
-        <strong>ЭкоПлатформа</strong>
-        <span className="app-shell-footer-separator" />
         <span className="app-shell-loading-footer-line" />
       </footer>
     </div>

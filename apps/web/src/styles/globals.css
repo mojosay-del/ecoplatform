@@ -3915,28 +3915,46 @@ input[type="checkbox"]:focus-visible {
   position: relative;
   z-index: 25;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px 14px;
-  min-height: 52px;
-  padding: 10px 24px;
-  border-top: 0;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px 24px 22px;
+  border-top: 1px solid var(--line);
   background: var(--panel);
   color: var(--text-muted);
-  font-size: 12px;
-}
-
-.app-shell-footer strong {
-  color: var(--text);
   font-size: 13px;
 }
 
-.app-shell-footer-links {
+.app-shell-footer-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1.2fr 1fr;
+  gap: 24px 32px;
+  align-items: start;
+}
+
+.app-shell-footer-brand-col strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.app-shell-footer-brand-col p {
+  margin: 0;
+  max-width: 34ch;
+  line-height: 1.5;
+}
+
+.app-shell-footer-col {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 12px;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-shell-footer-col-title {
+  margin-bottom: 2px;
+  color: var(--text);
+  font-weight: 600;
 }
 
 .app-shell-footer a {
@@ -3949,14 +3967,52 @@ input[type="checkbox"]:focus-visible {
   text-decoration: underline;
 }
 
-.app-shell-footer-separator {
-  width: 1px;
-  height: 16px;
-  background: var(--line);
+.app-shell-footer-muted {
+  color: var(--text-subtle);
 }
 
-.app-shell-footer-copyright {
-  color: var(--text-muted);
+.app-shell-footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+.app-shell-footer-requisites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.app-shell-footer-disclaimer {
+  margin: 0;
+  max-width: 56ch;
+}
+
+/* Загрузочный скелет футера — остаётся тонкой центрированной полосой. */
+.app-shell-loading-footer {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 10px 24px;
+}
+
+@media (max-width: 720px) {
+  .app-shell-footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 440px) {
+  .app-shell-footer-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Компактный футер со ссылками под формой или маркетинговой карточкой. */
