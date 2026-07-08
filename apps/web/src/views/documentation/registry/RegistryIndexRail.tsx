@@ -5,11 +5,14 @@
 
 import { useReducedMotion } from "motion/react";
 import type { DocumentationNode } from "@ecoplatform/shared";
-import { useRegistryScrollSpy } from "../use-registry-scroll-spy";
+import { useScrollSpy } from "../../../lib/use-scroll-spy";
 
 export function RegistryIndexRail({ sections, codes }: { sections: DocumentationNode[]; codes: Map<string, string> }) {
   const reducedMotion = useReducedMotion();
-  const activeSlug = useRegistryScrollSpy(sections.map((node) => node.slug));
+  const activeSlug = useScrollSpy(
+    sections.map((node) => node.slug),
+    "data-registry-slug",
+  );
 
   if (sections.length < 2) return null;
 

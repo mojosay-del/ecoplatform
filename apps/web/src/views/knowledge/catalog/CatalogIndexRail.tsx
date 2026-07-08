@@ -5,11 +5,14 @@
 
 import { useReducedMotion } from "motion/react";
 import type { KnowledgeNode } from "@ecoplatform/shared";
-import { useCatalogScrollSpy } from "../use-catalog-scroll-spy";
+import { useScrollSpy } from "../../../lib/use-scroll-spy";
 
 export function CatalogIndexRail({ categories, codes }: { categories: KnowledgeNode[]; codes: Map<string, string> }) {
   const reducedMotion = useReducedMotion();
-  const activeSlug = useCatalogScrollSpy(categories.map((node) => node.slug));
+  const activeSlug = useScrollSpy(
+    categories.map((node) => node.slug),
+    "data-catalog-slug",
+  );
 
   if (categories.length < 2) return null;
 
