@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ChevronLeft, MessageSquare, Plus, X } from "lucide-react";
+import { ChevronLeft, MessageSquare, Plus, Send, Tag, X } from "lucide-react";
 import { supportTicketCategories } from "@ecoplatform/shared";
 import "./support-drawer.css";
-import { SendActionIcon } from "./app-shell/nav-icons";
+import { AuthSelect } from "./auth/auth-select";
 import { StatusPill, supportStatusPillVariant } from "./StatusPill";
 import { errorText, api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -88,6 +88,8 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
   const [tab, setTab] = useState<"list" | "new">("list");
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [category, setCategory] = useState<string>("technical");
+  const categoryLabelId = useId();
   const ticketsQuery = useInfiniteApiQuery<Ticket>(
     open && token ? "support-drawer-tickets" : null,
     30,
@@ -136,7 +138,12 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
         subject: String(form.get("subject")),
         text: String(form.get("text")),
       },
-      { onSuccess: () => formElement.reset() },
+      {
+        onSuccess: () => {
+          formElement.reset();
+          setCategory("technical");
+        },
+      },
     );
   }
 
@@ -236,16 +243,23 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
               </div>
             ) : (
               <form className="support-drawer-body support-drawer-form" onSubmit={onSubmit}>
-                <label className="form-field">
-                  <span>Категория</span>
-                  <select className="select" name="category" defaultValue="technical">
-                    {supportTicketCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {SUPPORT_CATEGORY_LABELS[category] ?? category}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="form-field">
+                  <span className="form-field-label" id={categoryLabelId}>
+                    Категория
+                  </span>
+                  <AuthSelect
+                    icon={Tag}
+                    label="Категория"
+                    labelId={categoryLabelId}
+                    name="category"
+                    value={category}
+                    options={supportTicketCategories.map((value) => ({
+                      value,
+                      label: SUPPORT_CATEGORY_LABELS[value] ?? value,
+                    }))}
+                    onChange={setCategory}
+                  />
+                </div>
                 <label className="form-field">
                   <span>Тема</span>
                   <input className="input" name="subject" placeholder="Коротко опишите вопрос" required minLength={3} />
@@ -262,7 +276,7 @@ export function UserSupportDrawer({ open, onClose }: DrawerProps) {
                   />
                 </label>
                 <button className="button" type="submit" disabled={createTicket.isPending}>
-                  <SendActionIcon size={18} />
+                  <Send size={18} aria-hidden="true" />
                   {createTicket.isPending ? "Отправляю…" : "Отправить обращение"}
                 </button>
                 {message ? <p className="support-drawer-flash">{message}</p> : null}
@@ -383,7 +397,7 @@ function TicketThread({ ticket, onReplied }: { ticket: Ticket; onReplied: () => 
               title={sendReply.isPending ? "Отправляем ответ" : "Ответить"}
               type="submit"
             >
-              <SendActionIcon size={22} />
+              <Send size={20} aria-hidden="true" />
             </button>
           </div>
         </form>

@@ -268,7 +268,10 @@
 }
 .support-drawer-message.from-user .support-drawer-message-avatar,
 .support-drawer-composer-avatar {
-  background: var(--text);
+  /* background-color (не shorthand): иначе сбрасывались бы background-size/position
+     из .has-image, и аватар в чате рисовался бы «чёрным кругом» — картинка
+     натуральным размером в углу поверх тёмной заливки. */
+  background-color: var(--text);
   color: var(--white);
   box-shadow: none;
 }
