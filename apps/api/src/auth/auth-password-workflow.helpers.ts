@@ -1,6 +1,7 @@
 import { BadRequestException, UnauthorizedException } from "@nestjs/common";
 import { compare, hash } from "bcryptjs";
 import { MIN_PASSWORD_LENGTH } from "@ecoplatform/shared";
+import { EmailService } from "../email/email.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
 import { PasswordPolicyService } from "./password-policy.service";
@@ -9,6 +10,7 @@ export type AuthPasswordWorkflowDeps = {
   prisma: PrismaService;
   passwordPolicy: PasswordPolicyService;
   sessionCache: SessionCacheService;
+  email: EmailService;
 };
 
 /**
@@ -56,6 +58,11 @@ export async function changeAuthUserPassword(
     });
   });
   await deps.sessionCache.invalidateUser(userId);
+
+  // Уведомляем владельца о смене пароля (best-effort — сбой письма не должен
+  // ломать саму смену). Если менял не он — в письме совет завершить все сессии
+  // и сменить пароль.
+  await deps.email.sendPasswordChangedAlert({ to: user.email }).catch(() => undefined);
 
   return { ok: true };
 }

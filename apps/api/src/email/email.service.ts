@@ -61,9 +61,39 @@ export class EmailService {
       ...input,
       subject: "Код подтверждения изменения профиля",
       actionText: `Ваш код для изменения ${fieldLabel}:`,
-      ignoreText: "Если вы не меняли данные профиля, просто проигнорируйте это письмо.",
+      ignoreText:
+        "Если вы не запрашивали изменение — не сообщайте код никому, завершите все сессии и смените пароль в личном кабинете.",
       warnContext: "account contact change",
     });
+  }
+
+  // Алерт о смене пароля: уходит владельцу аккаунта после успешной смены.
+  // Best-effort — вызывающий код проглатывает ошибку, смена пароля уже применена.
+  async sendPasswordChangedAlert(input: { to: string }): Promise<void> {
+    if (this.deliveryDisabled()) {
+      return;
+    }
+
+    const config = this.smtpConfig();
+    const transporter = this.getTransporter(config);
+    const lines = [
+      "Пароль на вашем аккаунте ЭкоПлатформы изменён.",
+      "Если это были вы — никаких действий не требуется, остальные сессии уже завершены.",
+      "Если это были не вы — срочно завершите все сессии и смените пароль.",
+    ];
+
+    try {
+      await this.sendMailWithTimeout(transporter, config.sendTimeoutMs, {
+        from: config.from,
+        to: input.to,
+        subject: "Пароль аккаунта изменён",
+        text: lines.join("\n"),
+        html: lines.map((line) => `<p>${line}</p>`).join(""),
+      });
+    } catch (error) {
+      // Алерт — best-effort: пароль уже сменён, падать на письме нельзя.
+      this.logger.warn(`SMTP password-changed alert failed: ${smtpErrorCode(error)}`);
+    }
   }
 
   // M-9: код на НОВЫЙ email — подтверждение владения новым адресом (вторая

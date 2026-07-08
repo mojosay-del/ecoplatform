@@ -395,6 +395,7 @@ export class AuthService {
       prisma: this.prisma,
       passwordPolicy: this.passwordPolicy,
       sessionCache: this.sessionCache,
+      email: this.email,
     };
   }
 
