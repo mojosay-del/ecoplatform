@@ -11,10 +11,14 @@ import {
   type AddressCountryCode,
   type AddressDraft,
 } from "../../lib/company-address";
+import { PhoneInput } from "../../components/auth/phone-input";
+import type { PhoneCountryId } from "../../components/auth/types";
+import { formatPhoneFull, getPhoneCountry } from "../../components/auth/utils";
 import { errorText, api } from "../../lib/api";
 import { queryKeys } from "../../lib/query";
 import { COMPANY_FIELD_CONFIG } from "./constants";
 import { useAccountDialogBodyLock } from "./hooks";
+import { phoneStateFromValue } from "./personal-profile-utils";
 import { AccountDetailList, AccountEditableValue } from "./shared";
 import type { CompanyEditableField, CompanyFormState } from "./types";
 
@@ -46,6 +50,10 @@ export function CompanyProfileForm({
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  // Телефон компании редактируется тем же PhoneInput, что и в регистрации/личных
+  // данных (страна + маска), но без подтверждения по почте — сохраняется сразу.
+  const [phoneCountryId, setPhoneCountryId] = useState<PhoneCountryId>("ru");
+  const [phoneDigits, setPhoneDigits] = useState("");
   const activeFieldConfig = editingField ? COMPANY_FIELD_CONFIG[editingField] : null;
 
   // Если внешние данные billing изменились (например, после успешного сейва) —
@@ -63,6 +71,11 @@ export function CompanyProfileForm({
   function openEditDialog(field: CompanyEditableField) {
     setForm(billingToFormState(billing));
     setMessage(null);
+    if (field === "corporatePhone") {
+      const phone = phoneStateFromValue(billing.corporatePhone ?? "");
+      setPhoneCountryId(phone.countryId);
+      setPhoneDigits(phone.digits);
+    }
     setEditingField(field);
   }
 
@@ -83,12 +96,28 @@ export function CompanyProfileForm({
     if (!editingField) return;
 
     setMessage(null);
+
+    let dto: CompanyProfileUpdateDto;
+    if (editingField === "corporatePhone") {
+      if (phoneDigits.length === 0) {
+        dto = { corporatePhone: null };
+      } else {
+        const fullPhone = formatPhoneFull(getPhoneCountry(phoneCountryId), phoneDigits);
+        if (!fullPhone) {
+          setMessage({ type: "error", text: "Введите полный номер телефона." });
+          return;
+        }
+        dto = { corporatePhone: fullPhone };
+      }
+    } else {
+      const trimmedValue = form[editingField].trim();
+      dto =
+        editingField === "organizationName"
+          ? { organizationName: trimmedValue }
+          : { [editingField]: trimmedValue || null };
+    }
+
     setSaving(true);
-    const trimmedValue = form[editingField].trim();
-    const dto: CompanyProfileUpdateDto =
-      editingField === "organizationName"
-        ? { organizationName: trimmedValue }
-        : { [editingField]: trimmedValue || null };
     try {
       const updated = await api.billing.updateCompanyProfile(dto);
       handleSaved(updated);
@@ -193,20 +222,34 @@ export function CompanyProfileForm({
               </button>
             </header>
             <form className="account-form account-password-modal-form" onSubmit={onSubmit}>
-              <label>
-                <span>{activeFieldConfig.inputLabel}</span>
-                {/* eslint-disable jsx-a11y/no-autofocus -- автофокус первого поля переносит фокус в модалку при открытии (корректно для диалога) */}
-                <input
-                  autoFocus
-                  className="input"
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => setField(editingField, event.target.value)}
-                  placeholder={activeFieldConfig.placeholder}
-                  required={activeFieldConfig.required}
-                  type={activeFieldConfig.type}
-                  value={form[editingField]}
-                />
-                {/* eslint-enable jsx-a11y/no-autofocus */}
-              </label>
+              {editingField === "corporatePhone" ? (
+                 
+                <label>
+                  <span>{activeFieldConfig.inputLabel}</span>
+                  <PhoneInput
+                    name="corporatePhone"
+                    countryId={phoneCountryId}
+                    digits={phoneDigits}
+                    onCountryChange={setPhoneCountryId}
+                    onDigitsChange={setPhoneDigits}
+                  />
+                </label>
+              ) : (
+                <label>
+                  <span>{activeFieldConfig.inputLabel}</span>
+                  {/* eslint-disable jsx-a11y/no-autofocus -- автофокус первого поля переносит фокус в модалку при открытии (корректно для диалога) */}
+                  <input
+                    autoFocus
+                    className="input"
+                    onChange={(event: ChangeEvent<HTMLInputElement>) => setField(editingField, event.target.value)}
+                    placeholder={activeFieldConfig.placeholder}
+                    required={activeFieldConfig.required}
+                    type={activeFieldConfig.type}
+                    value={form[editingField]}
+                  />
+                  {/* eslint-enable jsx-a11y/no-autofocus */}
+                </label>
+              )}
               {message?.type === "error" ? (
                 <p className="account-form-message account-form-message-error">{message.text}</p>
               ) : null}
@@ -277,7 +320,7 @@ function CompanyAddressDialog({
     let cancelled = false;
     setSuggestState("loading");
     const timer = window.setTimeout(() => {
-      api.marketplace
+      api.geo
         .addressSuggest(query, draft.countryCode)
         .then((nextSuggestions) => {
           if (cancelled || requestRef.current !== requestId) return;

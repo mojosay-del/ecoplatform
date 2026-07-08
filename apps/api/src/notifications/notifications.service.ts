@@ -27,6 +27,7 @@ const MUTABLE_CATEGORIES = new Set<NotificationCategory>([
   NotificationCategory.billing,
   NotificationCategory.moderation,
   NotificationCategory.support,
+  NotificationCategory.forum,
 ]);
 
 const DISABLED_CATEGORIES = new Set<NotificationCategory>([NotificationCategory.security]);

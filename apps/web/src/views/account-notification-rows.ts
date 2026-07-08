@@ -22,6 +22,11 @@ export const ACCOUNT_NOTIFICATION_ROWS: AccountNotificationRow[] = [
     label: "Поддержка",
     description: "Ответы администратора и статусы обращений.",
   },
+  {
+    category: "forum",
+    label: "Форум",
+    description: "Ответы на ваши вопросы и отметки решением.",
+  },
 ];
 
 export function accountNotificationRowsForRoles(_roles: PlatformRole[]): AccountNotificationRow[] {

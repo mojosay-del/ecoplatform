@@ -329,7 +329,6 @@ export function ContactChangeDialog({
                         ? "Подготавливаем письмо с кодом подтверждения."
                         : "Код придёт на текущий email аккаунта после нажатия на кнопку."}
                 </p>
-                {activeCodeTarget ? <span className="account-contact-target">Код действует до {expiresAt}</span> : null}
               </div>
             </div>
             {verification ? (
