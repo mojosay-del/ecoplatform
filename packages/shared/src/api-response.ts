@@ -499,6 +499,8 @@ export type AuthMeUser = {
 
 export type AuthMeFeatures = {
   marketplace: boolean;
+  analyticsMap: boolean;
+  participantMap: boolean;
 };
 
 export type AuthMeCompany = {

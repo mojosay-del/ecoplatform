@@ -19,7 +19,7 @@ describe("AppShell future navigation teasers", () => {
     expect(appNavSections[0]?.items.map((item) => item.label)).toEqual(["Новости", "Индексы цен", "Форум"]);
     expect(appNavSections[1]?.items.map((item) => item.label)).toEqual(["Обучение", "Сырьё", "Документация"]);
     expect(appNavSections[2]?.items.map((item) => item.label)).toEqual([
-      "Калькулятор",
+      "Калькулятор заявки",
       "Продажные цены",
       "Карта аналитики",
       "Карта участников",
@@ -41,7 +41,11 @@ describe("AppShell future navigation teasers", () => {
   it("hides marketplace while the feature is disabled", () => {
     const labelsFor = (companyType: CompanyType | null, roles: string[] = [], marketplace = false) =>
       appNavSections.flatMap((section) =>
-        filterVisibleItems(section.items, { roles, companyType, features: { marketplace } }).map((item) => item.label),
+        filterVisibleItems(section.items, {
+          roles,
+          companyType,
+          features: { marketplace, analyticsMap: false, participantMap: false },
+        }).map((item) => item.label),
       );
 
     expect(labelsFor("collector")).not.toContain("Торговая площадка");
@@ -52,6 +56,19 @@ describe("AppShell future navigation teasers", () => {
     expect(labelsFor("trader", [], true)).toContain("Торговая площадка");
     expect(labelsFor("processor", [], true)).toContain("Торговая площадка");
     expect(labelsFor(null, ["content_manager"], true)).toContain("Торговая площадка");
+  });
+
+  it("hides the analytics/participant maps while their features are disabled", () => {
+    const labelsFor = (features: { marketplace: boolean; analyticsMap: boolean; participantMap: boolean }) =>
+      appNavSections.flatMap((section) =>
+        filterVisibleItems(section.items, { roles: [], companyType: "collector", features }).map((item) => item.label),
+      );
+
+    const allOff = { marketplace: false, analyticsMap: false, participantMap: false };
+    expect(labelsFor(allOff)).not.toContain("Карта аналитики");
+    expect(labelsFor(allOff)).not.toContain("Карта участников");
+    expect(labelsFor({ ...allOff, analyticsMap: true })).toContain("Карта аналитики");
+    expect(labelsFor({ ...allOff, participantMap: true })).toContain("Карта участников");
   });
 
   it("keeps admin routes behind one panel entry in the sidebar", () => {
@@ -79,10 +96,10 @@ describe("AppShell future navigation teasers", () => {
         filterVisibleItems(section.items, { roles, companyType }).map((item) => item.label),
       );
 
-    expect(labelsFor("collector")).toContain("Калькулятор");
-    expect(labelsFor("trader")).not.toContain("Калькулятор");
-    expect(labelsFor("processor")).not.toContain("Калькулятор");
-    expect(labelsFor(null, ["content_manager"])).toContain("Калькулятор");
+    expect(labelsFor("collector")).toContain("Калькулятор заявки");
+    expect(labelsFor("trader")).not.toContain("Калькулятор заявки");
+    expect(labelsFor("processor")).not.toContain("Калькулятор заявки");
+    expect(labelsFor(null, ["content_manager"])).toContain("Калькулятор заявки");
   });
 
   it("keeps account and notification links out of the global sidebar", () => {

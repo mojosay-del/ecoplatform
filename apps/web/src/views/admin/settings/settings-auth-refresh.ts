@@ -1,7 +1,9 @@
-type AuthFeatureKey = "marketplace";
+type AuthFeatureKey = "marketplace" | "analyticsMap" | "participantMap";
 
 const SETTING_AUTH_FEATURES = {
   "marketplace.enabled": "marketplace",
+  "maps.analytics_enabled": "analyticsMap",
+  "maps.participant_enabled": "participantMap",
 } as const satisfies Record<string, AuthFeatureKey>;
 
 export function shouldRefreshAuthAfterSettingChange(key: string): boolean {

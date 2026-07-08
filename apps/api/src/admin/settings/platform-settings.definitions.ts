@@ -54,6 +54,20 @@ export const platformSettingDefinitions = {
     schema: z.boolean(),
     default: false,
   },
+  "maps.analytics_enabled": {
+    label: "Карта аналитики",
+    description:
+      "Когда выключено — раздел «Карта аналитики» скрыт из меню. Раздел ещё в разработке; включайте по готовности.",
+    schema: z.boolean(),
+    default: false,
+  },
+  "maps.participant_enabled": {
+    label: "Карта участников",
+    description:
+      "Когда выключено — раздел «Карта участников» скрыт из меню. Раздел ещё в разработке; включайте по готовности.",
+    schema: z.boolean(),
+    default: false,
+  },
   "indices.stagnation_threshold_percent": {
     label: "Порог стагнации индексов (%)",
     description: "Если недельное изменение цены меньше этого порога по модулю — индекс показывает «стагнацию».",

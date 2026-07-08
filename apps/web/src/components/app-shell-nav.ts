@@ -56,12 +56,19 @@ export type AccountProfileModalId = "subscription" | "sessions" | "notifications
 export const ACCOUNT_SECTION_CHANGE_EVENT = "account:section-change";
 export const ACCOUNT_SECTION_NAVIGATE_EVENT = "account:section-navigate";
 
-const futureItem = (key: string, label: string, icon: NavIconKey, disabledHint: string): NavItem => ({
+const futureItem = (
+  key: string,
+  label: string,
+  icon: NavIconKey,
+  disabledHint: string,
+  feature?: keyof AuthMeFeatures,
+): NavItem => ({
   key,
   label,
   icon,
   disabled: true,
   disabledHint,
+  ...(feature ? { feature } : {}),
 });
 
 export const appNavSections: NavSection[] = [
@@ -93,7 +100,7 @@ export const appNavSections: NavSection[] = [
       {
         key: "calculator-retail",
         href: "/calculators/retail",
-        label: "Калькулятор",
+        label: "Калькулятор заявки",
         icon: "calculator",
         companyTypes: ["collector"],
       },
@@ -103,12 +110,14 @@ export const appNavSections: NavSection[] = [
         "Карта аналитики",
         "analytics-map",
         "Карта аналитики — географические срезы по рынку.",
+        "analyticsMap",
       ),
       futureItem(
         "participant-map",
         "Карта участников",
         "map",
         "Карта участников — география переработчиков, складов и логистики.",
+        "participantMap",
       ),
       {
         key: "marketplace",

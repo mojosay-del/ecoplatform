@@ -77,6 +77,8 @@ export async function getAuthMeUser(deps: AuthProfileDeps, userId: string): Prom
     platformRoles,
     features: {
       marketplace: await deps.settings.getValue("marketplace.enabled"),
+      analyticsMap: await deps.settings.getValue("maps.analytics_enabled"),
+      participantMap: await deps.settings.getValue("maps.participant_enabled"),
     },
     requiresReConsent: await hasPendingRequiredConsent(deps, userId),
     deletionRequestedAt: user.deletionRequestedAt?.toISOString() ?? null,
