@@ -64,13 +64,13 @@ describe("register-form helpers", () => {
     expect(canSubmitRegisterForm({ legalDocsCount: 0, passwordReady: true, requiredAccepted: true })).toBe(false);
     expect(getRegisterSubmitHint({ legalDocsCount: 0, passwordReady: true, requiredAccepted: true })).toBeNull();
     expect(getRegisterSubmitHint({ legalDocsCount: 2, passwordReady: false, requiredAccepted: false })).toBe(
-      "Отметьте обязательные согласия и доведите пароль до зелёного (минимум 12 символов, буква и цифра).",
+      "Отметьте обязательные согласия и доведите пароль до зелёного.",
     );
     expect(getRegisterSubmitHint({ legalDocsCount: 2, passwordReady: true, requiredAccepted: false })).toBe(
       "Отметьте все обязательные согласия, чтобы продолжить.",
     );
     expect(getRegisterSubmitHint({ legalDocsCount: 2, passwordReady: false, requiredAccepted: true })).toBe(
-      "Пароль должен стать зелёным: минимум 12 символов, буква и цифра.",
+      "Доведите пароль до зелёного.",
     );
     expect(canSubmitRegisterForm({ legalDocsCount: 2, passwordReady: true, requiredAccepted: true })).toBe(true);
     expect(getRegisterSubmitHint({ legalDocsCount: 2, passwordReady: true, requiredAccepted: true })).toBeNull();

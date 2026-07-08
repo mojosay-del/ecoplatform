@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 
-type AuthSelectOption = { value: string; label: string };
+type AuthSelectOption = { value: string; label: string; disabled?: boolean; hint?: string };
 
 /**
  * Кастомный выпадающий список в стиле auth-полей: триггер выглядит как обычное
@@ -65,9 +65,20 @@ export function AuthSelect({
     node?.scrollIntoView({ block: "nearest" });
   }, [open, activeIndex]);
 
+  // Отключённые опции (например «Трейдер»/«Переработчик» — «скоро») видны, но
+  // не выбираются: их пропускает клавиатура и не срабатывает выбор мышью.
+  const findEnabledIndex = (start: number, direction: 1 | -1) => {
+    let index = start;
+    while (index >= 0 && index < options.length) {
+      if (!options[index]?.disabled) return index;
+      index += direction;
+    }
+    return -1;
+  };
+
   const choose = (index: number) => {
     const option = options[index];
-    if (!option) return;
+    if (!option || option.disabled) return;
     onChange(option.value);
     setOpen(false);
   };
@@ -77,12 +88,18 @@ export function AuthSelect({
       case "ArrowDown":
         event.preventDefault();
         if (!open) setOpen(true);
-        else setActiveIndex((index) => Math.min(options.length - 1, index + 1));
+        else {
+          const next = findEnabledIndex(activeIndex + 1, 1);
+          if (next !== -1) setActiveIndex(next);
+        }
         break;
       case "ArrowUp":
         event.preventDefault();
         if (!open) setOpen(true);
-        else setActiveIndex((index) => Math.max(0, index - 1));
+        else {
+          const prev = findEnabledIndex(activeIndex - 1, -1);
+          if (prev !== -1) setActiveIndex(prev);
+        }
         break;
       case "Enter":
       case " ":
@@ -99,13 +116,15 @@ export function AuthSelect({
       case "Home":
         if (open) {
           event.preventDefault();
-          setActiveIndex(0);
+          const first = findEnabledIndex(0, 1);
+          if (first !== -1) setActiveIndex(first);
         }
         break;
       case "End":
         if (open) {
           event.preventDefault();
-          setActiveIndex(options.length - 1);
+          const last = findEnabledIndex(options.length - 1, -1);
+          if (last !== -1) setActiveIndex(last);
         }
         break;
       case "Tab":
@@ -147,12 +166,19 @@ export function AuthSelect({
                 id={`${listboxId}-${index}`}
                 role="option"
                 aria-selected={isSelected}
-                className={`auth-select-option${isActive ? " is-active" : ""}${isSelected ? " is-selected" : ""}`}
-                onMouseEnter={() => setActiveIndex(index)}
+                aria-disabled={option.disabled || undefined}
+                className={`auth-select-option${isActive ? " is-active" : ""}${isSelected ? " is-selected" : ""}${option.disabled ? " is-disabled" : ""}`}
+                onMouseEnter={() => {
+                  if (!option.disabled) setActiveIndex(index);
+                }}
                 onClick={() => choose(index)}
               >
                 <span className="auth-select-option-label">{option.label}</span>
-                {isSelected ? <Check size={16} strokeWidth={2.6} aria-hidden="true" /> : null}
+                {option.disabled && option.hint ? (
+                  <span className="auth-select-option-hint">{option.hint}</span>
+                ) : isSelected ? (
+                  <Check size={16} strokeWidth={2.6} aria-hidden="true" />
+                ) : null}
               </li>
             );
           })}

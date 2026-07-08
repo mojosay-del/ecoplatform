@@ -1,4 +1,4 @@
-import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/shared";
+import type { LegalDocumentSummary } from "@ecoplatform/shared";
 import { VERIFICATION_CODE_LENGTH } from "./constants";
 import type { RegisterFormValues, RegisterStep, VerificationPhase } from "./types";
 import { formatPhoneFull, getPhoneCountry, normalizeEmailValue } from "./utils";
@@ -25,7 +25,7 @@ export function getRegisterSubmitHint({ legalDocsCount, passwordReady, requiredA
   if (legalDocsCount === 0) return null;
 
   if (!requiredAccepted && !passwordReady) {
-    return `Отметьте обязательные согласия и доведите пароль до зелёного (минимум ${MIN_PASSWORD_LENGTH} символов, буква и цифра).`;
+    return "Отметьте обязательные согласия и доведите пароль до зелёного.";
   }
 
   if (!requiredAccepted) {
@@ -33,7 +33,7 @@ export function getRegisterSubmitHint({ legalDocsCount, passwordReady, requiredA
   }
 
   if (!passwordReady) {
-    return `Пароль должен стать зелёным: минимум ${MIN_PASSWORD_LENGTH} символов, буква и цифра.`;
+    return "Доведите пароль до зелёного.";
   }
 
   return null;

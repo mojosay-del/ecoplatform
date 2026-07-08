@@ -33,6 +33,6 @@ export type PhoneCountry = {
   placeholder: string;
 };
 
-export type PhoneCountryId = "ru" | "by" | "kz" | "am" | "kg" | "uz" | "tj" | "az" | "md" | "tm";
+export type PhoneCountryId = "ru" | "by" | "kz" | "uz";
 
 export type VerificationPhase = "typing" | "checking" | "success" | "error";

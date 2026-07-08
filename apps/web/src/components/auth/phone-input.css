@@ -2,6 +2,12 @@
 .phone-input-wrap {
   position: relative;
 }
+/* Когда открыт список стран — поднимаем обёртку в свой stacking context, чтобы
+   поповер рисовался поверх соседних контролов (например кнопки «Сохранить» в
+   модалке смены телефона), а не уходил под них. */
+.phone-input-wrap.is-open {
+  z-index: 40;
+}
 .phone-country {
   position: absolute;
   left: 8px;

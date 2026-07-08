@@ -1,9 +1,11 @@
 import type { PhoneCountry, PhoneCountryId, RegisterFormValues } from "./types";
 
+// Трейдер и Переработчик пока отключены: видны в поповере, но выбрать нельзя
+// (метка «скоро»). Единственный доступный тип — Заготовитель (дефолт формы).
 export const companyTypeOptions = [
   { value: "collector", label: "Заготовитель" },
-  { value: "trader", label: "Трейдер" },
-  { value: "processor", label: "Переработчик" },
+  { value: "trader", label: "Трейдер", disabled: true, hint: "скоро" },
+  { value: "processor", label: "Переработчик", disabled: true, hint: "скоро" },
 ];
 
 export const PHONE_COUNTRIES: PhoneCountry[] = [
@@ -32,60 +34,12 @@ export const PHONE_COUNTRIES: PhoneCountry[] = [
     placeholder: "700 123-45-67",
   },
   {
-    id: "am",
-    name: "Армения",
-    dialCode: "+374",
-    nationalLength: 8,
-    groups: [2, 3, 3],
-    placeholder: "77 123-456",
-  },
-  {
-    id: "kg",
-    name: "Киргизия",
-    dialCode: "+996",
-    nationalLength: 9,
-    groups: [3, 3, 3],
-    placeholder: "700 123 456",
-  },
-  {
     id: "uz",
     name: "Узбекистан",
     dialCode: "+998",
     nationalLength: 9,
     groups: [2, 3, 2, 2],
     placeholder: "90 123-45-67",
-  },
-  {
-    id: "tj",
-    name: "Таджикистан",
-    dialCode: "+992",
-    nationalLength: 9,
-    groups: [2, 3, 2, 2],
-    placeholder: "93 123-45-67",
-  },
-  {
-    id: "az",
-    name: "Азербайджан",
-    dialCode: "+994",
-    nationalLength: 9,
-    groups: [2, 3, 2, 2],
-    placeholder: "50 123-45-67",
-  },
-  {
-    id: "md",
-    name: "Молдова",
-    dialCode: "+373",
-    nationalLength: 8,
-    groups: [2, 3, 3],
-    placeholder: "69 123 456",
-  },
-  {
-    id: "tm",
-    name: "Туркменистан",
-    dialCode: "+993",
-    nationalLength: 8,
-    groups: [2, 3, 3],
-    placeholder: "65 123 456",
   },
 ];
 

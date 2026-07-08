@@ -6,6 +6,7 @@ import { MIN_PASSWORD_LENGTH, type LegalDocumentSummary } from "@ecoplatform/sha
 import { companyTypeOptions, VERIFICATION_CODE_LENGTH } from "./constants";
 import { AuthSelect } from "./auth-select";
 import { ConsentRow } from "./consent-row";
+import { FieldHint } from "./field-hint";
 import {
   AuthField,
   EmailInput,
@@ -101,7 +102,15 @@ export function PersonStepFields({
               onValueChange={(value) => setField("email", value)}
             />
           </AuthField>
-          <AuthField label="Пароль">
+          <AuthField
+            label="Пароль"
+            help={
+              <FieldHint title="Требования к паролю">
+                Минимум {MIN_PASSWORD_LENGTH} символов, обязательно буква и цифра. Доведите индикатор надёжности до
+                зелёного.
+              </FieldHint>
+            }
+          >
             <PasswordInput
               name="password"
               autoComplete="new-password"

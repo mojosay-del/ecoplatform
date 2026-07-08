@@ -2,7 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import { useEffect, useRef, useState } from "react";
-import { AM, AZ, BY, KG, KZ, MD, RU, TJ, TM, UZ } from "country-flag-icons/react/3x2";
+import { BY, KZ, RU, UZ } from "country-flag-icons/react/3x2";
 import { PHONE_COUNTRIES } from "./constants";
 import type { PhoneCountryId } from "./types";
 import { formatPhoneFull, formatPhoneLocal, getPhoneCountry, normalizePhoneDigits } from "./utils";
@@ -12,13 +12,7 @@ const FLAG_BY_ID: Record<PhoneCountryId, typeof RU> = {
   ru: RU,
   by: BY,
   kz: KZ,
-  am: AM,
-  kg: KG,
   uz: UZ,
-  tj: TJ,
-  az: AZ,
-  md: MD,
-  tm: TM,
 };
 
 function CountryFlag({ id }: { id: PhoneCountryId }) {
@@ -81,7 +75,7 @@ export function PhoneInput({
 
   return (
     <div
-      className="phone-input-wrap"
+      className={`phone-input-wrap${open ? " is-open" : ""}`}
       onBlur={(event) => {
         const nextTarget = event.relatedTarget as Node | null;
         if (!nextTarget || !event.currentTarget.contains(nextTarget)) {

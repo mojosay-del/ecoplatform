@@ -25,34 +25,21 @@
   padding: 36px 40px;
   /* Тонкая разделяющая полоска вместо «жёсткого стыка» двух цветов. */
   border-right: 1px solid rgb(var(--white-rgb) / 0.12);
-  /* Глубокий «ember»: тёмный угол снизу-справа + тёплый свет сверху-слева
-     дают объём вместо плоской ярко-оранжевой плашки. */
+  /* Чистый тёплый оранжевый: ровный бренд-градиент + один мягкий свет сверху-слева.
+     Без множественных наложений, тёмного угла и зерна — премиально, без «грязи». */
   background:
-    radial-gradient(80% 70% at 16% 12%, rgb(var(--auth-glow-rgb) / 0.42), transparent 55%),
-    radial-gradient(90% 90% at 88% 100%, rgb(var(--brand-ink-rgb) / 0.55), transparent 58%),
-    linear-gradient(155deg, #b85a2a 0%, #e0703a 46%, #f79152 100%);
+    radial-gradient(80% 70% at 18% 8%, rgb(var(--white-rgb) / 0.16), transparent 60%),
+    linear-gradient(160deg, #b85a2a 0%, #e0703a 50%, #f79152 100%);
 }
-.auth-visual::before,
-.auth-visual::after {
+/* Одна тонкая диагональная подсветка поверх градиента — лёгкий объём без «грязи». */
+.auth-visual::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-}
-/* Тонкая световая моделировка поверх градиента — даёт «премиальность». */
-.auth-visual::before {
-  opacity: 0.7;
-  background:
-    linear-gradient(135deg, rgb(var(--white-rgb) / 0.22), transparent 36%),
-    linear-gradient(315deg, rgb(var(--brand-ink-rgb) / 0.22), transparent 44%);
-}
-/* Лёгкий grain/noise через SVG turbulence. */
-.auth-visual::after {
-  opacity: 0.18;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
-  background-size: 200px 200px;
-  mix-blend-mode: overlay;
+  opacity: 0.5;
+  background: linear-gradient(135deg, rgb(var(--white-rgb) / 0.18), transparent 42%);
 }
 /* Анимированная «аврора»: два больших размытых световых пятна медленно
    дрейфуют — фон дышит, но не отвлекает. На transform/opacity = дёшево для GPU. */
@@ -62,9 +49,9 @@
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(closest-side, rgb(var(--auth-glow-rgb) / 0.55), transparent 70%) 18% 22% / 58% 58% no-repeat,
-    radial-gradient(closest-side, rgb(var(--brand-ember-rgb) / 0.6), transparent 70%) 82% 78% / 64% 64% no-repeat;
-  filter: blur(36px);
+    radial-gradient(closest-side, rgb(var(--auth-glow-rgb) / 0.4), transparent 72%) 18% 20% / 60% 60% no-repeat,
+    radial-gradient(closest-side, rgb(var(--brand-ember-rgb) / 0.42), transparent 72%) 82% 80% / 62% 62% no-repeat;
+  filter: blur(40px);
   animation: auth-aurora-drift 26s ease-in-out infinite alternate;
 }
 @keyframes auth-aurora-drift {
@@ -462,6 +449,126 @@
   flex: none;
   color: var(--brand);
 }
+/* Отключённая опция («скоро»): видна, но не выбирается — приглушённая, без hover. */
+.auth-select-option.is-disabled {
+  color: var(--text-subtle);
+  cursor: not-allowed;
+}
+.auth-select-option.is-disabled:hover {
+  background: transparent;
+}
+.auth-select-option-hint {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-subtle);
+  background: var(--surface-muted);
+}
+/* Кнопка-подсказка «?» у заголовка поля + портальная модалка (см. field-hint.tsx). */
+.field-hint-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-subtle);
+  background: transparent;
+  cursor: pointer;
+  vertical-align: middle;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
+}
+.field-hint-btn:hover {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+.field-hint-btn:focus-visible {
+  outline: none;
+  color: var(--brand);
+  box-shadow: var(--focus-ring);
+}
+.field-hint-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(var(--brand-ink-rgb) / 0.45);
+  animation: field-hint-fade 140ms ease;
+}
+.field-hint-modal {
+  width: min(420px, 100%);
+  padding: 20px 22px 22px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-lg);
+  animation: field-hint-pop 160ms ease;
+}
+.field-hint-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.field-hint-modal-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.field-hint-modal-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.field-hint-modal-close:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+.field-hint-modal-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+@keyframes field-hint-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+@keyframes field-hint-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .auth-step-actions {
   display: grid;
   grid-template-columns: minmax(112px, 0.44fr) 1fr;
@@ -593,11 +700,6 @@
     grid-template-rows: auto 1fr;
     border-right: none;
     border-bottom: 1px solid rgb(var(--white-rgb) / 0.12);
-  }
-
-  /* На мобильном grain отвлекает на маленькой плоскости — выключаем. */
-  .auth-visual::after {
-    display: none;
   }
 
   /* Билборд сжимается в узкую верхнюю полосу — обещание там не помещается.

@@ -13,10 +13,24 @@ import {
 } from "./constants";
 import { normalizeEmailValue, passwordStrength } from "./utils";
 
-export function AuthField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function AuthField({
+  label,
+  hint,
+  help,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  // Кнопка-подсказка «?» справа от заголовка поля (например требования к паролю).
+  help?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <label className="form-field">
-      <span className="form-field-label">{label}</span>
+      <span className="form-field-label">
+        {label}
+        {help}
+      </span>
       {children}
       {hint ? <span className="form-field-hint">{hint}</span> : null}
     </label>
@@ -192,16 +206,13 @@ export function PasswordInput({
 }
 
 export function PasswordStrengthMeter({ password }: { password: string }) {
+  // На пустом поле метр скрыт целиком (без «Введите пароль» и пустых полосок);
+  // индикатор и подпись появляются, как только пользователь начинает вводить.
+  if (password.length === 0) return null;
+
   const score = passwordStrength(password);
   const tone = score === 3 ? "strong" : score >= 2 ? "medium" : "weak";
-  const label =
-    password.length === 0
-      ? "Введите пароль"
-      : score === 3
-        ? "Надёжный пароль"
-        : score >= 2
-          ? "Почти готово"
-          : "Слишком простой";
+  const label = score === 3 ? "Надёжный пароль" : score >= 2 ? "Почти готово" : "Слишком простой";
 
   return (
     <div className={`password-strength password-strength-${tone}`} aria-live="polite">
