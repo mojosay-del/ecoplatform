@@ -138,14 +138,10 @@
 
 ## P2 — сильно желательно до беты
 
-- [ ] **C1. Прод-compose: healthcheck и ротация логов** — *Codex*
-  В `docker-compose.prod.yml` у `api`/`web`/`redis` нет `healthcheck` и нет
-  лимитов логов Docker (json-file растёт бесконечно). Добавить:
-  `healthcheck` для api (`wget -qO- http://localhost:4000/api/health`), web
-  (`wget -qO- http://localhost:3000/`), redis (`redis-cli ping`); всем сервисам
-  `logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }`.
-  Сверить синтаксис с работающим прод-компоузом. Критерий: `docker compose -f
-  docker-compose.prod.yml config` валиден.
+- [x] **C1. Прод-compose: healthcheck и ротация логов** — *Claude* ✅ 2026-07-10
+  Коммит `727964ad`. Healthcheck для api (`/api/health`), web (корень), redis
+  (`redis-cli ping`); общий пресет ротации логов (json-file 5×10 МБ) через
+  YAML-якорь `x-logging` на все сервисы. `docker compose config` валиден.
 
 - [x] **C2. Индекс на `CommentAttachment.fileId` + дедуп `Discussion`** — *Claude* ✅ 2026-07-10
   Коммит `7968308b`, миграция `20260710130000`. Добавлен `@@index([fileId])` на
@@ -191,29 +187,31 @@
   `EMAIL_DELIVERY_DISABLED`). Критерий: integration-прогон не делает сетевых
   вызовов к прод-S3.
 
-- [ ] **C8. Харнесс `test-app.ts` должен зеркалить прод-бутстрап** — *Claude*
-  Обнаружено при B1: `test/test-app.ts` вручную повторяет лишь часть настройки
-  из `main.ts` (setGlobalPrefix, cookieParser, csrf) и молча расходится с продом
-  по остальному (body-parser — уже пофикшен общим хелпером в B1, но helmet,
-  CORS, `GlobalExceptionFilter`, shutdown hooks не применяются). Из-за этого
-  тесты не ловят регрессии прод-middleware (напр., формат ошибок из
-  exception-filter, security-заголовки). Правка: вынести общий
-  `configureHttpApp(app)` в `common/`, звать из обоих мест; в тесте осознанно
-  оставлять только то, что реально мешает supertest (если что-то мешает).
-  Критерий: один источник настройки HTTP-слоя, тесты видят прод-поведение.
+- [x] **C8. Харнесс `test-app.ts` зеркалит прод-бутстрап** — *Claude* ✅ 2026-07-10
+  Коммит `3b107f48`. Вынесен `configureHttpApp(app)` в `common/http-app.ts`
+  (префикс, лимит тела, cookie, CSRF, `GlobalExceptionFilter`) — зовётся из
+  `main.ts` и `test-app.ts`. Теперь тесты прогоняют реальный exception-filter.
+  Прод-only транспорт (helmet/compression/CORS/trust-proxy/shutdown/openapi)
+  осознанно оставлен в main.ts (supertest'у не нужен). Полный integration
+  261/261 зелёный. Проверено, что 4xx-тела идентичны Nest-дефолту (фильтр
+  возвращает `getResponse()`), поэтому существующие ассерты не сломались.
 
 ## P3 — после беты / по ходу
 
-- [ ] **D1. ESLint warnings → 0** — *Codex*
-  В CI 21 предупреждение: 14× `@next/next/no-img-element` (перевести на
-  `next/image` или задокументировать исключение), 7× `jsx-a11y`
-  (`no-noninteractive-element-interactions`, `no-noninteractive-tabindex`).
-  По одному warning-типу за коммит.
+- [~] **D1. ESLint warnings → 0** — *Claude* ⏳ частично 2026-07-10
+  Коммит `75821d21` — закрыты 14× `@next/next/no-img-element`: это **ложные
+  срабатывания** (у приложения свой конвейер картинок — sharp AVIF/WebP из S3,
+  `preferredFileAssetImageUrl`; next/image был бы двойной оптимизацией), правило
+  отключено с обоснованием в eslint.config. Осталось **9 a11y-warning**
+  (`click-events-have-key-events`, `no-noninteractive-element-interactions`×3,
+  `control-has-associated-label`×2, `no-noninteractive-tabindex`) на бэкдропах
+  модалок и структуре таблиц — их корректная починка требует смены ролей/разметки
+  с проверкой взаимодействия, **сложены в B5** (UX/accessibility-проход с живым
+  приложением), а не заглушены вслепую перед бетой.
 
-- [ ] **D2. js-yaml moderate (GHSA-h67p-54hq-rp68)** — *Codex*
-  Транзитивная через `@nestjs/swagger`. Добавить в корневой `package.json`
-  `pnpm.overrides: { "js-yaml": ">=4.2.0" }` либо дождаться апдейта swagger;
-  `pnpm audit --prod` должен стать пустым.
+- [x] **D2. js-yaml moderate (GHSA-h67p-54hq-rp68)** — *Claude* ✅ 2026-07-10
+  Коммит `e2b5643c`. `@nestjs/swagger` тянул уязвимую `js-yaml@4.1.1`; добавлен
+  `pnpm.overrides: "js-yaml": ">=4.2.0"`, дубль убран, `pnpm audit --prod` чист.
 
 - [ ] **D3. Поиск новостей на trigram** — *Claude*
   `news-read.helpers.ts:46` ищет `contains/insensitive` (ILIKE %…% — не
@@ -235,17 +233,13 @@
   4352 строки после прошлого сплита (стили фич уже co-located). Выносить
   оставшиеся доменные куски постранично, без изменения визуала.
 
-- [ ] **D11. Локальная dev-БД потеряла `_prisma_migrations`** — *владелец + Claude*
-  Обнаружено при B2: в контейнере `ecoplatform-postgres-1` БД `ecoplatform`
-  содержит ВСЕ таблицы (и свежий C2-индекс), но служебной таблицы
-  `_prisma_migrations` НЕТ → `prisma migrate status` показывает «ничего не
-  применено». Ещё рядом висит лишняя БД `ecoplatform_test_test` — след того,
-  что integration global-setup когда-то задвоил суффикс `_test` (утёкший
-  `DATABASE_URL` между прогонами). Это ТОЛЬКО локальный артефакт: миграции в
-  репо, CI/prod применяют на чистую БД, коммиты не затронуты. Чинить
-  безопасно re-baseline'ом (`prisma migrate resolve --applied <name>` по всем
-  67, либо `migrate reset` + `seed` если данные не жалко) — НЕ `migrate deploy`
-  (упадёт, таблицы уже есть). Связано с C7/C8 (гигиена тест-харнесса БД).
+- [x] **D11. Локальная dev-БД потеряла `_prisma_migrations`** — *Claude* ✅ 2026-07-10
+  Обнаружено при B2: БД `ecoplatform` содержала все таблицы (и C2-индекс), но
+  без служебной `_prisma_migrations` → `migrate status` врал «ничего не
+  применено» (первопричина — утёкший `DATABASE_URL` тест-харнесса, оставивший
+  ещё и лишнюю БД `ecoplatform_test_test`). Исправлено re-baseline'ом:
+  `prisma migrate resolve --applied` по всем 67 миграциям → «up to date».
+  Локальная операция, коммита не требует. Первопричина снимается C7.
 
 - [ ] **D9. Наблюдаемый флейк `marketplace-reviews` под полной нагрузкой** — *Claude*
   При проверке A1 полный `pnpm test:integration` один раз уронил
