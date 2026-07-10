@@ -152,13 +152,11 @@
   Сверить синтаксис с работающим прод-компоузом. Критерий: `docker compose -f
   docker-compose.prod.yml config` валиден.
 
-- [ ] **C2. Индекс на `CommentAttachment.fileId`** — *Claude*
-  `apps/api/src/files/files-cleanup.helpers.ts:28` при проверке «файл-сирота»
-  делает `commentAttachment.count({ where: { fileId } })` — единственный
-  count без индекса (сейчас seq scan). Добавить `@@index([fileId])` в модель
-  `CommentAttachment` + миграция `prisma migrate diff`-стилем, как соседние.
-  Заодно дропнуть дубль-индекс `Discussion_targetType_targetId_idx` (полностью
-  повторяет unique `Discussion_targetType_targetId_key`) — одной миграцией.
+- [x] **C2. Индекс на `CommentAttachment.fileId` + дедуп `Discussion`** — *Claude* ✅ 2026-07-10
+  Коммит `7968308b`, миграция `20260710130000`. Добавлен `@@index([fileId])` на
+  `CommentAttachment` (убирает seq scan в files-cleanup); удалён дубль-индекс
+  `Discussion_targetType_targetId_idx` (повторял unique-ключ). Применено на dev,
+  `migrate diff` схема↔миграции — «No difference detected», тесты files+news 23/23.
 
 - [ ] **C3. Нагрузочный смоук с цифрами** — *Claude*
   autocannon/oha на локальном стенде: `GET /api/news?limit=20` (с Bearer),
@@ -167,12 +165,14 @@
   Цель: p95 < 300 мс при 100–200 RPS чтения, без 5xx, память API стабильна.
   Результаты записать сюда (числа + дата + машина).
 
-- [ ] **C4. Убрать `gender` из аудитории broadcast-рассылки** — *Codex*
-  Пол убран из регистрации (2026-06-16), поле у пользователей пустеет —
-  фильтр в рассылке мёртвый. Убрать из `apps/api/src/admin/broadcast/
-  admin-broadcast.schemas.ts`, `admin-broadcast.service.ts` (`buildWhere`),
-  вью админки `apps/web/src/views/admin/broadcast/*` и тестов. Критерий:
-  typecheck+тесты зелёные, в UI рассылки нет фильтра по полу.
+- [x] **C4. ~~Убрать gender из broadcast~~ — ОТМЕНЕНА (была ошибочной)** — *Claude* ✅ 2026-07-10
+  Проверка (по вопросу владельца) показала: премиса неверна. Пол убран ТОЛЬКО из
+  регистрации, но остаётся **рабочим опциональным полем профиля** — кабинет
+  имеет функциональный `PersonalProfileGenderDialog`, который шлёт
+  `api.account.updateProfile({ gender })` → `account.service.ts:66`. Значит
+  фильтр рассылки по полу **живой** и осмысленный (сегментирует тех, кто указал
+  пол в профиле). Ничего убирать не нужно. Урок: не считать поле «мёртвым» по
+  одному месту (регистрация) — проверять все точки записи.
 
 - [ ] **C5. Проверить наблюдаемость прода при деплое B3** — *владелец + Claude*
   На сервере в `deploy/.env.prod`: задан ли `SENTRY_DSN` (api и web),
