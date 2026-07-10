@@ -831,8 +831,9 @@ model Discussion {
   createdAt  DateTime             @default(now())
   updatedAt  DateTime             @updatedAt
 
+  // Уникальный (targetType, targetId) уже покрывает поиск по этим колонкам,
+  // поэтому отдельный @@index был бы дублем — не заводим.
   @@unique([targetType, targetId])
-  @@index([targetType, targetId])
 }
 
 model Comment {
@@ -867,6 +868,9 @@ model CommentAttachment {
   position  Int
 
   @@unique([commentId, position])
+  // Очистка файлов-сирот считает ссылки через `count({ where: { fileId } })`
+  // (files-cleanup.helpers). Без индекса это seq scan по всем вложениям.
+  @@index([fileId])
 }
 
 model CommentLike {
