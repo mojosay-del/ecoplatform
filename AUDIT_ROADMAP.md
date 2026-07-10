@@ -114,7 +114,18 @@
   `deploy/PRODUCTION.md`: **бэкап БД → git pull → up -d --build → проверка
   `/api/ready`**. Делать только после A3 (зелёный CI).
 
-- [ ] **B4. Живой E2E-прогон всех ключевых флоу** — *Claude*
+- [~] **B4. Живой E2E-прогон всех ключевых флоу** — *Claude* ⏳ smoke 2026-07-10
+  **Smoke пройден** (стенд поднят, preview web:3000 + api:4000): `/api/health` +
+  `/api/ready` (БД up, S3 up, redis fallback); вход admin@ecoplatform.local →
+  редирект `/news`; все ключевые разделы 200 (`/indices /education
+  /knowledge-base /documentation /forum /account /admin`); консоль без ошибок;
+  UI рендерится (сайдбар + контент). Это подтверждает, что правки сессии
+  (C8 http-app, B1 body-parser, A1b) в живом API корректны. **Осталось: полный
+  прогон каждого взаимодействия** (создание/правка контента, форум-цикл,
+  marketplace сделка+отзывы, поддержка, инвайты, двусторонняя смена контактов) —
+  делать отдельным фокусным заходом. NB: dev-БД пришлось ПЕРЕСИДИРОВАТЬ (была
+  стёрта утечкой окружения из D11/C7) — `SEED_ADMIN_PASSWORD=AdminDev12345!`
+  `SEED_DEMO_PASSWORD=DemoDev12345!`, аккаунты admin@/demo@ecoplatform.local.
   Прогнать на локальном стенде (preview web:3000 + api:4000) как пользователь:
   - auth: регистрация с email-кодом → вход → refresh после перезагрузки →
     выход; «забыли пароль»; lockout после 10 ошибок;
