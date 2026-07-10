@@ -1,4 +1,4 @@
-import { CompanyStatus, SubscriptionStatus } from "@prisma/client";
+import { CompanyStatus, NotificationChannel, SubscriptionStatus } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { setupIntegrationContext } from "./test/integration-context";
 import { expectPaginatedEnvelope } from "./test/integration-helpers";
@@ -174,7 +174,12 @@ describe("Demo gating", () => {
     expect(subscriptions).toHaveLength(1);
     expect(logs).toHaveLength(1);
     expect(notifications).toHaveLength(1);
-    expect(deliveries).toHaveLength(2);
+    // Идемпотентная активация создаёт ровно одну доставку — только in_app.
+    // Email-канал по умолчанию за флагом NOTIFICATION_EMAIL_ENABLED (рассыльщика
+    // ещё нет), поэтому email-NotificationDelivery не пишется. Путь с включённым
+    // флагом (in_app + email) покрыт unit-тестами notifications.service.test.ts.
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]?.channel).toBe(NotificationChannel.in_app);
 
     // Волна 9.7: payload админ-журнала пишется в формате before/after/diff.
     const auditPayload = logs[0].payload as {
