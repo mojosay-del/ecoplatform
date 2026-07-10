@@ -4,12 +4,11 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
 import type { NestExpressApplication } from "@nestjs/platform-express";
-import cookieParser from "cookie-parser";
 import { Logger as PinoNestLogger } from "nestjs-pino";
 import request from "supertest";
 import { AppModule } from "../app.module";
-import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME, csrfCookieMiddleware, CsrfGuard } from "../common/csrf.guard";
-import { configureBodyParser } from "../common/http-body-parser";
+import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../common/csrf.guard";
+import { configureHttpApp } from "../common/http-app";
 import { PrismaService } from "../prisma/prisma.service";
 
 export interface TestApp {
@@ -46,13 +45,9 @@ export async function createTestApp(): Promise<TestApp> {
 
   const app = moduleRef.createNestApplication<NestExpressApplication>();
   app.useLogger(app.get(PinoNestLogger));
-  app.setGlobalPrefix("api");
-  app.use(cookieParser());
-  app.use(csrfCookieMiddleware);
-  app.useGlobalGuards(new CsrfGuard());
-  // Тот же лимит тела, что в проде (main.ts), — иначе тест на крупную CMS-статью
-  // проверял бы поведение, которого в бою нет.
-  configureBodyParser(app);
+  // Тот же request-pipeline, что в проде (main.ts) — иначе тесты не
+  // воспроизводят прод-поведение (лимит тела, формат ошибок, CSRF). См. http-app.
+  configureHttpApp(app);
   await app.init();
 
   const prisma = app.get(PrismaService);
