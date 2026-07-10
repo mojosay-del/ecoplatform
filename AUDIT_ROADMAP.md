@@ -83,14 +83,15 @@
 
 ## P1 — до бета-теста
 
-- [ ] **B1. Поднять лимит JSON-body со 100 КБ** — *Claude*
-  В `apps/api/src/main.ts` body-parser остаётся на дефолтных ~100 КБ. CMS шлёт
-  статью целиком массивом блоков (`content.schemas.ts`) — длинная статья с
-  HTML-параграфами упрётся в лимит и получит невнятную ошибку. Правка:
-  `NestFactory.create(..., { rawBody: false })` + `app.useBodyParser("json",
-  { limit: "2mb" })` (или `bodyParser: json({ limit })`) — и явный тест на
-  сохранение крупного черновика. Критерий: статья ~500 КБ сохраняется;
-  integration-тест добавлен.
+- [x] **B1. Поднять лимит JSON-body со 100 КБ** — *Claude* ✅ 2026-07-10
+  Коммит `1bce44d6`. Лимит поднят 100 КБ → 2 МБ через `app.useBodyParser("json",
+  {limit})`. Конфиг вынесен в общий хелпер `common/http-body-parser.ts`, зовётся
+  из `main.ts` И из `test/test-app.ts`. Добавлен integration-тест (черновик
+  новости ~200 КБ → 201). **Попутная находка (см. C8):** харнесс `test-app.ts`
+  вручную повторяет лишь ЧАСТЬ прод-бутстрапа (setGlobalPrefix, cookieParser,
+  CSRF), а body-parser/helmet/CORS/exception-filter не применял — тест на крупное
+  тело сперва падал 413 именно из-за этого. Body-parser теперь общий; остальной
+  дрейф — в C8.
 
 - [ ] **B2. Актуализировать README и устаревшие комментарии схемы** — *Codex*
   - `README.md:97` — «62 SQL-миграции (2026-05-20 … 2026-06-21)» → 66 и даты
@@ -194,6 +195,17 @@
   CI/локально, либо мок S3-клиента в `integration-setup.ts` (по аналогии с
   `EMAIL_DELIVERY_DISABLED`). Критерий: integration-прогон не делает сетевых
   вызовов к прод-S3.
+
+- [ ] **C8. Харнесс `test-app.ts` должен зеркалить прод-бутстрап** — *Claude*
+  Обнаружено при B1: `test/test-app.ts` вручную повторяет лишь часть настройки
+  из `main.ts` (setGlobalPrefix, cookieParser, csrf) и молча расходится с продом
+  по остальному (body-parser — уже пофикшен общим хелпером в B1, но helmet,
+  CORS, `GlobalExceptionFilter`, shutdown hooks не применяются). Из-за этого
+  тесты не ловят регрессии прод-middleware (напр., формат ошибок из
+  exception-filter, security-заголовки). Правка: вынести общий
+  `configureHttpApp(app)` в `common/`, звать из обоих мест; в тесте осознанно
+  оставлять только то, что реально мешает supertest (если что-то мешает).
+  Критерий: один источник настройки HTTP-слоя, тесты видят прод-поведение.
 
 ## P3 — после беты / по ходу
 
