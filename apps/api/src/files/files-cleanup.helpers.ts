@@ -2,6 +2,7 @@ import { ForbiddenException } from "@nestjs/common";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import type { FileAsset } from "@prisma/client";
 import type { RequestUser } from "../common/request-user";
+import { swallowAndLog } from "../common/silent-catch";
 import { PrismaService } from "../prisma/prisma.service";
 import { compactFileIds } from "./files-reference.helpers";
 import { parseImageVariants } from "./files-response.helpers";
@@ -59,6 +60,13 @@ async function deleteAssetObjects(asset: FileAsset): Promise<void> {
         ),
       ),
     );
+  } catch (error) {
+    // Best-effort: недоступность S3 (сеть, DNS, транзиент провайдера) не должна
+    // ронять ночной cleanup удалённых аккаунтов и файлов-сирот — DB-часть к
+    // этому моменту уже применена, а прерывание оставило бы всю пачку
+    // недоделанной. Объект в худшем случае останется сиротой в бакете (дешевле,
+    // чем крах батча). В штатном режиме S3 доступен и удаление проходит.
+    swallowAndLog("files.delete.s3-object", { fileId: asset.id, storageKey: asset.storageKey })(error);
   } finally {
     config.client.destroy();
   }
