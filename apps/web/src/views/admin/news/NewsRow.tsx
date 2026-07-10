@@ -49,6 +49,9 @@ export function NewsRow({
               <span className="news-row-dot" aria-hidden />
               {CONTENT_STATUS_LABELS[item.status]}
             </span>
+            <span className={`news-row-access${item.accessTier === "extended" ? " is-extended" : ""}`}>
+              {item.accessTier === "extended" ? "Расширенная" : "Базовая"}
+            </span>
             {publishedDate ? (
               <time className="news-row-date" dateTime={publishedDate.toISOString()}>
                 Опубликовано {formatNewsDate(publishedDate)}

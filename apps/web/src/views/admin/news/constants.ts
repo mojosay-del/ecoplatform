@@ -6,6 +6,7 @@ export const EMPTY_DRAFT: DraftState = {
   title: "",
   lead: "",
   coverImageId: "",
+  accessTier: "basic",
   pinnedInForum: false,
   tags: [],
   blocks: [{ type: "paragraph", payload: { html: "" } }],

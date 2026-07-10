@@ -19,6 +19,7 @@ import type {
   ListingMoistureCondition,
   ListingPositionForm,
   ListingStatus,
+  NewsAccessTier,
   OfferStatus,
   PlatformRole,
   PriceCondition,
@@ -113,6 +114,7 @@ export type NewsListItem = {
   title: string;
   lead: string;
   coverImageId: string | null;
+  accessTier: NewsAccessTier;
   audioAttachment: NewsAudioAttachment | null;
   firstPublishedAt: IsoDateString | null;
   status: string;

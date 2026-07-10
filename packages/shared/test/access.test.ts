@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canAccessEducationSection,
   canAccessLearningLevel,
+  canAccessNewsTier,
   canOpenFunctionalSections,
   demoEndsAt,
   effectivePlan,
@@ -24,6 +25,8 @@ describe("MVP access rules", () => {
     expect(canOpenFunctionalSections(company, now)).toBe(true);
     expect(canAccessLearningLevel(company, "basic", false, now)).toBe(true);
     expect(canAccessLearningLevel(company, "extended", false, now)).toBe(false);
+    expect(canAccessNewsTier(company, "basic", now)).toBe(true);
+    expect(canAccessNewsTier(company, "extended", now)).toBe(true);
   });
 
   it("closes functional sections after demo expires", () => {
@@ -36,6 +39,8 @@ describe("MVP access rules", () => {
     };
 
     expect(canOpenFunctionalSections(company, now)).toBe(false);
+    expect(canAccessNewsTier(company, "basic", now)).toBe(false);
+    expect(canAccessNewsTier(company, "extended", now)).toBe(false);
   });
 
   it("keeps access while a paid subscription is still in the future", () => {
@@ -49,6 +54,8 @@ describe("MVP access rules", () => {
 
     expect(canOpenFunctionalSections(company, now)).toBe(true);
     expect(effectivePlan(company, now)).toBe("basic");
+    expect(canAccessNewsTier(company, "basic", now)).toBe(true);
+    expect(canAccessNewsTier(company, "extended", now)).toBe(false);
   });
 
   // Регрессия: истёкшая платная подписка (компания переведена hourly-cron'ом
@@ -66,6 +73,8 @@ describe("MVP access rules", () => {
 
     expect(canOpenFunctionalSections(company, now)).toBe(false);
     expect(effectivePlan(company, now)).toBe(null);
+    expect(canAccessNewsTier(company, "basic", now)).toBe(false);
+    expect(canAccessNewsTier(company, "extended", now)).toBe(false);
   });
 
   // Граничный случай: admin вручную выставил past_due, но подписка ещё
@@ -81,6 +90,8 @@ describe("MVP access rules", () => {
 
     expect(canOpenFunctionalSections(company, now)).toBe(true);
     expect(effectivePlan(company, now)).toBe("extended");
+    expect(canAccessNewsTier(company, "basic", now)).toBe(true);
+    expect(canAccessNewsTier(company, "extended", now)).toBe(true);
   });
 
   it("opens education only to collectors among regular company users", () => {

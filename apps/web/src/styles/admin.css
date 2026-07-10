@@ -2491,6 +2491,28 @@
   color: var(--green);
 }
 
+.news-row-access {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.news-row-access.is-extended {
+  border-color: rgb(var(--brand-rgb) / 0.38);
+  background: var(--premium-surface-bg);
+  color: var(--premium-surface-text);
+  box-shadow: 0 6px 14px -10px rgb(var(--brand-rgb) / 0.8);
+}
+
 .news-row-date {
   color: var(--muted);
   font-size: 12px;
@@ -2637,6 +2659,97 @@
 
 .news-content-field {
   padding-top: 4px;
+}
+
+.news-access-tier-field {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.news-access-tier-field legend {
+  margin-bottom: 8px;
+  color: var(--text-secondary-strong);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.news-access-tier-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.news-access-tier-options label {
+  position: relative;
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.news-access-tier-options label:hover {
+  border-color: var(--line-strong);
+  background: var(--panel-soft);
+}
+
+.news-access-tier-options label.is-selected {
+  border-color: rgb(var(--brand-rgb) / 0.55);
+  background: rgb(var(--brand-rgb) / 0.08);
+  box-shadow: 0 0 0 3px rgb(var(--brand-rgb) / 0.1);
+}
+
+.news-access-tier-options input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.news-access-tier-options label:has(input:focus-visible) {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.news-access-tier-options span {
+  display: grid;
+  gap: 3px;
+}
+
+.news-access-tier-options strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.news-access-tier-options small,
+.news-access-tier-field > p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.news-access-tier-field > p {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .news-access-tier-options {
+    grid-template-columns: 1fr;
+  }
 }
 /* Поле-строка (например, чекбокс «закрепить в форуме»): горизонтально, по
    центру (ранее inline flexDirection/alignItems/gap). Идёт после базового

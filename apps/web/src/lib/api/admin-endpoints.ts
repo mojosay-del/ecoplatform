@@ -1,4 +1,4 @@
-import type { AdminDashboardSummary, AdminStaffSummary, PaginatedResponse } from "@ecoplatform/shared";
+import type { AdminDashboardSummary, AdminStaffSummary, NewsAccessTier, PaginatedResponse } from "@ecoplatform/shared";
 import { adminForumApi } from "./admin-content-endpoints";
 import {
   adminBroadcastApi,
@@ -20,6 +20,7 @@ type AdminNewsListItem = {
   slug: string;
   status: string;
   coverImageId: string | null;
+  accessTier: NewsAccessTier;
   pinnedInForum: boolean;
   firstPublishedAt: string | null;
   createdAt: string;

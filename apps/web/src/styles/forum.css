@@ -527,6 +527,33 @@ section.forum-page .forum-hero .forum-title {
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-1px);
 }
+.forum-pinned.is-extended {
+  border-color: rgb(var(--brand-rgb) / 0.5);
+  border-left-color: var(--brand);
+  background: var(--premium-surface-gradient);
+  color: var(--premium-surface-text);
+  box-shadow: 0 22px 46px -28px rgb(var(--premium-surface-bg-rgb) / 0.9);
+}
+.forum-pinned.is-extended h3,
+.forum-pinned.is-extended .forum-card__body {
+  color: inherit;
+}
+.forum-pinned.is-extended .forum-card__body {
+  color: var(--premium-surface-text-muted);
+}
+.forum-pinned.is-extended .forum-chip,
+.forum-pinned.is-extended .forum-badge {
+  border-color: var(--premium-surface-line);
+  background: rgb(253 249 244 / 0.08);
+  color: var(--premium-surface-text);
+}
+.forum-pinned.is-extended .forum-chip--extended {
+  border-color: rgb(var(--brand-rgb) / 0.5);
+  background: rgb(var(--brand-rgb) / 0.18);
+}
+.forum-pinned.is-extended:hover {
+  box-shadow: 0 26px 54px -28px rgb(var(--premium-surface-bg-rgb) / 0.95);
+}
 
 /* ── Сайдбар ──────────────────────────────────────────────────────────────── */
 .forum-aside {

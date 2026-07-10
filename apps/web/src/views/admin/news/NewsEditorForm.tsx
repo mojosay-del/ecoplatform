@@ -99,6 +99,49 @@ export function NewsEditorForm({
         />
       </label>
 
+      <fieldset className="news-access-tier-field">
+        <legend>Доступ по подписке</legend>
+        <div className="news-access-tier-options">
+          <label
+            aria-label="Базовая — для всех активных подписок"
+            className={draft.accessTier === "basic" ? "is-selected" : undefined}
+            htmlFor="news-access-tier-basic"
+          >
+            <input
+              id="news-access-tier-basic"
+              type="radio"
+              name="news-access-tier"
+              value="basic"
+              checked={draft.accessTier === "basic"}
+              onChange={() => onDraftChange((prev) => ({ ...prev, accessTier: "basic" }))}
+            />
+            <span>
+              <strong>Базовая</strong>
+              <small>Для всех активных подписок</small>
+            </span>
+          </label>
+          <label
+            aria-label="Расширенная — для расширенного тарифа и демо"
+            className={draft.accessTier === "extended" ? "is-selected" : undefined}
+            htmlFor="news-access-tier-extended"
+          >
+            <input
+              id="news-access-tier-extended"
+              type="radio"
+              name="news-access-tier"
+              value="extended"
+              checked={draft.accessTier === "extended"}
+              onChange={() => onDraftChange((prev) => ({ ...prev, accessTier: "extended" }))}
+            />
+            <span>
+              <strong>Расширенная</strong>
+              <small>Расширенный тариф и демо</small>
+            </span>
+          </label>
+        </div>
+        <p>Пользователи базового тарифа не увидят расширенную публикацию в ленте и по прямой ссылке.</p>
+      </fieldset>
+
       <div className="form-field news-content-field">
         <span>Содержание новости</span>
         <DocumentEditor

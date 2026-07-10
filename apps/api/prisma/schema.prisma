@@ -87,6 +87,11 @@ enum ContentStatus {
   published
 }
 
+enum NewsAccessTier {
+  basic
+  extended
+}
+
 enum LearningAccessLevel {
   basic
   extended
@@ -741,6 +746,7 @@ model NewsPost {
   coverImageId     String?
   slug             String             @unique
   status           ContentStatus      @default(draft)
+  accessTier       NewsAccessTier     @default(basic)
   firstPublishedAt DateTime?
   createdById      String
   // «Закреплено в форуме»: новость-якорь показывается сверху ленты форума
@@ -759,6 +765,8 @@ model NewsPost {
   // Главный публичный запрос — лента: `where status=published, orderBy firstPublishedAt desc`.
   // Без этого индекса Postgres сканирует всю таблицу новостей.
   @@index([status, firstPublishedAt(sort: Desc)])
+  // Базовая лента дополнительно фильтруется по уровню доступа.
+  @@index([status, accessTier, firstPublishedAt(sort: Desc)])
   // Админка использует `orderBy updatedAt desc` — отдельный составной индекс.
   @@index([updatedAt(sort: Desc)])
   // Закреплённые в форуме новости: where status=published, pinnedInForum=true.

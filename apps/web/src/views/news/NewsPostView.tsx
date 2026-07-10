@@ -130,12 +130,13 @@ export function NewsPostView({ slug }: { slug: string }) {
   }
 
   const publishedDate = post?.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
+  const isExtended = post?.accessTier === "extended";
   // Новость, открытая как закреплённое обсуждение форума (?from=forum): возвращаем
   // на форум и оформляем в стиле обычного обсуждения (контейнер .forum-detail).
   const fromForum = searchParams.get("from") === "forum";
 
   const body = (
-    <>
+    <div className={`news-detail-surface${isExtended ? " is-extended" : ""}`}>
       {preview ? (
         <StatusPill as="p" className="cms-preview-banner" variant="warning">
           Предпросмотр новости: комментарии и реакции отключены.
@@ -145,6 +146,7 @@ export function NewsPostView({ slug }: { slug: string }) {
         <p className="page-subtitle">Загрузка…</p>
       ) : (
         <>
+          {isExtended ? <span className="news-tier-badge">Расширенная</span> : null}
           <header className="page-header">
             <h1 className="page-title">{post.title}</h1>
             <p className="page-subtitle">{post.lead}</p>
@@ -184,7 +186,7 @@ export function NewsPostView({ slug }: { slug: string }) {
           ) : null}
         </>
       )}
-    </>
+    </div>
   );
 
   if (fromForum) {

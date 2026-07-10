@@ -1,4 +1,4 @@
-import { ContentStatus, FileAccessLevel, ForumQuestionStatus } from "@prisma/client";
+import { ContentStatus, FileAccessLevel, ForumQuestionStatus, NewsAccessTier } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { setupIntegrationContext } from "./test/integration-context";
 
@@ -31,13 +31,17 @@ async function adminId() {
   return admin.id;
 }
 
-async function createNews(adminToken: string, input: { title: string; coverImageId?: string | null }) {
+async function createNews(
+  adminToken: string,
+  input: { title: string; coverImageId?: string | null; accessTier?: NewsAccessTier },
+) {
   const draft = await ctx.http
     .post("/api/admin/content/news")
     .set(auth(adminToken))
     .send({
       title: input.title,
       lead: `Лид: ${input.title}`,
+      ...(input.accessTier ? { accessTier: input.accessTier } : {}),
       coverImageId: input.coverImageId ?? null,
       blocks: [{ type: "paragraph", payload: { html: `<p>${input.title}</p>` } }],
       tags: ["seo"],
@@ -149,6 +153,28 @@ describe("SEO public API", () => {
     expect(paths).not.toContain(`/news/${draftNews.slug}`);
     expect(paths).not.toContain(`/knowledge-base/${draftKnowledge.body.slug}`);
     expect(paths).not.toContain(`/forum/q/${hiddenQuestion.id}`);
+  });
+
+  it("не публикует расширенные новости в sitemap и metadata API", async () => {
+    const adminToken = await loginAdmin();
+    const extendedNews = await publishNews(
+      adminToken,
+      (
+        await createNews(adminToken, {
+          title: "SEO extended news",
+          accessTier: NewsAccessTier.extended,
+        })
+      ).id,
+    );
+
+    const [sitemap, metadata] = await Promise.all([
+      ctx.http.get("/api/seo/sitemap"),
+      ctx.http.get("/api/seo/pages").query({ path: `/news/${extendedNews.slug}` }),
+    ]);
+
+    expect(sitemap.status).toBe(200);
+    expect(sitemap.body.items.map((item: { path: string }) => item.path)).not.toContain(`/news/${extendedNews.slug}`);
+    expect(metadata.status).toBe(404);
   });
 
   it("отдаёт page metadata без auth и не раскрывает приватные file URL", async () => {

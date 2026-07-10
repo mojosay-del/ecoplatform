@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Prisma } from "@prisma/client";
+import { CompanyStatus, NewsAccessTier, SubscriptionPlan, type Prisma } from "@prisma/client";
 import { setupIntegrationContext } from "./test/integration-context";
 
 const ctx = setupIntegrationContext();
@@ -94,6 +94,170 @@ describe("Content lifecycle: news", () => {
     expect(commentCount).toBe(0);
     expect(commentLikeCount).toBe(0);
     expect(discussionCount).toBe(0);
+  });
+});
+
+describe("Content access tiers: news", () => {
+  it("скрывает расширенные новости от basic, но открывает extended, demo и staff", async () => {
+    const adminToken = await loginAdmin();
+    const basicReader = await registerCompany("0800201");
+    const extendedReader = await registerCompany("0800202");
+    const demoReader = await registerCompany("0800203");
+    const subscriptionEndsAt = new Date("2099-01-01T00:00:00.000Z");
+    await Promise.all([
+      ctx.prisma.company.update({
+        where: { id: basicReader.companyId },
+        data: {
+          status: CompanyStatus.active,
+          demoEndsAt: null,
+          subscriptionPlan: SubscriptionPlan.basic,
+          subscriptionEndsAt,
+        },
+      }),
+      ctx.prisma.company.update({
+        where: { id: extendedReader.companyId },
+        data: {
+          status: CompanyStatus.active,
+          demoEndsAt: null,
+          subscriptionPlan: SubscriptionPlan.extended,
+          subscriptionEndsAt,
+        },
+      }),
+    ]);
+    const [basicLogin, extendedLogin] = await Promise.all([
+      ctx.http.post("/api/auth/login").send({
+        email: "user0800201@test.local",
+        password: "User12345678",
+      }),
+      ctx.http.post("/api/auth/login").send({
+        email: "user0800202@test.local",
+        password: "User12345678",
+      }),
+    ]);
+    expect(basicLogin.status).toBe(201);
+    expect(extendedLogin.status).toBe(201);
+    const basicToken = basicLogin.body.accessToken as string;
+    const extendedToken = extendedLogin.body.accessToken as string;
+
+    const tag = "tier-access-news";
+    const basicDraft = await ctx.http
+      .post("/api/admin/content/news")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Базовая новость для матрицы доступа",
+        lead: "Доступна всем активным подпискам.",
+        blocks: [{ type: "paragraph", payload: { html: "<p>Базовый текст.</p>" } }],
+        tags: [tag],
+      });
+    expect(basicDraft.status).toBe(201);
+    expect(basicDraft.body.accessTier).toBe("basic");
+
+    const extendedDraft = await ctx.http
+      .post("/api/admin/content/news")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Расширенная новость для матрицы доступа",
+        lead: "Доступна расширенному тарифу и демо.",
+        blocks: [{ type: "paragraph", payload: { html: "<p>Расширенный текст.</p>" } }],
+        tags: [tag],
+      });
+    expect(extendedDraft.status).toBe(201);
+    expect(extendedDraft.body.accessTier).toBe("basic");
+
+    const extendedPatched = await ctx.http
+      .patch(`/api/admin/content/news/${extendedDraft.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: extendedDraft.body.title,
+        lead: extendedDraft.body.lead,
+        accessTier: NewsAccessTier.extended,
+        blocks: [{ type: "paragraph", payload: { html: "<p>Расширенный текст.</p>" } }],
+        tags: [tag],
+      });
+    expect(extendedPatched.status).toBe(200);
+    expect(extendedPatched.body.accessTier).toBe("extended");
+
+    const [basicNews, extendedNews] = await Promise.all([
+      ctx.http
+        .post(`/api/admin/content/news/${basicDraft.body.id}/publish`)
+        .set("Authorization", `Bearer ${adminToken}`),
+      ctx.http
+        .post(`/api/admin/content/news/${extendedDraft.body.id}/publish`)
+        .set("Authorization", `Bearer ${adminToken}`),
+    ]);
+    expect(basicNews.status).toBe(201);
+    expect(extendedNews.status).toBe(201);
+
+    const filteredPath = `/api/news?tags%5B%5D=${encodeURIComponent(tag)}`;
+    const [basicList, extendedList, demoList, staffList] = await Promise.all([
+      ctx.http.get(filteredPath).set("Authorization", `Bearer ${basicToken}`),
+      ctx.http.get(filteredPath).set("Authorization", `Bearer ${extendedToken}`),
+      ctx.http.get(filteredPath).set("Authorization", `Bearer ${demoReader.token}`),
+      ctx.http.get(filteredPath).set("Authorization", `Bearer ${adminToken}`),
+    ]);
+    expect(basicList.body.total).toBe(1);
+    expect(basicList.body.items.map((item: { id: string }) => item.id)).toEqual([basicDraft.body.id]);
+    for (const response of [extendedList, demoList, staffList]) {
+      expect(response.status).toBe(200);
+      expect(response.body.total).toBe(2);
+      expect(response.body.items.map((item: { id: string }) => item.id)).toContain(extendedDraft.body.id);
+    }
+
+    const searchQuery = encodeURIComponent("Расширенная новость для матрицы доступа");
+    const [basicFirstPage, extendedFirstPage, basicSearch, extendedSearch] = await Promise.all([
+      ctx.http.get(`${filteredPath}&limit=1`).set("Authorization", `Bearer ${basicToken}`),
+      ctx.http.get(`${filteredPath}&limit=1`).set("Authorization", `Bearer ${extendedToken}`),
+      ctx.http.get(`/api/news?q=${searchQuery}`).set("Authorization", `Bearer ${basicToken}`),
+      ctx.http.get(`/api/news?q=${searchQuery}`).set("Authorization", `Bearer ${extendedToken}`),
+    ]);
+    expect(basicFirstPage.body).toMatchObject({ total: 1, hasMore: false });
+    expect(extendedFirstPage.body).toMatchObject({ total: 2, hasMore: true });
+    expect(basicSearch.body).toMatchObject({ total: 0, hasMore: false });
+    expect(extendedSearch.body).toMatchObject({ total: 1, hasMore: false });
+    expect(extendedSearch.body.items).toContainEqual(expect.objectContaining({ id: extendedDraft.body.id }));
+
+    const [basicDetail, extendedDetail, demoDetail] = await Promise.all([
+      ctx.http.get(`/api/news/${extendedDraft.body.slug}`).set("Authorization", `Bearer ${basicToken}`),
+      ctx.http.get(`/api/news/${extendedDraft.body.slug}`).set("Authorization", `Bearer ${extendedToken}`),
+      ctx.http.get(`/api/news/${extendedDraft.body.slug}`).set("Authorization", `Bearer ${demoReader.token}`),
+    ]);
+    expect(basicDetail.status).toBe(404);
+    expect(basicDetail.body.message).toBe("Новость не найдена.");
+    expect(extendedDetail.body.accessTier).toBe("extended");
+    expect(demoDetail.body.accessTier).toBe("extended");
+
+    const comment = await ctx.http
+      .post(`/api/news/${extendedDraft.body.id}/comments`)
+      .set("Authorization", `Bearer ${demoReader.token}`)
+      .send({ text: "Комментарий из демо." });
+    expect(comment.status).toBe(201);
+
+    const [basicPostLike, basicComment, basicCommentLike] = await Promise.all([
+      ctx.http.post(`/api/news/${extendedDraft.body.id}/like`).set("Authorization", `Bearer ${basicToken}`),
+      ctx.http
+        .post(`/api/news/${extendedDraft.body.id}/comments`)
+        .set("Authorization", `Bearer ${basicToken}`)
+        .send({ text: "Не должно сохраниться." }),
+      ctx.http.post(`/api/news/comments/${comment.body.id}/like`).set("Authorization", `Bearer ${basicToken}`),
+    ]);
+    expect(basicPostLike.status).toBe(404);
+    expect(basicComment.status).toBe(404);
+    expect(basicCommentLike.status).toBe(404);
+
+    const [basicTags, extendedTags] = await Promise.all([
+      ctx.http.get("/api/news/tags?limit=100").set("Authorization", `Bearer ${basicToken}`),
+      ctx.http.get("/api/news/tags?limit=100").set("Authorization", `Bearer ${extendedToken}`),
+    ]);
+    expect(basicTags.body.find((item: { name: string }) => item.name === tag)?.usageCount).toBe(1);
+    expect(extendedTags.body.find((item: { name: string }) => item.name === tag)?.usageCount).toBe(2);
+
+    const audit = await ctx.prisma.adminActionLog.findFirst({
+      where: { action: "news.update", entityId: extendedDraft.body.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(audit?.payload).toMatchObject({
+      diff: { accessTier: { before: "basic", after: "extended" } },
+    });
   });
 });
 

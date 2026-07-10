@@ -1,3 +1,4 @@
+import { CompanyStatus, NewsAccessTier, SubscriptionPlan } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { setupIntegrationContext } from "./test/integration-context";
 
@@ -476,6 +477,62 @@ describe("Forum: закреплённые новости", () => {
     const pinned = await ctx.http.get("/api/forum/pinned-news").set(auth(reader.token));
     expect(pinned.status).toBe(200);
     expect(pinned.body.some((item: { id: string }) => item.id === create.body.id)).toBe(true);
+  });
+
+  it("расширенное закрепление скрыто от basic и доступно extended и demo", async () => {
+    const adminToken = await loginAdmin();
+    const basicReader = await registerCompany("0900031");
+    const extendedReader = await registerCompany("0900032");
+    const demoReader = await registerCompany("0900033");
+    const subscriptionEndsAt = new Date("2099-01-01T00:00:00.000Z");
+    await Promise.all([
+      ctx.prisma.company.update({
+        where: { id: basicReader.companyId },
+        data: {
+          status: CompanyStatus.active,
+          demoEndsAt: null,
+          subscriptionPlan: SubscriptionPlan.basic,
+          subscriptionEndsAt,
+        },
+      }),
+      ctx.prisma.company.update({
+        where: { id: extendedReader.companyId },
+        data: {
+          status: CompanyStatus.active,
+          demoEndsAt: null,
+          subscriptionPlan: SubscriptionPlan.extended,
+          subscriptionEndsAt,
+        },
+      }),
+    ]);
+    const [basicLogin, extendedLogin] = await Promise.all([
+      ctx.http.post("/api/auth/login").send({ email: "user0900031@test.local", password: "User12345678" }),
+      ctx.http.post("/api/auth/login").send({ email: "user0900032@test.local", password: "User12345678" }),
+    ]);
+
+    const create = await ctx.http
+      .post("/api/admin/content/news")
+      .set(auth(adminToken))
+      .send({
+        title: "Расширенное закрепление",
+        lead: "Доступно расширенному тарифу и демо.",
+        accessTier: NewsAccessTier.extended,
+        pinnedInForum: true,
+        blocks: [{ type: "paragraph", payload: { html: "<p>Расширенный разбор.</p>" } }],
+        tags: [],
+      });
+    expect(create.status).toBe(201);
+    await ctx.http.post(`/api/admin/content/news/${create.body.id}/publish`).set(auth(adminToken)).expect(201);
+
+    const [basicPinned, extendedPinned, demoPinned] = await Promise.all([
+      ctx.http.get("/api/forum/pinned-news").set(auth(basicLogin.body.accessToken as string)),
+      ctx.http.get("/api/forum/pinned-news").set(auth(extendedLogin.body.accessToken as string)),
+      ctx.http.get("/api/forum/pinned-news").set(auth(demoReader.token)),
+    ]);
+    expect(basicPinned.body.some((item: { id: string }) => item.id === create.body.id)).toBe(false);
+    for (const response of [extendedPinned, demoPinned]) {
+      expect(response.body).toContainEqual(expect.objectContaining({ id: create.body.id, accessTier: "extended" }));
+    }
   });
 });
 

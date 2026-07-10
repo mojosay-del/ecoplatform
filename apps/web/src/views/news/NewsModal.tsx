@@ -195,6 +195,7 @@ export function NewsModal({
 
   const showLoadingShell = state === "loading" || (state === "ready" && Boolean(post) && !modalContentReady);
   const showCloseButton = !showLoadingShell;
+  const isExtended = post?.accessTier === "extended";
 
   return createPortal(
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- клик по фону — мышиное удобство; с клавиатуры окно закрывается кнопкой закрытия и Escape
@@ -209,7 +210,10 @@ export function NewsModal({
       aria-label={showLoadingShell ? "Новость загружается" : "Новость"}
       aria-busy={showLoadingShell}
     >
-      <div className={`news-modal${showLoadingShell ? " is-loading-content" : " is-content-ready"}`} ref={modalRef}>
+      <div
+        className={`news-modal${isExtended ? " is-extended" : ""}${showLoadingShell ? " is-loading-content" : " is-content-ready"}`}
+        ref={modalRef}
+      >
         {showCloseButton ? (
           <button className="news-modal-close" onClick={onClose} type="button" aria-label="Закрыть">
             <X size={20} />

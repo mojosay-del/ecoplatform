@@ -50,6 +50,10 @@ export const contentStatuses = ["draft", "published"] as const;
 
 export type ContentStatus = (typeof contentStatuses)[number];
 
+export const newsAccessTiers = ["basic", "extended"] as const;
+
+export type NewsAccessTier = (typeof newsAccessTiers)[number];
+
 export const learningAccessLevels = ["basic", "extended", "one_time"] as const;
 
 export type LearningAccessLevel = (typeof learningAccessLevels)[number];

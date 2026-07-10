@@ -18,6 +18,7 @@ import { MarketplaceReviewsService } from "../marketplace/services/marketplace-r
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SessionCacheService } from "../redis/session-cache.service";
+import { assertUserCanAccessNewsTier } from "../content/services/news-access.helpers";
 import {
   enrichCases,
   getCase as getCaseWorkflow,
@@ -72,7 +73,7 @@ export class ModerationService {
   async createComplaint(input: ComplaintInput, user: RequestUser) {
     this.assertFunctionalAccess(user);
 
-    const entity = await this.loadPublishedEntity(input.entityType, input.entityId);
+    const entity = await this.loadPublishedEntity(input.entityType, input.entityId, user);
     if (entity.authorUserId === user.id) {
       throw new ForbiddenException("Нельзя пожаловаться на свой материал.");
     }
@@ -204,7 +205,11 @@ export class ModerationService {
     }
   }
 
-  private async loadPublishedEntity(entityType: ModeratedEntityType, entityId: string): Promise<EntityResolution> {
+  private async loadPublishedEntity(
+    entityType: ModeratedEntityType,
+    entityId: string,
+    user: RequestUser,
+  ): Promise<EntityResolution> {
     if (entityType === "news_comment") {
       const comment = await this.prisma.comment.findUnique({
         where: { id: entityId },
@@ -222,22 +227,24 @@ export class ModerationService {
       }
       const newsPost = await this.prisma.newsPost.findUnique({
         where: { id: comment.discussion.targetId },
-        select: { status: true },
+        select: { status: true, accessTier: true },
       });
       if (!newsPost || newsPost.status !== ContentStatus.published) {
         throw new NotFoundException("Комментарий не найден или недоступен для жалобы.");
       }
+      assertUserCanAccessNewsTier(user, newsPost.accessTier, "Комментарий не найден или недоступен для жалобы.");
       return { type: "news_comment", authorUserId: comment.userId, authorCompanyId: comment.user.companyId };
     }
 
     if (entityType === "news_post") {
       const post = await this.prisma.newsPost.findUnique({
         where: { id: entityId },
-        select: { id: true, status: true, createdById: true },
+        select: { id: true, status: true, accessTier: true, createdById: true },
       });
       if (!post || post.status !== ContentStatus.published) {
         throw new NotFoundException("Новость не найдена или недоступна для жалобы.");
       }
+      assertUserCanAccessNewsTier(user, post.accessTier, "Новость не найдена или недоступна для жалобы.");
       return { type: "news_post", authorUserId: post.createdById, authorCompanyId: null };
     }
 

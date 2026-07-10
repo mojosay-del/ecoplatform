@@ -34,6 +34,7 @@ export function NewsCard({
   const audioUrl = preferredFileAssetMediaUrl(audioAsset);
   const shouldReserveCover = Boolean(post.coverImageId);
   const hasAudio = Boolean(post.audioAttachment);
+  const isExtended = post.accessTier === "extended";
   const publishedDate = post.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
   const [settledCoverUrl, setSettledCoverUrl] = useState<string | null>(null);
   const showSkeleton = shouldRenderCoveredCardSkeleton({
@@ -50,7 +51,7 @@ export function NewsCard({
   return (
     <article
       aria-busy={showSkeleton ? "true" : undefined}
-      className={`news-tile ${shouldReserveCover ? "news-tile-with-cover" : "news-tile-text"} ${
+      className={`news-tile${isExtended ? " is-extended" : ""} ${shouldReserveCover ? "news-tile-with-cover" : "news-tile-text"} ${
         showSkeleton ? "is-awaiting-cover" : "is-cover-ready"
       }`}
     >
@@ -76,7 +77,7 @@ export function NewsCard({
             </a>
           ) : null}
           <div className="news-tile-body">
-            <span className="news-tile-category">Новости</span>
+            <span className="news-tile-category">{isExtended ? "Расширенная" : "Новости"}</span>
             <a className="news-tile-title-link" href={href} onClick={openFromLink}>
               <h2 className="news-tile-title">{post.title}</h2>
             </a>

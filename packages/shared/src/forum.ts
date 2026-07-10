@@ -7,7 +7,7 @@
 // админ. Тело — простой текст. Репутация автора собирается из marketplace
 // (рейтинг + сделки) и собственной метрики форума, здесь не дублируется.
 
-import type { CompanyType } from "./domain";
+import type { CompanyType, NewsAccessTier } from "./domain";
 import type { IsoDateString } from "./api-response";
 
 // Значение оси-справочника. Обе оси редактируются админом из CMS.
@@ -98,6 +98,7 @@ export type ForumPinnedNews = {
   slug: string;
   title: string;
   lead: string;
+  accessTier: NewsAccessTier;
   // Есть ли у новости подкаст (аудио-вложение) — отметка в карточке.
   hasPodcast: boolean;
   firstPublishedAt: IsoDateString | null;

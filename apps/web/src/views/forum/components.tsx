@@ -151,10 +151,11 @@ function SearchSnippet({ snippet }: { snippet: NonNullable<ForumQuestionListItem
 }
 
 export function PinnedNewsCard({ item }: { item: ForumPinnedNews }) {
+  const isExtended = item.accessTier === "extended";
   return (
     // ?from=forum → страница новости открывается в стиле обсуждения форума с
     // кнопкой «К форуму» (а не «Назад к новостям»).
-    <Link href={`/news/${item.slug}?from=forum`} className="forum-pinned">
+    <Link href={`/news/${item.slug}?from=forum`} className={`forum-pinned${isExtended ? " is-extended" : ""}`}>
       <div className="forum-tags">
         <span className="forum-badge forum-badge--pin">
           <Pin size={14} /> Закреплено
@@ -163,6 +164,7 @@ export function PinnedNewsCard({ item }: { item: ForumPinnedNews }) {
           <Newspaper size={13} className="u-inline-icon" />
           Из новостей
         </span>
+        {isExtended ? <span className="forum-chip forum-chip--extended">Расширенная</span> : null}
         {item.hasPodcast ? (
           <span className="forum-stat">
             <Headphones size={15} /> Подкаст

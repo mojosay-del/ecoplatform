@@ -1,4 +1,5 @@
 import type { Block } from "../../../lib/editor/block-types";
+import type { NewsAccessTier } from "@ecoplatform/shared";
 
 export type NewsTag = {
   id: string;
@@ -21,6 +22,7 @@ export type NewsItem = {
   slug: string;
   status: "draft" | "published";
   coverImageId: string | null;
+  accessTier: NewsAccessTier;
   pinnedInForum: boolean;
   tags: Array<{ newsTagId: string; newsTag: NewsTag }>;
   firstPublishedAt: string | null;
@@ -40,6 +42,7 @@ export type DraftState = {
   title: string;
   lead: string;
   coverImageId: string;
+  accessTier: NewsAccessTier;
   pinnedInForum: boolean;
   tags: string[];
   blocks: Block[];

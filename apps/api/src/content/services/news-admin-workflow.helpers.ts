@@ -39,6 +39,7 @@ export async function createNewsPost(
     data: {
       title: input.title,
       lead: input.lead,
+      accessTier: input.accessTier,
       coverImageId: input.coverImageId,
       pinnedInForum: input.pinnedInForum ?? false,
       slug,
@@ -67,6 +68,7 @@ export async function createNewsPost(
     action: "news.create",
     entityType: "NewsPost",
     entityId: post.id,
+    payload: { accessTier: input.accessTier },
   });
 
   return findAdminNews(prisma, post.id);
@@ -104,6 +106,7 @@ export async function updateNewsPost(
       data: {
         title: input.title,
         lead: input.lead,
+        accessTier: input.accessTier,
         coverImageId: input.coverImageId,
         pinnedInForum: input.pinnedInForum ?? false,
         blocks: {
@@ -130,11 +133,13 @@ export async function updateNewsPost(
   ]);
   await common.cleanupDetachedFiles(previousFileIds);
 
-  await auditLog.record({
+  await auditLog.recordChange({
     actorId: user.id,
     action: "news.update",
     entityType: "NewsPost",
     entityId: id,
+    before: { accessTier: before.accessTier },
+    after: { accessTier: input.accessTier },
   });
 
   return findAdminNews(prisma, id);
@@ -162,6 +167,7 @@ export async function publishNewsPost({ prisma, auditLog }: NewsAdminWorkflowDep
     action: "news.publish",
     entityType: "NewsPost",
     entityId: id,
+    payload: { accessTier: existing.accessTier },
   });
 
   return updated;

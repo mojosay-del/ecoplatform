@@ -4,6 +4,7 @@ import {
   documentationDisplayIconNames,
   knowledgeBaseDisplayIconNames,
   lessonBlockSchema,
+  newsAccessTiers,
   newsBlockSchema,
 } from "@ecoplatform/shared";
 
@@ -49,6 +50,7 @@ export const knowledgeTreeQuerySchema = z.object({
 export const newsInputSchema = z.object({
   title: z.string().min(1),
   lead: z.string().min(1),
+  accessTier: z.enum(newsAccessTiers).default("basic"),
   coverImageId: z.string().nullable().optional(),
   slug: z.string().optional(),
   blocks: z.array(newsBlockSchema).default([]),

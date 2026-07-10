@@ -10,6 +10,7 @@ import {
   loadPublishedNewsCommentCounts,
   newsCommentAuthorSelect,
 } from "./news-comment.helpers";
+import { assertUserCanAccessNewsTier, newsAccessWhere } from "./news-access.helpers";
 import { normaliseTagFilters } from "./news-tag.helpers";
 import { sanitizeContentBlocksForResponse } from "./content-block-response.helpers";
 
@@ -35,6 +36,7 @@ export async function listPublishedNews(
   common.assertFunctionalAccess(user);
 
   const pagination = resolvePagination(paginationInput, { defaultLimit: 20, maxLimit: 100 });
+  const accessWhere = newsAccessWhere(user);
   const tagFilters = normaliseTagFilters(paginationInput.tags);
   const search = paginationInput.q?.trim();
   const andFilters: Prisma.NewsPostWhereInput[] = tagFilters.map((name) => ({
@@ -53,6 +55,7 @@ export async function listPublishedNews(
 
   const where: Prisma.NewsPostWhereInput = {
     status: ContentStatus.published,
+    ...accessWhere,
     ...(andFilters.length > 0 ? { AND: andFilters } : {}),
   };
 
@@ -101,19 +104,35 @@ export async function listPublishedNewsTags(
 ) {
   common.assertFunctionalAccess(user);
   const limit = resolvePagination({ limit: options.limit }, { defaultLimit: 20, maxLimit: 100 }).limit;
+  const accessiblePublishedNews = {
+    status: ContentStatus.published,
+    ...newsAccessWhere(user),
+  } satisfies Prisma.NewsPostWhereInput;
 
-  return prisma.newsTag.findMany({
+  const tags = await prisma.newsTag.findMany({
     where: {
       posts: {
         some: {
-          newsPost: { status: ContentStatus.published },
+          newsPost: accessiblePublishedNews,
         },
       },
     },
-    orderBy: [{ usageCount: "desc" }, { name: "asc" }],
-    take: limit,
-    select: { id: true, name: true, slug: true, usageCount: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      _count: {
+        select: {
+          posts: { where: { newsPost: accessiblePublishedNews } },
+        },
+      },
+    },
   });
+
+  return tags
+    .map(({ _count, ...tag }) => ({ ...tag, usageCount: _count.posts }))
+    .sort((left, right) => right.usageCount - left.usageCount || left.name.localeCompare(right.name, "ru"))
+    .slice(0, limit);
 }
 
 export async function getPublishedNews(
@@ -140,6 +159,9 @@ export async function getPublishedNews(
   const canPreview = options.preview && canPreviewAuthoredContent(user, post.createdById);
   if (post.status !== ContentStatus.published && !canPreview) {
     throw new NotFoundException("Новость не найдена.");
+  }
+  if (!canPreview) {
+    assertUserCanAccessNewsTier(user, post.accessTier);
   }
 
   // Комментарии берём через Discussion. Если её ещё нет (никто не комментировал),

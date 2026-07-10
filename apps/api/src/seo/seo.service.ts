@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { ContentStatus, ForumQuestionStatus } from "@prisma/client";
+import { ContentStatus, ForumQuestionStatus, NewsAccessTier } from "@prisma/client";
 import type { SeoPageSummary, SeoPageType, SeoSitemapEntry, SeoSitemapResponse } from "@ecoplatform/shared";
 import { publicUrl } from "../files/files-storage.helpers";
 import { PrismaService } from "../prisma/prisma.service";
@@ -29,7 +29,7 @@ export class SeoService {
   async sitemap(): Promise<SeoSitemapResponse> {
     const [news, knowledge, documentation, forumQuestions] = await Promise.all([
       this.prisma.newsPost.findMany({
-        where: { status: ContentStatus.published },
+        where: { status: ContentStatus.published, accessTier: NewsAccessTier.basic },
         orderBy: { firstPublishedAt: "desc" },
         take: SITEMAP_MAX_PER_TYPE,
         select: { slug: true, firstPublishedAt: true, updatedAt: true },
@@ -125,11 +125,12 @@ export class SeoService {
         lead: true,
         coverImageId: true,
         status: true,
+        accessTier: true,
         firstPublishedAt: true,
         updatedAt: true,
       },
     });
-    if (!row || row.status !== ContentStatus.published) {
+    if (!row || row.status !== ContentStatus.published || row.accessTier !== NewsAccessTier.basic) {
       throw new NotFoundException("SEO-страница не найдена.");
     }
 

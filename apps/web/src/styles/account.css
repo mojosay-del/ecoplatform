@@ -2187,17 +2187,15 @@ body.account-password-modal-open {
   position: relative;
   overflow: hidden;
   border-color: rgb(253 249 244 / 0.14);
-  background:
-    radial-gradient(360px 200px at 85% -12%, rgb(var(--brand-rgb) / 0.28), transparent 62%),
-    linear-gradient(165deg, #33261b 0%, var(--learning-hero-bg) 58%, #1a130e 100%);
-  color: var(--learning-hero-text);
-  box-shadow: 0 24px 52px -24px rgb(var(--learning-hero-bg-rgb) / 0.75);
+  background: var(--premium-surface-gradient);
+  color: var(--premium-surface-text);
+  box-shadow: 0 24px 52px -24px rgb(var(--premium-surface-bg-rgb) / 0.75);
 }
 
 .account-plan.is-premium .account-plan-desc,
 .account-plan.is-premium .account-plan-period,
 .account-plan.is-premium .account-plan-price-note {
-  color: var(--learning-hero-text-muted);
+  color: var(--premium-surface-text-muted);
 }
 
 .account-plan.is-premium .account-plan-features li.is-off {
@@ -2206,7 +2204,7 @@ body.account-password-modal-open {
 
 .account-plan.is-premium .account-plan-check {
   background: rgb(253 249 244 / 0.14);
-  color: var(--learning-hero-text);
+  color: var(--premium-surface-text);
 }
 
 .account-plan.is-premium .account-billing-period-toggle {
@@ -2215,19 +2213,19 @@ body.account-password-modal-open {
 }
 
 .account-plan.is-premium .account-billing-period-toggle button {
-  color: var(--learning-hero-text-muted);
+  color: var(--premium-surface-text-muted);
 }
 
 .account-plan.is-premium .account-billing-period-toggle button.is-active {
-  background: var(--learning-hero-text);
-  color: var(--learning-hero-bg);
+  background: var(--premium-surface-text);
+  color: var(--premium-surface-bg);
 }
 
 /* Кнопка на тёмной карте: светлая, как на hero «Обучения». */
 .account-plan.is-premium .button.secondary {
   border-color: rgb(253 249 244 / 0.28);
   background: rgb(253 249 244 / 0.1);
-  color: var(--learning-hero-text);
+  color: var(--premium-surface-text);
 }
 
 .account-plan.is-premium .button.secondary:hover:not(:disabled) {
@@ -2244,7 +2242,12 @@ body.account-password-modal-open {
   border-color: rgb(var(--brand-rgb) / 0.55);
   background:
     radial-gradient(360px 200px at 85% -12%, rgb(var(--brand-rgb) / 0.34), transparent 62%),
-    linear-gradient(165deg, #33261b 0%, var(--learning-hero-bg) 58%, #1a130e 100%);
+    linear-gradient(
+      165deg,
+      var(--premium-surface-start) 0%,
+      var(--premium-surface-bg) 58%,
+      var(--premium-surface-deep) 100%
+    );
 }
 
 .account-plan-badge {

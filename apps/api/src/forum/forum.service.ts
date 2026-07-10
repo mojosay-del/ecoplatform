@@ -7,6 +7,7 @@ import { paginatedResponse, resolvePagination } from "../common/pagination";
 import type { RequestUser } from "../common/request-user";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { newsAccessWhere } from "../content/services/news-access.helpers";
 import {
   acceptForumAnswer,
   createForumAnswer,
@@ -224,7 +225,7 @@ export class ForumService {
   async pinnedNews(user: RequestUser) {
     assertFunctionalAccess(user);
     const rows = await this.prisma.newsPost.findMany({
-      where: { status: ContentStatus.published, pinnedInForum: true },
+      where: { status: ContentStatus.published, pinnedInForum: true, ...newsAccessWhere(user) },
       orderBy: { firstPublishedAt: "desc" },
       take: PINNED_NEWS_LIMIT,
       select: {
@@ -232,6 +233,7 @@ export class ForumService {
         slug: true,
         title: true,
         lead: true,
+        accessTier: true,
         firstPublishedAt: true,
         blocks: { where: { type: "audio" }, select: { id: true }, take: 1 },
       },
@@ -241,6 +243,7 @@ export class ForumService {
       slug: row.slug,
       title: row.title,
       lead: row.lead,
+      accessTier: row.accessTier,
       hasPodcast: row.blocks.length > 0,
       firstPublishedAt: row.firstPublishedAt ? row.firstPublishedAt.toISOString() : null,
     }));

@@ -105,6 +105,23 @@
   --learning-hero-text: #fdf9f4;
   --learning-hero-text-muted: rgb(253 249 244 / 0.72);
   --learning-hero-line: rgb(253 249 244 / 0.16);
+  /* Общая премиум-тема: тариф «Расширенная» и расширенные новости используют
+     один тёплый тёмный визуальный язык. */
+  --premium-surface-bg: #201812;
+  --premium-surface-bg-rgb: 32 24 18;
+  --premium-surface-start: #33261b;
+  --premium-surface-deep: #1a130e;
+  --premium-surface-text: #fdf9f4;
+  --premium-surface-text-muted: rgb(253 249 244 / 0.72);
+  --premium-surface-line: rgb(253 249 244 / 0.16);
+  --premium-surface-gradient:
+    radial-gradient(360px 200px at 85% -12%, rgb(var(--brand-rgb) / 0.28), transparent 62%),
+    linear-gradient(
+      165deg,
+      var(--premium-surface-start) 0%,
+      var(--premium-surface-bg) 58%,
+      var(--premium-surface-deep) 100%
+    );
   --knowledge-gradient-start: #f6c89e;
   --knowledge-gradient-end: #b9743b;
   --lesson-upgrade-text: #6e5742;

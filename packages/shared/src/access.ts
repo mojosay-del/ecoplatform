@@ -1,4 +1,4 @@
-import type { CompanyAccessSnapshot, LearningAccessLevel, PlatformRole } from "./domain";
+import type { CompanyAccessSnapshot, LearningAccessLevel, NewsAccessTier, PlatformRole } from "./domain";
 
 export const DEMO_DURATION_HOURS = 24;
 export const EDUCATION_COMPANY_TYPES: readonly CompanyAccessSnapshot["type"][] = ["collector"];
@@ -63,6 +63,23 @@ export function effectivePlan(
 
 export function canAccessBasicContent(company: CompanyAccessSnapshot, now = new Date()): boolean {
   return effectivePlan(company, now) !== null;
+}
+
+// Демо намеренно видит оба уровня новостей: это отдельное продуктовое правило,
+// которое не расширяет доступ к обучению и другим возможностям тарифа.
+export function canAccessNewsTier(
+  company: CompanyAccessSnapshot,
+  accessTier: NewsAccessTier,
+  now = new Date(),
+): boolean {
+  const plan = effectivePlan(company, now);
+  if (plan === "demo_basic") {
+    return true;
+  }
+  if (accessTier === "basic") {
+    return plan === "basic" || plan === "extended";
+  }
+  return plan === "extended";
 }
 
 export function canAccessLearningLevel(

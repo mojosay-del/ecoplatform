@@ -5,6 +5,7 @@ import type { ModuleAccessService } from "../../common/module-access.service";
 import type { RequestUser } from "../../common/request-user";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { ContentCommonService } from "./content-common.service";
+import { assertUserCanAccessNewsTier } from "./news-access.helpers";
 
 type NewsInteractionDeps = {
   prisma: PrismaService;
@@ -15,10 +16,14 @@ type NewsInteractionDeps = {
 
 export async function toggleNewsPostLike({ prisma, common }: NewsInteractionDeps, id: string, user: RequestUser) {
   common.assertFunctionalAccess(user);
-  const post = await prisma.newsPost.findUnique({ where: { id }, select: { id: true, status: true } });
+  const post = await prisma.newsPost.findUnique({
+    where: { id },
+    select: { id: true, status: true, accessTier: true },
+  });
   if (!post || post.status !== ContentStatus.published) {
     throw new NotFoundException("Новость не найдена.");
   }
+  assertUserCanAccessNewsTier(user, post.accessTier);
 
   const existing = await prisma.newsLike.findUnique({
     where: { userId_newsPostId: { userId: user.id, newsPostId: id } },
@@ -63,11 +68,12 @@ export async function toggleNewsCommentLike(
   }
   const newsPost = await prisma.newsPost.findUnique({
     where: { id: comment.discussion.targetId },
-    select: { status: true },
+    select: { status: true, accessTier: true },
   });
   if (!newsPost || newsPost.status !== ContentStatus.published) {
     throw new NotFoundException("Комментарий не найден.");
   }
+  assertUserCanAccessNewsTier(user, newsPost.accessTier, "Комментарий не найден.");
   if (comment.userId === user.id) {
     throw new ForbiddenException("Нельзя поставить лайк своему комментарию.");
   }
@@ -106,11 +112,12 @@ export async function addNewsComment(
 
   const post = await prisma.newsPost.findUnique({
     where: { id: newsPostId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, accessTier: true },
   });
   if (!post || post.status !== ContentStatus.published) {
     throw new NotFoundException("Новость не найдена.");
   }
+  assertUserCanAccessNewsTier(user, post.accessTier);
 
   let parentCommentId = input.parentCommentId;
 

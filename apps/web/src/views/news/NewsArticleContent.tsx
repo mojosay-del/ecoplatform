@@ -52,9 +52,10 @@ export function NewsArticleContent({
   const cover = post.coverImageId ? (coverAssets.get(post.coverImageId) ?? null) : null;
   const coverUrl = preferredFileAssetImageUrl(cover);
   const publishedDate = post.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
+  const isExtended = post.accessTier === "extended";
 
   return (
-    <div className="news-article">
+    <div className={`news-article${isExtended ? " is-extended" : ""}`}>
       {coverUrl ? (
         <div className="news-article-cover">
           <Image
@@ -69,7 +70,7 @@ export function NewsArticleContent({
       ) : null}
       <div className="news-article-body">
         <div className="news-article-content">
-          <span className="news-tile-category">Новости</span>
+          <span className="news-tile-category">{isExtended ? "Расширенная" : "Новости"}</span>
           <h1 className="news-article-title">{post.title}</h1>
           <p className="news-article-lead">{post.lead}</p>
           <div className="content-blocks">
