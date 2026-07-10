@@ -3,6 +3,7 @@
 
 import { config as loadEnv } from "dotenv";
 import { resolve } from "path";
+import { assertLocalTestDatabase } from "./integration-global-setup";
 
 loadEnv({ path: resolve(__dirname, "../../../../.env") });
 
@@ -29,9 +30,14 @@ process.env.S3_SECRET_ACCESS_KEY = "ci-secret";
 process.env.S3_PRIVATE_BUCKET = "ci-test-private";
 
 // DATABASE_URL приходит из globalSetup (process.env уже изменён в parent-процессе vitest).
+// Эшелонированная оборона (см. global-setup): (1) только loopback-хост — прод/
+// удалённая БД недостижимы; (2) имя БД обязано содержать `_test` — не dev.
+if (process.env.DATABASE_URL) {
+  assertLocalTestDatabase(process.env.DATABASE_URL);
+}
 if (!process.env.DATABASE_URL?.includes("_test")) {
-  // Подстраховка: если тесты пытаются работать против dev-БД — лучше упасть с понятной ошибкой,
-  // чем случайно затереть локальные данные при TRUNCATE.
+  // Если тесты пытаются работать против dev-БД (без суффикса _test) — падаем с
+  // понятной ошибкой, чтобы не затереть локальные данные при TRUNCATE.
   throw new Error(
     `Integration tests should target *_test database, got ${process.env.DATABASE_URL ?? "<undefined>"}. ` +
       "Check apps/api/vitest.integration.config.ts globalSetup.",

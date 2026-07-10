@@ -31,9 +31,33 @@ function withDatabase(url: string, db: string): string {
   return u.toString();
 }
 
+// 🔒 КРИТИЧЕСКАЯ ЗАЩИТА: integration-тесты создают/мигрируют/TRUNCATE'ят БД.
+// Разрешаем их ТОЛЬКО против локальной БД (loopback-хост). Прод и любой
+// удалённый Postgres (напр. Timeweb 192.168.0.5) — недостижимы отсюда by design.
+// Это последняя линия обороны против катастрофы «тесты снесли прод».
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
+
+export function assertLocalTestDatabase(url: string): void {
+  const { host, database } = parseDatabaseUrl(url);
+  if (!LOOPBACK_HOSTS.has(host)) {
+    throw new Error(
+      `❌ Integration-тесты запрещены против нелокальной БД (host=${host}). ` +
+        `Разрешён только loopback (localhost/127.0.0.1). Это защита от прогона по проду/удалённой БД.`,
+    );
+  }
+  // Прод-БД называется ecoplatform_db (см. deploy/PRODUCTION.md) — явный запрет
+  // на случай, если её когда-то поднимут локально в проброшенном порту.
+  if (database === "ecoplatform_db") {
+    throw new Error(`❌ Integration-тесты запрещены против БД '${database}' (имя прод-БД).`);
+  }
+}
+
 export default async function setup() {
   const baseUrl = process.env.DATABASE_URL;
   if (!baseUrl) throw new Error("DATABASE_URL не задан — нечего использовать для тестовой БД");
+
+  // Броня: не даём тестам даже начать против удалённой/прод-БД.
+  assertLocalTestDatabase(baseUrl);
 
   const { host, port, user, password, database } = parseDatabaseUrl(baseUrl);
   const testDb = `${database}_test`;
