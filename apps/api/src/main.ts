@@ -19,6 +19,7 @@ import { Logger as PinoNestLogger } from "nestjs-pino";
 import { AppModule } from "./app.module";
 import { createCorsOrigin } from "./common/cors-origin";
 import { csrfCookieMiddleware, CsrfGuard } from "./common/csrf.guard";
+import { configureBodyParser } from "./common/http-body-parser";
 import { GlobalExceptionFilter, registerProcessErrorHandlers } from "./common/global-exception.filter";
 import { FilesService } from "./files/files.service";
 import { setupOpenApi } from "./openapi/openapi";
@@ -51,6 +52,9 @@ async function bootstrap() {
     }),
   );
   app.use(compression());
+
+  // Лимит тела JSON (2 МБ) — общий с integration-харнессом. См. http-body-parser.
+  configureBodyParser(app);
 
   // Все 5xx/4xx будут логироваться единообразно с URL, методом, actorId и
   // (для 5xx) stack-трейсом. См. GlobalExceptionFilter.

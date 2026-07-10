@@ -314,4 +314,33 @@ describe("Content updates: news", () => {
     expect(patched.body.blocks).toHaveLength(2);
     expect(patched.body.tags).toHaveLength(2);
   });
+
+  it("принимает крупную статью тела >100 КБ (лимит JSON body-parser поднят)", async () => {
+    const adminToken = await loginAdmin();
+
+    // Длинный абзац (~1 КБ безопасного HTML) повторяем в 200 блоков → тело
+    // сериализуется в ~200 КБ и заведомо превышает дефолтные 100 КБ Express.
+    // Без поднятого лимита (app.useBodyParser json 2mb) запрос вернул бы 413.
+    const longParagraph = `<p>${"Абзац с содержательным текстом для проверки лимита тела запроса. ".repeat(15)}</p>`;
+    const blocks = Array.from({ length: 200 }, () => ({
+      type: "paragraph" as const,
+      payload: { html: longParagraph },
+    }));
+
+    const payloadBytes = Buffer.byteLength(JSON.stringify({ blocks }), "utf8");
+    expect(payloadBytes).toBeGreaterThan(100 * 1024);
+
+    const largeDraft = await ctx.http
+      .post("/api/admin/content/news")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        title: "Крупная статья для проверки лимита тела",
+        lead: "Тело статьи превышает дефолтные 100 КБ Express.",
+        blocks,
+        tags: ["большое-тело"],
+      });
+
+    expect(largeDraft.status).toBe(201);
+    expect(largeDraft.body.blocks).toHaveLength(200);
+  });
 });
