@@ -57,7 +57,11 @@ export default defineConfig([
       ecmaVersion: "latest",
       sourceType: "module",
       parserOptions: {
-        project: ["./apps/api/tsconfig.eslint.json", "./apps/web/tsconfig.json", "./packages/shared/tsconfig.eslint.json"],
+        project: [
+          "./apps/api/tsconfig.eslint.json",
+          "./apps/web/tsconfig.json",
+          "./packages/shared/tsconfig.eslint.json",
+        ],
         tsconfigRootDir,
       },
       globals: {
@@ -111,6 +115,13 @@ export default defineConfig([
       ...nextPlugin.configs["core-web-vitals"].rules,
       ...rulesAsWarnings(jsxA11y.configs.recommended.rules),
       "@next/next/no-html-link-for-pages": "off",
+      // Отключено осознанно: у приложения СВОЙ конвейер оптимизации картинок —
+      // sharp генерит AVIF/WebP-варианты на сервере, а `preferredFileAssetImageUrl`
+      // отдаёт уже готовый оптимизированный вариант из S3. Прогонять их через
+      // next/image (/_next/image) — двойная оптимизация: лишняя нагрузка на
+      // web-контейнер и, по предупреждению самого Next, доп. расходы провайдера.
+      // Поэтому `<img>` на готовые S3-URL здесь корректен, а не «медленный LCP».
+      "@next/next/no-img-element": "off",
       "no-unsanitized/method": "error",
       "no-unsanitized/property": "error",
       "react-hooks/exhaustive-deps": "error",
