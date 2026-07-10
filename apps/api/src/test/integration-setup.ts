@@ -14,6 +14,20 @@ process.env.EMAIL_DELIVERY_DISABLED = "1";
 process.env.EMAIL_VERIFICATION_TEST_CODE = "1234";
 delete process.env.DADATA_API_KEY;
 
+// C7: локально `.env` указывает на БОЕВОЙ S3 — без этой подмены integration-тесты
+// слали бы DeleteObject на прод-бакет (риск случайного удаления при совпадении
+// ключа). Форсим фейковый недостижимый endpoint (как в CI). Тестам реальный S3
+// не нужен: presigned-ссылки — локальная криптоподпись (сети нет), а удаление
+// объектов best-effort и глотает сетевые ошибки (см. files-cleanup.helpers).
+// Реальных upload/GetObject в integration-тестах нет.
+process.env.S3_ENDPOINT = "https://s3.example.test";
+process.env.S3_PUBLIC_BASE_URL = "https://s3.example.test";
+process.env.S3_REGION = "ru-1";
+process.env.S3_BUCKET = "ci-test";
+process.env.S3_ACCESS_KEY_ID = "ci-key";
+process.env.S3_SECRET_ACCESS_KEY = "ci-secret";
+process.env.S3_PRIVATE_BUCKET = "ci-test-private";
+
 // DATABASE_URL приходит из globalSetup (process.env уже изменён в parent-процессе vitest).
 if (!process.env.DATABASE_URL?.includes("_test")) {
   // Подстраховка: если тесты пытаются работать против dev-БД — лучше упасть с понятной ошибкой,
