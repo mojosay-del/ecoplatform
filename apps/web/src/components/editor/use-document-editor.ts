@@ -58,7 +58,10 @@ export function useDocumentEditor({
     onUpdate({ editor }) {
       const next = docToBlocks(editor.getJSON());
       lastEmittedRef.current = JSON.stringify(next);
-      onChangeRef.current(next);
+      // Tiptap диспатчит транзакции синхронно; обновление внешнего React-стейта
+      // прямо тут ловит React в середине рендера → warning «flushSync … lifecycle».
+      // Откладываем в микротаск (рекомендация Tiptap performance-гайда).
+      queueMicrotask(() => onChangeRef.current(next));
     },
   });
 
