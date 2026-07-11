@@ -4,6 +4,7 @@ import { hasStaleAuthFeaturesAfterSettingsLoad, shouldRefreshAuthAfterSettingCha
 describe("settings auth refresh", () => {
   it("refreshes the current user after changing feature-backed settings", () => {
     expect(shouldRefreshAuthAfterSettingChange("marketplace.enabled")).toBe(true);
+    expect(shouldRefreshAuthAfterSettingChange("tools.sales_prices_enabled")).toBe(true);
   });
 
   it("does not refresh the current user for unrelated settings", () => {
@@ -18,6 +19,11 @@ describe("settings auth refresh", () => {
     expect(
       hasStaleAuthFeaturesAfterSettingsLoad([{ key: "marketplace.enabled", value: false }], { marketplace: false }),
     ).toBe(false);
+    expect(
+      hasStaleAuthFeaturesAfterSettingsLoad([{ key: "tools.sales_prices_enabled", value: true }], {
+        salesPrices: false,
+      }),
+    ).toBe(true);
   });
 
   it("ignores non-feature settings and missing feature snapshots", () => {

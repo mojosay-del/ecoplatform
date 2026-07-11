@@ -68,6 +68,12 @@ export const platformSettingDefinitions = {
     schema: z.boolean(),
     default: false,
   },
+  "tools.sales_prices_enabled": {
+    label: "Продажные цены",
+    description: "Когда выключено — неготовый раздел «Продажные цены» скрыт из меню. Включайте по готовности.",
+    schema: z.boolean(),
+    default: false,
+  },
   "indices.stagnation_threshold_percent": {
     label: "Порог стагнации индексов (%)",
     description: "Если недельное изменение цены меньше этого порога по модулю — индекс показывает «стагнацию».",

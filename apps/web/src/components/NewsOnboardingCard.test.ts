@@ -25,7 +25,7 @@ function demoUser(demoEndsAt: string | null, status: "demo" | "active" = "demo")
       subscriptionEndsAt: null,
     },
     platformRoles: [],
-    features: { marketplace: false, analyticsMap: false, participantMap: false },
+    features: { marketplace: false, analyticsMap: false, participantMap: false, salesPrices: false },
     requiresReConsent: false,
     deletionRequestedAt: null,
     deletionScheduledFor: null,

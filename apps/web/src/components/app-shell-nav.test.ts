@@ -44,7 +44,7 @@ describe("AppShell future navigation teasers", () => {
         filterVisibleItems(section.items, {
           roles,
           companyType,
-          features: { marketplace, analyticsMap: false, participantMap: false },
+          features: { marketplace, analyticsMap: false, participantMap: false, salesPrices: false },
         }).map((item) => item.label),
       );
 
@@ -58,15 +58,22 @@ describe("AppShell future navigation teasers", () => {
     expect(labelsFor(null, ["content_manager"], true)).toContain("Торговая площадка");
   });
 
-  it("hides the analytics/participant maps while their features are disabled", () => {
-    const labelsFor = (features: { marketplace: boolean; analyticsMap: boolean; participantMap: boolean }) =>
+  it("hides future tools while their features are disabled", () => {
+    const labelsFor = (features: {
+      marketplace: boolean;
+      analyticsMap: boolean;
+      participantMap: boolean;
+      salesPrices: boolean;
+    }) =>
       appNavSections.flatMap((section) =>
         filterVisibleItems(section.items, { roles: [], companyType: "collector", features }).map((item) => item.label),
       );
 
-    const allOff = { marketplace: false, analyticsMap: false, participantMap: false };
+    const allOff = { marketplace: false, analyticsMap: false, participantMap: false, salesPrices: false };
+    expect(labelsFor(allOff)).not.toContain("Продажные цены");
     expect(labelsFor(allOff)).not.toContain("Карта аналитики");
     expect(labelsFor(allOff)).not.toContain("Карта участников");
+    expect(labelsFor({ ...allOff, salesPrices: true })).toContain("Продажные цены");
     expect(labelsFor({ ...allOff, analyticsMap: true })).toContain("Карта аналитики");
     expect(labelsFor({ ...allOff, participantMap: true })).toContain("Карта участников");
   });

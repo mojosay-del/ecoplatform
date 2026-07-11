@@ -15,7 +15,7 @@ import { queryKeys } from "../../lib/query";
 import { useCoverAssets, useFileAssetsByIds } from "../../lib/use-cover-assets";
 import { useInfiniteApiQuery } from "../../lib/use-infinite-api-query";
 import { AccessClosed, AuthRequired, ErrorState, getNewsFeedSnapshot } from "../shared";
-import { addNewsTagSelection, buildNewsUrl, normaliseNewsTagSelection } from "../news-tag-filters";
+import { buildNewsUrl, normaliseNewsTagSelection, toggleNewsTagSelection } from "../news-tag-filters";
 import { NEWS_PAGE_SIZE } from "./constants";
 import { NewsCard, NewsCardSkeleton } from "./NewsCard";
 import { NewsModal } from "./NewsModal";
@@ -99,8 +99,7 @@ export function NewsView() {
   }
 
   function selectTag(tag: string) {
-    const nextTags = addNewsTagSelection(selectedTags, tag);
-    if (nextTags.length === selectedTags.length) return;
+    const nextTags = toggleNewsTagSelection(selectedTags, tag);
     router.push(buildNewsUrl(currentSearch, nextTags), { scroll: true });
   }
 

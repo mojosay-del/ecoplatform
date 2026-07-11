@@ -380,17 +380,16 @@
 }
 
 .news-tile.is-extended {
-  border-color: rgb(var(--brand-rgb) / 0.5);
+  border-color: var(--premium-surface-line);
   background: var(--premium-surface-gradient);
   box-shadow: 0 24px 52px -28px rgb(var(--premium-surface-bg-rgb) / 0.9);
 }
 
 .news-tile.is-extended:not(.is-awaiting-cover):hover {
-  border-color: rgb(var(--brand-rgb) / 0.72);
+  border-color: var(--premium-surface-line);
   box-shadow: 0 26px 56px -28px rgb(var(--premium-surface-bg-rgb) / 0.95);
 }
 
-.news-tile.is-extended .news-tile-category,
 .news-article.is-extended .news-tile-category,
 .news-tier-badge {
   display: inline-flex;
@@ -569,9 +568,23 @@
 }
 
 .news-tile-tag {
+  gap: 5px;
   min-height: 28px;
   padding: 5px 9px;
   font-size: var(--text-xs);
+}
+
+.news-tile-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.news-tile-tag-remove {
+  flex: 0 0 auto;
+  color: var(--white);
 }
 
 /* Кликабельная плитка — это <a> без подчёркивания, чтобы сохранялись

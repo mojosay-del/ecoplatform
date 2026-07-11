@@ -503,6 +503,7 @@ export type AuthMeFeatures = {
   marketplace: boolean;
   analyticsMap: boolean;
   participantMap: boolean;
+  salesPrices: boolean;
 };
 
 export type AuthMeCompany = {

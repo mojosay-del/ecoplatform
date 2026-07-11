@@ -104,7 +104,13 @@ export const appNavSections: NavSection[] = [
         icon: "calculator",
         companyTypes: ["collector"],
       },
-      futureItem("sales-prices", "Продажные цены", "sales-prices", "Продажные цены — аналитика цен продаж."),
+      futureItem(
+        "sales-prices",
+        "Продажные цены",
+        "sales-prices",
+        "Продажные цены — аналитика цен продаж.",
+        "salesPrices",
+      ),
       futureItem(
         "analytics-map",
         "Карта аналитики",

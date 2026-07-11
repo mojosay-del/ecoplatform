@@ -40,4 +40,13 @@ describe("news tag filters", () => {
     );
     expect(buildNewsUrl("tag=рынок", [])).toBe("/news");
   });
+
+  it("removes one selected tag while preserving the remaining filters and unrelated URL params", () => {
+    const remainingTags = toggleNewsTagSelection(["рынок", "пластик"], "рынок");
+
+    expect(buildNewsUrl("tag=рынок&tag=пластик&source=card", remainingTags)).toBe(
+      "/news?source=card&tag=%D0%BF%D0%BB%D0%B0%D1%81%D1%82%D0%B8%D0%BA",
+    );
+    expect(buildNewsUrl("tag=рынок&source=card", toggleNewsTagSelection(["рынок"], "рынок"))).toBe("/news?source=card");
+  });
 });

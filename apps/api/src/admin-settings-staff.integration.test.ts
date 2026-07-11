@@ -131,6 +131,7 @@ describe("Platform settings", () => {
         "moderation.max_locks_per_moderator",
         "demo.duration_hours",
         "marketplace.enabled",
+        "tools.sales_prices_enabled",
         "indices.stagnation_threshold_percent",
       ]),
     );
@@ -140,6 +141,30 @@ describe("Platform settings", () => {
     const marketplace = res.body.find((item: { key: string }) => item.key === "marketplace.enabled");
     expect(marketplace.value).toBe(false);
     expect(marketplace.defaultValue).toBe(false);
+    const salesPrices = res.body.find((item: { key: string }) => item.key === "tools.sales_prices_enabled");
+    expect(salesPrices.value).toBe(false);
+    expect(salesPrices.defaultValue).toBe(false);
+  });
+
+  it("обновляет признак видимости продажных цен в профиле пользователя", async () => {
+    const adminToken = await loginAdmin();
+
+    const before = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+    expect(before.body.features.salesPrices).toBe(false);
+
+    const enabled = await ctx.http
+      .patch("/api/admin/settings/tools.sales_prices_enabled")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ value: true });
+    expect(enabled.status).toBe(200);
+
+    const after = await ctx.http.get("/api/auth/me").set("Authorization", `Bearer ${adminToken}`);
+    expect(after.body.features.salesPrices).toBe(true);
+
+    await ctx.http
+      .patch("/api/admin/settings/tools.sales_prices_enabled")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ value: false });
   });
 
   it("PATCH меняет значение настройки и пишет audit log", async () => {

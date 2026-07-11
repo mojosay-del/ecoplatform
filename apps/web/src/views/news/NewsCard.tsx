@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, X } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import type { NewsListItem } from "@ecoplatform/shared";
 import { AudioMessagePlayer } from "../../components/AudioMessagePlayer";
@@ -10,6 +10,7 @@ import { CoverImage } from "../../components/CoverImage";
 import "../../components/cover.css";
 import { NewsMetaItem, formatNewsDate } from "../shared";
 import { shouldRenderCoveredCardSkeleton } from "../shared/covered-card-readiness";
+import { newsCardLabels, newsCardTagState } from "./news-card-presentation";
 
 export function NewsCard({
   audioAsset,
@@ -35,6 +36,7 @@ export function NewsCard({
   const shouldReserveCover = Boolean(post.coverImageId);
   const hasAudio = Boolean(post.audioAttachment);
   const isExtended = post.accessTier === "extended";
+  const labels = newsCardLabels(post.accessTier);
   const publishedDate = post.firstPublishedAt ? new Date(post.firstPublishedAt) : null;
   const [settledCoverUrl, setSettledCoverUrl] = useState<string | null>(null);
   const showSkeleton = shouldRenderCoveredCardSkeleton({
@@ -77,7 +79,10 @@ export function NewsCard({
             </a>
           ) : null}
           <div className="news-tile-body">
-            <span className="news-tile-category">{isExtended ? "Расширенная" : "Новости"}</span>
+            <div className="news-tile-labels">
+              <span className="news-tile-category">{labels.category}</span>
+              {labels.tier ? <span className="news-tier-badge">{labels.tier}</span> : null}
+            </div>
             <a className="news-tile-title-link" href={href} onClick={openFromLink}>
               <h2 className="news-tile-title">{post.title}</h2>
             </a>
@@ -143,7 +148,7 @@ function NewsCardTags({
   return (
     <div className="news-tile-tags" aria-label="Теги новости">
       {tags.map(({ newsTag }) => {
-        const isActive = selectedTags.includes(newsTag.name);
+        const { isActive, showRemoveIcon } = newsCardTagState(selectedTags, newsTag.name);
         return (
           <button
             aria-pressed={isActive}
@@ -152,7 +157,10 @@ function NewsCardTags({
             onClick={() => onSelectTag(newsTag.name)}
             type="button"
           >
-            {newsTag.name}
+            <span>{newsTag.name}</span>
+            {showRemoveIcon ? (
+              <X aria-hidden="true" className="news-tile-tag-remove" size={13} strokeWidth={2.5} />
+            ) : null}
           </button>
         );
       })}
