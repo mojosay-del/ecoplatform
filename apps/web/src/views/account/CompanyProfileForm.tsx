@@ -223,7 +223,6 @@ export function CompanyProfileForm({
             </header>
             <form className="account-form account-password-modal-form" onSubmit={onSubmit}>
               {editingField === "corporatePhone" ? (
-                 
                 <label>
                   <span>{activeFieldConfig.inputLabel}</span>
                   <PhoneInput
