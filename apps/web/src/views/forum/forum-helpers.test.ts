@@ -6,6 +6,7 @@ import {
   forumStatusLabel,
   forumStatusVariant,
   initialsFromName,
+  visibleForumMarketplaceReputation,
 } from "./forum-helpers";
 
 describe("forum helpers", () => {
@@ -50,6 +51,28 @@ describe("forum helpers", () => {
     expect(forumProfileRoleLabel({ companyType: "collector", verified: false })).toBe("Заготовитель");
     expect(forumProfileRoleLabel({ companyType: null, verified: true })).toBe("Проверенный профиль");
     expect(forumProfileRoleLabel({ companyType: null, verified: false })).toBeNull();
+  });
+
+  it("hides marketplace rating and deals while the marketplace is disabled", () => {
+    expect(visibleForumMarketplaceReputation({ rating: 4.8, dealsCompleted: 12 }, false)).toEqual({
+      rating: null,
+      dealsCompleted: 0,
+    });
+    expect(visibleForumMarketplaceReputation({ rating: 4.8, dealsCompleted: 12 }, undefined)).toEqual({
+      rating: null,
+      dealsCompleted: 0,
+    });
+  });
+
+  it("keeps marketplace rating and deals while the marketplace is enabled", () => {
+    expect(visibleForumMarketplaceReputation({ rating: 4.8, dealsCompleted: 12 }, true)).toEqual({
+      rating: 4.8,
+      dealsCompleted: 12,
+    });
+    expect(visibleForumMarketplaceReputation({ rating: null, dealsCompleted: 0 }, true)).toEqual({
+      rating: null,
+      dealsCompleted: 0,
+    });
   });
 
   it("builds avatar initials from display name", () => {
