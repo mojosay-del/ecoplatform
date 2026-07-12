@@ -67,6 +67,40 @@ describe("AccountService contact change email fallback", () => {
   });
 });
 
+describe("AccountService onboarding tours", () => {
+  it("добавляет ключ тура к пройденным и возвращает свежего AuthMeUser", async () => {
+    const prisma = {
+      user: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ onboardingToursCompleted: ["platform"] }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+    };
+    const service = createService(prisma, {});
+
+    const result = await service.completeOnboardingTour("user-1", "indices");
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { onboardingToursCompleted: ["platform", "indices"] },
+    });
+    expect(result).toEqual({ id: "user-1", email: "new@test.local" });
+  });
+
+  it("идемпотентен: уже пройденный тур не пишет в БД повторно", async () => {
+    const prisma = {
+      user: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({ onboardingToursCompleted: ["platform"] }),
+        update: vi.fn(),
+      },
+    };
+    const service = createService(prisma, {});
+
+    await service.completeOnboardingTour("user-1", "platform");
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+});
+
 describe("AccountService two-sided email change (M-9)", () => {
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV };

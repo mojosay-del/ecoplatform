@@ -9,6 +9,7 @@ export * from "./forum";
 export * from "./geo";
 export * from "./knowledge-base-icons";
 export * from "./nomenclature-material";
+export * from "./onboarding";
 export * from "./price-index";
 export * from "./slug";
 export * from "./trip-calculator";

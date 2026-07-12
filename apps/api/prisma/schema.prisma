@@ -290,6 +290,9 @@ model User {
   // Разрешённые сотруднику (member) разделы платформы — ключи из MEMBER_SECTIONS
   // (app-shell-nav). У владельца (owner) не используется: доступ полный.
   allowedSections            String[]                        @default([])
+  // Пройденные онбординг-туры — ключи из ONBOARDING_TOUR_KEYS (@ecoplatform/shared).
+  // Первичная инструкция показывается один раз; любое её закрытие фиксируется здесь навсегда.
+  onboardingToursCompleted   String[]                        @default([])
   platformStaff              PlatformStaff?
   sessions                   Session[]
   newsLikes                  NewsLike[]

@@ -492,6 +492,9 @@ export type AuthMeUser = {
   // (null у владельца = полный доступ, фильтрация навигации по разделам не идёт).
   companyRole: CompanyRole;
   memberSections: string[] | null;
+  // Ключи пройденных онбординг-туров (ONBOARDING_TOUR_KEYS в onboarding.ts).
+  // Тип — string[], а не enum: убранный из кода ключ в БД не ломает контракт.
+  onboardingToursCompleted: string[];
   platformRoles: PlatformRole[];
   features: AuthMeFeatures;
   requiresReConsent: boolean;

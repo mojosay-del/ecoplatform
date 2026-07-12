@@ -6,6 +6,7 @@ import {
   accountContactChangeStartDtoSchema,
   accountContactChangeVerifyDtoSchema,
   accountProfileUpdateDtoSchema,
+  onboardingTourCompleteDtoSchema,
 } from "@ecoplatform/shared";
 import { CurrentUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
@@ -25,6 +26,14 @@ export class AccountController {
   async updateProfile(@CurrentUser() user: RequestUser, @Body() body: unknown) {
     const input = parseBody(accountProfileUpdateDtoSchema, body);
     return this.account.updateProfile(user.id, input);
+  }
+
+  // Отметить онбординг-тур пройденным: первичная инструкция показывается один
+  // раз, любое её закрытие фиксируется за пользователем навсегда. Идемпотентно.
+  @Post("onboarding/tours")
+  async completeOnboardingTour(@CurrentUser() user: RequestUser, @Body() body: unknown) {
+    const input = parseBody(onboardingTourCompleteDtoSchema, body);
+    return this.account.completeOnboardingTour(user.id, input.tour);
   }
 
   @Throttle(CONTACT_CHANGE_THROTTLE)

@@ -13,6 +13,7 @@ import type {
   LegalDocumentDetail,
   LegalDocumentSummary,
   LegalDocumentType,
+  OnboardingTourKey,
   PaginatedResponse,
   SelfSubscriptionDto,
   TripCalculatorSettings,
@@ -101,6 +102,10 @@ export const accountApi = {
   // fileId — id уже загруженного через api.files.upload публичного изображения.
   setAvatar: (fileId: string) => apiFetch<AuthMeUser>("/account/avatar", { method: "POST", body: { fileId } }),
   removeAvatar: () => apiFetch<AuthMeUser>("/account/avatar", { method: "DELETE" }),
+  // Отметить онбординг-тур пройденным (навсегда). Идемпотентно; возвращает
+  // свежего AuthMeUser — его нужно применить через auth.applyUser.
+  completeOnboardingTour: (tour: OnboardingTourKey) =>
+    apiFetch<AuthMeUser>("/account/onboarding/tours", { method: "POST", body: { tour } }),
 };
 
 export const tripCalculatorApi = {

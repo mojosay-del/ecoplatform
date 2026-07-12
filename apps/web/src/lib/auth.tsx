@@ -23,6 +23,9 @@ type AuthContextValue = {
   verifyRegistration: (input: RegistrationVerifyDto) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
+  // Применить AuthMeUser, уже полученный из ответа мутации (PATCH-профиль,
+  // отметка тура и т.п.), без лишнего GET /auth/me.
+  applyUser: (user: User) => void;
 };
 
 export type RegistrationStartResult = {
@@ -144,9 +147,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadMe, token]);
 
+  const applyUser = useCallback((nextUser: User) => {
+    setUser(nextUser);
+  }, []);
+
   const value = useMemo(
-    () => ({ token, user, ready, login, register, resendRegistrationCode, verifyRegistration, logout, refreshMe }),
-    [login, logout, ready, refreshMe, register, resendRegistrationCode, token, user, verifyRegistration],
+    () => ({
+      token,
+      user,
+      ready,
+      login,
+      register,
+      resendRegistrationCode,
+      verifyRegistration,
+      logout,
+      refreshMe,
+      applyUser,
+    }),
+    [applyUser, login, logout, ready, refreshMe, register, resendRegistrationCode, token, user, verifyRegistration],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

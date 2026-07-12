@@ -15,6 +15,7 @@ function demoUser(demoEndsAt: string): AuthMeUser {
     companyId: "company-1",
     companyRole: "owner",
     memberSections: null,
+    onboardingToursCompleted: [],
     company: {
       id: "company-1",
       organizationName: "Демо ООО",

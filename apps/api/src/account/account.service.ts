@@ -13,6 +13,7 @@ import type {
   AccountContactChangeVerifyDto,
   AccountProfileUpdateDto,
   AuthMeUser,
+  OnboardingTourKey,
 } from "@ecoplatform/shared";
 import { PlatformSettingsService } from "../admin/settings/platform-settings.service";
 import { getAuthMeUser } from "../auth/auth-profile.helpers";
@@ -70,6 +71,25 @@ export class AccountService {
       data,
     });
     await this.sessionCache.invalidateUser(userId);
+
+    return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
+  }
+
+  // Добавить ключ тура в набор пройденных. Идемпотентно: повторный вызов не
+  // создаёт дублей и не пишет в БД. Ключ провалидирован zod-enum в контроллере.
+  // Session-cache не трогаем: это не restrictive-поле, /auth/me читает свежее.
+  async completeOnboardingTour(userId: string, tour: OnboardingTourKey): Promise<AuthMeUser> {
+    const current = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { onboardingToursCompleted: true },
+    });
+
+    if (!current.onboardingToursCompleted.includes(tour)) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { onboardingToursCompleted: [...current.onboardingToursCompleted, tour] },
+      });
+    }
 
     return getAuthMeUser({ prisma: this.prisma, settings: this.settings }, userId);
   }

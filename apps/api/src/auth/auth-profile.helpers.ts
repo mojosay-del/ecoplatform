@@ -17,6 +17,7 @@ const authMeUserSelect = {
   companyId: true,
   companyRole: true,
   allowedSections: true,
+  onboardingToursCompleted: true,
   deletionRequestedAt: true,
   avatarFile: { select: { storageKey: true, accessLevel: true } },
   company: {
@@ -63,6 +64,7 @@ export async function getAuthMeUser(deps: AuthProfileDeps, userId: string): Prom
     // относится, иначе CMS-админ упирался бы в «Раздел недоступен».
     memberSections:
       user.companyRole === "member" && user.companyId && platformRoles.length === 0 ? user.allowedSections : null,
+    onboardingToursCompleted: user.onboardingToursCompleted,
     company: user.company
       ? {
           id: user.company.id,
