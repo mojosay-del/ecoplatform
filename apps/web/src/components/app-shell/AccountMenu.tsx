@@ -66,7 +66,7 @@ export function AccountMenu({
   }, [open]);
 
   return (
-    <div className="account-menu-root" ref={rootRef}>
+    <div className="account-menu-root" data-tour="shell-account" ref={rootRef}>
       <button
         className="icon-button"
         type="button"

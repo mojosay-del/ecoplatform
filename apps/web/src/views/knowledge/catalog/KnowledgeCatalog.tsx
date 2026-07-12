@@ -41,7 +41,7 @@ export function KnowledgeCatalog({ tree }: { tree: KnowledgeNode[] }) {
         ) : (
           <>
             <CatalogIndexRail categories={tree} codes={codes} />
-            <div className="knowledge-catalog-sections">
+            <div className="knowledge-catalog-sections" data-tour="kb-sections">
               {tree.map((category) => (
                 <CatalogSection category={category} codes={codes} covers={covers} key={category.id} />
               ))}

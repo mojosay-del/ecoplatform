@@ -23,7 +23,7 @@ export function CatalogIndexRail({ categories, codes }: { categories: KnowledgeN
   }
 
   return (
-    <nav aria-label="Разделы каталога" className="knowledge-index-rail">
+    <nav aria-label="Разделы каталога" className="knowledge-index-rail" data-tour="kb-rail">
       {categories.map((node) => (
         <button
           className={`knowledge-index-chip${node.slug === activeSlug ? " is-active" : ""}`}

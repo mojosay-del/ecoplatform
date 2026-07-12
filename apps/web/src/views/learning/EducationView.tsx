@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import type { LearningModuleListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
+import { TourHintButton } from "../../components/tour/TourHintButton";
 import "../../components/cover.css";
 import { api, preferredFileAssetImageUrl } from "../../lib/api";
 import { useCoverAssets } from "../../lib/use-cover-assets";
@@ -64,7 +65,10 @@ export function EducationView() {
       <section className="page">
         <header className="education-header">
           <p className="page-hero-eyebrow">Академия ЭкоПлатформы</p>
-          <h1 className="education-title">Обучение</h1>
+          <div className="tour-title-row">
+            <h1 className="education-title">Обучение</h1>
+            <TourHintButton tour="education" />
+          </div>
           <p className="education-subtitle">Практические материалы для закупки, склада и работы с качеством сырья.</p>
           <p className="education-header-metric">{lessonsLabel}</p>
         </header>
@@ -82,6 +86,7 @@ export function EducationView() {
             <motion.div
               animate="visible"
               className="education-grid"
+              data-tour={data.length > 0 ? "education-grid" : undefined}
               initial={reducedMotion ? false : "hidden"}
               variants={gridVariants}
             >

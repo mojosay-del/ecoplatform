@@ -11,6 +11,7 @@ import { Check, ChevronDown, X } from "lucide-react";
 import type { ForumPinnedNews, ForumQuestionListItem, ForumSummary, ForumTaxonomy } from "@ecoplatform/shared";
 import { AnimatedSearchPlaceholder } from "../../components/AnimatedSearchPlaceholder";
 import { AppShell } from "../../components/AppShell";
+import { TourHintButton } from "../../components/tour/TourHintButton";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { queryKeys } from "../../lib/query";
@@ -258,8 +259,11 @@ export function ForumListView() {
       <section className="page forum-page">
         <div className="forum-hero">
           <p className="page-hero-eyebrow">Отраслевая память</p>
-          <h1 className="forum-title">Найдите готовый ответ — или спросите тех, кто уже сталкивался</h1>
-          <form className="forum-search" onSubmit={handleSearch} role="search">
+          <div className="tour-title-row">
+            <h1 className="forum-title">Найдите готовый ответ — или спросите тех, кто уже сталкивался</h1>
+            <TourHintButton tour="forum" />
+          </div>
+          <form className="forum-search" data-tour="forum-search" onSubmit={handleSearch} role="search">
             <input
               type="search"
               value={queryDraft}
@@ -280,7 +284,7 @@ export function ForumListView() {
 
         <div className="forum-layout">
           <div className="forum-main">
-            <div className="forum-filters">
+            <div className="forum-filters" data-tour="forum-filters">
               <div className="forum-filters__row">
                 <div className="forum-field">
                   <label htmlFor="forum-mat">Вид сырья</label>
@@ -313,7 +317,7 @@ export function ForumListView() {
 
             <div className="forum-feed-head">
               <span className="forum-count">{countLabel}</span>
-              <div className="forum-seg" role="group" aria-label="Сортировка">
+              <div className="forum-seg" data-tour="forum-sort" role="group" aria-label="Сортировка">
                 {SORTS.map((option) => (
                   <button
                     key={option.value}

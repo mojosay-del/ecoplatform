@@ -124,7 +124,7 @@ export function AccountStatTiles({
   const isOwner = user?.companyRole === "owner";
 
   return (
-    <div className="account-stats">
+    <div className="account-stats" data-tour="account-tiles">
       <AccountStatTile
         iconClassName="account-stat-warn"
         iconName="subscription"

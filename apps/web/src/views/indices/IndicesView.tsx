@@ -7,6 +7,7 @@
 import { useMemo } from "react";
 import type { NomenclatureListItem, PaginatedResponse } from "@ecoplatform/shared";
 import { AppShell } from "../../components/AppShell";
+import { TourHintButton } from "../../components/tour/TourHintButton";
 import { api } from "../../lib/api";
 import { getIndexMarketPulse } from "../index-movement-summary";
 import { AccessClosed, AuthRequired, ErrorState, useApiQuery } from "../shared";
@@ -50,7 +51,10 @@ export function IndicesView() {
       <section className="page">
         <header className="indices-header">
           <p className="page-hero-eyebrow">Пульс рынка</p>
-          <h1 className="indices-title">Индексы цен на вторсырьё</h1>
+          <div className="tour-title-row">
+            <h1 className="indices-title">Индексы цен на вторсырьё</h1>
+            <TourHintButton tour="indices" />
+          </div>
           <p className="indices-subtitle">Актуальные ценовые индексы по основным видам сырья.</p>
           {lastUpdated ? (
             <span className="indices-updated-pill">
@@ -77,7 +81,7 @@ export function IndicesView() {
           <>
             <IndexMarketPulse items={data} />
             <IndexMovementSummaryTable items={data} />
-            <div className="indices-grid">
+            <div className="indices-grid" data-tour="indices-grid">
               {data.map((item) => (
                 <IndexCard key={item.id} item={item} />
               ))}

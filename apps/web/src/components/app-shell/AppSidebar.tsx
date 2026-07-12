@@ -31,6 +31,7 @@ export function AppSidebar({
   return (
     <aside
       className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}
+      data-tour="shell-sidebar"
       role="navigation"
       aria-label="Основная навигация"
     >
@@ -65,7 +66,13 @@ export function AppSidebar({
           // Группа внутри единственного navigation-лендмарка (<aside>), а не
           // отдельный безымянный <nav> — иначе скринридер слышит «navigation»
           // несколько раз подряд без различия. Имя группы — её видимый заголовок.
-          <div className="nav-section" key={section.title} role="group" aria-labelledby={titleId}>
+          <div
+            className="nav-section"
+            data-tour={section.tourAnchor}
+            key={section.title}
+            role="group"
+            aria-labelledby={titleId}
+          >
             <p className="nav-title" id={titleId}>
               {section.title}
             </p>

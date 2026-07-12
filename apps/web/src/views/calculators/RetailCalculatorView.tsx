@@ -3,6 +3,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { Clock, Coins, Plus, Route, TrendingDown, TrendingUp, Truck, Weight, X } from "lucide-react";
 import { AppShell } from "../../components/AppShell";
+import { TourHintButton } from "../../components/tour/TourHintButton";
 import { AccessClosed, AuthRequired } from "../shared";
 import { MATERIAL_LEGEND } from "../marketplace/materials";
 import { Field } from "./Field";
@@ -121,12 +122,15 @@ export function RetailCalculatorView() {
               <Truck size={20} />
             </span>
             <div>
-              <h1 className="tc-head-title">Ехать за заявкой?</h1>
+              <div className="tour-title-row">
+                <h1 className="tc-head-title">Ехать за заявкой?</h1>
+                <TourHintButton tour="calculator-retail" />
+              </div>
               <p className="tc-head-sub">Расчёт выгоды рейса за вторсырьём</p>
             </div>
           </header>
 
-          <div className="tc-vehicle-chips" role="list" aria-label="Пресеты машин">
+          <div className="tc-vehicle-chips" data-tour="tc-vehicles" role="list" aria-label="Пресеты машин">
             {settings.vehicles.map((vehicle) => (
               <span
                 key={vehicle.id}
@@ -155,7 +159,7 @@ export function RetailCalculatorView() {
 
           <div className="tc-main-grid">
             <div className="tc-primary-stack">
-              <div className={`tc-verdict${good ? " is-good" : " is-bad"}`}>
+              <div className={`tc-verdict${good ? " is-good" : " is-bad"}`} data-tour="tc-verdict">
                 <div className="tc-verdict-tag">
                   {good ? <TrendingUp size={16} aria-hidden /> : <TrendingDown size={16} aria-hidden />}
                   {good ? "Ехать выгодно" : "Ехать невыгодно"}
@@ -191,7 +195,7 @@ export function RetailCalculatorView() {
                 </div>
               ) : null}
 
-              <section className="tc-card">
+              <section className="tc-card" data-tour="tc-request">
                 <h2 className="tc-card-title">Заявка</h2>
                 <div className="tc-material-chips">
                   {MATERIAL_LEGEND.map((item) => (

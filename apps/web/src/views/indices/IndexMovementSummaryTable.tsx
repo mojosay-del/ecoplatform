@@ -36,7 +36,7 @@ export function IndexMovementSummaryTable({ items }: { items: NomenclatureListIt
   const periodLabel = INDEX_PERIOD_LABELS[period].toLowerCase();
 
   return (
-    <section className="index-movement-summary" aria-labelledby="index-movement-title">
+    <section className="index-movement-summary" data-tour="indices-summary" aria-labelledby="index-movement-title">
       <div className="index-movement-head">
         <div className="index-movement-title">
           <h2 id="index-movement-title">Движение индексов</h2>

@@ -6,6 +6,7 @@
 import { X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { AnimatedSearchPlaceholder } from "../../../components/AnimatedSearchPlaceholder";
+import { TourHintButton } from "../../../components/tour/TourHintButton";
 import { pluralizeRu } from "../../shared";
 import { KNOWLEDGE_SEARCH_EXAMPLES, type KnowledgeSearchController } from "../use-knowledge-search";
 
@@ -22,9 +23,12 @@ export function CatalogHero({ materialCount, search }: { materialCount: number; 
       transition={{ duration: 0.45, ease: EASE }}
     >
       <p className="knowledge-hero-eyebrow">Библиотека вторсырья</p>
-      <h1 className="knowledge-hero-title">База знаний по сырью</h1>
+      <div className="tour-title-row">
+        <h1 className="knowledge-hero-title">База знаний по сырью</h1>
+        <TourHintButton tour="knowledge-base" />
+      </div>
       <p className="knowledge-hero-subtitle">Номенклатуры, требования к качеству и практические признаки вторсырья</p>
-      <form className="knowledge-search" onSubmit={search.handleSearch} role="search">
+      <form className="knowledge-search" data-tour="kb-search" onSubmit={search.handleSearch} role="search">
         <input
           type="search"
           value={search.query}

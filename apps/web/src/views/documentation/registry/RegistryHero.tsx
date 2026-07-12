@@ -6,6 +6,7 @@
 import { X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { AnimatedSearchPlaceholder } from "../../../components/AnimatedSearchPlaceholder";
+import { TourHintButton } from "../../../components/tour/TourHintButton";
 import { pluralizeRu } from "../../shared";
 import { DOCUMENTATION_SEARCH_EXAMPLES, type DocumentationSearchController } from "../use-documentation-search";
 
@@ -28,11 +29,14 @@ export function RegistryHero({
       transition={{ duration: 0.45, ease: EASE }}
     >
       <p className="doc-hero-eyebrow">Реестр документов</p>
-      <h1 className="doc-hero-title">Документация</h1>
+      <div className="tour-title-row">
+        <h1 className="doc-hero-title">Документация</h1>
+        <TourHintButton tour="documentation" />
+      </div>
       <p className="doc-hero-subtitle">
         Шаблоны, регламенты и отраслевые справки для работы с вторсырьём — с версиями и датами вступления в силу
       </p>
-      <form className="doc-search" onSubmit={search.handleSearch} role="search">
+      <form className="doc-search" data-tour="doc-search" onSubmit={search.handleSearch} role="search">
         <input
           type="search"
           value={search.query}

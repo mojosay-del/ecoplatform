@@ -7,8 +7,6 @@ import { X } from "lucide-react";
 import type { NewsPostDetail } from "@ecoplatform/shared";
 import { AnimatedSearchPlaceholder } from "../../components/AnimatedSearchPlaceholder";
 import { AppShell } from "../../components/AppShell";
-import { NewsOnboardingCard } from "../../components/NewsOnboardingCard";
-import { NEWS_ONBOARDING_STORAGE_KEY, shouldShowNewsOnboarding } from "../../components/news-onboarding-state";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { queryKeys } from "../../lib/query";
@@ -24,8 +22,7 @@ const SEARCH_DEBOUNCE_MS = 2000;
 const NEWS_SEARCH_EXAMPLES = ["Заводы", "Логистика", "Законы", "Субсидии", "Цены", "Переработка"];
 
 export function NewsView() {
-  const { ready, token, user } = useAuth();
-  const [onboardingDismissed, setOnboardingDismissed] = useState<boolean | null>(null);
+  const { ready, token } = useAuth();
   const [newsSearchQuery, setNewsSearchQuery] = useState("");
   const [debouncedNewsSearchQuery, setDebouncedNewsSearchQuery] = useState("");
   const queryClient = useQueryClient();
@@ -67,18 +64,8 @@ export function NewsView() {
   );
   const audioAssets = useFileAssetsByIds(audioFileIds);
   const openedSlug = searchParams.get("post");
-  const showOnboarding =
-    user && onboardingDismissed === false ? shouldShowNewsOnboarding(user, onboardingDismissed) : false;
   const hasNewsSearchDraft = newsSearchQuery.length > 0;
   const isNewsSearching = activeNewsSearchQuery.length >= 2;
-
-  useEffect(() => {
-    try {
-      setOnboardingDismissed(localStorage.getItem(NEWS_ONBOARDING_STORAGE_KEY) === "1");
-    } catch {
-      setOnboardingDismissed(false);
-    }
-  }, []);
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedNewsSearchQuery(newsSearchQuery.trim()), SEARCH_DEBOUNCE_MS);
@@ -118,15 +105,6 @@ export function NewsView() {
       current.map((post) => (post.id === updatedPost.id ? { ...post, ...getNewsFeedSnapshot(updatedPost) } : post)),
     );
     queryClient.setQueryData(queryKeys.news.detail(updatedPost.slug), updatedPost);
-  }
-
-  function dismissOnboarding() {
-    setOnboardingDismissed(true);
-    try {
-      localStorage.setItem(NEWS_ONBOARDING_STORAGE_KEY, "1");
-    } catch {
-      // ignore (private mode)
-    }
   }
 
   if (state === "unauthenticated") {
@@ -170,7 +148,6 @@ export function NewsView() {
             ) : null}
           </form>
         </header>
-        {showOnboarding && user ? <NewsOnboardingCard user={user} onDismiss={dismissOnboarding} /> : null}
 
         {state === "loading" ? (
           <div className="news-masonry" aria-busy="true">

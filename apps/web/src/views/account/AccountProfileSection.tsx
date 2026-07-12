@@ -92,6 +92,7 @@ export function AccountProfileSection({
       <motion.div
         animate="visible"
         className="account-section-grid"
+        data-tour="account-cards"
         initial={reducedMotion ? false : "hidden"}
         variants={accountBlock(0.2)}
       >

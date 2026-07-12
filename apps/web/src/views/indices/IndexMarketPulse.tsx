@@ -20,7 +20,7 @@ export function IndexMarketPulse({ items }: { items: NomenclatureListItem[] }) {
   const total = pulse.risingCount + pulse.fallingCount + pulse.flatCount;
 
   return (
-    <section className="index-pulse" aria-label="Пульс рынка">
+    <section className="index-pulse" data-tour="indices-pulse" aria-label="Пульс рынка">
       <article className="index-pulse-card">
         <span className="index-pulse-label">Настроение рынка</span>
         <div className="index-pulse-sentiment index-num">

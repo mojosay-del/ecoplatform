@@ -24,7 +24,7 @@ export function NotificationBell() {
   const badgeLabel = count > 99 ? "99+" : String(count);
 
   return (
-    <div className="notification-bell-root">
+    <div className="notification-bell-root" data-tour="shell-notifications">
       <button
         type="button"
         className="icon-button notification-bell"

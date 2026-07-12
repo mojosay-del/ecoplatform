@@ -5,6 +5,7 @@ import { Check, Circle } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { BillingStatus } from "@ecoplatform/shared";
 import type { User } from "../../lib/auth";
+import { TourHintButton } from "../../components/tour/TourHintButton";
 import { COMPANY_TYPE_LABELS, PLATFORM_ROLE_LABELS } from "../../lib/display-labels";
 import { AccountAvatarEditor } from "./AccountAvatarEditor";
 import { accountItem, accountStagger } from "./account-motion";
@@ -48,9 +49,12 @@ export function AccountWelcomeHero({
         <motion.span className="account-welcome-hi" variants={accountItem}>
           {greeting},
         </motion.span>
-        <motion.h1 className="account-welcome-name" variants={accountItem}>
-          {fullName}
-        </motion.h1>
+        <div className="tour-title-row">
+          <motion.h1 className="account-welcome-name" variants={accountItem}>
+            {fullName}
+          </motion.h1>
+          <TourHintButton tour="account" />
+        </div>
         <motion.div className="account-welcome-tags" variants={accountItem}>
           {isPlatformStaff ? (
             user?.platformRoles?.map((role) => (
@@ -128,7 +132,7 @@ function ProfileCompletionRing({
   }, [checklistOpen]);
 
   return (
-    <div className="account-welcome-ring" ref={containerRef}>
+    <div className="account-welcome-ring" data-tour="account-ring" ref={containerRef}>
       <button
         aria-expanded={checklistOpen}
         aria-haspopup="dialog"

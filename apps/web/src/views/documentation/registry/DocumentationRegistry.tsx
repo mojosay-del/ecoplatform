@@ -113,7 +113,7 @@ export function DocumentationRegistry({ tree }: { tree: DocumentationNode[] }) {
             <EssentialsShelf items={pinned.data} onDownload={onDownload} />
             <FormatLegend active={format} formats={formats} onChange={setFormat} />
             <RegistryIndexRail codes={codes} sections={sections} />
-            <div className="doc-sections">
+            <div className="doc-sections" data-tour="doc-sections">
               {sections.map((section) => (
                 <RegistrySection
                   codes={codes}

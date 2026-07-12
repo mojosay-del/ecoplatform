@@ -42,6 +42,8 @@ export type NavItem = {
 export type NavSection = {
   title: string;
   items: NavItem[];
+  // Якорь онбординг-тура (data-tour на .nav-section в сайдбаре).
+  tourAnchor?: string;
 };
 
 export type BreadcrumbItem = {
@@ -82,6 +84,7 @@ export const appNavSections: NavSection[] = [
   },
   {
     title: "Базы знаний",
+    tourAnchor: "shell-nav-knowledge",
     items: [
       {
         key: "education",

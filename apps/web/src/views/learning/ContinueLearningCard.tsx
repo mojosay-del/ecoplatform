@@ -29,6 +29,7 @@ export function ContinueLearningCard({
       animate={{ opacity: 1, y: 0 }}
       aria-label="Продолжить обучение"
       className="education-resume"
+      data-tour="education-continue"
       initial={reducedMotion ? false : { opacity: 0, y: 14 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
     >

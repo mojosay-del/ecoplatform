@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Lock, Menu } from "lucide-react";
 import type { BillingStatus } from "@ecoplatform/shared";
 import { useAuth } from "../lib/auth";
@@ -30,6 +30,7 @@ import {
 } from "./app-shell-nav";
 import { DemoBanner } from "./DemoBanner";
 import { NotificationBell } from "./NotificationBell";
+import { TourProvider, type TourNavControls } from "./tour/TourProvider";
 import { UserSupportDrawer } from "./UserSupportDrawer";
 import { SupportTopbarIcon, type AnimatedNavIconHandle, useAnimatedNavIconPlayback } from "./app-shell/nav-icons";
 
@@ -166,6 +167,37 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
     });
   }
 
+  // Навигационные шаги онбординг-тура: на мобильном открываем drawer меню, на
+  // десктопе транзиентно разворачиваем свёрнутый сайдбар и возвращаем как было
+  // после тура. localStorage не трогаем — как marketplace-автосвёртка выше.
+  const tourPriorCollapsedRef = useRef(false);
+  const collapsedRef = useRef(collapsed);
+  useEffect(() => {
+    collapsedRef.current = collapsed;
+  }, [collapsed]);
+  const tourNavControls = useMemo<TourNavControls>(
+    () => ({
+      setNavSpotlight: (active) => {
+        if (window.matchMedia("(max-width: 880px)").matches) {
+          setMobileNavOpen(active);
+          return;
+        }
+        if (active && collapsedRef.current) {
+          tourPriorCollapsedRef.current = true;
+          setCollapsed(false);
+        }
+      },
+      endNavSpotlight: () => {
+        setMobileNavOpen(false);
+        if (tourPriorCollapsedRef.current) {
+          tourPriorCollapsedRef.current = false;
+          setCollapsed(true);
+        }
+      },
+    }),
+    [],
+  );
+
   if (!ready || !token) {
     return null;
   }
@@ -189,95 +221,100 @@ function AppShellContent({ children, chrome }: { children: ReactNode; chrome: Ap
   const memberSectionBlocked = isMemberSectionBlocked(appNavSections, pathname, user?.memberSections);
 
   return (
-    <div
-      className={`app-shell${showSidebar ? "" : " app-shell-no-sidebar"}${subscriptionGateRequired ? " is-subscription-gated" : ""}`}
-      data-collapsed={collapsed ? "true" : "false"}
-    >
-      {showSidebar ? (
-        <AppSidebar
-          activeAccountSection={activeAccountSection}
-          collapsed={collapsed}
-          mobileNavOpen={mobileNavOpen}
-          onCloseMobileNav={() => setMobileNavOpen(false)}
-          onToggleCollapsed={toggleCollapsed}
-          pathname={pathname}
-          visibleNav={visibleNav}
-        />
-      ) : null}
-      {showSidebar && mobileNavOpen ? (
-        <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
-      ) : null}
-      <main className="main" id="main-content" tabIndex={-1}>
-        <header className="topbar">
-          {showSidebar ? (
-            <button
-              className="icon-button mobile-menu-button"
-              type="button"
-              onClick={() => setMobileNavOpen(true)}
-              aria-label="Открыть меню"
-            >
-              <Menu size={20} />
-            </button>
-          ) : null}
-          {showSidebar && chrome.mobileTopbarAction ? (
-            <div className="topbar-mobile-action">{chrome.mobileTopbarAction}</div>
-          ) : null}
-          {!showSidebar ? (
-            <Link className="topbar-brand" href="/news" title="ЭкоПлатформа">
-              <Image alt="" height={30} src="/brand/logo.webp" width={30} priority />
-              <span>ЭкоПлатформа</span>
-            </Link>
-          ) : null}
-          {showBreadcrumbs ? <Breadcrumb nav={visibleNav} pathname={pathname} trail={chrome.breadcrumbTrail} /> : null}
-          <div className="topbar-spacer" />
-          {showDemoBanner ? <DemoBanner user={user} pathname={pathname} /> : null}
-          {showNotifications ? <NotificationBell /> : null}
-          {isAdminUser ? null : (
-            <button
-              className="icon-button"
-              type="button"
-              onClick={() => setSupportOpen(true)}
-              title="Поддержка"
-              aria-label="Открыть поддержку"
-              {...supportIconPlayback}
-            >
-              <SupportTopbarIcon ref={supportIconRef} size={27} />
-            </button>
-          )}
-          <AccountMenu
+    <TourProvider blocked={subscriptionGateRequired || memberSectionBlocked} navControls={tourNavControls}>
+      <div
+        className={`app-shell${showSidebar ? "" : " app-shell-no-sidebar"}${subscriptionGateRequired ? " is-subscription-gated" : ""}`}
+        data-collapsed={collapsed ? "true" : "false"}
+      >
+        {showSidebar ? (
+          <AppSidebar
             activeAccountSection={activeAccountSection}
-            activeAccountModal={activeAccountModal}
-            includeBusiness={!isAdminUser}
-            onLogout={logout}
+            collapsed={collapsed}
+            mobileNavOpen={mobileNavOpen}
+            onCloseMobileNav={() => setMobileNavOpen(false)}
+            onToggleCollapsed={toggleCollapsed}
             pathname={pathname}
-            searchKey={searchParams.toString()}
-            user={user}
+            visibleNav={visibleNav}
           />
-        </header>
-        <div className={`page-surface${isAdminArea ? " is-admin" : ""}`}>
-          {showAdminPanelBackLink ? (
-            <Link className="button ghost admin-panel-back-link" href="/admin">
-              ← Панель управления
-            </Link>
-          ) : null}
-          {memberSectionBlocked ? <MemberSectionDenied /> : children}
-        </div>
-      </main>
-      <AppShellFooter />
-      {/* Drawer поддержки рендерим один раз на уровне AppShell — компонент
+        ) : null}
+        {showSidebar && mobileNavOpen ? (
+          <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
+        ) : null}
+        <main className="main" id="main-content" tabIndex={-1}>
+          <header className="topbar">
+            {showSidebar ? (
+              <button
+                className="icon-button mobile-menu-button"
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="Открыть меню"
+              >
+                <Menu size={20} />
+              </button>
+            ) : null}
+            {showSidebar && chrome.mobileTopbarAction ? (
+              <div className="topbar-mobile-action">{chrome.mobileTopbarAction}</div>
+            ) : null}
+            {!showSidebar ? (
+              <Link className="topbar-brand" href="/news" title="ЭкоПлатформа">
+                <Image alt="" height={30} src="/brand/logo.webp" width={30} priority />
+                <span>ЭкоПлатформа</span>
+              </Link>
+            ) : null}
+            {showBreadcrumbs ? (
+              <Breadcrumb nav={visibleNav} pathname={pathname} trail={chrome.breadcrumbTrail} />
+            ) : null}
+            <div className="topbar-spacer" />
+            {showDemoBanner ? <DemoBanner user={user} pathname={pathname} /> : null}
+            {showNotifications ? <NotificationBell /> : null}
+            {isAdminUser ? null : (
+              <button
+                className="icon-button"
+                type="button"
+                data-tour="shell-support"
+                onClick={() => setSupportOpen(true)}
+                title="Поддержка"
+                aria-label="Открыть поддержку"
+                {...supportIconPlayback}
+              >
+                <SupportTopbarIcon ref={supportIconRef} size={27} />
+              </button>
+            )}
+            <AccountMenu
+              activeAccountSection={activeAccountSection}
+              activeAccountModal={activeAccountModal}
+              includeBusiness={!isAdminUser}
+              onLogout={logout}
+              pathname={pathname}
+              searchKey={searchParams.toString()}
+              user={user}
+            />
+          </header>
+          <div className={`page-surface${isAdminArea ? " is-admin" : ""}`}>
+            {showAdminPanelBackLink ? (
+              <Link className="button ghost admin-panel-back-link" href="/admin">
+                ← Панель управления
+              </Link>
+            ) : null}
+            {memberSectionBlocked ? <MemberSectionDenied /> : children}
+          </div>
+        </main>
+        <AppShellFooter />
+        {/* Drawer поддержки рендерим один раз на уровне AppShell — компонент
           сам проверяет проп `open` и ничего не рисует, пока он false. */}
-      {isAdminUser ? null : <UserSupportDrawer open={supportOpen} onClose={() => setSupportOpen(false)} />}
-      {subscriptionGateRequired ? (
-        <SubscriptionDialog
-          billing={subscriptionGateBilling}
-          billingState={subscriptionGateBillingState}
-          closeDisabled
-          onBillingUpdated={setSubscriptionGateBilling}
-          onClose={() => undefined}
-          onGateSatisfied={() => undefined}
-        />
-      ) : null}
-    </div>
+        {isAdminUser ? null : <UserSupportDrawer open={supportOpen} onClose={() => setSupportOpen(false)} />}
+        {subscriptionGateRequired ? (
+          <SubscriptionDialog
+            billing={subscriptionGateBilling}
+            billingState={subscriptionGateBillingState}
+            closeDisabled
+            onBillingUpdated={setSubscriptionGateBilling}
+            onClose={() => undefined}
+            onGateSatisfied={() => undefined}
+          />
+        ) : null}
+      </div>
+    </TourProvider>
   );
 }
 

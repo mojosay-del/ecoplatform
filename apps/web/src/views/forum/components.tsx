@@ -25,12 +25,14 @@ import type {
   PlatformRole,
 } from "@ecoplatform/shared";
 import { ArrowUpActionIcon } from "../../components/app-shell/nav-icons";
+import { useAuth } from "../../lib/auth";
 import {
   forumProfileRoleLabel,
   forumStatusLabel,
   forumStatusVariant,
   initialsFromName,
   relativeTime,
+  visibleForumMarketplaceReputation,
 } from "./forum-helpers";
 import { forumSearchSnippetSegments, forumSearchSnippetSourceLabel } from "./search-snippet";
 
@@ -69,7 +71,9 @@ export function Avatar({ author, className }: { author: ForumAuthorReputation; c
 
 // Репутация автора: имя + роль + «проверенный» + рейтинг + сделки + решено на форуме.
 export function Reputation({ author }: { author: ForumAuthorReputation }) {
+  const { user } = useAuth();
   const displayName = author.companyName ?? author.name;
+  const marketplaceReputation = visibleForumMarketplaceReputation(author, user?.features.marketplace);
   const profileRoleLabel = forumProfileRoleLabel({
     companyType: author.companyType,
     isPlatformStaff: author.isPlatformStaff,
@@ -88,8 +92,12 @@ export function Reputation({ author }: { author: ForumAuthorReputation }) {
           {profileRoleLabel}
         </span>
       ) : null}
-      {author.rating != null ? <span className="forum-rep">★ {author.rating.toFixed(1)}</span> : null}
-      {author.dealsCompleted > 0 ? <span className="forum-rep">{author.dealsCompleted} сделок</span> : null}
+      {marketplaceReputation.rating != null ? (
+        <span className="forum-rep">★ {marketplaceReputation.rating.toFixed(1)}</span>
+      ) : null}
+      {marketplaceReputation.dealsCompleted > 0 ? (
+        <span className="forum-rep">{marketplaceReputation.dealsCompleted} сделок</span>
+      ) : null}
       {author.forumSolved > 0 ? <span className="forum-rep">{author.forumSolved} решено</span> : null}
     </span>
   );
@@ -229,7 +237,7 @@ export function AsideProfile({
           <Award size={20} aria-hidden="true" />
           <span>Ответы, выбранные решением, повышают вашу репутацию на форуме</span>
         </p>
-        <Link href="/forum/ask" className="button forum-profile-cta">
+        <Link href="/forum/ask" className="button forum-profile-cta" data-tour="forum-ask">
           <Plus size={22} aria-hidden="true" /> Задать вопрос
         </Link>
       </div>

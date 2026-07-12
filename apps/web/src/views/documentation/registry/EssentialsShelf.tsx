@@ -18,7 +18,7 @@ export function EssentialsShelf({
   if (items.length === 0) return null;
 
   return (
-    <section className="doc-shelf" aria-label="Часто нужные">
+    <section className="doc-shelf" data-tour="doc-essentials" aria-label="Часто нужные">
       <header className="doc-shelf-head">
         <span aria-hidden="true" className="doc-shelf-icon">
           <Pin size={15} strokeWidth={2.2} />
